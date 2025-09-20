@@ -1,0 +1,263 @@
+import { v } from "convex/values";
+
+import { createSimpleLogger } from "../../libs/logging/simple";
+import { internal } from "../_generated/api";
+import type { Id } from "../_generated/dataModel";
+import { internalAction } from "../_generated/server";
+
+// Type definitions for sync results
+interface SyncResult {
+  success: boolean;
+  recordsProcessed: number;
+  platform: string;
+  duration?: number;
+  error?: string;
+  errors?: string[];
+  // Indicates whether any data changed during the sync
+  dataChanged?: boolean;
+}
+
+// Removed unused ScheduledSyncResult interface
+
+const _logger = createSimpleLogger("SyncHandlers");
+
+/**
+ * Handle initial 60-day sync for a platform
+ */
+export const handleInitialSync = internalAction({
+  args: {
+    organizationId: v.id("organizations"),
+    platform: v.union(v.literal("shopify"), v.literal("meta")),
+    accountId: v.optional(v.string()),
+    dateRange: v.optional(
+      v.object({
+        daysBack: v.number(),
+      }),
+    ),
+  },
+  returns: v.object({
+    success: v.boolean(),
+    recordsProcessed: v.number(),
+    platform: v.string(),
+    duration: v.optional(v.number()),
+    error: v.optional(v.string()),
+    errors: v.optional(v.array(v.string())),
+    // Some platform syncs include this flag
+    dataChanged: v.optional(v.boolean()),
+  }),
+  handler: async (ctx, args): Promise<SyncResult> => {
+    const startTime = Date.now();
+
+    console.log(
+      `[INITIAL_SYNC] Starting ${args.platform} sync for organization ${args.organizationId} - Fetching ${args.dateRange?.daysBack || 60} days of data`,
+    );
+
+    let sessionId: Id<"syncSessions"> | null = null;
+
+    try {
+      // Create sync session
+      sessionId = await ctx.runMutation(
+        internal.jobs.helpers.createSyncSession,
+        {
+          organizationId: args.organizationId,
+          platform: args.platform,
+          type: "initial",
+        },
+      );
+
+      // Execute platform-specific initial sync
+      let result: SyncResult;
+
+      switch (args.platform) {
+        case "shopify":
+          result = (await ctx.runAction(
+            internal.integrations.shopifySync.initial,
+            {
+              organizationId: args.organizationId,
+              dateRange: {
+                daysBack: args.dateRange?.daysBack || 60,
+              },
+            },
+          )) as any;
+          // Ensure platform field present
+          result = { ...result, platform: args.platform };
+          break;
+        case "meta":
+          result = (await ctx.runAction(
+            internal.integrations.metaSync.initial,
+            {
+              organizationId: args.organizationId,
+              accountId: args.accountId,
+              dateRange: {
+                daysBack: args.dateRange?.daysBack || 60,
+              },
+            },
+          )) as any;
+          result = { ...result, platform: args.platform };
+          break;
+
+        default:
+          throw new Error(`Unknown platform: ${args.platform}`);
+      }
+
+      // Update sync session with results
+      await ctx.runMutation(internal.jobs.helpers.updateSyncSession, {
+        sessionId: (sessionId ?? undefined) as Id<"syncSessions"> | undefined,
+        status: "completed",
+        recordsProcessed: result.recordsProcessed || 0,
+        completedAt: Date.now(),
+        duration: Date.now() - startTime,
+      });
+
+      // Analytics calculation should be triggered separately after sync completes
+      // This avoids circular dependencies between handlers
+
+      console.log(
+        `[INITIAL_SYNC] ✅ Completed ${args.platform} sync for organization ${args.organizationId} - Processed ${result.recordsProcessed || 0} records in ${Math.round((Date.now() - startTime) / 1000)}s`,
+      );
+
+      return result;
+    } catch (error) {
+      console.error(
+        `[INITIAL_SYNC] ❌ Failed ${args.platform} sync for organization ${args.organizationId} after ${Math.round((Date.now() - startTime) / 1000)}s`,
+        error,
+      );
+
+      // Update sync session with error
+      await ctx.runMutation(internal.jobs.helpers.updateSyncSession, {
+        sessionId: (sessionId ?? undefined) as Id<"syncSessions"> | undefined,
+        status: "failed",
+        error: error instanceof Error ? error.message : String(error),
+        completedAt: Date.now(),
+        duration: Date.now() - startTime,
+      });
+
+      throw error;
+    }
+  },
+});
+
+/**
+ * Handle scheduled incremental sync
+ */
+export const handleScheduledSync = internalAction({
+  args: {
+    organizationId: v.id("organizations"),
+    platforms: v.array(v.union(v.literal("shopify"), v.literal("meta"))),
+    syncType: v.union(v.literal("initial"), v.literal("incremental")),
+  },
+  returns: v.object({
+    success: v.boolean(),
+    results: v.any(),
+    // Include fields to satisfy broader consumers expecting SyncResult-like shapes
+    platform: v.optional(v.string()),
+    recordsProcessed: v.optional(v.number()),
+    error: v.optional(v.string()),
+  }),
+  handler: async (ctx, args): Promise<any> => {
+    console.log(
+      `[ScheduledSync] Starting for organization ${args.organizationId}`,
+    );
+
+    // Execute once for all platforms so orchestrator runs them together
+    // and triggers analytics only once if any data changed.
+    try {
+      const execResult = await ctx.runAction(
+        internal.engine.orchestrator.execute,
+        {
+          organizationId: args.organizationId,
+          platforms: args.platforms,
+          syncType: args.syncType,
+        },
+      );
+
+      return {
+        success: true,
+        results: execResult?.results ?? [],
+        platform: args.platforms[0] || "",
+        recordsProcessed: Array.isArray(execResult?.results)
+          ? execResult.results.reduce(
+              (sum: number, r: any) => sum + (r?.recordsProcessed || 0),
+              0,
+            )
+          : 0,
+      } as any;
+    } catch (error) {
+      console.error(`[ScheduledSync] Failed`, error);
+      return {
+        success: false,
+        results: [],
+        platform: args.platforms[0] || "",
+        recordsProcessed: 0,
+        error: error instanceof Error ? error.message : String(error),
+      } as any;
+    }
+  },
+});
+
+/**
+ * Handle immediate user-triggered sync
+ */
+export const handleImmediateSync = internalAction({
+  args: {
+    organizationId: v.id("organizations"),
+    platforms: v.array(v.union(v.literal("shopify"), v.literal("meta"))),
+    syncType: v.union(v.literal("initial"), v.literal("incremental")),
+    triggeredBy: v.string(),
+  },
+  returns: v.object({
+    success: v.boolean(),
+    recordsProcessed: v.number(),
+    platform: v.string(),
+    duration: v.optional(v.number()),
+    error: v.optional(v.string()),
+    errors: v.optional(v.array(v.string())),
+    dataChanged: v.optional(v.boolean()),
+  }),
+  handler: async (ctx, args): Promise<SyncResult> => {
+    console.log(`[ImmediateSync] User-triggered`, {
+      org: String(args.organizationId),
+      by: args.triggeredBy,
+    });
+
+    // Execute sync with high priority
+    const execResult: any = await ctx.runAction(
+      internal.engine.orchestrator.execute as any,
+      {
+        organizationId: args.organizationId,
+        platforms: args.platforms,
+        syncType: args.syncType,
+      },
+    );
+
+    // Analytics calculation should be triggered separately after sync completes
+    // This avoids circular dependencies between handlers
+
+    const success = Array.isArray(execResult?.results)
+      ? execResult.results.every((r: any) => r?.success)
+      : !!execResult?.success;
+    const recordsProcessed = Array.isArray(execResult?.results)
+      ? execResult.results.reduce(
+          (sum: number, r: any) => sum + (r?.recordsProcessed || 0),
+          0,
+        )
+      : 0;
+    const duration =
+      typeof execResult?.duration === "number"
+        ? execResult.duration
+        : undefined;
+    const error = success
+      ? undefined
+      : Array.isArray(execResult?.results)
+        ? execResult.results.find((r: any) => !r?.success)?.error
+        : execResult?.error;
+
+    return {
+      success,
+      recordsProcessed,
+      platform: args.platforms[0] || "",
+      duration,
+      error,
+    };
+  },
+});

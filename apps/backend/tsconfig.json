@@ -1,0 +1,16 @@
+{
+  "extends": "../../packages/typescript-config/base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "baseUrl": ".",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "verbatimModuleSyntax": true,
+    "paths": {
+      "@/*": ["./*"],
+      "@repo/convex/*": ["./convex/_generated/*"]
+    }
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["_generated", "node_modules"]
+}

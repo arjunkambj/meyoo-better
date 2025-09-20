@@ -1,0 +1,19 @@
+{
+  "extends": "@repo/typescript-config/base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "emitDeclarationOnly": false,
+    "baseUrl": ".",
+    "paths": {
+      "@repo/convex/*": [
+        "../../apps/backend/convex/_generated/*"
+      ]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules", "dist"]
+}

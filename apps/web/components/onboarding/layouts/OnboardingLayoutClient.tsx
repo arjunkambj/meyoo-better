@@ -1,0 +1,164 @@
+"use client";
+
+import { usePathname, useRouter } from "next/navigation";
+import type React from "react";
+import { memo, useEffect, useMemo } from "react";
+import { useQuery } from "convex/react";
+import { useSetAtom, useAtomValue } from "jotai";
+import { api } from "@/libs/convexApi";
+import {
+  getStepByRoute,
+  TOTAL_STEPS,
+  getNextStep,
+} from "@/constants/onboarding";
+import {
+  onboardingStateAtom,
+  setOnboardingDataAtom,
+  setOnboardingLoadingAtom,
+  navigateToStepAtom,
+  prefetchRouteAtom,
+} from "@/store/onboarding";
+import { navigationPendingAtom, setNavigationPendingAtom } from "@/store/onboarding";
+import { OnboardingSkeleton } from "./OnboardingSkeleton";
+import { Logo } from "@/components/shared/Logo";
+import MinimalProgressBar from "../MinimalProgressBar";
+
+// Hook for batched onboarding data with Jotai integration
+const useOnboardingData = () => {
+  const router = useRouter();
+  const user = useQuery(api.core.users.getCurrentUser);
+  const status = useQuery(api.core.onboarding.getOnboardingStatus);
+
+  const setOnboardingData = useSetAtom(setOnboardingDataAtom);
+  const setLoading = useSetAtom(setOnboardingLoadingAtom);
+  const prefetchRoute = useSetAtom(prefetchRouteAtom);
+
+  const isLoading = user === undefined || status === undefined;
+
+  // Update Jotai store when data changes
+  useEffect(() => {
+    if (!isLoading) {
+      setOnboardingData({
+        user: user || null,
+        status: status || null,
+        connections: status?.connections
+          ? [
+              { platform: "shopify", isActive: status.connections.shopify },
+              { platform: "meta", isActive: status.connections.meta },
+            ]
+          : null,
+      });
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+  }, [user, status, isLoading, setOnboardingData, setLoading]);
+
+  // Prefetch next route for instant navigation
+  useEffect(() => {
+    if (!isLoading && status?.currentStep) {
+      const nextStep = getNextStep(
+        status.currentStep,
+        typeof window !== "undefined" ? window.location.pathname : undefined
+      );
+      if (nextStep?.route) {
+        router.prefetch(nextStep.route);
+        prefetchRoute(nextStep.route);
+      }
+    }
+  }, [status?.currentStep, isLoading, router, prefetchRoute]);
+
+  return { isLoading };
+};
+
+interface OnboardingLayoutClientProps {
+  children: React.ReactNode;
+}
+
+export const OnboardingLayoutClient = memo(function OnboardingLayoutClient({
+  children,
+}: OnboardingLayoutClientProps) {
+  const pathname = usePathname();
+  const { isLoading } = useOnboardingData();
+
+  // Get state from Jotai atoms
+  const onboardingState = useAtomValue(onboardingStateAtom);
+  const navigateToStep = useSetAtom(navigateToStepAtom);
+  const navigationPending = useAtomValue(navigationPendingAtom);
+  const setNavigationPending = useSetAtom(setNavigationPendingAtom);
+
+  // Determine current step from route; fall back to stored state
+  const stepMeta = useMemo(() => getStepByRoute(pathname), [pathname]);
+  const currentStep = stepMeta?.id ?? onboardingState.currentStep;
+
+  // Update Jotai state when route changes
+  useEffect(() => {
+    if (currentStep !== onboardingState.currentStep) {
+      navigateToStep({ step: currentStep, route: pathname });
+    }
+    // Clear any pending overlay on route change
+    setNavigationPending(false);
+  }, [currentStep, pathname, onboardingState.currentStep, navigateToStep]);
+
+  // Safety: auto-clear pending overlay if it lingers without a route change
+  useEffect(() => {
+    if (!navigationPending) return;
+    const t = setTimeout(() => {
+      setNavigationPending(false);
+    }, 2000);
+    return () => clearTimeout(t);
+  }, [navigationPending, setNavigationPending]);
+
+  // Derived UI values
+  const isWide = useMemo(
+    () =>
+      pathname === "/onboarding/cost" ||
+      pathname === "/onboarding/billing" ||
+      pathname === "/onboarding/products",
+    [pathname]
+  );
+  const containerWidthClass = isWide ? "max-w-7xl" : "max-w-3xl";
+
+  // Show skeleton while loading
+  if (isLoading || onboardingState.isLoading) {
+    return <OnboardingSkeleton currentStep={currentStep} />;
+  }
+
+  return (
+    <div className="relative flex min-h-dvh w-full bg-background overflow-x-hidden">
+      <main className="flex flex-col flex-1 min-w-0 min-h-0">
+        {/* Minimal Header */}
+        <header className="sticky top-0 z-20 bg-background border-b border-divider">
+          {/* Progress Bar at top */}
+          <MinimalProgressBar 
+            currentStep={currentStep}
+            totalSteps={TOTAL_STEPS}
+          />
+          {/* Logo and step indicator */}
+          <div className="px-4 sm:px-6 py-3">
+            <div className="max-w-7xl mx-auto flex items-center justify-between">
+              <Logo size="sm" />
+              <span className="text-xs text-default-400">
+                Step {currentStep} of {TOTAL_STEPS}
+              </span>
+            </div>
+          </div>
+        </header>
+
+        {/* Content Area */}
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <div className={`min-h-[600px] px-4 sm:px-6 py-6 sm:py-8 md:py-10 ${navigationPending ? "pointer-events-none" : ""}`} aria-busy={navigationPending}>
+            <div className={`${containerWidthClass} mx-auto w-full`}>
+              {children}
+            </div>
+          </div>
+        </div>
+      </main>
+      {navigationPending && (
+        <div className="fixed inset-0 z-50 bg-transparent" aria-hidden="true" />
+      )}
+    </div>
+  );
+});
+
+OnboardingLayoutClient.displayName = "OnboardingLayoutClient";

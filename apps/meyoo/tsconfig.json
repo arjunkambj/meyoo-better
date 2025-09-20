@@ -1,0 +1,24 @@
+{
+  "extends": "@repo/typescript-config/nextjs.json",
+  "compilerOptions": {
+    "plugins": [
+      { "name": "next" }
+    ],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"],
+      "@repo/types/*": ["../../packages/types/*"],
+      "@repo/convex/*": ["../backend/convex/_generated/*"],
+      "convex": ["../../node_modules/convex"],
+      "convex/*": ["../../node_modules/convex/*"]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "next-env.d.ts",
+    "next.config.*",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": ["node_modules"]
+}

@@ -1,0 +1,61 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "ui": "tui",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "outputs": [".next/**", "!.next/cache/**"]
+    },
+    "lint": {
+      "dependsOn": ["^lint"]
+    },
+    "check-types": {
+      "dependsOn": ["^check-types"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "watch-types": {
+      "cache": false,
+      "persistent": true
+    }
+  },
+  "globalEnv": [
+    "NODE_ENV",
+    "NEXT_PUBLIC_APP_URL",
+    "NEXT_PUBLIC_CONVEX_URL",
+    "NEXT_PUBLIC_APP_INSTALL_URI",
+    "HOST",
+    "SHOPIFY_API_KEY",
+    "SHOPIFY_API_SECRET",
+    "SHOPIFY_SCOPES",
+    "SHOPIFY_DEV_ACCESS_TOKEN",
+    "SHOPIFY_APP_HANDLE",
+    "SHOPIFY_REDIRECT_URI",
+    "SHOPIFY_WEBHOOK_SECRET",
+    "PROVISION_HMAC_SECRET",
+    "GOOGLE_CLIENT_ID",
+    "CONVEX_DEPLOY_KEY",
+    "GOOGLE_CLIENT_SECRET",
+    "GOOGLE_ADS_CLIENT_ID",
+    "GOOGLE_ADS_CLIENT_SECRET",
+    "META_APP_ID",
+    "META_APP_SECRET",
+    "CONVEX_SITE_URL",
+    "AUTH_RESEND_KEY",
+    "RESEND_API_KEY",
+    "META_TICK_MINUTES",
+    "SHOPIFY_API_VERSION",
+    "META_API_VERSION",
+    "CONVEX_CLOUD_URL",
+    "META_BATCH_SIZE",
+    "LOG_META",
+    "SHOPIFY_WEBHOOK_DEBUG",
+    "LOG_WEBHOOKS",
+    "META_BASE_URL",
+    "META_DEBUG",
+    "GOOGLE_DEBUG"
+  ]
+}

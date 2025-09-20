@@ -1,0 +1,238 @@
+export const footerNavigation = {
+  main: [
+    {
+      name: "Home",
+      href: "/",
+      icon: "solar:home-2-linear",
+      activeIcon: "solar:home-2-bold",
+    },
+    {
+      name: "Careers",
+      href: "/careers",
+      icon: "solar:briefcase-linear",
+      activeIcon: "solar:briefcase-bold",
+    },
+    {
+      name: "About",
+      href: "/about",
+      icon: "solar:info-circle-linear",
+      activeIcon: "solar:info-circle-bold",
+    },
+    {
+      name: "Contact",
+      href: "/contact",
+      icon: "solar:chat-square-call-linear",
+      activeIcon: "solar:chat-square-call-bold",
+    },
+    {
+      name: "Blog",
+      href: "/blog",
+      icon: "solar:document-linear",
+      activeIcon: "solar:document-bold",
+    },
+  ],
+  legal: [
+    {
+      name: "Privacy Policy",
+      href: "/privacy/policy",
+      icon: "solar:shield-check-linear",
+      activeIcon: "solar:shield-check-bold",
+    },
+    {
+      name: "Terms of Service",
+      href: "/privacy/terms",
+      icon: "solar:document-text-linear",
+      activeIcon: "solar:document-text-bold",
+    },
+    {
+      name: "Cookie Policy",
+      href: "/cookies",
+      icon: "solar:cookie-linear",
+      activeIcon: "solar:cookie-bold",
+    },
+    {
+      name: "Data Protection",
+      href: "/data-protection",
+      icon: "solar:lock-password-linear",
+      activeIcon: "solar:lock-password-bold",
+    },
+    {
+      name: "Data Deletion",
+      href: "/privacy/data-deletion",
+      icon: "solar:trash-bin-minimalistic-linear",
+      activeIcon: "solar:trash-bin-minimalistic-bold",
+    },
+  ],
+  product: [
+    {
+      name: "Dashboard",
+      href: "/dashboard",
+      icon: "solar:widgets-linear",
+      activeIcon: "solar:widgets-bold",
+    },
+    {
+      name: "Analytics",
+      href: "#features",
+      icon: "solar:chart-2-linear",
+      activeIcon: "solar:chart-2-bold",
+    },
+    {
+      name: "Integrations",
+      href: "#integrations",
+      icon: "solar:widget-2-linear",
+      activeIcon: "solar:widget-2-bold",
+    },
+    {
+      name: "API Docs",
+      href: "/docs/api",
+      icon: "solar:code-square-linear",
+      activeIcon: "solar:code-square-bold",
+    },
+    {
+      name: "Pricing",
+      href: "#pricing",
+      icon: "solar:tag-price-linear",
+      activeIcon: "solar:tag-price-bold",
+    },
+    {
+      name: "Changelog",
+      href: "/changelog",
+      icon: "solar:plain-linear",
+      activeIcon: "solar:plain-bold",
+    },
+  ],
+  solutions: [
+    {
+      name: "D2C Brands",
+      href: "/solutions/d2c",
+      icon: "solar:shop-2-linear",
+      activeIcon: "solar:shop-2-bold",
+    },
+    {
+      name: "Agencies",
+      href: "/solutions/agencies",
+      icon: "solar:users-group-rounded-linear",
+      activeIcon: "solar:users-group-rounded-bold",
+    },
+    {
+      name: "Enterprise",
+      href: "/solutions/enterprise",
+      icon: "solar:buildings-2-linear",
+      activeIcon: "solar:buildings-2-bold",
+    },
+    {
+      name: "Shopify Plus",
+      href: "/solutions/shopify-plus",
+      icon: "logos:shopify",
+      activeIcon: "logos:shopify-icon",
+    },
+    {
+      name: "Multi-Store",
+      href: "/solutions/multi-store",
+      icon: "solar:shop-minimalistic-linear",
+      activeIcon: "solar:shop-minimalistic-bold",
+    },
+  ],
+  resources: [
+    {
+      name: "Help Center",
+      href: "/help",
+      icon: "solar:question-circle-linear",
+      activeIcon: "solar:question-circle-bold",
+    },
+    {
+      name: "Documentation",
+      href: "/docs",
+      icon: "solar:book-linear",
+      activeIcon: "solar:book-bold",
+    },
+    {
+      name: "Community",
+      href: "/community",
+      icon: "solar:users-group-two-rounded-linear",
+      activeIcon: "solar:users-group-two-rounded-bold",
+    },
+    {
+      name: "Webinars",
+      href: "/webinars",
+      icon: "solar:videocamera-recording-linear",
+      activeIcon: "solar:videocamera-recording-bold",
+    },
+    {
+      name: "Case Studies",
+      href: "/case-studies",
+      icon: "solar:document-linear",
+      activeIcon: "solar:document-bold",
+    },
+    {
+      name: "ROI Calculator",
+      href: "/roi-calculator",
+      icon: "solar:calculator-linear",
+      activeIcon: "solar:calculator-bold",
+    },
+  ],
+  company: [
+    {
+      name: "About Us",
+      href: "/about",
+      icon: "solar:info-circle-linear",
+      activeIcon: "solar:info-circle-bold",
+    },
+    {
+      name: "Careers",
+      href: "/careers",
+      icon: "solar:briefcase-linear",
+      activeIcon: "solar:briefcase-bold",
+    },
+    {
+      name: "Blog",
+      href: "/blog",
+      icon: "solar:document-linear",
+      activeIcon: "solar:document-bold",
+    },
+    {
+      name: "Press Kit",
+      href: "/press",
+      icon: "solar:bag-music-linear",
+      activeIcon: "solar:bag-music-bold",
+    },
+    {
+      name: "Contact",
+      href: "/contact",
+      icon: "solar:chat-round-line-linear",
+      activeIcon: "solar:chat-round-line-bold",
+    },
+    {
+      name: "Partners",
+      href: "/partners",
+      icon: "solar:hand-helping-linear",
+      activeIcon: "solar:hand-helping-bold",
+    },
+  ],
+  social: [
+    {
+      name: "Twitter",
+      href: "https://twitter.com/meyoo",
+      icon: "ri:twitter-x-line",
+      activeIcon: "ri:twitter-x-fill",
+    },
+    {
+      name: "LinkedIn",
+      href: "https://linkedin.com/company/meyoo",
+      icon: "mdi:linkedin",
+      activeIcon: "mdi:linkedin",
+    },
+    {
+      name: "Discord",
+      href: "https://discord.gg/meyoo",
+      icon: "ic:baseline-discord",
+      activeIcon: "ic:baseline-discord",
+    },
+    {
+      name: "YouTube",
+      href: "https://youtube.com/@meyoo",
+      icon: "mdi:youtube",
+      activeIcon: "mdi:youtube",
+    },
+  ],
+};

@@ -1,0 +1,30 @@
+{
+  "name": "@repo/backend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "convex dev",
+    "dev:server": "",
+    "check-types": "tsc --noEmit",
+    "check-types:watch": "tsc --noEmit -w",
+    "watch-types": "tsc --noEmit -w",
+    "lint": "eslint . --fix",
+    "codegen": "convex codegen",
+    "build": "echo nothing-to-build"
+  },
+  "dependencies": {
+    "@auth/core": "0.37.0",
+    "@convex-dev/action-retrier": "^0.2.1",
+    "@convex-dev/auth": "^0.0.88",
+    "@convex-dev/rate-limiter": "^0.2.12",
+    "@convex-dev/resend": "^0.1.10",
+    "@convex-dev/workpool": "^0.2.18",
+    "@oslojs/crypto": "^1.0.1",
+    "@react-email/render": "^1.2.1",
+    "@repo/types": "workspace:*",
+    "@repo/typescript-config": "workspace:*",
+    "convex": "^1.27.1",
+    "graphql-request": "^7.2.0",
+    "resend": "^6.0.3"
+  }
+}

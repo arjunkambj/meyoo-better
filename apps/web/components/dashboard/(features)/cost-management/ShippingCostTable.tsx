@@ -1,0 +1,266 @@
+"use client";
+
+import {
+  addToast,
+  Button,
+  Input,
+  Modal,
+  ModalBody,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+  Table,
+  TableBody,
+  TableCell,
+  TableColumn,
+  TableHeader,
+  TableRow,
+  useDisclosure,
+  Skeleton,
+} from "@heroui/react";
+import { Icon } from "@iconify/react";
+import { useState } from "react";
+// Delete flow removed; only edit/set single shipping cost
+import type { GenericId as Id } from "convex/values";
+import {
+  useCurrentUser,
+  useShippingCosts,
+  useCreateShippingCost as useUpsertShippingCost,
+} from "@/hooks";
+import { getCurrencySymbol } from "@/libs/utils/format";
+import { TableSkeleton } from "@/components/shared/skeletons";
+
+const columns = [
+  { name: "Name", uid: "name" },
+  { name: "Shipping Price", uid: "baseRate" },
+  { name: "Actions", uid: "actions" },
+];
+
+// Simplified: single flat shipping amount
+
+interface ShippingFormData {
+  _id?: Id<"costs">;
+  name?: string;
+  baseRate?: number;
+}
+
+interface ShippingCostItem {
+  _id: Id<"costs">;
+  name: string;
+  type: "shipping";
+  baseRate?: number;
+  value?: number;
+}
+
+export default function ShippingCostTable() {
+  
+  const [formData, setFormData] = useState<ShippingFormData>({});
+  const { isOpen, onOpen, onOpenChange } = useDisclosure();
+
+  const user = useCurrentUser();
+  const currency = user?.primaryCurrency || "USD";
+  const { shippingCosts: allShippingCosts, loading } = useShippingCosts();
+  const baseCosts = (allShippingCosts || []) as ShippingCostItem[];
+  const shippingCosts: ShippingCostItem[] = baseCosts.slice(0, 1);
+  const upsertShippingCost = useUpsertShippingCost();
+
+  const handleEdit = (item: ShippingCostItem) => {
+    setFormData(item);
+    onOpen();
+  };
+
+  const handleAdd = () => {
+    setFormData({
+      name: "",
+      baseRate: 0,
+    });
+    onOpen();
+  };
+
+  const handleSave = async () => {
+    try {
+      await upsertShippingCost({
+        name: formData.name || "Shipping",
+        value: formData.baseRate || 0,
+        calculation: "FIXED",
+        provider: formData.name || "Shipping",
+      });
+      addToast({
+        title: formData._id ? "Shipping cost updated" : "Shipping cost added",
+        color: "success",
+        timeout: 3000,
+      });
+      onOpenChange();
+    } catch (_error) {
+      addToast({
+        title: "Failed to save",
+        color: "danger",
+        timeout: 3000,
+      });
+    }
+  };
+
+  // Weight tiers and delete flow removed for simplified single-price shipping
+
+  const renderCell = (item: ShippingCostItem, columnKey: React.Key) => {
+    switch (columnKey) {
+      case "name":
+        return <span className="font-medium">{item.name}</span>;
+
+      case "baseRate":
+        return (
+          <span>
+            {typeof item.value === "number"
+              ? `${getCurrencySymbol(currency)}${(item.value || 0).toFixed(2)}`
+              : "-"}
+          </span>
+        );
+
+      case "actions":
+        return (
+          <div className="flex gap-2">
+            <Button
+              isIconOnly
+              size="sm"
+              variant="light"
+              onPress={() => handleEdit(item)}
+            >
+              <Icon icon="solar:pen-2-linear" width={16} />
+            </Button>
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <h2 className="text-xl font-semibold">Shipping Costs</h2>
+          {shippingCosts.length === 0 ? (
+            <Button
+              color="primary"
+              startContent={<Icon icon="solar:add-square-bold" width={16} />}
+              isDisabled={loading}
+              onPress={handleAdd}
+            >
+              Set Shipping Cost
+            </Button>
+          ) : null}
+        </div>
+
+        {loading ? <Skeleton className="h-10 w-64 rounded-lg" /> : null}
+      </div>
+
+      <div>
+        {loading ? (
+          <TableSkeleton
+            rows={3}
+            columns={3}
+            showHeader={false}
+            showPagination={false}
+            className="border border-divider"
+          />
+        ) : (
+          <Table
+            removeWrapper
+            aria-label="Shipping costs table"
+            className="rounded-xl border border-divider overflow-hidden"
+            classNames={{
+              th: "bg-default-100 text-default-600 font-medium",
+            }}
+            shadow="none"
+          >
+            <TableHeader columns={columns}>
+              {(column) => (
+                <TableColumn key={column.uid}>{column.name}</TableColumn>
+              )}
+            </TableHeader>
+            <TableBody
+              emptyContent={
+                <div className="text-center py-10">
+                  <Icon
+                    className="mx-auto text-default-300 mb-4"
+                    icon="solar:delivery-bold-duotone"
+                    width={48}
+                  />
+                  <p className="text-default-500 mb-2">No shipping costs added yet</p>
+                  <p className="text-small text-default-400">
+                    Add shipping costs to track delivery expenses
+                  </p>
+                </div>
+              }
+              items={shippingCosts || []}
+            >
+              {(item: ShippingCostItem) => (
+                <TableRow key={item._id} className="odd:bg-default-50/40">
+                  {(columnKey) => (
+                    <TableCell>{renderCell(item, columnKey)}</TableCell>
+                  )}
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        )}
+      </div>
+
+      <Modal isOpen={isOpen} size="2xl" onOpenChange={onOpenChange}>
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader>
+                {formData._id ? "Edit Shipping Cost" : "Set Shipping Cost"}
+              </ModalHeader>
+              <ModalBody className="bg-default-50 gap-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <Input
+                    isRequired
+                    label="Name"
+                    labelPlacement="outside"
+                    size="sm"
+                    value={formData.name || ""}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, name: value })
+                    }
+                  />
+                  <Input
+                    isRequired
+                    label="Shipping Price"
+                    labelPlacement="outside"
+                    size="sm"
+                    startContent={getCurrencySymbol(currency)}
+                    type="number"
+                    value={formData.baseRate?.toString() || ""}
+                    onValueChange={(value) =>
+                      setFormData({
+                        ...formData,
+                        baseRate: parseFloat(value) || 0,
+                      })
+                    }
+                  />
+                </div>
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="flat" onPress={onClose}>
+                  Cancel
+                </Button>
+                <Button
+                  color="primary"
+                  isDisabled={!formData.name}
+                  onPress={handleSave}
+                >
+                  {formData._id ? "Update" : "Add"}
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+
+      
+    </div>
+  );
+}

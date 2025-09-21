@@ -127,7 +127,7 @@ const KPI = React.memo(function KPI({
   const cardContent = (
     <Card
       className={cn(
-        "bg-content2/60 dark:bg-content1 rounded-2xl border border-default-100  w-full overflow-hidden",
+        "bg-content2/90 dark:bg-content1 rounded-2xl border border-default-100  w-full overflow-hidden",
         paddingClass,
         sizeClasses[size],
         className
@@ -136,7 +136,7 @@ const KPI = React.memo(function KPI({
       <div className="flex flex-col h-full  min-w-0 justify-between">
         {/* Header with title and icon */}
         <div className="flex items-start justify-between mb-2.5 gap-2">
-          <span className="text-sm text-default-900 font-normal truncate flex-1">
+          <span className="text-sm font-medium text-default-800 font-medium truncate flex-1">
             {title}
           </span>
           {icon && <Icon className={iconColor} icon={icon} width={20} />}
@@ -146,7 +146,7 @@ const KPI = React.memo(function KPI({
         <div className="flex-1 min-w-0">
           <div
             className={cn(
-              "font-bold tracking-tight tabular-nums text-foreground truncate",
+              "font-bold tracking-tight tabular-nums text-default-800 truncate",
               valueSizeClasses[size]
             )}
           >
@@ -164,7 +164,7 @@ const KPI = React.memo(function KPI({
         {/* Change indicator at bottom */}
         {changeData && (
           <div className="flex items-center justify-between mt-1">
-            <div className="text-xs text-default-600">vs last period</div>
+            <div className="text-xs text-default-500">vs last period</div>
             <div
               className={cn(
                 "flex items-center gap-0.5 text-xs font-medium",

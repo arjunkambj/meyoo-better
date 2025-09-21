@@ -130,7 +130,7 @@ export function AdSpendSummaryWidget({
   if (loading) {
     return (
       <Card
-        className="p-6 bg-content2 dark:bg-content1 rounded-2xl border border-default-200/50"
+        className="p-6 bg-content2/90 dark:bg-content1 rounded-2xl border border-default-200/50"
         shadow="none"
       >
         <div className="animate-pulse">
@@ -147,11 +147,11 @@ export function AdSpendSummaryWidget({
 
   return (
     <Card
-      className="p-5 bg-content2 dark:bg-content1 rounded-2xl border border-default-200/50 h-full"
+      className="p-5 bg-content2/90 dark:bg-content1 rounded-2xl border border-default-200/50 h-full"
       shadow="none"
     >
-      <div className="mb-3 pb-3 border-b border-divider">
-        <h3 className="text-sm font-medium text-default-900">
+      <div className="mb-2.5 pb-2.5 border-b border-divider">
+        <h3 className="text-lg font-medium text-default-900">
           Ad Spend Summary
         </h3>
       </div>

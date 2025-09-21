@@ -61,7 +61,7 @@ const heroConfig = heroui({
           800: "#0b5f30",
           900: "#073c1e",
           foreground: "#ffffff",
-          DEFAULT: "#40d27f",
+          DEFAULT: "#17c964",
         },
         warning: {
           50: "#fef4e4",

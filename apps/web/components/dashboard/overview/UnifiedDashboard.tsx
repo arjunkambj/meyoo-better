@@ -14,8 +14,8 @@ import { analyticsDateRangeAtom } from "@/store/atoms";
 
 import { CustomizationModalUnified } from "./CustomizationModalUnified";
 import { DashboardHeader } from "./components/DashboardHeader";
-import { Zone1KPIGrid } from "./components/Zone1KPIGrid";
-import { Zone2WidgetArea } from "./components/Zone2WidgetArea";
+import { MetricsContainer } from "./components/MetricsContainer";
+import { WidgetsContainer } from "./components/WidgetsContainer";
 
 export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
   const [isCustomizing, setIsCustomizing] = useState(false);
@@ -32,14 +32,12 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
   const { config, saveConfig, isLoading: configLoading } = useDashboard();
 
   // Get analytics data
-  const {
-    metrics: overviewMetrics,
-    isLoading: metricsLoading,
-  } = useOverviewAnalytics(
-    dateRange
-      ? { startDate: dateRange.start, endDate: dateRange.end }
-      : undefined,
-  );
+  const { metrics: overviewMetrics, isLoading: metricsLoading } =
+    useOverviewAnalytics(
+      dateRange
+        ? { startDate: dateRange.start, endDate: dateRange.end }
+        : undefined
+    );
 
   // Get platform-specific metrics
   const platformMetrics = usePlatformMetrics(dateRange);
@@ -157,20 +155,20 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
   }, [overviewMetrics, platformMetrics]);
 
   const handleCustomizationApply = useCallback(
-    async (zone1Items: string[], zone2Items: string[]) => {
+    async (kpiItems: string[], widgetItems: string[]) => {
       await saveConfig({
-        zone1: zone1Items,
-        zone2: zone2Items,
+        kpis: kpiItems,
+        widgets: widgetItems,
       });
       setIsCustomizing(false);
     },
-    [saveConfig],
+    [saveConfig]
   );
 
   const isLoading = configLoading || metricsLoading;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
       <Spacer y={0.5} />
       <DashboardHeader onCustomize={() => setIsCustomizing(true)} />
@@ -180,32 +178,32 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
       {/* Plan Usage Alert */}
       <PlanUsageAlert variant="compact" />
 
-      {/* Zone 1: KPI Cards */}
+      {/* KPI Metrics */}
       <div className="mb-8">
-        <Zone1KPIGrid
+        <MetricsContainer
           isLoading={isLoading}
+          metrics={config.kpis}
           metricsData={allMetricsData}
           overviewMetrics={overviewMetrics}
           primaryCurrency={primaryCurrency}
-          zone1Items={config?.zone1 || []}
         />
       </div>
 
-      {/* Zone 2: Widgets */}
-      <Zone2WidgetArea
+      {/* Widgets */}
+      <WidgetsContainer
         isLoading={isLoading}
+        widgets={config.widgets}
         metricsData={allMetricsData}
         overviewMetrics={overviewMetrics}
         primaryCurrency={primaryCurrency}
         showCostSetupWarning={showCostSetupWarning}
-        zone2Items={config?.zone2 || []}
       />
 
       {/* Customization Modal */}
       <CustomizationModalUnified
         isOpen={isCustomizing}
-        zone1Items={config?.zone1 || []}
-        zone2Items={config?.zone2 || []}
+        kpiItems={config.kpis}
+        widgetItems={config.widgets}
         onApply={handleCustomizationApply}
         onClose={() => setIsCustomizing(false)}
       />

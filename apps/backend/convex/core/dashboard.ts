@@ -18,8 +18,8 @@ export const getDashboardLayout = query({
   returns: v.union(
     v.null(),
     v.object({
-      zone1: v.array(v.string()), // KPI metric IDs
-      zone2: v.array(v.string()), // Widget IDs
+      kpis: v.array(v.string()), // KPI metric IDs
+      widgets: v.array(v.string()), // Widget IDs
     }),
   ),
   handler: async (ctx) => {
@@ -37,6 +37,14 @@ export const getDashboardLayout = query({
       .first();
 
     if (userDashboard?.config) {
+      // Handle legacy format
+      const config = userDashboard.config as any;
+      if (config.zone1 && config.zone2) {
+        return {
+          kpis: config.zone1,
+          widgets: config.zone2,
+        };
+      }
       return userDashboard.config;
     }
 
@@ -52,30 +60,34 @@ export const getDashboardLayout = query({
       .first();
 
     if (orgDashboard?.config) {
+      // Handle legacy format
+      const config = orgDashboard.config as any;
+      if (config.zone1 && config.zone2) {
+        return {
+          kpis: config.zone1,
+          widgets: config.zone2,
+        };
+      }
       return orgDashboard.config;
     }
 
     // Return default configuration if no saved layout exists
-    // Aligns with web default (exclude Cost Breakdown by default)
     return {
-      zone1: [
-        // Top KPIs (10 pinned metrics) — ordered for new users
-        // 1) Revenue, 2) Total Ad Spend, 3) COGS, 4) Orders,
-        // 5) Net Profit, 6) Taxes Collected, 7) Profit Margin,
-        // 8) ROAS, 9) Repeat Rate, 10) AOV
-        "revenue",
-        "totalAdSpend",
-        "cogs",
-        "orders",
+      kpis: [
+        // Default KPIs - ordered for new users
         "netProfit",
-        "taxesCollected",
+        "revenue",
         "netProfitMargin",
-        "blendedRoas",
-        "repeatCustomerRate",
+        "orders",
         "avgOrderValue",
+        "blendedRoas", // MER
+        "totalAdSpend",
+        "shopifyConversionRate",
+        "repeatCustomerRate",
+        "moMRevenueGrowth",
       ],
-      zone2: [
-        // Essential widgets for new users (exclude Cost Breakdown by default)
+      widgets: [
+        // Essential widgets for new users
         "adSpendSummary",
         "customerSummary",
         "orderSummary",
@@ -87,12 +99,12 @@ export const getDashboardLayout = query({
 // ============ MUTATIONS ============
 
 /**
- * Update dashboard layout configuration (Zone 1 & Zone 2)
+ * Update dashboard layout configuration
  */
 export const updateDashboardLayout = mutation({
   args: {
-    zone1: v.array(v.string()), // KPI metric IDs
-    zone2: v.array(v.string()), // Widget IDs
+    kpis: v.array(v.string()), // KPI metric IDs
+    widgets: v.array(v.string()), // Widget IDs
   },
   returns: v.object({ success: v.boolean() }),
   handler: async (ctx, args) => {
@@ -111,8 +123,8 @@ export const updateDashboardLayout = mutation({
       // Update existing user-specific dashboard
       await ctx.db.patch(userDashboard._id, {
         config: {
-          zone1: args.zone1,
-          zone2: args.zone2,
+          kpis: args.kpis,
+          widgets: args.widgets,
         },
         updatedAt: Date.now(),
       });
@@ -130,8 +142,8 @@ export const updateDashboardLayout = mutation({
         createdBy: userId,
         updatedAt: Date.now(),
         config: {
-          zone1: args.zone1,
-          zone2: args.zone2,
+          kpis: args.kpis,
+          widgets: args.widgets,
         },
       });
     }

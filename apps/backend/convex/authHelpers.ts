@@ -258,20 +258,19 @@ export async function createNewUserData(
     createdBy: userId,
     updatedAt: now,
     config: {
-      zone1: [
-        "revenue",
+      kpis: [
         "netProfit",
+        "revenue",
         "netProfitMargin",
         "orders",
         "avgOrderValue",
         "blendedRoas",
-        "totalCustomers",
-        "newCustomers",
-        "repeatCustomerRate",
         "totalAdSpend",
+        "shopifyConversionRate",
+        "repeatCustomerRate",
+        "moMRevenueGrowth",
       ],
-      zone2: [
-        "costBreakdown",
+      widgets: [
         "adSpendSummary",
         "customerSummary",
         "orderSummary",

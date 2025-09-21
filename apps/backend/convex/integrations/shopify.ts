@@ -4509,24 +4509,21 @@ export const handleAppUninstalled = internalMutation({
               createdBy: owner._id,
               updatedAt: Date.now(),
               config: {
-                zone1: [
-                  // Top KPIs (10 pinned metrics) — ordered for new users
-                  // 1) Revenue, 2) Total Ad Spend, 3) COGS, 4) Orders,
-                  // 5) Net Profit, 6) Taxes Collected, 7) Profit Margin,
-                  // 8) ROAS, 9) Repeat Rate, 10) AOV
-                  "revenue",
-                  "totalAdSpend",
-                  "cogs",
-                  "orders",
+                kpis: [
+                  // Default KPIs - ordered for new users
                   "netProfit",
-                  "taxesCollected",
+                  "revenue",
                   "netProfitMargin",
-                  "blendedRoas",
-                  "repeatCustomerRate",
+                  "orders",
                   "avgOrderValue",
+                  "blendedRoas", // MER
+                  "totalAdSpend",
+                  "shopifyConversionRate",
+                  "repeatCustomerRate",
+                  "moMRevenueGrowth",
                 ],
-                zone2: [
-                  // Essential widgets for new users (exclude Cost Breakdown by default)
+                widgets: [
+                  // Essential widgets for new users
                   "adSpendSummary",
                   "customerSummary",
                   "orderSummary",

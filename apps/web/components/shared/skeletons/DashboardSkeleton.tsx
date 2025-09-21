@@ -5,12 +5,12 @@ import { Card, Skeleton } from "@heroui/react";
 export function PinnedMetricsGridSkeleton() {
   return (
     <div className="space-y-4">
-      {/* First Row - Normal KPI cards */}
-      <div className="grid grid-cols-5 gap-4">
-        {Array.from({ length: 5 }).map((_, i) => (
+      {/* Simplified responsive grid matching MetricsContainer */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+        {Array.from({ length: 10 }).map((_, i) => (
           <Card
             // biome-ignore lint/suspicious/noArrayIndexKey: Skeleton components use index-based keys as they don't represent real data
-            key={`row1-${i}`}
+            key={`kpi-${i}`}
             className="p-4 bg-content1 rounded-2xl border border-divider h-[120px]"
           >
             <div className="flex flex-col h-full justify-between">
@@ -26,28 +26,6 @@ export function PinnedMetricsGridSkeleton() {
             </div>
           </Card>
         ))}
-      </div>
-
-      {/* Second Row - Shared border container */}
-      <div className="border border-divider rounded-2xl bg-content1">
-        <div className="flex items-stretch">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div
-              // biome-ignore lint/suspicious/noArrayIndexKey: Skeleton components use index-based keys as they don't represent real data
-              key={`row2-${i}`}
-              className={`flex-1 flex flex-col justify-center h-[120px] py-3 px-4 ${
-                i < 4 ? "border-r border-divider/50" : ""
-              }`}
-            >
-              <Skeleton className="h-3.5 w-20 rounded-md mb-1.5" />
-              <Skeleton className="h-7 w-24 rounded-md mb-2" />
-              <div className="flex items-center justify-between">
-                <Skeleton className="h-3 w-16 rounded-md" />
-                <Skeleton className="h-3 w-10 rounded-md" />
-              </div>
-            </div>
-          ))}
-        </div>
       </div>
     </div>
   );
@@ -174,12 +152,12 @@ export function DashboardLoadingSkeleton() {
         <Skeleton className="h-4 w-48 rounded-md" />
       </div>
 
-      {/* Zone 1: Pinned Metrics Grid */}
+      {/* KPI Metrics Grid */}
       <div className="mb-8">
         <PinnedMetricsGridSkeleton />
       </div>
 
-      {/* Zone 2: Widgets */}
+      {/* Widgets */}
       <div className="space-y-4">
         <Skeleton className="h-6 w-40 rounded-md" />
 

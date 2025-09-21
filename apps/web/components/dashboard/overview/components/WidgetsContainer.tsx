@@ -1,14 +1,13 @@
 "use client";
 
 import { WidgetSkeleton } from "@/components/shared/skeletons";
+import { WidgetRenderer } from "./WidgetRenderer";
 
 type OverviewMetricView = { value: number; change?: number };
 type OverviewMetricsView = Record<string, OverviewMetricView>;
 
-import { WidgetRenderer } from "./WidgetRenderer";
-
-interface Zone2WidgetAreaProps {
-  zone2Items: string[];
+interface WidgetsContainerProps {
+  widgets: string[];
   metricsData: Record<string, number>;
   overviewMetrics: OverviewMetricsView | null;
   primaryCurrency: string;
@@ -16,27 +15,41 @@ interface Zone2WidgetAreaProps {
   isLoading: boolean;
 }
 
-export function Zone2WidgetArea({
-  zone2Items,
+// Default widgets if none are selected
+const DEFAULT_WIDGETS = [
+  "adSpendSummary",
+  "customerSummary",
+  "orderSummary",
+];
+
+export function WidgetsContainer({
+  widgets,
   metricsData,
   overviewMetrics,
   primaryCurrency,
   showCostSetupWarning,
   isLoading,
-}: Zone2WidgetAreaProps) {
+}: WidgetsContainerProps) {
+  // Use provided widgets or default widgets if none provided
+  const displayWidgets = widgets.length > 0 ? widgets : DEFAULT_WIDGETS;
+
   if (isLoading) {
     return (
       <div className="space-y-4">
         <h2 className="text-lg font-semibold">Analytics Widgets</h2>
         <div className="space-y-4">
-          {/* Cost Breakdown skeleton */}
-          <WidgetSkeleton variant="large" />
+          {/* Check if costBreakdown is included */}
+          {displayWidgets.includes("costBreakdown") && (
+            <WidgetSkeleton variant="large" />
+          )}
 
           {/* Other widgets skeleton */}
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-            <WidgetSkeleton />
-            <WidgetSkeleton />
-            <WidgetSkeleton />
+            {displayWidgets
+              .filter((w) => w !== "costBreakdown")
+              .map((_, index) => (
+                <WidgetSkeleton key={index} />
+              ))}
           </div>
         </div>
       </div>
@@ -48,31 +61,24 @@ export function Zone2WidgetArea({
       <h2 className="text-lg font-semibold">Analytics Widgets</h2>
       <div className="space-y-4">
         {/* Cost Breakdown takes full width */}
-        {zone2Items?.map((widgetId: string) => {
-          if (widgetId === "costBreakdown") {
-            return (
-              <div key={widgetId} className="w-full">
-                <WidgetRenderer
-                  isLoading={false}
-                  metricsData={metricsData}
-                  overviewMetrics={overviewMetrics}
-                  primaryCurrency={primaryCurrency}
-                  showCostSetupWarning={showCostSetupWarning}
-                  widgetId={widgetId}
-                />
-              </div>
-            );
-          }
-
-          return null;
-        })}
+        {displayWidgets.includes("costBreakdown") && (
+          <div className="w-full">
+            <WidgetRenderer
+              isLoading={false}
+              metricsData={metricsData}
+              overviewMetrics={overviewMetrics}
+              primaryCurrency={primaryCurrency}
+              showCostSetupWarning={showCostSetupWarning}
+              widgetId="costBreakdown"
+            />
+          </div>
+        )}
 
         {/* Grid for non-costBreakdown widgets */}
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-          {zone2Items?.map((widgetId: string) => {
-            if (widgetId === "costBreakdown") return null;
-
-            return (
+          {displayWidgets
+            .filter((widgetId) => widgetId !== "costBreakdown")
+            .map((widgetId) => (
               <WidgetRenderer
                 key={widgetId}
                 isLoading={false}
@@ -82,8 +88,7 @@ export function Zone2WidgetArea({
                 showCostSetupWarning={showCostSetupWarning}
                 widgetId={widgetId}
               />
-            );
-          })}
+            ))}
         </div>
       </div>
     </div>

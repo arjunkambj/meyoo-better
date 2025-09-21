@@ -1,6 +1,6 @@
 "use client";
 
-import { Card, cn, Tooltip } from "@heroui/react";
+import { Card, cn, Tooltip, Divider } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import React, { useMemo } from "react";
 
@@ -38,7 +38,7 @@ const KPI = React.memo(function KPI({
   tooltip,
 }: KPIProps) {
   // Unified padding for all sizes (matching overview widgets)
-  const paddingClass = "p-5";
+  const paddingClass = "py-4 px-5";
 
   const changeData = useMemo(() => {
     if (change === undefined || change === null) return null;
@@ -127,15 +127,15 @@ const KPI = React.memo(function KPI({
   const cardContent = (
     <Card
       className={cn(
-        "bg-content2 dark:bg-content1 rounded-2xl border border-default-200 w-full overflow-hidden",
+        "bg-content2/60 dark:bg-content1 rounded-2xl border border-default-100  w-full overflow-hidden",
         paddingClass,
         sizeClasses[size],
         className
       )}
     >
-      <div className="flex flex-col h-full min-w-0 justify-between">
+      <div className="flex flex-col h-full  min-w-0 justify-between">
         {/* Header with title and icon */}
-        <div className="flex items-start justify-between mb-3 gap-2">
+        <div className="flex items-start justify-between mb-2.5 gap-2">
           <span className="text-sm text-default-900 font-normal truncate flex-1">
             {title}
           </span>
@@ -158,6 +158,8 @@ const KPI = React.memo(function KPI({
             <div className="mt-3"></div>
           )}
         </div>
+
+        <Divider className="mb-1.5 bg-default-200 mt-3.5" />
 
         {/* Change indicator at bottom */}
         {changeData && (

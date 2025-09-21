@@ -4,8 +4,8 @@ import { useQuery } from "convex-helpers/react/cache/hooks";
 import { api } from "@/libs/convexApi";
 
 export interface DashboardConfig {
-  zone1: string[]; // KPI metric IDs
-  zone2: string[]; // Widget IDs
+  kpis: string[]; // KPI metric IDs
+  widgets: string[]; // Widget IDs
 }
 
 export function useDashboard() {
@@ -17,24 +17,21 @@ export function useDashboard() {
 
   // Default config if no saved layout
   const defaultConfig: DashboardConfig = {
-    zone1: [
-      // Top KPIs (10 pinned metrics) — ordered for new users
-      // 1) Revenue, 2) Total Ad Spend, 3) COGS, 4) Orders,
-      // 5) Net Profit, 6) Taxes Collected, 7) Profit Margin,
-      // 8) ROAS, 9) Repeat Rate, 10) AOV
-      "revenue",
-      "totalAdSpend",
-      "cogs",
-      "orders",
+    kpis: [
+      // Default KPIs - ordered for new users
       "netProfit",
-      "taxesCollected",
+      "revenue",
       "netProfitMargin",
-      "blendedRoas",
-      "repeatCustomerRate",
+      "orders",
       "avgOrderValue",
+      "blendedRoas", // MER
+      "totalAdSpend",
+      "shopifyConversionRate",
+      "repeatCustomerRate",
+      "moMRevenueGrowth",
     ],
-    zone2: [
-      // Essential widgets for new users (exclude Cost Breakdown by default)
+    widgets: [
+      // Essential widgets for new users
       "adSpendSummary",
       "customerSummary",
       "orderSummary",

@@ -27,16 +27,16 @@ const MemoizedSelectedItemsList = React.memo(SelectedItemsList);
 interface CustomizationModalUnifiedProps {
   isOpen: boolean;
   onClose: () => void;
-  zone1Items: string[]; // KPI metric IDs
-  zone2Items: string[]; // Widget IDs
-  onApply: (zone1Items: string[], zone2Items: string[]) => void;
+  kpiItems: string[]; // KPI metric IDs
+  widgetItems: string[]; // Widget IDs
+  onApply: (kpiItems: string[], widgetItems: string[]) => void;
 }
 
 export function CustomizationModalUnified({
   isOpen,
   onClose,
-  zone1Items: initialZone1,
-  zone2Items: initialZone2,
+  kpiItems,
+  widgetItems,
   onApply,
 }: CustomizationModalUnifiedProps) {
   // Home Dashboard preset (kpi.md)
@@ -56,8 +56,8 @@ export function CustomizationModalUnified({
     [],
   );
   const [activeTab, setActiveTab] = useState<"kpi" | "widget">("kpi");
-  const [zone1Items, setZone1Items] = useState<string[]>(initialZone1);
-  const [zone2Items, setZone2Items] = useState<string[]>(initialZone2);
+  const [selectedKpis, setSelectedKpis] = useState<string[]>(kpiItems);
+  const [selectedWidgets, setSelectedWidgets] = useState<string[]>(widgetItems);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState<string>("coreKPIs");
   const [_isPending, startTransition] = useTransition();
@@ -142,31 +142,31 @@ export function CustomizationModalUnified({
 
   const handleKPIToggle = useCallback((metricId: string, checked: boolean) => {
     if (checked) {
-      setZone1Items((prev) =>
+      setSelectedKpis((prev) =>
         prev.includes(metricId) ? prev : [...prev, metricId],
       );
     } else {
-      setZone1Items((prev) => prev.filter((id) => id !== metricId));
+      setSelectedKpis((prev) => prev.filter((id) => id !== metricId));
     }
   }, []);
 
   const handleWidgetToggle = useCallback(
     (widgetId: string, checked: boolean) => {
       if (checked) {
-        setZone2Items((prev) =>
+        setSelectedWidgets((prev) =>
           prev.includes(widgetId) ? prev : [...prev, widgetId],
         );
       } else {
-        setZone2Items((prev) => prev.filter((id) => id !== widgetId));
+        setSelectedWidgets((prev) => prev.filter((id) => id !== widgetId));
       }
     },
     [],
   );
 
   const handleApply = useCallback(() => {
-    onApply(zone1Items, zone2Items);
+    onApply(selectedKpis, selectedWidgets);
     onClose();
-  }, [zone1Items, zone2Items, onApply, onClose]);
+  }, [selectedKpis, selectedWidgets, onApply, onClose]);
 
   const handleCategoryChange = useCallback((category: string) => {
     startTransition(() => {
@@ -178,9 +178,9 @@ export function CustomizationModalUnified({
   const handleItemRemove = useCallback(
     (id: string) => {
       if (activeTab === "kpi") {
-        setZone1Items((prev) => prev.filter((i) => i !== id));
+        setSelectedKpis((prev) => prev.filter((i) => i !== id));
       } else {
-        setZone2Items((prev) => prev.filter((i) => i !== id));
+        setSelectedWidgets((prev) => prev.filter((i) => i !== id));
       }
     },
     [activeTab],
@@ -189,9 +189,9 @@ export function CustomizationModalUnified({
   const handleItemsReorder = useCallback(
     (items: string[]) => {
       if (activeTab === "kpi") {
-        setZone1Items(items);
+        setSelectedKpis(items);
       } else {
-        setZone2Items(items);
+        setSelectedWidgets(items);
       }
     },
     [activeTab],
@@ -224,7 +224,7 @@ export function CustomizationModalUnified({
                       size="sm"
                       variant="flat"
                       startContent={<Icon icon="solar:stars-bold-duotone" width={14} />}
-                      onPress={() => setZone1Items(HOME_DASHBOARD_PRESET)}
+                      onPress={() => setSelectedKpis(HOME_DASHBOARD_PRESET)}
                     >
                       Use Home Dashboard (10)
                     </Button>
@@ -232,7 +232,7 @@ export function CustomizationModalUnified({
                       size="sm"
                       variant="light"
                       startContent={<Icon icon="solar:eraser-linear" width={14} />}
-                      onPress={() => setZone1Items([])}
+                      onPress={() => setSelectedKpis([])}
                     >
                       Clear
                     </Button>
@@ -264,7 +264,7 @@ export function CustomizationModalUnified({
                         size="sm"
                         variant="flat"
                       >
-                        {zone1Items.length}
+                        {selectedKpis.length}
                       </Chip>
                     </div>
                   }
@@ -281,7 +281,7 @@ export function CustomizationModalUnified({
                         size="sm"
                         variant="flat"
                       >
-                        {zone2Items.length}
+                        {selectedWidgets.length}
                       </Chip>
                     </div>
                   }
@@ -304,7 +304,7 @@ export function CustomizationModalUnified({
                     items={displayItems}
                     placeholder="Search metrics..."
                     searchQuery={searchQuery}
-                    selectedIds={zone1Items}
+                    selectedIds={selectedKpis}
                     onItemToggle={handleKPIToggle}
                     onSearchChange={setSearchQuery}
                   />
@@ -314,7 +314,7 @@ export function CustomizationModalUnified({
                     items={displayItems}
                     placeholder="Search widgets..."
                     searchQuery={searchQuery}
-                    selectedIds={zone2Items}
+                    selectedIds={selectedWidgets}
                     onItemToggle={handleWidgetToggle}
                     onSearchChange={setSearchQuery}
                   />
@@ -322,7 +322,7 @@ export function CustomizationModalUnified({
 
                 {/* Right: Selected Items with Position Control */}
                 <MemoizedSelectedItemsList
-                  items={activeTab === "kpi" ? zone1Items : zone2Items}
+                  items={activeTab === "kpi" ? selectedKpis : selectedWidgets}
                   type={activeTab}
                   onItemRemove={handleItemRemove}
                   onItemsReorder={handleItemsReorder}

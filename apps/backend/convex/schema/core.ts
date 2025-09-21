@@ -200,13 +200,13 @@ export const dashboards = defineTable({
   ),
   allowedUsers: v.optional(v.array(v.id("users"))),
 
-  // Configuration - Clean 2-zone layout
+  // Configuration - Simplified dashboard layout
   config: v.optional(
     v.object({
-      // Zone 1: KPI Cards
-      zone1: v.array(v.string()), // Array of metric IDs
-      // Zone 2: Widgets
-      zone2: v.array(v.string()), // Array of widget IDs
+      // KPI Cards
+      kpis: v.array(v.string()), // Array of metric IDs
+      // Widgets
+      widgets: v.array(v.string()), // Array of widget IDs
     }),
   ),
 

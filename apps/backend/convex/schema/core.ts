@@ -339,16 +339,6 @@ export const syncSessions = defineTable({
     "startedAt",
   ]);
 
-export const userPreferences = defineTable({
-  userId: v.id("users"),
-  businessType: v.optional(v.string()),
-  businessCategory: v.optional(v.string()),
-  industry: v.optional(v.string()),
-  timezone: v.optional(v.string()),
-  emailNotifications: v.optional(v.boolean()),
-  marketingEmails: v.optional(v.boolean()),
-}).index("by_user", ["userId"]);
-
 // Dedicated onboarding table - centralized onboarding state management
 export const onboarding = defineTable({
   // User and organization context
@@ -562,11 +552,6 @@ export const aiLimits = {
 
 // Notifications table for system-wide notifications
 export const notifications = defineTable({
-  // Target user or organization
-  recipientId: v.optional(v.id("users")), // null means system-wide notification
-  organizationId: v.optional(v.id("organizations")), // for org-specific notifications
-
-  // Notification content
   title: v.string(),
   message: v.string(),
   type: v.union(
@@ -581,47 +566,15 @@ export const notifications = defineTable({
   isRead: v.optional(v.boolean()),
   // System-wide notifications (when true, applies to all users)
   isSystem: v.optional(v.boolean()),
-  actionUrl: v.optional(v.string()), // URL to navigate to when clicked
-  actionLabel: v.optional(v.string()), // Button label for action
-
-  // Sender information
-  senderId: v.optional(v.id("users")), // Who sent the notification
-  senderName: v.optional(v.string()), // Cache sender name
-
-  // Metadata
-  metadata: v.optional(
-    v.object({
-      priority: v.optional(
-        v.union(
-          v.literal("low"),
-          v.literal("normal"),
-          v.literal("high"),
-          v.literal("urgent"),
-        ),
-      ),
-      category: v.optional(v.string()), // "billing", "integration", "system", etc.
-      expiresAt: v.optional(v.number()), // Auto-expire notifications
-      iconName: v.optional(v.string()), // Icon to display
-      imageUrl: v.optional(v.string()), // Optional image
-      tags: v.optional(v.array(v.string())), // Filtering tags
-    }),
-  ),
+  organizationId: v.optional(v.id("organizations")),
 
   // Timestamps
   createdAt: v.number(),
-  readAt: v.optional(v.number()),
-  updatedAt: v.optional(v.number()),
 })
-  .index("by_recipient", ["recipientId"])
-  .index("by_organization", ["organizationId"])
-  .index("by_recipient_read", ["recipientId", "isRead"])
-  .index("by_recipient_created", ["recipientId", "createdAt"])
   .index("by_type", ["type"])
-  .index("by_sender", ["senderId"])
-  .index("by_created", ["createdAt"])
-  .index("by_category", ["metadata.category"])
-  .index("by_system_read", ["isSystem", "isRead"]) // eq(true), eq(false)
-  .index("by_system_created", ["isSystem", "createdAt"]); // eq(true), order by date
+  .index("by_organization", ["organizationId"])
+  .index("by_system", ["isSystem"])
+  .index("by_created", ["createdAt"]);
 
 export const integrationRequests = defineTable({
   // Platform details

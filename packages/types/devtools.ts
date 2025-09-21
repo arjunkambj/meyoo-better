@@ -82,13 +82,6 @@ export interface ActivityLog {
   details?: Record<string, unknown>;
 }
 
-export interface RateLimitStatus {
-  platform: string;
-  limit: number;
-  remaining: number;
-  resetAt: number;
-}
-
 export interface CacheStatus {
   entries: number;
   size: number;
@@ -118,7 +111,6 @@ export interface DevToolsState {
   jobQueueStatus: JobQueueStatus | null;
   webhookLogs: WebhookLog[];
   activityLogs: ActivityLog[];
-  rateLimits: RateLimitStatus[];
   cacheStatus: CacheStatus | null;
   debugMessages: DebugMessage[];
   performanceMetrics: PerformanceMetric[];

@@ -81,26 +81,17 @@ export interface ExpenseCategory {
 
   // Category info
   name: string;
-  description?: string;
-  icon?: string;
-  color?: string;
 
   // Type
   type: ExpenseCategoryType;
-
-  // Parent category for hierarchy
-  parentId?: Id<"costCategories">;
-
-  // Budget
-  monthlyBudget?: number;
-  yearlyBudget?: number;
 
   // Status
   isActive: boolean;
   isDefault: boolean;
 
   // Metadata
-  updatedAt?: string;
+  createdAt?: number;
+  updatedAt?: number;
 }
 
 export interface Expense {

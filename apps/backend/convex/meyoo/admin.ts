@@ -767,7 +767,6 @@ export const resetMetaData = mutation({
       metaInsights: v.number(),
       integrationSessions: v.number(),
       webhookLogs: v.number(),
-      activityLogs: v.number(),
       usersUpdated: v.number(),
     }),
   }),
@@ -794,7 +793,6 @@ export const resetMetaData = mutation({
     let metaInsights = 0;
     let integrationSessions = 0;
     const webhookLogs = 0;
-    let activityLogs = 0;
     let usersUpdated = 0;
 
     // Delete Meta ad accounts
@@ -827,21 +825,6 @@ export const resetMetaData = mutation({
     }
 
     // Webhook logs removed
-
-    // Delete activity logs
-    const activities = await (ctx.db.query as any)("userActivity")
-      .withIndex("by_organization", (q: any) =>
-        q.eq("organizationId", args.organizationId),
-      )
-      .collect();
-
-    for (const a of activities) {
-      // Filter for Meta-related activities
-      if (a.metadata?.platform === "meta" || a.action?.includes("meta")) {
-        await ctx.db.delete(a._id);
-        activityLogs++;
-      }
-    }
 
     // Remove/disable integration sessions for Meta
     const sessions = await ctx.db
@@ -895,13 +878,12 @@ export const resetMetaData = mutation({
         metaAdAccounts,
         metaCampaigns,
         metaAds,
-        metaInsights,
-        integrationSessions,
-        webhookLogs,
-        activityLogs,
-        usersUpdated,
-      },
-    };
+      metaInsights,
+      integrationSessions,
+      webhookLogs,
+      usersUpdated,
+    },
+  };
   },
 });
 
@@ -927,7 +909,6 @@ export const resetShopifyData = mutation({
       customers: v.number(),
       metafields: v.number(),
       webhookLogs: v.number(),
-      activityLogs: v.number(),
       integrationSessions: v.number(),
       billingReset: v.boolean(),
       usersUpdated: v.number(),
@@ -962,7 +943,6 @@ export const resetShopifyData = mutation({
     let customers = 0;
     const metafields = 0;
     const webhookLogs = 0;
-    let activityLogs = 0;
     let integrationSessions = 0;
     let billingReset = false;
     let usersUpdated = 0;
@@ -1102,21 +1082,6 @@ export const resetShopifyData = mutation({
 
     // Webhook logs removed
 
-    // Delete activity logs
-    const activities = await (ctx.db.query as any)("userActivity")
-      .withIndex("by_organization", (q: any) =>
-        q.eq("organizationId", args.organizationId),
-      )
-      .collect();
-
-    for (const a of activities) {
-      // Filter for Shopify-related activities
-      if (a.metadata?.platform === "shopify" || a.action?.includes("shopify")) {
-        await ctx.db.delete(a._id);
-        activityLogs++;
-      }
-    }
-
     // Remove integration sessions for Shopify
     const sessions = await ctx.db
       .query("integrationSessions")
@@ -1196,7 +1161,6 @@ export const resetShopifyData = mutation({
         customers,
         metafields,
         webhookLogs,
-        activityLogs,
         integrationSessions,
         billingReset,
         usersUpdated,
@@ -1678,26 +1642,8 @@ export const resetEverything = mutation({
     // Sync engine
     await deleteByOrg("syncProfiles");
     await deleteByOrg("syncSessions");
-    await deleteByOrg("syncQueue");
     await deleteByOrg("syncHistory");
     await deleteByOrg("dataFreshness");
-
-    // Rate limits by org+platform
-    const ratePlatforms = ["shopify", "meta"];
-
-    for (const p of ratePlatforms) {
-      const rl = await ctx.db
-        .query("rateLimits")
-        .withIndex("by_org_platform", (q) =>
-          q.eq("organizationId", args.organizationId).eq("platform", p),
-        )
-        .collect();
-
-      for (const r of rl) {
-        await ctx.db.delete(r._id);
-        deleted++;
-      }
-    }
 
     // Costs
     await deleteByOrg("costs");
@@ -1712,18 +1658,6 @@ export const resetEverything = mutation({
     await deleteByOrg("gdprRequests");
 
     // Webhook logs table removed; no-op cleanup retained for compatibility
-
-    // Delete activity logs
-    const activityLogs = await (ctx.db.query as any)("userActivity")
-      .withIndex("by_organization", (q: any) =>
-        q.eq("organizationId", args.organizationId),
-      )
-      .collect();
-
-    for (const a of activityLogs) {
-      await ctx.db.delete(a._id);
-      deleted++;
-    }
 
     // Delete notifications
     const notifications = await ctx.db

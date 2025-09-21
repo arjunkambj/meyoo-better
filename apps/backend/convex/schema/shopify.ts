@@ -481,13 +481,11 @@ export const shopifySessions = defineTable({
   // Session details
   startTime: v.number(),
   endTime: v.optional(v.number()),
-  duration: v.optional(v.number()), // In seconds
 
   // Traffic source
   referrerSource: v.optional(v.string()), // google, facebook, direct, etc.
   referrerDomain: v.optional(v.string()),
   landingPage: v.optional(v.string()),
-  landingPageTitle: v.optional(v.string()),
 
   // UTM parameters
   utmSource: v.optional(v.string()),
@@ -498,34 +496,16 @@ export const shopifySessions = defineTable({
 
   // Session activity
   pageViews: v.number(),
-  events: v.optional(
-    v.array(
-      v.object({
-        type: v.string(), // page_view, add_to_cart, checkout, purchase
-        timestamp: v.number(),
-        data: v.optional(v.any()),
-      }),
-    ),
-  ),
 
   // Device & location
   deviceType: v.optional(v.string()), // desktop, mobile, tablet
-  browser: v.optional(v.string()),
-  operatingSystem: v.optional(v.string()),
   country: v.optional(v.string()),
   region: v.optional(v.string()),
   city: v.optional(v.string()),
 
   // Conversion tracking
   hasConverted: v.boolean(),
-  orderId: v.optional(v.id("shopifyOrders")),
   conversionValue: v.optional(v.number()),
-  productsViewed: v.optional(v.number()),
-  cartValue: v.optional(v.number()),
-
-  // Session quality
-  bounced: v.optional(v.boolean()),
-  exitPage: v.optional(v.string()),
 
   // Metadata
   syncedAt: v.number(),
@@ -536,6 +516,5 @@ export const shopifySessions = defineTable({
   .index("by_visitor_token", ["visitorToken"])
   .index("by_start_time", ["startTime"])
   .index("by_conversion", ["hasConverted"])
-  .index("by_order", ["orderId"])
   .index("by_referrer_source", ["referrerSource"])
   .index("by_store_and_date", ["storeId", "startTime"]);

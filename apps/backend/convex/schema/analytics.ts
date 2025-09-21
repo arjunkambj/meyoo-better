@@ -433,14 +433,6 @@ export const productMetrics = defineTable({
   profit: v.number(),
   profitMargin: v.number(),
 
-  // Inventory
-  startingInventory: v.optional(v.number()),
-  endingInventory: v.optional(v.number()),
-
-  // Returns
-  unitsReturned: v.optional(v.number()),
-  returnRate: v.optional(v.number()),
-
   // Metadata
   syncedAt: v.number(),
 })
@@ -457,9 +449,6 @@ export const channelMetrics = defineTable({
 
   // Channel info
   channel: v.string(), // meta, google, organic, email, etc.
-  source: v.optional(v.string()),
-  medium: v.optional(v.string()),
-  campaign: v.optional(v.string()),
 
   // Performance
   orders: v.number(),
@@ -468,41 +457,10 @@ export const channelMetrics = defineTable({
   profit: v.number(),
   roas: v.number(),
 
-  // Traffic
-  sessions: v.optional(v.number()),
-  visitors: v.optional(v.number()),
-  conversionRate: v.optional(v.number()),
-
-  // Customer metrics
-  newCustomers: v.optional(v.number()),
-  cac: v.optional(v.number()),
-
   // Platform-specific metrics (for Meta and Google)
   clicks: v.optional(v.number()),
   impressions: v.optional(v.number()),
   purchases: v.optional(v.number()),
-
-  // Meta-specific
-  leads: v.optional(v.number()),
-  leadValue: v.optional(v.number()),
-  costPerLead: v.optional(v.number()),
-  videoViews: v.optional(v.number()),
-  linkClicks: v.optional(v.number()),
-  viewContent: v.optional(v.number()),
-  completeRegistration: v.optional(v.number()),
-
-  // Google-specific
-  shoppingSales: v.optional(v.number()),
-  shoppingUnits: v.optional(v.number()),
-  videoViewRate: v.optional(v.number()),
-  searchImpressionShare: v.optional(v.number()),
-  searchTopImpressionShare: v.optional(v.number()),
-  allConversions: v.optional(v.number()),
-  allConversionsValue: v.optional(v.number()),
-  viewThroughConversions: v.optional(v.number()),
-
-  // Quality scores (both platforms)
-  averageQualityScore: v.optional(v.number()),
 
   // Metadata
   syncedAt: v.number(),
@@ -511,8 +469,7 @@ export const channelMetrics = defineTable({
   .index("by_date", ["date"])
   .index("by_channel", ["channel"])
   .index("by_channel_date", ["channel", "date"])
-  .index("by_org_channel_date", ["organizationId", "channel", "date"])
-  .index("by_source_medium", ["source", "medium"]);
+  .index("by_org_channel_date", ["organizationId", "channel", "date"]);
 
 // Customer lifetime value tracking
 export const customerMetrics = defineTable({
@@ -1076,4 +1033,3 @@ export const customerJourneyMetrics = defineTable({
   .index("by_customer", ["customerId"])
   .index("by_first_touch", ["firstTouchpoint"])
   .index("by_path_length", ["pathLength"]);
-

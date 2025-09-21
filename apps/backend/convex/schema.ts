@@ -22,18 +22,11 @@ import {
   syncSessions,
   memberships,
   usage,
-  userPreferences,
   users,
 } from "./schema/core";
 import { costCategories, costs, productCostComponents } from "./schema/costs";
 import { metaAdAccounts, metaInsights } from "./schema/meta";
-import {
-  adminActivity,
-  meyooInvites,
-  systemAnalytics,
-  systemHealth,
-  userActivity,
-} from "./schema/meyoo";
+import { systemAnalytics, systemHealth } from "./schema/meyoo";
 import { gdprRequests, auditLogs, webhookReceipts } from "./schema/security";
 import { tickets, ticketResponses } from "./schema/tickets";
 import {
@@ -51,9 +44,7 @@ import {
 } from "./schema/shopify";
 import {
   syncProfiles,
-  syncQueue,
   syncHistory,
-  rateLimits,
   dataFreshness,
   platformRateLimits,
   schedulerState,
@@ -65,7 +56,6 @@ export default defineSchema({
   // Core tables
   ...authTables,
   users,
-  userPreferences,
   organizations,
   memberships,
   invites,
@@ -81,9 +71,7 @@ export default defineSchema({
 
   // Sync engine tables (omitted)
   syncProfiles,
-  syncQueue,
   syncHistory,
-  rateLimits,
   dataFreshness,
   platformRateLimits,
   schedulerState,
@@ -131,10 +119,7 @@ export default defineSchema({
 
   // Meyoo admin tables (omitted)
   // Include Meyoo/admin tables to support admin operations and logging
-  meyooInvites,
   systemAnalytics,
-  userActivity,
-  adminActivity,
   systemHealth,
 
   // Notifications

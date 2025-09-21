@@ -177,15 +177,6 @@ export interface ProductMetrics {
   totalCost: number;
   profit: number;
   profitMargin: number;
-
-  // Inventory
-  startingInventory?: number;
-  endingInventory?: number;
-
-  // Returns
-  unitsReturned?: number;
-  returnRate?: number;
-
   // Metadata
   syncedAt: string;
 }
@@ -198,9 +189,6 @@ export interface ChannelMetrics {
 
   // Channel info
   channel: string;
-  source?: string;
-  medium?: string;
-  campaign?: string;
 
   // Performance
   orders: number;
@@ -209,13 +197,10 @@ export interface ChannelMetrics {
   profit: number;
   roas: number;
 
-  // Traffic
-  sessions?: number;
-  conversionRate?: number;
-
-  // Customer metrics
-  newCustomers?: number;
-  cac?: number;
+  // Platform metrics (subset tracked today)
+  clicks?: number;
+  impressions?: number;
+  purchases?: number;
 
   // Metadata
   syncedAt: string;

@@ -33,9 +33,6 @@ export const tickets = defineTable({
     v.literal("urgent"),
   ),
 
-  // Assignment (for internal use)
-  assignedTo: v.optional(v.id("users")),
-
   // Metadata
   createdAt: v.number(),
   updatedAt: v.number(),
@@ -47,8 +44,7 @@ export const tickets = defineTable({
 })
   .index("by_email", ["email"])
   .index("by_status", ["status"])
-  .index("by_created", ["createdAt"])
-  .index("by_assigned", ["assignedTo"]);
+  .index("by_created", ["createdAt"]);
 
 // Ticket responses/comments
 export const ticketResponses = defineTable({

@@ -103,9 +103,6 @@ export const costCategories = defineTable({
 
   // Category info
   name: v.string(),
-  description: v.optional(v.string()),
-  icon: v.optional(v.string()),
-  color: v.optional(v.string()),
 
   // Type mapping
   costType: v.union(
@@ -118,13 +115,6 @@ export const costCategories = defineTable({
     v.literal("marketing"),
   ),
 
-  // Hierarchy
-  parentId: v.optional(v.id("costCategories")),
-
-  // Budget tracking
-  monthlyBudget: v.optional(v.number()),
-  yearlyBudget: v.optional(v.number()),
-
   // Status
   isActive: v.boolean(),
   isDefault: v.boolean(),
@@ -135,8 +125,7 @@ export const costCategories = defineTable({
 })
   .index("by_organization", ["organizationId"])
   .index("by_org_active", ["organizationId", "isActive"])
-  .index("by_type", ["costType"])
-  .index("by_parent", ["parentId"]);
+  .index("by_type", ["costType"]);
 
 // Track actual cost allocations
 // costAllocations table removed (unused)

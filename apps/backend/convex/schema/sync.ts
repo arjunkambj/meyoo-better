@@ -69,50 +69,6 @@ export const syncProfiles = defineTable({
   .index("by_next_sync", ["nextScheduledSync"]);
 
 /**
- * Sync queue for scheduled jobs
- */
-export const syncQueue = defineTable({
-  organizationId: v.id("organizations"),
-
-  // Job details
-  jobId: v.string(),
-  jobType: v.string(), // "sync", "analytics", "cleanup"
-  priority: v.number(), // 1-10 (10 = highest)
-
-  // Scheduling
-  scheduledFor: v.number(), // When to execute
-  executeAfter: v.optional(v.number()), // Don't execute before this time
-
-  // Dependencies
-  dependsOn: v.optional(v.array(v.string())), // Other job IDs
-  blockedBy: v.optional(v.array(v.string())), // Jobs blocking this one
-
-  // Status
-  status: v.string(), // "pending", "processing", "completed", "failed"
-  attempts: v.number(),
-  maxAttempts: v.number(),
-
-  // Execution
-  startedAt: v.optional(v.number()),
-  completedAt: v.optional(v.number()),
-  workerId: v.optional(v.string()), // Worker processing this job
-
-  // Payload
-  payload: v.any(), // Job-specific data
-
-  // Results
-  result: v.optional(v.any()),
-  error: v.optional(v.string()),
-
-  createdAt: v.number(),
-  updatedAt: v.number(),
-})
-  .index("by_organization", ["organizationId"])
-  .index("by_status_priority", ["status", "priority"])
-  .index("by_scheduled", ["scheduledFor"])
-  .index("by_job_id", ["jobId"]);
-
-/**
  * Sync history for analytics and debugging
  */
 export const syncHistory = defineTable({
@@ -153,37 +109,6 @@ export const syncHistory = defineTable({
   .index("by_organization", ["organizationId"])
   .index("by_org_date", ["organizationId", "date"])
   .index("by_org_platform_date", ["organizationId", "platform", "date"]);
-
-/**
- * Rate limit tracking per platform
- */
-export const rateLimits = defineTable({
-  organizationId: v.id("organizations"),
-  platform: v.string(),
-
-  // Current window
-  windowStart: v.number(),
-  windowEnd: v.number(),
-
-  // Usage
-  requestsUsed: v.number(),
-  requestsLimit: v.number(),
-
-  // Rate limit headers from API
-  remaining: v.optional(v.number()),
-  resetsAt: v.optional(v.number()),
-
-  // Throttling
-  isThrottled: v.boolean(),
-  throttledUntil: v.optional(v.number()),
-
-  createdAt: v.number(),
-  updatedAt: v.number(),
-})
-  .index("by_org_platform", ["organizationId", "platform"])
-  .index("by_window", ["windowEnd"])
-  .index("by_throttled", ["isThrottled"])
-  .index("by_organization", ["organizationId"]);
 
 /**
  * Global platform rate limits (e.g., Meta 10k req/hour across all accounts)

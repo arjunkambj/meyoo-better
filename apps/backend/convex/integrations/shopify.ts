@@ -4477,20 +4477,7 @@ export const handleAppUninstalled = internalMutation({
         deletedCounts.notifications++;
       }
 
-      // 14. Delete user preferences (users already reset at the beginning)
-      for (const user of users) {
-        // Delete ALL user preferences to ensure clean state
-        const preferences = await ctx.db
-          .query("userPreferences")
-          .withIndex("by_user", (q) => q.eq("userId", user._id))
-          .collect();
-
-        for (const pref of preferences) {
-          await ctx.db.delete(pref._id);
-        }
-      }
-
-      // 15. Create fresh default dashboard
+      // 14. Create fresh default dashboard
       // Organization state was already reset at the beginning
       if (orgId) {
         const organization = await ctx.db.get(orgId);

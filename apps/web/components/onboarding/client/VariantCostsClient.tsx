@@ -36,8 +36,6 @@ type RowEdit = {
   handling?: string;
   shipping?: string;
   tax?: string;
-  paymentFeePercent?: string;
-  paymentFixedPerItem?: string;
 };
 
 type VariantRow = {

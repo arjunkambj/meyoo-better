@@ -1,7 +1,6 @@
 import { authTables } from "@convex-dev/auth/server";
 import { defineSchema } from "convex/server";
 import {
-  channelMetrics,
   customerMetrics,
   metricsDaily,
   metricsMonthly,
@@ -26,7 +25,6 @@ import {
 } from "./schema/core";
 import { costCategories, costs, productCostComponents } from "./schema/costs";
 import { metaAdAccounts, metaInsights } from "./schema/meta";
-import { systemAnalytics, systemHealth } from "./schema/meyoo";
 import { gdprRequests, auditLogs, webhookReceipts } from "./schema/security";
 import { tickets, ticketResponses } from "./schema/tickets";
 import {
@@ -44,8 +42,6 @@ import {
 } from "./schema/shopify";
 import {
   syncProfiles,
-  syncHistory,
-  dataFreshness,
   platformRateLimits,
   schedulerState,
 } from "./schema/sync";
@@ -71,8 +67,6 @@ export default defineSchema({
 
   // Sync engine tables (omitted)
   syncProfiles,
-  syncHistory,
-  dataFreshness,
   platformRateLimits,
   schedulerState,
 
@@ -81,7 +75,6 @@ export default defineSchema({
   metricsWeekly,
   metricsMonthly,
   productMetrics,
-  channelMetrics,
   customerMetrics,
   realtimeMetrics,
 
@@ -116,11 +109,6 @@ export default defineSchema({
 
   // Admin & Support tables (omitted)
   integrationRequests,
-
-  // Meyoo admin tables (omitted)
-  // Include Meyoo/admin tables to support admin operations and logging
-  systemAnalytics,
-  systemHealth,
 
   // Notifications
   notifications,

@@ -7,10 +7,9 @@ import { sanitizeDecimal } from "./sanitize";
 
 type NumericInputProps = Omit<InputProps, "onValueChange" | "type" | "inputMode"> & {
   onValueChange?: (value: string) => void;
-  allowPercentSuffix?: boolean;
 };
 
-export function NumericInput({ onValueChange, allowPercentSuffix, ...rest }: NumericInputProps) {
+export function NumericInput({ onValueChange, ...rest }: NumericInputProps) {
   return (
     <Input
       {...rest}
@@ -22,4 +21,3 @@ export function NumericInput({ onValueChange, allowPercentSuffix, ...rest }: Num
 }
 
 export { sanitizeDecimal };
-

@@ -1,6 +1,6 @@
 "use client";
 
-import { addToast, Button, Skeleton, Tab, Tabs } from "@heroui/react";
+import { Button, Skeleton, Tab, Tabs } from "@heroui/react";
 import { Spacer } from "@heroui/spacer";
 import { Icon } from "@iconify/react";
 import { useCallback, useState } from "react";

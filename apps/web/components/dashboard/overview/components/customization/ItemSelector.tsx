@@ -2,6 +2,7 @@
 
 import { Checkbox, cn, Input, ScrollShadow } from "@heroui/react";
 import { Icon } from "@iconify/react";
+import { useMemo } from "react";
 
 interface Item {
   id: string;
@@ -31,6 +32,8 @@ export function ItemSelector({
   placeholder,
   className,
 }: ItemSelectorProps) {
+  const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+
   return (
     <div className={cn("px-4 overflow-hidden", className)}>
       <Input
@@ -49,7 +52,7 @@ export function ItemSelector({
               className="p-2 border border-divider rounded-lg hover:bg-default-100 transition-colors"
             >
               <Checkbox
-                isSelected={selectedIds.includes(item.id)}
+                isSelected={selectedSet.has(item.id)}
                 size="sm"
                 value={item.id}
                 onValueChange={(checked) => onItemToggle(item.id, checked)}

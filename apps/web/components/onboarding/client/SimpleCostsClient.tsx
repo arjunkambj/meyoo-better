@@ -137,7 +137,6 @@ export default function SimpleCostsClient() {
       const payload = {
         operatingCosts: form.operatingCosts ? Number(form.operatingCosts) : 0,
         shippingCost: form.shippingCost ? Number(form.shippingCost) : 0,
-        shippingMode: 'per_order' as const,
         // Handling fee removed from onboarding cost setup; configure per product instead
         paymentFeePercent: form.paymentFeePercent ? Number(form.paymentFeePercent) : 0,
       };

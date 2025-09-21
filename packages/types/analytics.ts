@@ -181,31 +181,6 @@ export interface ProductMetrics {
   syncedAt: string;
 }
 
-// Channel metrics
-export interface ChannelMetrics {
-  _id: Id<"channelMetrics">;
-  organizationId: string;
-  date: string;
-
-  // Channel info
-  channel: string;
-
-  // Performance
-  orders: number;
-  revenue: number;
-  adSpend: number;
-  profit: number;
-  roas: number;
-
-  // Platform metrics (subset tracked today)
-  clicks?: number;
-  impressions?: number;
-  purchases?: number;
-
-  // Metadata
-  syncedAt: string;
-}
-
 // Customer metrics
 export interface CustomerMetrics {
   _id: Id<"customerMetrics">;

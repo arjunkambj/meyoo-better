@@ -8,6 +8,8 @@ import type { ThemeProviderProps } from "next-themes";
 import { ThemeProvider as NextThemesProvider } from "next-themes";
 import type * as React from "react";
 
+import { FeatureAccessProvider } from "@/hooks/mainapp/useFeatureAccess";
+import { OnboardingProvider } from "@/hooks/onboarding/useOnboarding";
 import { ConvexClientProvider } from "./ConvexClientProvider";
 
 interface ProvidersProps {
@@ -31,7 +33,11 @@ export function Providers({ children, themeProps }: ProvidersProps) {
       <JotaiProvider>
         <HeroUIProvider navigate={router.push}>
           <NextThemesProvider {...themeProps}>
-            <ConvexQueryCacheProvider>{children}</ConvexQueryCacheProvider>
+            <ConvexQueryCacheProvider>
+              <OnboardingProvider>
+                <FeatureAccessProvider>{children}</FeatureAccessProvider>
+              </OnboardingProvider>
+            </ConvexQueryCacheProvider>
           </NextThemesProvider>
         </HeroUIProvider>
       </JotaiProvider>

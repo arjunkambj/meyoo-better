@@ -8,6 +8,28 @@ export interface DashboardConfig {
   widgets: string[]; // Widget IDs
 }
 
+const DEFAULT_DASHBOARD_CONFIG: DashboardConfig = {
+  kpis: [
+    // Default KPIs - ordered for new users
+    "netProfit",
+    "revenue",
+    "netProfitMargin",
+    "orders",
+    "avgOrderValue",
+    "blendedRoas", // MER
+    "totalAdSpend",
+    "shopifyConversionRate",
+    "repeatCustomerRate",
+    "moMRevenueGrowth",
+  ],
+  widgets: [
+    // Essential widgets for new users
+    "adSpendSummary",
+    "customerSummary",
+    "orderSummary",
+  ],
+};
+
 export function useDashboard() {
   // Query to get dashboard layout
   const dashboardLayout = useQuery(api.core.dashboard.getDashboardLayout);
@@ -15,31 +37,8 @@ export function useDashboard() {
   // Mutation to update dashboard layout
   const updateLayout = useMutation(api.core.dashboard.updateDashboardLayout);
 
-  // Default config if no saved layout
-  const defaultConfig: DashboardConfig = {
-    kpis: [
-      // Default KPIs - ordered for new users
-      "netProfit",
-      "revenue",
-      "netProfitMargin",
-      "orders",
-      "avgOrderValue",
-      "blendedRoas", // MER
-      "totalAdSpend",
-      "shopifyConversionRate",
-      "repeatCustomerRate",
-      "moMRevenueGrowth",
-    ],
-    widgets: [
-      // Essential widgets for new users
-      "adSpendSummary",
-      "customerSummary",
-      "orderSummary",
-    ],
-  };
-
   // Use saved layout or default
-  const config = dashboardLayout || defaultConfig;
+  const config = dashboardLayout || DEFAULT_DASHBOARD_CONFIG;
 
   // Save config function
   const saveConfig = async (newConfig: DashboardConfig) => {

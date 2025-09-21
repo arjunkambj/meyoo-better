@@ -87,17 +87,22 @@ export const ProductsTable = React.memo(function ProductsTable({
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const { primaryCurrency } = useUser();
   const currencySymbol = getCurrencySymbol(primaryCurrency);
-  // Filter products based on search
-  const filteredProducts = products.filter((product) => {
-    if (!search) return true;
-    const searchLower = search.toLowerCase();
+  const searchTerm = search.trim().toLowerCase();
+  const filteredProducts = useMemo(() => {
+    if (!searchTerm) return products;
 
-    return (
-      product.name.toLowerCase().includes(searchLower) ||
-      product.sku.toLowerCase().includes(searchLower) ||
-      product.vendor.toLowerCase().includes(searchLower)
-    );
-  });
+    return products.filter((product) => {
+      const name = product.name.toLowerCase();
+      const sku = product.sku.toLowerCase();
+      const vendor = product.vendor.toLowerCase();
+
+      return (
+        name.includes(searchTerm) ||
+        sku.includes(searchTerm) ||
+        vendor.includes(searchTerm)
+      );
+    });
+  }, [products, searchTerm]);
 
   const renderCell = useCallback(
     (item: Product, columnKey: React.Key) => {

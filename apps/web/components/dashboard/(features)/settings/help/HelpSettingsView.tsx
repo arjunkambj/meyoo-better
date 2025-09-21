@@ -4,7 +4,6 @@ import {
   Card,
   CardBody,
   Chip,
-  Divider,
   Modal,
   ModalBody,
   ModalContent,

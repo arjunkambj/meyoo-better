@@ -63,9 +63,8 @@ export function useOverviewAnalytics(dateRange?: {
       }
     : null;
 
-  // Log the summary data to debug
-  if (summary) {
-    console.log("[useOverviewAnalytics] Summary data received:", {
+  if (process.env.NODE_ENV !== "production" && summary) {
+    console.debug("[useOverviewAnalytics] Summary data received", {
       revenue: summary.revenue,
       orders: summary.orders,
       profit: summary.profit,
@@ -74,8 +73,10 @@ export function useOverviewAnalytics(dateRange?: {
     });
   }
 
-  console.log("[useOverviewAnalytics] realTimeMetrics:", realTimeMetrics);
-  console.log("[useOverviewAnalytics] Metrics will be created:", !!summary);
+  if (process.env.NODE_ENV !== "production") {
+    console.debug("[useOverviewAnalytics] realTimeMetrics", realTimeMetrics);
+    console.debug("[useOverviewAnalytics] Metrics will be created", !!summary);
+  }
 
   // Prepare metrics in the format expected by AnalyticsOverview component
   const metrics = summary
@@ -483,9 +484,6 @@ export function useAnalyticsMetrics(params: {
   };
 }
 
-/**
- * Get channel performance metrics
- */
 export function useChannelPerformance(params?: {
   dateRange?: {
     startDate: string;
@@ -495,25 +493,29 @@ export function useChannelPerformance(params?: {
 }) {
   const { timezone } = useOrganizationTimeZone();
   const performance = useQuery(
-    api.web.analytics.getChannelPerformance,
+    api.web.analytics.getChannelRevenue,
     params?.dateRange
       ? {
           dateRange: toUtcRangeStrings(params.dateRange, timezone),
-          channel: params.channels?.[0],
         }
-      : "skip"
+      : "skip",
   );
   const loading = performance === undefined;
   const error =
     performance === null && !loading
       ? "Failed to load channel performance"
       : null;
+  const filteredChannels = performance?.channels?.filter((channel) =>
+    params?.channels?.length ? params.channels.includes(channel.name) : true,
+  );
 
   return {
-    performance: performance || [],
+    performance: filteredChannels || [],
+    totalRevenue: performance?.totalRevenue ?? 0,
+    timeSeries: performance?.timeSeries ?? [],
     loading,
     error,
-    hasData: (performance && performance.length > 0) ?? false,
+    hasData: (filteredChannels && filteredChannels.length > 0) ?? false,
   };
 }
 

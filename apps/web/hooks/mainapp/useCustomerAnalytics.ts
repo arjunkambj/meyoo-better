@@ -168,8 +168,16 @@ export function useCustomerAnalytics(dateRange?: {
   }, [customersData]);
 
   // Process geographic data
+  const totalCustomersAcrossCountries = useMemo(() => {
+    if (!geographicData) return 0;
+
+    return geographicData.countries.reduce((sum, country) => sum + country.customers, 0);
+  }, [geographicData]);
+
   const geographic: GeoData[] | undefined = useMemo(() => {
     if (!geographicData) return undefined;
+
+    const total = totalCustomersAcrossCountries || 1;
 
     // Convert to GeoData array format expected by GeographicDistribution component
     return geographicData.countries.map((country) => ({
@@ -177,12 +185,9 @@ export function useCustomerAnalytics(dateRange?: {
       customers: country.customers,
       revenue: country.revenue,
       avgOrderValue: country.avgOrderValue,
-      percentage:
-        (country.customers /
-          geographicData.countries.reduce((sum, c) => sum + c.customers, 0)) *
-        100,
+      percentage: (country.customers / total) * 100,
     }));
-  }, [geographicData]);
+  }, [geographicData, totalCustomersAcrossCountries]);
 
   // Process journey data
   const journey: JourneyStage[] | undefined = useMemo(() => {

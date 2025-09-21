@@ -31,7 +31,6 @@ type TransactionCost = {
   _id?: string;
   name?: string;
   provider?: string;
-  providerType?: string;
   description?: string;
   calculation?: string;
   value?: number;
@@ -40,7 +39,6 @@ type TransactionCost = {
   config?: {
     percentageFee?: number;
     fixedFee?: number;
-    providerType?: string;
     chargebackFee?: number;
     refundFee?: number;
     disputeFee?: number;

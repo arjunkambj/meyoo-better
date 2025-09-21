@@ -742,16 +742,18 @@ export const getLastSyncTimeInternal = internalQuery({
     organizationId: v.id("organizations"),
   },
   handler: async (ctx, args) => {
-    const lastSync = await ctx.db
-      .query("syncHistory")
-      .withIndex("by_org_platform_date", (q) =>
-        q.eq("organizationId", args.organizationId).eq("platform", "meta")
+    const lastSyncSession = await ctx.db
+      .query("syncSessions")
+      .withIndex("by_org_platform_and_date", (q) =>
+        q.eq("organizationId", args.organizationId).eq("platform", "meta"),
       )
       .order("desc")
       .first();
 
-    return lastSync?.updatedAt
-      ? new Date(lastSync.updatedAt).toISOString()
+    const timestamp = lastSyncSession?.completedAt ?? lastSyncSession?.startedAt;
+
+    return timestamp
+      ? new Date(timestamp).toISOString()
       : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   },
 });
@@ -1189,10 +1191,11 @@ export const setPrimaryAdAccount = mutation({
       // Check if we've already synced this account recently
       const recentSync = await ctx.db
         .query("metaAdAccounts")
-        .withIndex("by_organization", (q) =>
-          q.eq("organizationId", user.organizationId as Id<"organizations">),
+        .withIndex("by_account_org", (q) =>
+          q
+            .eq("accountId", args.accountId)
+            .eq("organizationId", user.organizationId as Id<"organizations">),
         )
-        .filter((q) => q.eq(q.field("accountId"), args.accountId))
         .first();
 
       // Only schedule if not synced in the last hour
@@ -1711,10 +1714,11 @@ export const getSyncStatus = query({
     // Get the latest sync session for Meta
     const syncSession = await ctx.db
       .query("syncSessions")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", user.organizationId as Id<"organizations">)
+      .withIndex("by_org_platform_and_date", (q) =>
+        q
+          .eq("organizationId", user.organizationId as Id<"organizations">)
+          .eq("platform", "meta"),
       )
-      .filter((q) => q.eq(q.field("platform"), "meta"))
       .order("desc")
       .first();
 

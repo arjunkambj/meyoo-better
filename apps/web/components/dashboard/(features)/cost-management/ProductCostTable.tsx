@@ -49,12 +49,64 @@ export default function ProductCostTable() {
   const currencySymbol = useMemo(() => getCurrencySymbol(currency), [currency]);
 
   const [page, setPage] = useState(1);
-  const pageSize = 1000; // large page for grouped UX
-  const { data, totalPages, loading } = useShopifyProductVariantsPaginated(
+  const pageSize = 200; // smaller page keeps DOM manageable while grouping
+  const {
+    data: variantData,
+    totalPages,
+    loading,
+  } = useShopifyProductVariantsPaginated(
     page,
     pageSize,
     undefined
   );
+
+  const variants = useMemo<VariantRow[]>(
+    () => (Array.isArray(variantData) ? (variantData as VariantRow[]) : []),
+    [variantData],
+  );
+
+  const variantGroups = useMemo(() => {
+    if (!variants.length) {
+      return [] as Array<{
+        key: string;
+        productName: string;
+        productImage?: string;
+        productStatus?: string;
+        items: VariantRow[];
+      }>;
+    }
+
+    const map = new Map<
+      string,
+      {
+        key: string;
+        productName: string;
+        productImage?: string;
+        productStatus?: string;
+        items: VariantRow[];
+      }
+    >();
+
+    variants.forEach((variant) => {
+      const productName = variant.productName || "Product";
+      const productImage = variant.productImage || "";
+      const key = `${productName}__${productImage}`;
+
+      if (!map.has(key)) {
+        map.set(key, {
+          key,
+          productName,
+          productImage,
+          productStatus: variant.productStatus,
+          items: [],
+        });
+      }
+
+      map.get(key)!.items.push(variant);
+    });
+
+    return Array.from(map.values());
+  }, [variants]);
 
   const [edits, setEdits] = useState<Record<string, RowEdit>>({});
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
@@ -133,11 +185,11 @@ export default function ProductCostTable() {
             color="primary"
             isDisabled={!bulkPct || isNaN(Number(bulkPct))}
             onPress={() => {
-              if (!data || !bulkPct) return;
+              if (!variants.length || !bulkPct) return;
               const pct = Number(bulkPct);
               setEdits((prev) => {
                 const next = { ...prev } as Record<string, RowEdit>;
-                (data as VariantRow[]).forEach((v) => {
+                variants.forEach((v) => {
                   const id = String(v._id);
                   const original = (
                     prev[id]?.cogs ??
@@ -166,11 +218,11 @@ export default function ProductCostTable() {
             color="secondary"
             isDisabled={!bulkPct || isNaN(Number(bulkPct))}
             onPress={() => {
-              if (!data || !bulkPct) return;
+              if (!variants.length || !bulkPct) return;
               const pct = Number(bulkPct);
               setEdits((prev) => {
                 const next = { ...prev } as Record<string, RowEdit>;
-                (data as VariantRow[]).forEach((v) => {
+                variants.forEach((v) => {
                   const id = String(v._id);
                   next[id] = { ...(next[id] || {}), tax: String(pct) };
                 });
@@ -185,11 +237,11 @@ export default function ProductCostTable() {
             variant="flat"
             isDisabled={!bulkPct || isNaN(Number(bulkPct))}
             onPress={() => {
-              if (!data || !bulkPct) return;
+              if (!variants.length || !bulkPct) return;
               const pct = Number(bulkPct);
               setEdits((prev) => {
                 const next = { ...prev } as Record<string, RowEdit>;
-                (data as VariantRow[]).forEach((v) => {
+                variants.forEach((v) => {
                   const id = String(v._id);
                   const price = Number(v.price ?? 0) || 0;
                   const computed = (price * pct) / 100;
@@ -208,13 +260,13 @@ export default function ProductCostTable() {
             size="sm"
             variant="flat"
             onPress={() => {
-              if (!data) {
+              if (!variants.length) {
                 setEdits({});
                 return;
               }
               setEdits((prev) => {
                 const next: Record<string, RowEdit> = { ...prev };
-                (data as VariantRow[]).forEach((v) => {
+                variants.forEach((v) => {
                   const id = String(v._id);
                   next[id] = { cogs: "", tax: "", handling: "" };
                 });
@@ -261,7 +313,7 @@ export default function ProductCostTable() {
                 </TableCell>
               </TableRow>
             ))
-          ) : (data || []).length === 0 ? (
+          ) : variants.length === 0 ? (
             <TableRow>
               <TableCell colSpan={6}>
                 <div className="p-4 text-center text-default-500 text-sm">
@@ -272,35 +324,7 @@ export default function ProductCostTable() {
           ) : (
             // Group by product with collapsible sections
             (() => {
-              const list = (data || []) as VariantRow[];
-              const map = new Map<
-                string,
-                {
-                  key: string;
-                  productName: string;
-                  productImage?: string;
-                  productStatus?: string;
-                  items: VariantRow[];
-                }
-              >();
-              for (const v of list) {
-                const productName = v.productName || "Product";
-                const productImage = v.productImage || "";
-                const key = `${productName}__${productImage}`;
-                if (!map.has(key)) {
-                  map.set(key, {
-                    key,
-                    productName,
-                    productImage,
-                    productStatus: v.productStatus,
-                    items: [],
-                  });
-                }
-                map.get(key)!.items.push(v);
-              }
-              const groups = Array.from(map.values());
-
-              return groups.flatMap((grp, grpIndex) => {
+              return variantGroups.flatMap((grp, grpIndex) => {
                 const count = grp.items.length;
                 const isOpen = expandedGroups.has(grp.key);
                 const s = String(grp.productStatus || "").toLowerCase();

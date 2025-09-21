@@ -544,12 +544,6 @@ export const invoices = defineTable({
   .index("by_organization_and_status", ["organizationId", "status"])
   .index("by_issued_date", ["issuedAt"]);
 
-// Simplified AI limits (kept for reference)
-export const aiLimits = {
-  free: { monthly: 50 },
-  paid: { monthly: 1000 },
-};
-
 // Notifications table for system-wide notifications
 export const notifications = defineTable({
   title: v.string(),
@@ -591,5 +585,6 @@ export const integrationRequests = defineTable({
 })
   .index("by_organization", ["organizationId"])
   .index("by_user", ["userId"])
+  .index("by_user_platform", ["userId", "platformName"])
   .index("by_created", ["createdAt"])
   .index("by_platform", ["platformName"]);

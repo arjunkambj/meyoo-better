@@ -11,15 +11,9 @@ export function useOnboardingCosts() {
   );
 
   const saveInitialCosts = async (costs: {
-    cogsPercent?: number;
     shippingCost?: number;
-    shippingMode?: 'per_order' | 'per_item';
-    shippingPerItem?: number;
     paymentFeePercent?: number;
-    paymentFixedFee?: number;
-    taxPercent?: number;
     operatingCosts?: number;
-    handlingPerItem?: number;
   }) => {
     try {
       const result = await saveInitialCostsMutation(costs);

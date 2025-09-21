@@ -1,7 +1,8 @@
 import { useMutation } from "convex/react";
-import { getStepKeyById, TOTAL_STEPS } from "@/constants/onboarding";
 import { api } from "@/libs/convexApi";
 import { useQuery } from "convex-helpers/react/cache/hooks";
+import { createContext, useContext, useMemo } from "react";
+import type { ReactNode } from "react";
 
 /**
  * Onboarding Flow Management Hooks
@@ -9,10 +10,7 @@ import { useQuery } from "convex-helpers/react/cache/hooks";
 
 // Use key-based helpers derived from ONBOARDING_STEPS; no separate numeric mapping.
 
-/**
- * Get current onboarding status
- */
-export function useOnboarding() {
+function useOnboardingInternal() {
   const status = useQuery(api.core.onboarding.getOnboardingStatus);
   const updateStateMutation = useMutation(
     api.core.onboarding.updateOnboardingState
@@ -94,6 +92,53 @@ export function useOnboarding() {
     isExtraCostSetup: status?.isExtraCostSetup || false,
     hasMeta: status?.connections?.meta || false,
   };
+}
+
+type OnboardingContextValue = ReturnType<typeof useOnboardingInternal>;
+
+const OnboardingContext = createContext<OnboardingContextValue | null>(null);
+
+export function OnboardingProvider({ children }: { children: ReactNode }) {
+  const value = useOnboardingInternal();
+
+  const memoValue = useMemo(
+    () => ({ ...value }),
+    [
+      value.status,
+      value.loading,
+      value.error,
+      value.isCompleted,
+      value.currentStep,
+      value.completedSteps,
+      value.connections,
+      value.nextStep,
+      value.updateBusinessProfile,
+      value.finishOnboarding,
+      value.hasShopify,
+      value.isProductCostSetup,
+      value.isExtraCostSetup,
+      value.hasMeta,
+    ],
+  );
+
+  return (
+    <OnboardingContext.Provider value={memoValue}>
+      {children}
+    </OnboardingContext.Provider>
+  );
+}
+
+/**
+ * Get current onboarding status
+ */
+export function useOnboarding(): OnboardingContextValue {
+  const context = useContext(OnboardingContext);
+
+  if (context) {
+    return context;
+  }
+
+  return useOnboardingInternal();
 }
 
 /**

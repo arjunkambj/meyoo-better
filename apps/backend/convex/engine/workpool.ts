@@ -34,8 +34,7 @@ export type JobType =
   | "analytics:rollup" // Aggregate metrics
   | "cleanup:old_data" // Clean old data
   | "maintenance:reassign_store_users" // Post-auth store user reassign
-  | "maintenance:dedupe_meta_accounts" // Cleanup duplicate Meta ad accounts
-  | "email:send"; // Send notifications
+  | "maintenance:dedupe_meta_accounts"; // Cleanup duplicate Meta ad accounts
 
 // Job data types for each job type
 export interface SyncJobData {
@@ -65,13 +64,6 @@ export interface CleanupJobData {
   daysToKeep?: number;
 }
 
-export interface EmailJobData {
-  to: string;
-  subject: string;
-  body: string;
-  organizationId?: Id<"organizations">;
-}
-
 export interface MaintenanceReassignJobData {
   organizationId: Id<"organizations">;
   userId: Id<"users">;
@@ -81,7 +73,6 @@ export type JobData =
   | SyncJobData
   | AnalyticsJobData
   | CleanupJobData
-  | EmailJobData
   | MaintenanceReassignJobData;
 
 interface JobOptions {
@@ -237,20 +228,6 @@ export async function createJob(
           retry: {
             maxAttempts: options?.maxAttempts || 2,
             initialBackoffMs: options?.initialBackoffMs || 2000,
-            base: 2,
-          },
-        },
-      );
-      break;
-    case "email:send":
-      jobId = await workpool.enqueueAction(
-        ctx as any,
-        internal.jobs.emailHandlers.handleEmailSend,
-        data as any,
-        {
-          retry: {
-            maxAttempts: options?.maxAttempts || 3,
-            initialBackoffMs: options?.initialBackoffMs || 1000,
             base: 2,
           },
         },

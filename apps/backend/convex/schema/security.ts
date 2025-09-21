@@ -58,66 +58,6 @@ export const webhookReceipts = defineTable({
   .index("by_provider", ["providerWebhookId"])
   .index("by_shop_topic", ["shopDomain", "topic"]);
 
-export const gdprComplianceLogs = defineTable({
-  // Request info
-  requestType: v.union(
-    v.literal("customers/data_request"),
-    v.literal("customers/redact"),
-    v.literal("shop/redact"),
-  ),
-  shopDomain: v.string(),
-  shopId: v.optional(v.string()),
-
-  // Customer info (if applicable)
-  customerId: v.optional(v.string()),
-  customerEmail: v.optional(v.string()),
-  orderIds: v.optional(v.array(v.string())),
-
-  // Request/Response data
-  requestPayload: v.object({
-    shop_id: v.string(),
-    shop_domain: v.string(),
-    orders_to_redact: v.optional(v.array(v.string())),
-    customer: v.optional(
-      v.object({
-        id: v.string(),
-        email: v.optional(v.string()),
-        phone: v.optional(v.string()),
-      }),
-    ),
-    data_request: v.optional(
-      v.object({
-        id: v.string(),
-      }),
-    ),
-  }),
-  responseStatus: v.string(),
-  processingResult: v.optional(
-    v.object({
-      success: v.boolean(),
-      message: v.optional(v.string()),
-      recordsProcessed: v.optional(v.number()),
-      recordsDeleted: v.optional(v.number()),
-      deletedCount: v.optional(
-        v.object({
-          customers: v.number(),
-          orders: v.number(),
-          products: v.optional(v.number()),
-          stores: v.optional(v.number()),
-        }),
-      ),
-      errors: v.optional(v.array(v.string())),
-    }),
-  ),
-
-  // Timestamp
-  processedAt: v.number(),
-})
-  .index("by_shop_domain", ["shopDomain"])
-  .index("by_request_type", ["requestType"])
-  .index("by_processed_at", ["processedAt"])
-  .index("by_customer_email", ["customerEmail"]);
-
 export const gdprRequests = defineTable({
   organizationId: v.id("organizations"),
   shopDomain: v.string(),

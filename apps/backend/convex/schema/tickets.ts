@@ -43,6 +43,7 @@ export const tickets = defineTable({
   organizationId: v.optional(v.id("organizations")),
 })
   .index("by_email", ["email"])
+  .index("by_user", ["userId"])
   .index("by_status", ["status"])
   .index("by_created", ["createdAt"]);
 

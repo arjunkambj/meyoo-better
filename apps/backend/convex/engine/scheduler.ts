@@ -308,24 +308,20 @@ export const getLastSyncTime = internalQuery({
   },
   returns: v.union(v.null(), v.number()),
   handler: async (ctx, args) => {
-    const query = ctx.db
-      .query("syncHistory")
-      .withIndex("by_org_platform_date", (q) => {
-        return q
+    const lastSyncSession = await ctx.db
+      .query("syncSessions")
+      .withIndex("by_org_platform_and_date", (q) =>
+        q
           .eq("organizationId", args.organizationId as Id<"organizations">)
-          .eq("platform", args.platform || "shopify")
-          .gte("date", "2000-01-01");
-      })
+          .eq("platform", args.platform || "shopify"),
+      )
       .order("desc")
       .first();
 
-    const lastSync = await query;
+    if (!lastSyncSession) return null;
 
-    if (!lastSync) return null;
-
-    // syncHistory stores aggregated daily stats, not individual syncs
-    // Return the updatedAt timestamp as an approximation
-    return lastSync.updatedAt;
+    // Prefer the completion timestamp; fall back to when the sync started
+    return lastSyncSession.completedAt ?? lastSyncSession.startedAt;
   },
 });
 

@@ -1,16 +1,25 @@
 "use client";
 
 import { cn } from "@heroui/react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { PlanUsageAlert } from "../../shared/billing/PlanUsageAlert";
 import UserProfile from "../../shared/UserProfile";
-import { useOnboarding } from "@/hooks";
+import { useOnboarding, useCurrentUser } from "@/hooks";
 
 import SidebarToggle from "./SidebarToggle";
 
 export default function DashBoardHeader({ className }: { className?: string }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user } = useCurrentUser();
   const { status: _status } = useOnboarding();
+
+  // Fast redirect for non-onboarded users
+  const isOnboardingRoute = pathname?.startsWith("/onboarding");
+  if (user && user.isOnboarded === false && !isOnboardingRoute) {
+    router.replace("/onboarding/shopify");
+    return null;
+  }
 
   // Map pathnames to page titles
   const getPageTitle = () => {

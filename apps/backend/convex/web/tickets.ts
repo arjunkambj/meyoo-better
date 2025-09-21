@@ -104,7 +104,7 @@ export const getUserTickets = query({
     // Also get tickets by user ID if different
     const userIdTickets = await ctx.db
       .query("tickets")
-      .filter((q) => q.eq(q.field("userId"), user._id))
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
       .collect();
 
     // Merge and deduplicate

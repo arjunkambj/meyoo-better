@@ -54,24 +54,10 @@ export const costs = defineTable({
 
   // Provider info (for payment fees, shipping, etc.)
   provider: v.optional(v.string()), // Stripe, PayPal, FedEx, etc.
-  providerType: v.optional(v.string()), // payment_processor, carrier, etc.
 
-  // Application scope
-  applyTo: v.optional(
-    v.union(
-      v.literal("all"),
-      v.literal("specific_products"),
-      v.literal("specific_categories"),
-      v.literal("specific_orders"),
-      v.literal("specific_channels"),
-    ),
-  ),
-  applyToIds: v.optional(v.array(v.string())), // IDs of products/categories/etc.
-
-  // Status and priority
+  // Status
   isActive: v.boolean(),
   isDefault: v.boolean(),
-  priority: v.number(), // For determining which cost to apply when multiple match
 
   // Effective dates
   effectiveFrom: v.number(),
@@ -85,16 +71,12 @@ export const costs = defineTable({
   .index("by_org_and_type", ["organizationId", "type"])
   .index("by_org_type_name", ["organizationId", "type", "name"])
   .index("by_org_type_and_active", ["organizationId", "type", "isActive"])
+  .index("by_org_type_default", ["organizationId", "type", "isDefault"])
+  .index("by_org_type_frequency", ["organizationId", "type", "frequency"])
   .index("by_org_and_active", ["organizationId", "isActive"])
   .index("by_type", ["type"])
-  .index("by_priority", ["priority"])
   .index("by_effective_from", ["effectiveFrom"])
-  .index("by_provider", ["provider"])
-  .index("by_org_type_and_effective", [
-    "organizationId",
-    "type",
-    "effectiveFrom",
-  ]);
+  .index("by_provider", ["provider"]);
 
 // Cost categories for grouping and organization
 export const costCategories = defineTable({
@@ -127,41 +109,6 @@ export const costCategories = defineTable({
   .index("by_org_active", ["organizationId", "isActive"])
   .index("by_type", ["costType"]);
 
-// Track actual cost allocations
-// costAllocations table removed (unused)
-
-// DEPRECATED: Historical cost defaults for initial setup
-// Kept for backwards-compatibility/migrations. Do not write new data here.
-// Single source of truth is the `costs` table (global) and `productCostComponents` (per-variant).
-export const historicalCostDefaults = defineTable({
-  organizationId: v.id("organizations"),
-
-  // Average costs for historical/onboarding defaults
-  cogsPercent: v.optional(v.number()), // Average COGS as % of revenue
-  shippingCost: v.optional(v.number()), // Average shipping cost per order (per-order model)
-  paymentFeePercent: v.optional(v.number()), // Payment processing fee %
-  paymentFixedFee: v.optional(v.number()), // Fixed fee component per transaction (e.g. $0.30)
-  taxPercent: v.optional(v.number()), // Average tax rate %
-  marketingPercent: v.optional(v.number()), // Marketing as % of revenue (optional)
-  operatingCosts: v.optional(v.number()), // Monthly operating costs (optional)
-
-  // Optional per-item onboarding defaults
-  shippingMode: v.optional(v.union(v.literal("per_order"), v.literal("per_item"))),
-  shippingPerItem: v.optional(v.number()),
-  handlingPerItem: v.optional(v.number()),
-
-  // Setup metadata
-  setupType: v.string(), // "initial_historical" or "dashboard_setup"
-  appliedTo: v.string(), // "historical_60_days"
-  setupBy: v.optional(v.id("users")), // User who set up the costs (optional for system-generated)
-
-  // Timestamps
-  createdAt: v.number(),
-  updatedAt: v.optional(v.number()),
-})
-  .index("by_organization", ["organizationId"])
-  .index("by_setup_type", ["setupType"]);
-
 // Per-variant product-level cost components
 export const productCostComponents = defineTable({
   organizationId: v.id("organizations"),
@@ -192,4 +139,6 @@ export const productCostComponents = defineTable({
   .index("by_organization", ["organizationId"])
   .index("by_variant", ["variantId"])
   .index("by_org_variant", ["organizationId", "variantId"]) 
+  .index("by_org_and_active", ["organizationId", "isActive"]) 
+  .index("by_variant_and_active", ["variantId", "isActive"]) 
   .index("by_effective_from", ["effectiveFrom"]);

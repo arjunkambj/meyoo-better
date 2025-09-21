@@ -331,7 +331,6 @@ export const addCost = mutation({
       config: args.config,
       isActive: true,
       isDefault: false,
-      priority: 0,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });
@@ -590,14 +589,13 @@ export const bulkImportCosts = mutation({
         value: roundMoney(cost.value),
         calculation: "fixed" as const,
         effectiveFrom: cost.effectiveFrom,
-        description: cost.description,
-        provider: cost.provider,
-        isActive: true,
-        isDefault: false,
-        priority: 0,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      });
+      description: cost.description,
+      provider: cost.provider,
+      isActive: true,
+      isDefault: false,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
 
       importedIds.push(costId);
     }
@@ -671,8 +669,9 @@ export const getProductsWithVariants = query({
     // Get all cost components for variants
     const allCostComponents = await ctx.db
       .query("productCostComponents")
-      .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
-      .filter((q) => q.eq(q.field("isActive"), true))
+      .withIndex("by_org_and_active", (q) =>
+        q.eq("organizationId", orgId).eq("isActive", true),
+      )
       .collect();
 
     // Create a map of variant ID to cost components
@@ -816,7 +815,6 @@ export const setVariantCosts = mutation({
           effectiveFrom: Date.now(),
           isActive: true,
           isDefault: false,
-          priority: 0,
           createdAt: Date.now(),
           updatedAt: Date.now(),
         });
@@ -1022,10 +1020,8 @@ export const applyGlobalHandling = mutation({
           calculation: 'percentage',
           value: args.value,
           frequency: 'percentage',
-          applyTo: 'all',
           isActive: true,
           isDefault: true,
-          priority: 1,
           effectiveFrom: Date.now(),
           createdAt: Date.now(),
           updatedAt: Date.now(),
@@ -1066,7 +1062,10 @@ export const saveProductCostComponents = mutation({
         cost.cogsPerUnit !== undefined ||
         cost.shippingPerUnit !== undefined ||
         cost.handlingPerUnit !== undefined ||
-        cost.taxPercent !== undefined;
+        cost.taxPercent !== undefined ||
+        cost.paymentFeePercent !== undefined ||
+        cost.paymentFixedPerItem !== undefined ||
+        cost.paymentProvider !== undefined;
 
       if (!hasAnyValue) continue;
 
@@ -1149,10 +1148,12 @@ export const updateHistoricalTaxRate = internalMutation({
     // Single source of truth: update or create a tax cost entry only
     const existingTaxCost = await ctx.db
       .query("costs")
-      .withIndex("by_org_and_type", (q) =>
-        q.eq("organizationId", args.organizationId).eq("type", "tax")
+      .withIndex("by_org_type_default", (q) =>
+        q
+          .eq("organizationId", args.organizationId)
+          .eq("type", "tax")
+          .eq("isDefault", true),
       )
-      .filter((q) => q.eq(q.field("isDefault"), true))
       .first();
     
     if (existingTaxCost) {
@@ -1169,7 +1170,6 @@ export const updateHistoricalTaxRate = internalMutation({
         calculation: "percentage",
         isActive: true,
         isDefault: true,
-        priority: 0,
         effectiveFrom: Date.now(),
         createdAt: Date.now(),
         updatedAt: Date.now(),
@@ -1218,10 +1218,9 @@ export const createProductCostComponents = internalMutation({
       // Check if component already exists
       const existing = await ctx.db
         .query("productCostComponents")
-        .withIndex("by_variant", (q) =>
-          q.eq("variantId", variantId)
+        .withIndex("by_variant_and_active", (q) =>
+          q.eq("variantId", variantId).eq("isActive", true)
         )
-        .filter((q) => q.eq(q.field("isActive"), true))
         .first();
       
       if (existing) {
@@ -1278,10 +1277,9 @@ export const validateCostDataCompleteness = internalQuery({
     // Check cost components
     const costComponents = await ctx.db
       .query("productCostComponents")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId)
+      .withIndex("by_org_and_active", (q) =>
+        q.eq("organizationId", args.organizationId).eq("isActive", true)
       )
-      .filter((q) => q.eq(q.field("isActive"), true))
       .collect();
     
     const variantsWithCostComponents = new Set(costComponents.map(c => c.variantId)).size;
@@ -1289,10 +1287,9 @@ export const validateCostDataCompleteness = internalQuery({
     // Check other cost types
     const costs = await ctx.db
       .query("costs")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId)
+      .withIndex("by_org_and_active", (q) =>
+        q.eq("organizationId", args.organizationId).eq("isActive", true)
       )
-      .filter((q) => q.eq(q.field("isActive"), true))
       .collect();
     
     const hasTaxRate = costs.some(c => c.type === "tax");
@@ -1338,39 +1335,6 @@ export const validateCostDataCompleteness = internalQuery({
       hasPaymentFees: hasPaymentFees,
       recommendations,
     };
-  },
-});
-
-/**
- * Calculate COGS for products
- */
-export const calculateProductCOGS = internalQuery({
-  args: {
-    organizationId: v.id("organizations"),
-    productId: v.string(),
-    quantity: v.number(),
-  },
-  handler: async (ctx, args) => {
-    // Get product cost configuration
-    const allCosts = await ctx.db
-      .query("costs")
-      .withIndex("by_org_and_type", (q) =>
-        q.eq("organizationId", args.organizationId).eq("type", "product"),
-      )
-      .collect();
-
-    // Filter in memory for product-specific costs
-    const productCosts = allCosts.filter(
-      (cost) =>
-        cost.applyToIds?.includes(args.productId) || cost.applyTo === "all",
-    )[0];
-
-    if (productCosts) {
-      return productCosts.value * args.quantity;
-    }
-
-    // Return default or zero if no cost found
-    return 0;
   },
 });
 
@@ -1433,7 +1397,6 @@ export const calculateShippingCost = internalMutation({
         },
         isActive: true,
         isDefault: false,
-        priority: 0,
         createdAt: Date.now(),
         updatedAt: Date.now(),
       });
@@ -1506,16 +1469,15 @@ export const syncPlatformCosts = internalMutation({
             calculation: "fixed" as const,
             effectiveFrom: cost.effectiveFrom,
             description: cost.description,
-            config: {
-              source: args.platform,
-              synced: true,
-            },
-            isActive: true,
-            isDefault: false,
-            priority: 0,
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-          });
+          config: {
+            source: args.platform,
+            synced: true,
+          },
+          isActive: true,
+          isDefault: false,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
         }
       }
     }

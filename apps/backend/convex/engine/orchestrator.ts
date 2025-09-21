@@ -356,10 +356,12 @@ export const logSyncComplete = internalMutation({
         // Check if at least one successful sync has completed
         const successfulSyncs = await ctx.db
           .query("syncSessions")
-          .withIndex("by_organization", (q) =>
-            q.eq("organizationId", syncSession.organizationId),
+          .withIndex("by_org_platform_and_status", (q) =>
+            q
+              .eq("organizationId", syncSession.organizationId)
+              .eq("platform", syncSession.platform)
+              .eq("status", "completed"),
           )
-          .filter((q) => q.eq(q.field("status"), "completed"))
           .take(1);
 
         if (successfulSyncs.length > 0) {

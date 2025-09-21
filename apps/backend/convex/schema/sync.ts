@@ -69,48 +69,6 @@ export const syncProfiles = defineTable({
   .index("by_next_sync", ["nextScheduledSync"]);
 
 /**
- * Sync history for analytics and debugging
- */
-export const syncHistory = defineTable({
-  organizationId: v.id("organizations"),
-  platform: v.string(),
-
-  // Aggregated daily stats
-  date: v.string(), // YYYY-MM-DD
-
-  // Sync counts
-  totalSyncs: v.number(),
-  successfulSyncs: v.number(),
-  failedSyncs: v.number(),
-  manualSyncs: v.number(),
-
-  // Data volume
-  recordsProcessed: v.number(),
-  dataTransferred: v.number(), // Bytes
-  apiCallsUsed: v.number(),
-
-  // Performance
-  avgSyncDuration: v.number(), // Milliseconds
-  minSyncDuration: v.number(),
-  maxSyncDuration: v.number(),
-
-  // Errors
-  errors: v.array(
-    v.object({
-      timestamp: v.number(),
-      message: v.string(),
-      count: v.number(),
-    }),
-  ),
-
-  createdAt: v.number(),
-  updatedAt: v.number(),
-})
-  .index("by_organization", ["organizationId"])
-  .index("by_org_date", ["organizationId", "date"])
-  .index("by_org_platform_date", ["organizationId", "platform", "date"]);
-
-/**
  * Global platform rate limits (e.g., Meta 10k req/hour across all accounts)
  */
 export const platformRateLimits = defineTable({
@@ -133,49 +91,6 @@ export const schedulerState = defineTable({
   updatedAt: v.number(),
 })
   .index("by_name", ["name"]);
-
-/**
- * Data freshness tracking
- */
-export const dataFreshness = defineTable({
-  organizationId: v.id("organizations"),
-
-  // Per-platform freshness
-  platforms: v.object({
-    shopify: v.optional(
-      v.object({
-        lastSync: v.number(),
-        lastWebhook: v.optional(v.number()),
-        dataAge: v.number(), // Minutes since last update
-        isStale: v.boolean(),
-      }),
-    ),
-    meta: v.optional(
-      v.object({
-        lastSync: v.number(),
-        dataAge: v.number(),
-        isStale: v.boolean(),
-      }),
-    ),
-    google: v.optional(
-      v.object({
-        lastSync: v.number(),
-        dataAge: v.number(),
-        isStale: v.boolean(),
-      }),
-    ),
-  }),
-
-  // Overall freshness
-  overallFreshness: v.number(), // 0-100 score
-  needsSync: v.boolean(),
-  priority: v.string(), // "low", "medium", "high", "critical"
-
-  createdAt: v.number(),
-  updatedAt: v.number(),
-})
-  .index("by_organization", ["organizationId"])
-  .index("by_needs_sync", ["needsSync", "priority"]);
 
 /**
  * Presence sessions for lightweight online detection

@@ -40,17 +40,8 @@ export interface Cost {
     [key: string]: unknown;
   };
   provider?: string;
-  providerType?: string;
-  applyTo?:
-    | "all"
-    | "specific_products"
-    | "specific_categories"
-    | "specific_orders"
-    | "specific_channels";
-  applyToIds?: string[];
   isActive: boolean;
   isDefault: boolean;
-  priority: number;
   effectiveFrom: number;
   effectiveTo?: number;
   createdAt?: number;
@@ -125,14 +116,6 @@ export interface Expense {
   effectiveFrom: number;
   effectiveTo?: number;
 
-  // Application
-  applyTo:
-    | "all"
-    | "specific_products"
-    | "specific_orders"
-    | "specific_channels";
-  applyToIds?: string[];
-
   // Invoice/receipt
   invoiceNumber?: string;
   receiptUrl?: string;
@@ -162,7 +145,6 @@ export interface TransactionFee {
 
   // Provider info
   provider: string;
-  providerType: "payment_processor" | "marketplace" | "platform";
 
   // Fee structure
   percentageFee: number;

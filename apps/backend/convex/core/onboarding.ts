@@ -518,15 +518,9 @@ export const completeOnboarding = mutation({
  */
 export const saveInitialCosts = mutation({
   args: {
-    cogsPercent: v.optional(v.number()),
     shippingCost: v.optional(v.number()),
-    shippingMode: v.optional(v.union(v.literal("per_order"), v.literal("per_item"))),
-    shippingPerItem: v.optional(v.number()),
     paymentFeePercent: v.optional(v.number()),
-    paymentFixedFee: v.optional(v.number()),
-    taxPercent: v.optional(v.number()),
     operatingCosts: v.optional(v.number()),
-    handlingPerItem: v.optional(v.number()),
   },
   returns: v.object({
     success: v.boolean(),
@@ -558,91 +552,16 @@ export const saveInitialCosts = mutation({
     // Create or update cost records for analytics (idempotent during onboarding)
     const now = Date.now();
 
-    // Create COGS cost record if provided
-    if (args.cogsPercent !== undefined && args.cogsPercent > 0) {
-      const existingCOGS = await ctx.db
-        .query("costs")
-        .withIndex("by_org_and_type", (q) =>
-          q.eq("organizationId", user.organizationId as Id<"organizations">).eq("type", "product"),
-        )
-        .filter((q) => q.eq(q.field("name"), "Cost of Goods Sold"))
-        .first();
-
-      if (existingCOGS) {
-        await ctx.db.patch(existingCOGS._id, {
-          calculation: "percentage",
-          value: args.cogsPercent,
-          frequency: "percentage",
-          isActive: true,
-          isDefault: true,
-          updatedAt: now,
-        } as any);
-      } else {
-        await ctx.db.insert("costs", {
-          organizationId: user.organizationId as Id<"organizations">,
-          userId: user._id,
-          type: "product",
-          name: "Cost of Goods Sold",
-          description: "Initial COGS percentage from onboarding",
-          calculation: "percentage",
-          value: args.cogsPercent,
-          frequency: "percentage",
-          applyTo: "all",
-          isActive: true,
-          isDefault: true,
-          priority: 1,
-          effectiveFrom: now,
-          createdAt: now,
-        } as any);
-      }
-    }
-
-    // Create shipping cost record (per order or per item)
-    if (args.shippingMode === "per_item") {
-      if (args.shippingPerItem !== undefined && args.shippingPerItem > 0) {
-        const existingPerItem = await ctx.db
-          .query("costs")
-          .withIndex("by_org_and_type", (q) =>
-            q.eq("organizationId", user.organizationId as Id<"organizations">).eq("type", "shipping"),
-          )
-          .filter((q) => q.eq(q.field("frequency"), "per_item"))
-          .first();
-
-        if (existingPerItem) {
-          await ctx.db.patch(existingPerItem._id, {
-            calculation: "fixed",
-            value: args.shippingPerItem,
-            frequency: "per_item",
-            isActive: true,
-            isDefault: true,
-            updatedAt: now,
-          } as any);
-        } else {
-          await ctx.db.insert("costs", {
-            organizationId: user.organizationId as Id<"organizations">,
-            userId: user._id,
-            type: "shipping",
-            name: "Shipping Cost (per item)",
-            description: "Initial shipping cost per item from onboarding",
-            calculation: "fixed",
-            value: args.shippingPerItem,
-            frequency: "per_item",
-            applyTo: "all",
-            isActive: true,
-            isDefault: true,
-            priority: 1,
-            effectiveFrom: now,
-            createdAt: now,
-          } as any);
-        }
-      }
-    } else if (args.shippingCost !== undefined && args.shippingCost > 0) {
+    // Create shipping cost record (flat per order)
+    if (args.shippingCost !== undefined && args.shippingCost > 0) {
       const existingPerOrder = await ctx.db
         .query("costs")
-        .withIndex("by_org_and_type", (q) =>
-          q.eq("organizationId", user.organizationId as Id<"organizations">).eq("type", "shipping"),
+        .withIndex("by_org_type_frequency", (q) =>
+          q
+            .eq("organizationId", user.organizationId as Id<"organizations">)
+            .eq("type", "shipping")
+            .eq("frequency", "per_order"),
         )
-        .filter((q) => q.eq(q.field("frequency"), "per_order"))
         .first();
 
       if (existingPerOrder) {
@@ -664,10 +583,8 @@ export const saveInitialCosts = mutation({
           calculation: "fixed",
           value: args.shippingCost,
           frequency: "per_order",
-          applyTo: "all",
           isActive: true,
           isDefault: true,
-          priority: 1,
           effectiveFrom: now,
           createdAt: now,
         } as any);
@@ -691,7 +608,6 @@ export const saveInitialCosts = mutation({
           isActive: true,
           isDefault: true,
           updatedAt: now,
-          config: args.paymentFixedFee ? { fixedFee: args.paymentFixedFee } : existingPayment.config,
         } as any);
       } else {
         await ctx.db.insert("costs", {
@@ -703,53 +619,11 @@ export const saveInitialCosts = mutation({
           calculation: "percentage",
           value: args.paymentFeePercent,
           frequency: "percentage",
-          config: args.paymentFixedFee ? { fixedFee: args.paymentFixedFee } : undefined,
-          applyTo: "all",
           isActive: true,
           isDefault: true,
-          priority: 1,
           effectiveFrom: now,
           createdAt: now,
         } as any);
-      }
-    }
-
-    // Create or update tax record if provided (avoid duplicates)
-    if (args.taxPercent !== undefined && args.taxPercent > 0) {
-      const existingTax = await ctx.db
-        .query("costs")
-        .withIndex("by_org_and_type", (q) =>
-          q
-            .eq("organizationId", user.organizationId as Id<"organizations">)
-            .eq("type", "tax"),
-        )
-        .first();
-
-      if (existingTax) {
-        await ctx.db.patch(existingTax._id, {
-          calculation: "percentage",
-          value: args.taxPercent,
-          frequency: "percentage",
-          isActive: true,
-          updatedAt: Date.now(),
-        });
-      } else {
-        await ctx.db.insert("costs", {
-          organizationId: user.organizationId,
-          userId: user._id,
-          type: "tax",
-          name: "Sales Tax",
-          description: "Initial tax percentage from onboarding",
-          calculation: "percentage",
-          value: args.taxPercent,
-          frequency: "percentage",
-          applyTo: "all",
-          isActive: true,
-          isDefault: true,
-          priority: 1,
-          effectiveFrom: now,
-          createdAt: Date.now(),
-        });
       }
     }
 
@@ -757,10 +631,12 @@ export const saveInitialCosts = mutation({
     if (args.operatingCosts !== undefined && args.operatingCosts > 0) {
       const existingOp = await ctx.db
         .query("costs")
-        .withIndex("by_org_and_type", (q) =>
-          q.eq("organizationId", user.organizationId as Id<"organizations">).eq("type", "operational"),
+        .withIndex("by_org_type_frequency", (q) =>
+          q
+            .eq("organizationId", user.organizationId as Id<"organizations">)
+            .eq("type", "operational")
+            .eq("frequency", "monthly"),
         )
-        .filter((q) => q.eq(q.field("frequency"), "monthly"))
         .first();
 
       if (existingOp) {
@@ -782,49 +658,8 @@ export const saveInitialCosts = mutation({
           calculation: "fixed",
           value: args.operatingCosts,
           frequency: "monthly",
-          applyTo: "all",
           isActive: true,
           isDefault: true,
-          priority: 1,
-          effectiveFrom: now,
-          createdAt: now,
-        } as any);
-      }
-    }
-
-    // Optional: handling per item default
-    if (args.handlingPerItem !== undefined && args.handlingPerItem > 0) {
-      const existingHandling = await ctx.db
-        .query("costs")
-        .withIndex("by_org_and_type", (q) =>
-          q.eq("organizationId", user.organizationId as Id<"organizations">).eq("type", "handling"),
-        )
-        .filter((q) => q.eq(q.field("frequency"), "per_item"))
-        .first();
-
-      if (existingHandling) {
-        await ctx.db.patch(existingHandling._id, {
-          calculation: "fixed",
-          value: args.handlingPerItem,
-          frequency: "per_item",
-          isActive: true,
-          isDefault: true,
-          updatedAt: now,
-        } as any);
-      } else {
-        await ctx.db.insert("costs", {
-          organizationId: user.organizationId as Id<"organizations">,
-          userId: user._id,
-          type: "handling",
-          name: "Handling (per item)",
-          description: "Initial handling/overhead cost per item from onboarding",
-          calculation: "fixed",
-          value: args.handlingPerItem,
-          frequency: "per_item",
-          applyTo: "all",
-          isActive: true,
-          isDefault: true,
-          priority: 1,
           effectiveFrom: now,
           createdAt: now,
         } as any);

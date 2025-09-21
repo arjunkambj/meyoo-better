@@ -1,5 +1,6 @@
 import { useMutation } from "convex/react";
 import { useQuery } from "convex-helpers/react/cache/hooks";
+import { useMemo } from "react";
 
 import { api } from "@/libs/convexApi";
 import type { GenericId as Id } from "convex/values";
@@ -39,23 +40,46 @@ export function useUserTickets(
   const loading = tickets === undefined;
   const error = tickets === null && !loading ? "Failed to load tickets" : null;
 
+  const { list, openCount, inProgressCount, resolvedCount } =
+    useMemo(() => {
+      const list = (tickets as TicketListItem[] | null | undefined) || [];
+
+      return list.reduce(
+        (acc, ticket) => {
+          switch (ticket.status) {
+            case "open":
+              acc.openCount += 1;
+              break;
+            case "in_progress":
+              acc.inProgressCount += 1;
+              break;
+            case "resolved":
+              acc.resolvedCount += 1;
+              break;
+            default:
+              break;
+          }
+
+          acc.list.push(ticket);
+          return acc;
+        },
+        {
+          list: [] as TicketListItem[],
+          openCount: 0,
+          inProgressCount: 0,
+          resolvedCount: 0,
+        },
+      );
+    }, [tickets]);
+
   return {
-    tickets: (tickets as TicketListItem[] | null | undefined) || [],
+    tickets: list,
     loading,
     error,
-    hasTickets: (tickets && tickets.length > 0) ?? false,
-    openCount:
-      (tickets as TicketListItem[] | null | undefined)?.filter(
-        (t: TicketListItem) => t.status === "open",
-      ).length || 0,
-    inProgressCount:
-      (tickets as TicketListItem[] | null | undefined)?.filter(
-        (t: TicketListItem) => t.status === "in_progress",
-      ).length || 0,
-    resolvedCount:
-      (tickets as TicketListItem[] | null | undefined)?.filter(
-        (t: TicketListItem) => t.status === "resolved",
-      ).length || 0,
+    hasTickets: list.length > 0,
+    openCount,
+    inProgressCount,
+    resolvedCount,
   };
 }
 
@@ -97,23 +121,51 @@ export function useAllTickets(filters?: {
       ? "Failed to load tickets or access denied"
       : null;
 
+  const {
+    list,
+    openCount,
+    inProgressCount,
+    highPriorityCount,
+  } = useMemo(() => {
+    const list = (tickets as TicketListItem[] | null | undefined) || [];
+
+    return list.reduce(
+      (acc, ticket) => {
+        switch (ticket.status) {
+          case "open":
+            acc.openCount += 1;
+            break;
+          case "in_progress":
+            acc.inProgressCount += 1;
+            break;
+          default:
+            break;
+        }
+
+        if (ticket.priority === "high" || ticket.priority === "urgent") {
+          acc.highPriorityCount += 1;
+        }
+
+        acc.list.push(ticket);
+        return acc;
+      },
+      {
+        list: [] as TicketListItem[],
+        openCount: 0,
+        inProgressCount: 0,
+        highPriorityCount: 0,
+      },
+    );
+  }, [tickets]);
+
   return {
-    tickets: (tickets as TicketListItem[] | null | undefined) || [],
+    tickets: list,
     loading,
     error,
-    totalCount: tickets?.length || 0,
-    openCount:
-      (tickets as TicketListItem[] | null | undefined)?.filter(
-        (t: TicketListItem) => t.status === "open",
-      ).length || 0,
-    inProgressCount:
-      (tickets as TicketListItem[] | null | undefined)?.filter(
-        (t: TicketListItem) => t.status === "in_progress",
-      ).length || 0,
-    highPriorityCount:
-      (tickets as TicketListItem[] | null | undefined)?.filter(
-        (t: TicketListItem) => t.priority === "high" || t.priority === "urgent",
-      ).length || 0,
+    totalCount: list.length,
+    openCount,
+    inProgressCount,
+    highPriorityCount,
   };
 }
 

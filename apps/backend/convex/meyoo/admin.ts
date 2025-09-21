@@ -588,7 +588,7 @@ export const resetTestData = mutation({
         v.literal("products"),
         v.literal("customers"),
         v.literal("analytics"),
-        v.literal("sync_history"),
+        v.literal("sync_sessions"),
         v.literal("all"),
       ),
     ),
@@ -600,7 +600,7 @@ export const resetTestData = mutation({
       products: v.number(),
       customers: v.number(),
       analytics: v.number(),
-      syncHistory: v.number(),
+      syncSessions: v.number(),
     }),
   }),
   handler: async (ctx, args) => {
@@ -626,7 +626,7 @@ export const resetTestData = mutation({
       products: 0,
       customers: 0,
       analytics: 0,
-      syncHistory: 0,
+      syncSessions: 0,
     };
 
     const shouldDelete = (
@@ -635,7 +635,7 @@ export const resetTestData = mutation({
         | "products"
         | "customers"
         | "analytics"
-        | "sync_history"
+        | "sync_sessions"
         | "all",
     ) => args.dataTypes.includes("all") || args.dataTypes.includes(dataType);
 
@@ -691,7 +691,6 @@ export const resetTestData = mutation({
         "realtimeMetrics",
         "productMetrics",
         "customerMetrics",
-        "channelMetrics",
       ];
 
       for (const tableName of analyticsTables) {
@@ -701,8 +700,7 @@ export const resetTestData = mutation({
               | "metricsDaily"
               | "realtimeMetrics"
               | "productMetrics"
-              | "customerMetrics"
-              | "channelMetrics",
+              | "customerMetrics",
           )
           .withIndex("by_organization", (q) =>
             q.eq("organizationId", args.organizationId),
@@ -716,8 +714,8 @@ export const resetTestData = mutation({
       }
     }
 
-    // Delete sync history
-    if (shouldDelete("sync_history")) {
+    // Delete sync sessions
+    if (shouldDelete("sync_sessions")) {
       const syncSessions = await ctx.db
         .query("syncSessions")
         .withIndex("by_organization", (q) =>
@@ -727,20 +725,7 @@ export const resetTestData = mutation({
 
       for (const session of syncSessions) {
         await ctx.db.delete(session._id);
-        deletedCounts.syncHistory++;
-      }
-
-      // Also delete sync history records by index
-      const syncHistory = await ctx.db
-        .query("syncHistory")
-        .withIndex("by_organization", (q) =>
-          q.eq("organizationId", args.organizationId),
-        )
-        .collect();
-
-      for (const history of syncHistory) {
-        await ctx.db.delete(history._id);
-        deletedCounts.syncHistory++;
+        deletedCounts.syncSessions++;
       }
     }
 
@@ -1256,19 +1241,6 @@ export const resetEverything = mutation({
           }
           break;
         }
-        case "channelMetrics": {
-          const rows = await ctx.db
-            .query("channelMetrics")
-            .withIndex("by_organization", (q) =>
-              q.eq("organizationId", args.organizationId),
-            )
-            .collect();
-          for (const row of rows) {
-            await ctx.db.delete(row._id);
-            deleted++;
-          }
-          break;
-        }
         case "customerMetrics": {
           const rows = await ctx.db
             .query("customerMetrics")
@@ -1625,25 +1597,12 @@ export const resetEverything = mutation({
     // realtime cache only
     await deleteByOrg("realtimeMetrics");
     await deleteByOrg("productMetrics");
-    await deleteByOrg("channelMetrics");
     await deleteByOrg("customerMetrics");
     await deleteByOrg("realtimeMetrics");
-    await deleteByOrg("rfmSegments");
-    await deleteByOrg("cohortAnalysis");
-    await deleteByOrg("productProfitability");
-    await deleteByOrg("inventoryMetrics");
-    await deleteByOrg("returnAnalytics");
-    await deleteByOrg("geographicMetrics");
-    await deleteByOrg("predictiveMetrics");
-    await deleteByOrg("marketBasketAnalysis");
-    await deleteByOrg("customerJourneyMetrics");
-    await deleteByOrg("metricWidgets");
 
     // Sync engine
     await deleteByOrg("syncProfiles");
     await deleteByOrg("syncSessions");
-    await deleteByOrg("syncHistory");
-    await deleteByOrg("dataFreshness");
 
     // Costs
     await deleteByOrg("costs");

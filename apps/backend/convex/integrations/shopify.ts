@@ -1408,10 +1408,11 @@ export const getLastSyncTimeInternal = internalQuery({
   handler: async (ctx, args) => {
     const lastSession = await ctx.db
       .query("syncSessions")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId as Id<"organizations">)
+      .withIndex("by_org_platform_and_date", (q) =>
+        q
+          .eq("organizationId", args.organizationId as Id<"organizations">)
+          .eq("platform", "shopify"),
       )
-      .filter((q) => q.eq(q.field("platform"), "shopify"))
       .order("desc")
       .first();
 
@@ -4340,7 +4341,6 @@ export const handleAppUninstalled = internalMutation({
         "metricsWeekly",
         "metricsMonthly",
         "productMetrics",
-        "channelMetrics",
         "customerMetrics",
         "realtimeMetrics",
       ];

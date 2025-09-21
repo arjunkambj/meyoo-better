@@ -193,8 +193,8 @@ export const updateSyncMetrics = internalMutation({
 
     if (!profile) return;
 
-    // These metrics are now tracked in syncHistory table, not in profile
-    // For now, just update basic sync tracking
+    // Detailed metrics previously lived in the syncHistory table.
+    // With that table removed, keep lightweight tracking on the profile.
 
     await ctx.db.patch(profile._id, {
       lastSync: Date.now(),

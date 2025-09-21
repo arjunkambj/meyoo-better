@@ -7,7 +7,7 @@ ALways USE CONTEXT& to Fetch docs
 - Monorepo managed by Turbo and Bun.
 - Apps
   - `apps/web` — Next.js (App Router) storefront; code in `app/`, shared UI in `components/`, utilities under `libs/`.
-  - `apps/meyoo` — Next.js Admin panel; minimal scaffold plus standard folders (`components/`, `hooks/`, `libs/`, `config/`, `constants/`, `store/`, `types/`, `styles/`). Dev on port 3001.
+- `apps/admin` — Next.js Admin panel (formerly `apps/meyoo`); minimal scaffold plus standard folders (`components/`, `hooks/`, `libs/`, `config/`, `constants/`, `store/`, `types/`, `styles/`). Dev on port 3001.
   - `apps/backend` — Convex backend. Functions and jobs under `convex/` organized by domain:
     - `convex/web/*` — storefront APIs
     - `convex/meyoo/*` — admin APIs
@@ -28,6 +28,7 @@ ALways USE CONTEXT& to Fetch docs
 - Lint: `bun run lint` — ESLint via shared configs.
 - Types: `bun run check-types` — TypeScript no‑emit checks.
 - Format: `bun run format` — Prettier on `ts/tsx/md`.
+- Convex codegen runs on the managed server; **never run `convex codegen` locally**.
 
 ### Workspace filtering (Turbo)
 

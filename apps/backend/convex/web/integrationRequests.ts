@@ -22,13 +22,13 @@ export const createRequest = mutation({
   }),
   handler: async (ctx, args) => {
     const { user, orgId } = await requireUserAndOrg(ctx);
+    const normalizedPlatform = args.platformName.toLowerCase();
 
     // Check if user already requested this platform
     const existingRequest = await ctx.db
       .query("integrationRequests")
-      .withIndex("by_user", (q) => q.eq("userId", user._id))
-      .filter((q) =>
-        q.eq(q.field("platformName"), args.platformName.toLowerCase()),
+      .withIndex("by_user_platform", (q) =>
+        q.eq("userId", user._id).eq("platformName", normalizedPlatform),
       )
       .first();
 
@@ -37,7 +37,7 @@ export const createRequest = mutation({
     }
 
     const requestId = await ctx.db.insert("integrationRequests", {
-      platformName: args.platformName.toLowerCase(),
+      platformName: normalizedPlatform,
       description: args.description,
       userId: user._id,
       organizationId: orgId as Id<"organizations">,

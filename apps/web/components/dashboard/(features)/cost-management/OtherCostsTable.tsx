@@ -73,17 +73,8 @@ interface Cost {
     | "percentage";
   config?: unknown;
   provider?: string;
-  providerType?: string;
-  applyTo?:
-    | "all"
-    | "specific_products"
-    | "specific_categories"
-    | "specific_orders"
-    | "specific_channels";
-  applyToIds?: string[];
   isActive: boolean;
   isDefault: boolean;
-  priority: number;
   effectiveFrom: number;
   effectiveTo?: number;
   createdAt?: number;
@@ -111,7 +102,6 @@ interface ExpenseConfig {
   paymentStatus?: "paid" | "pending" | "overdue";
   vendorName?: string;
   categoryId?: Id<"costCategories">;
-  applyTo?: string;
   isRecurring?: boolean;
 }
 

@@ -35,7 +35,7 @@ export default function MarketingIntegrationsClient() {
 
   const user = useCurrentUser();
   const { meta } = useIntegration();
-  const { nextStep, status } = useOnboarding();
+  const { status } = useOnboarding();
   const router = useRouter();
   const searchParams = useSearchParams();
   // Guard against double-effects in React Strict Mode to avoid duplicate toasts

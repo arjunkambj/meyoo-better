@@ -11,15 +11,12 @@ import {
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import React, { useCallback, useEffect, useMemo } from "react";
+import React, { useCallback, useMemo } from "react";
 import { useCurrentUser } from "@/hooks";
 
 const UserProfile = React.memo(() => {
   const { user } = useCurrentUser();
   const { signOut } = useAuthActions();
-  const router = useRouter();
-  const pathname = usePathname();
 
   const handleLogout = useCallback(async () => {
     await signOut();
@@ -36,36 +33,30 @@ const UserProfile = React.memo(() => {
     [user]
   );
 
-  // Redirect not-onboarded users to onboarding when they hit protected views
-  useEffect(() => {
-    if (!pathname) return;
-
-    const isOnboardingRoute = pathname.startsWith("/onboarding");
-    if (isOnboardingRoute) return;
-
-    if (user && user.isOnboarded === false) {
-      router.replace("/onboarding/shopify");
-    }
-  }, [pathname, router, user]);
-
   // Memoize navigation items for better performance
   const navigationItems = useMemo(
     () => [
       {
         key: "settings",
-        href: "/settings/general",
+        href: "/settings",
         icon: "solar:settings-linear",
         label: "Settings",
       },
       {
         key: "billing",
-        href: "/settings/billing-invoices",
+        href: "/settings?tab=billing",
         icon: "solar:card-linear",
         label: "Billing",
       },
       {
+        key: "team",
+        href: "/settings?tab=team",
+        icon: "solar:users-group-rounded-linear",
+        label: "Team",
+      },
+      {
         key: "help",
-        href: "/settings/help",
+        href: "/settings?tab=support",
         icon: "solar:question-circle-linear",
         label: "Help & Support",
       },

@@ -60,7 +60,7 @@ This project uses a monorepo structure managed with Turborepo and Bun:
 meyoo-better/
 ├── apps/
 │   ├── web/                 # Customer-facing dashboard (Port 3000)
-│   ├── meyoo/               # Admin backoffice app (Port 3001)
+│   ├── admin/               # Admin backoffice app (Port 3001)
 │   └── backend/             # Convex serverless backend
 ├── packages/
 │   ├── @repo/types/         # Shared TypeScript types
@@ -226,7 +226,7 @@ convex/
 ### Frontend Apps
 
 - **`/apps/web`**: Customer dashboard for viewing profits and analytics
-- **`/apps/meyoo`**: Internal admin dashboard for system management
+- **`/apps/admin`**: Internal admin dashboard for system management
 
 ### Shared Packages
 

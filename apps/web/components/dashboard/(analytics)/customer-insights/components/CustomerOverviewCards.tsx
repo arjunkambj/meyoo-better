@@ -13,13 +13,11 @@ export interface CustomerMetrics {
   avgLTV: number;
   avgCAC: number;
   ltvCacRatio: number;
-  retentionRate: number;
   churnRate: number;
   changes: {
     totalCustomers: number;
     newCustomers: number;
     avgLTV: number;
-    retentionRate: number;
     churnRate: number;
   };
 }
@@ -101,11 +99,10 @@ export const CustomerOverviewCards = memo(function CustomerOverviewCards({
               subtitle: `CAC: ${formatCurrency(metrics.avgCAC)}`,
             },
             {
-              title: "Retention",
-              value: `${!Number.isNaN(metrics.retentionRate) ? metrics.retentionRate.toFixed(1) : "0.0"}%`,
-              change: formatChange(metrics.changes.retentionRate),
+              title: "Churn",
+              value: `${!Number.isNaN(metrics.churnRate) ? metrics.churnRate.toFixed(1) : "0.0"}%`,
+              change: formatChange(metrics.changes.churnRate, true),
               icon: "solar:restart-bold-duotone",
-              subtitle: `Churn: ${!Number.isNaN(metrics.churnRate) ? metrics.churnRate.toFixed(1) : "0.0"}%`,
             },
           ]
         : [],
@@ -138,5 +135,4 @@ export const CustomerOverviewCards = memo(function CustomerOverviewCards({
     </div>
   );
 });
-
 

@@ -103,8 +103,6 @@ interface OrderSummaryWidgetProps {
   avgOrderProfitChange?: number;
   avgOrderCost: number;
   avgOrderCostChange?: number;
-  purchaseFrequency: number;
-  purchaseFrequencyChange?: number;
   currency?: string;
   loading?: boolean;
 }
@@ -118,8 +116,6 @@ export function OrderSummaryWidget({
   avgOrderProfitChange,
   avgOrderCost,
   avgOrderCostChange,
-  purchaseFrequency,
-  purchaseFrequencyChange,
   currency = "USD",
   loading = false,
 }: OrderSummaryWidgetProps) {
@@ -132,7 +128,7 @@ export function OrderSummaryWidget({
         <div className="animate-pulse">
           <div className="h-4 bg-default-200 rounded w-1/3 mb-4" />
           <div className="space-y-3">
-            {[1, 2, 3, 4, 5].map((i) => (
+            {[1, 2, 3, 4].map((i) => (
               <div key={i} className="h-6 bg-default-200 rounded" />
             ))}
           </div>
@@ -186,14 +182,6 @@ export function OrderSummaryWidget({
           label="Avg. Order Cost"
           hint="Average cost per order including COGS"
           value={avgOrderCost}
-        />
-
-        <Metric
-          change={purchaseFrequencyChange}
-          format="number"
-          label="Purchase Frequency"
-          hint="Average number of purchases per customer"
-          value={purchaseFrequency}
         />
       </div>
     </Card>

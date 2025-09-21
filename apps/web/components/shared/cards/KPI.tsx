@@ -167,7 +167,7 @@ const KPI = React.memo(function KPI({
             <div className="text-xs text-default-600">vs last period</div>
             <div
               className={cn(
-                "flex items-center gap-0.5 text-sm font-medium",
+                "flex items-center gap-0.5 text-xs font-medium",
                 changeData.type === "positive"
                   ? "text-success"
                   : changeData.type === "neutral"
@@ -175,14 +175,6 @@ const KPI = React.memo(function KPI({
                     : "text-danger"
               )}
             >
-              <Icon
-                icon={
-                  changeData.trend === "up"
-                    ? "solar:arrow-up-linear"
-                    : "solar:arrow-down-linear"
-                }
-                width={14}
-              />
               <span>{changeData.text}</span>
             </div>
           </div>

@@ -65,20 +65,16 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
       contributionMarginPercentage:
         overviewMetrics?.contributionMarginPercentage?.value || 0,
       operatingMargin: overviewMetrics?.operatingMargin?.value || 0,
-      ebitdaMargin: overviewMetrics?.ebitdaMargin?.value || 0,
 
       // Marketing
       totalAdSpend: overviewMetrics?.totalAdSpend?.value || 0,
       metaAdSpend: overviewMetrics?.metaAdSpend?.value || 0,
-      googleAdSpend: overviewMetrics?.googleAdSpend?.value || 0,
       metaSpendPercentage: overviewMetrics?.metaSpendPercentage?.value || 0,
-      googleSpendPercentage: overviewMetrics?.googleSpendPercentage?.value || 0,
       marketingPercentageOfGross:
         overviewMetrics?.marketingPercentageOfGross?.value || 0,
       marketingPercentageOfNet:
         overviewMetrics?.marketingPercentageOfNet?.value || 0,
       metaROAS: overviewMetrics?.metaROAS?.value || 0,
-      googleROAS: overviewMetrics?.googleROAS?.value || 0,
 
       // Growth
       moMRevenueGrowth: overviewMetrics?.moMRevenueGrowth?.value || 0,
@@ -147,8 +143,6 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
           ? overviewMetrics.avgOrderValue.value -
             overviewMetrics.avgOrderProfit.value
           : 0,
-      purchaseFrequency: 0, // TODO: Calculate from customer data
-
       // Platform metrics (numbers only)
       ...(platformNumbers as Record<string, number>),
     };

@@ -83,15 +83,8 @@ export const calculateCustomerMetrics = internalMutation({
         return sum + orderProfit;
       }, 0);
 
-      // Calculate purchase frequency (orders per month)
       const firstOrderDate = new Date(firstOrder.shopifyCreatedAt);
       const lastOrderDate = new Date(lastOrder.shopifyCreatedAt);
-      const monthsActive = Math.max(
-        1,
-        (lastOrderDate.getTime() - firstOrderDate.getTime()) /
-          (1000 * 60 * 60 * 24 * 30),
-      );
-      const purchaseFrequency = lifetimeOrders / monthsActive;
 
       // Calculate days between purchases
       let daysBetweenPurchases = 0;
@@ -138,7 +131,6 @@ export const calculateCustomerMetrics = internalMutation({
         lifetimeOrders,
         lifetimeProfit,
         avgOrderValue,
-        purchaseFrequency,
         daysBetweenPurchases,
         segment,
         // Attribution - can be enhanced with actual channel data

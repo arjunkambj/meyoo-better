@@ -1,9 +1,8 @@
 "use client";
 
-import { Checkbox, cn, Input, ScrollShadow } from "@heroui/react";
+import { Checkbox, cn, ScrollShadow } from "@heroui/react";
 import { Icon } from "@iconify/react";
-import { useVirtualizer } from "@tanstack/react-virtual";
-import React, { useCallback, useEffect, useMemo, useRef } from "react";
+import React, { useCallback, useMemo } from "react";
 
 interface Item {
   id: string;
@@ -14,23 +13,22 @@ interface Item {
   description?: string;
 }
 
-type SectionEntry = {
+type SectionHeader = {
   type: 'section';
-  id: string; // unique section id
-  label: string; // section label (e.g., category name)
-  icon?: string; // optional icon for section
+  id: string;
+  label: string;
+  icon: string;
+  count?: number;
 };
 
-type ListEntry = Item | SectionEntry;
+type ListItem = Item | SectionHeader;
 
 interface VirtualizedItemSelectorProps {
-  items: ListEntry[];
+  items: ListItem[];
   selectedIds: string[];
-  searchQuery: string;
-  onSearchChange: (query: string) => void;
   onItemToggle: (id: string, checked: boolean) => void;
-  placeholder: string;
   className?: string;
+  style?: React.CSSProperties;
 }
 
 // Memoized item component for better performance
@@ -53,7 +51,7 @@ const ItemRow = React.memo(
 
     return (
       <div
-        className={`py-1 px-2 border border-divider rounded-md hover:bg-default-50 transition-colors ${
+        className={`py-1.5 px-2 border border-divider rounded-md hover:bg-default-50 transition-colors ${
           isSelected ? "bg-primary-50 border-primary-200" : ""
         }`}
       >
@@ -78,19 +76,9 @@ const ItemRow = React.memo(
               icon={item.icon}
               width={14}
             />
-            <span className="text-xs font-medium text-default-700 flex-1">
+            <span className="text-xs font-medium text-default-700 flex-1 truncate">
               {item.label || item.name}
             </span>
-            {item.description && (
-              <span
-                className="text-xs text-default-400 truncate max-w-[120px]"
-                title={item.description}
-              >
-                {item.description.length > 20
-                  ? `${item.description.substring(0, 20)}...`
-                  : item.description}
-              </span>
-            )}
           </div>
         </Checkbox>
       </div>
@@ -100,74 +88,16 @@ const ItemRow = React.memo(
 
 ItemRow.displayName = "ItemRow";
 
-// Simple non-selectable section header row
-const SectionRow = React.memo(({ entry }: { entry: SectionEntry }) => {
-  return (
-    <div className="py-1 px-2 text-[11px] uppercase tracking-wide text-default-400 flex items-center gap-1.5">
-      {entry.icon ? (
-        <Icon className="text-default-300" icon={entry.icon} width={12} />
-      ) : null}
-      <span className="font-semibold">{entry.label}</span>
-    </div>
-  );
-});
-SectionRow.displayName = 'SectionRow';
-
-// Debounce hook
-function useDebounce<T>(value: T, delay: number): T {
-  const [debouncedValue, setDebouncedValue] = React.useState<T>(value);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [value, delay]);
-
-  return debouncedValue;
-}
 
 export function VirtualizedItemSelector({
   items,
   selectedIds,
-  searchQuery,
-  onSearchChange,
   onItemToggle,
-  placeholder,
   className,
+  style,
 }: VirtualizedItemSelectorProps) {
-  const parentRef = useRef<HTMLDivElement>(null);
-  const [localSearchQuery, setLocalSearchQuery] = React.useState(searchQuery);
-
-  // Debounced search
-  const debouncedSearchQuery = useDebounce(localSearchQuery, 200);
-
-  // Update parent component when debounced value changes
-  useEffect(() => {
-    onSearchChange(debouncedSearchQuery);
-  }, [debouncedSearchQuery, onSearchChange]);
-
   // Create a Set for faster lookup
   const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
-
-  // Estimate item size - much more compact now
-  const estimateSize = useCallback(() => {
-    return 32; // Compact size for all items
-  }, []);
-
-  // Virtual list configuration
-  const virtualizer = useVirtualizer({
-    count: items.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize,
-    overscan: 8, // Render more items for smoother scrolling with compact items
-    gap: 4, // Smaller gap between items
-  });
-
-  const virtualItems = virtualizer.getVirtualItems();
 
   // Memoized toggle handler
   const handleItemToggle = useCallback(
@@ -177,62 +107,104 @@ export function VirtualizedItemSelector({
     [onItemToggle],
   );
 
-  return (
-    <div className={cn("px-4 flex flex-col", className)}>
-      <Input
-        className="mb-3 flex-shrink-0"
-        placeholder={placeholder}
-        size="sm"
-        startContent={
-          <Icon
-            className="text-default-400"
-            icon="solar:search-linear"
-            width={14}
-          />
+  // Process items into renderable rows
+  const renderableRows = useMemo(() => {
+    const rows: Array<{ type: 'section'; section: SectionHeader } | { type: 'items'; items: Item[] }> = [];
+    let currentRowItems: Item[] = [];
+
+    items.forEach((item) => {
+      const isSection = 'type' in item && item.type === 'section';
+
+      if (isSection) {
+        // Flush current row if it has items
+        if (currentRowItems.length > 0) {
+          rows.push({ type: 'items', items: currentRowItems });
+          currentRowItems = [];
         }
-        value={localSearchQuery}
-        onValueChange={setLocalSearchQuery}
-      />
+        // Add section header
+        rows.push({ type: 'section', section: item as SectionHeader });
+      } else {
+        // Add item to current row
+        currentRowItems.push(item as Item);
 
-      <ScrollShadow hideScrollBar className="h-[400px]" visibility="none">
-        <div ref={parentRef} className="h-full overflow-y-auto scrollbar-hide">
-          <div
-            style={{
-              height: `${virtualizer.getTotalSize()}px`,
-              width: "100%",
-              position: "relative",
-            }}
-          >
-            {virtualItems.map((virtualItem) => {
-              const entry = items[virtualItem.index];
-              if (!entry) return null;
-              const isSection = "type" in entry && entry.type === 'section';
+        // If we have 2 items, flush the row
+        if (currentRowItems.length === 2) {
+          rows.push({ type: 'items', items: currentRowItems });
+          currentRowItems = [];
+        }
+      }
+    });
 
+    // Flush any remaining items
+    if (currentRowItems.length > 0) {
+      rows.push({ type: 'items', items: currentRowItems });
+    }
+
+    return rows;
+  }, [items]);
+
+  return (
+    <div className={cn("px-2 flex flex-col", className)} style={style}>
+      <ScrollShadow hideScrollBar className="h-[430px]" visibility="none">
+        <div className="">
+          {renderableRows.map((row, index) => {
+            if (row.type === 'section') {
+              const section = row.section;
               return (
                 <div
-                  key={virtualItem.key}
-                  style={{
-                    position: "absolute",
-                    top: 0,
-                    left: 0,
-                    width: "100%",
-                    height: `${virtualItem.size}px`,
-                    transform: `translateY(${virtualItem.start}px)`,
-                  }}
+                  key={section.id}
+                  className="w-full mt-5 mb-3 first:mt-0"
                 >
-                  {isSection ? (
-                    <SectionRow entry={entry as SectionEntry} />
+                  <div className="flex items-center justify-between px-3 py-2 bg-gradient-to-r from-default-100 to-default-50 rounded-lg border border-default-200">
+                    <div className="flex items-center gap-2.5">
+                      <Icon
+                        className="text-primary-500"
+                        icon={section.icon}
+                        width={18}
+                      />
+                      <span className="text-sm font-semibold text-default-800">
+                        {section.label}
+                      </span>
+                    </div>
+                    {section.count && (
+                      <span className="text-xs font-medium text-default-600 bg-default-100 px-2 py-0.5 rounded-full">
+                        {section.count} metrics
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            } else {
+              // Render items row
+              const rowItems = row.items;
+              if (rowItems.length === 0) return null;
+
+              return (
+                <div key={`row-${index}`} className="flex gap-2 mb-2">
+                  {rowItems[0] && (
+                    <div className="w-[calc(50%-0.25rem)]">
+                      <ItemRow
+                        isSelected={selectedIdSet.has(rowItems[0].id)}
+                        item={rowItems[0]}
+                        onToggle={handleItemToggle}
+                      />
+                    </div>
+                  )}
+                  {rowItems[1] ? (
+                    <div className="w-[calc(50%-0.25rem)]">
+                      <ItemRow
+                        isSelected={selectedIdSet.has(rowItems[1].id)}
+                        item={rowItems[1]}
+                        onToggle={handleItemToggle}
+                      />
+                    </div>
                   ) : (
-                    <ItemRow
-                      isSelected={selectedIdSet.has((entry as Item).id)}
-                      item={entry as Item}
-                      onToggle={handleItemToggle}
-                    />
+                    <div className="w-[calc(50%-0.25rem)]"></div>
                   )}
                 </div>
               );
-            })}
-          </div>
+            }
+          })}
         </div>
       </ScrollShadow>
     </div>

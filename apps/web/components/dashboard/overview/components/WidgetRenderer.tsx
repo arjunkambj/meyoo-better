@@ -90,8 +90,6 @@ export function WidgetRenderer({
           avgOrderValueChange={overviewMetrics?.avgOrderValue?.change ?? 0}
           currency={primaryCurrency}
           loading={isLoading}
-          purchaseFrequency={metricsData.purchaseFrequency ?? 0}
-          purchaseFrequencyChange={0}
         />
       );
     default:

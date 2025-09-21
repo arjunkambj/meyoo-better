@@ -29,6 +29,8 @@ interface SelectedItemsListProps {
   type: "kpi" | "widget";
   onItemsReorder: (items: string[]) => void;
   onItemRemove: (id: string) => void;
+  className?: string;
+  style?: React.CSSProperties;
 }
 
 export const SelectedItemsList = React.memo(function SelectedItemsList({
@@ -36,6 +38,8 @@ export const SelectedItemsList = React.memo(function SelectedItemsList({
   type,
   onItemsReorder,
   onItemRemove,
+  className,
+  style,
 }: SelectedItemsListProps) {
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -62,7 +66,7 @@ export const SelectedItemsList = React.memo(function SelectedItemsList({
   const additionalItems = useMemo(() => items.slice(10), [items]);
 
   return (
-    <div className="col-span-4 border-l pl-4 overflow-hidden">
+    <div className={`border-l pl-4 overflow-hidden ${className || ''}`} style={style}>
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold text-default-700">
           {type === "kpi" ? "Selected KPIs" : "Selected Widgets"}

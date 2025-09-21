@@ -187,13 +187,6 @@ export function useOverviewAnalytics(dateRange?: {
           suffix: "%",
           decimal: 1,
         },
-        ebitdaMargin: {
-          label: "EBITDA Margin",
-          value: 0, // Still calculated elsewhere
-          suffix: "%",
-          decimal: 1,
-        },
-
         // Marketing Analytics
         totalAdSpend: {
           label: "Total Ad Spend",
@@ -207,21 +200,9 @@ export function useOverviewAnalytics(dateRange?: {
           change: summary.metaAdSpendChange || 0,
           prefix: currencySymbol,
         },
-        googleAdSpend: {
-          label: "Google Ad Spend",
-          value: summary.googleAdSpend || 0,
-          change: summary.googleAdSpendChange || 0,
-          prefix: currencySymbol,
-        },
         metaSpendPercentage: {
           label: "Meta % of Ad Spend",
           value: summary.metaSpendPercentage || 0,
-          suffix: "%",
-          decimal: 1,
-        },
-        googleSpendPercentage: {
-          label: "Google % of Ad Spend",
-          value: summary.googleSpendPercentage || 0,
           suffix: "%",
           decimal: 1,
         },
@@ -245,12 +226,6 @@ export function useOverviewAnalytics(dateRange?: {
           label: "Meta ROAS",
           value: summary.metaROAS || 0,
           change: summary.metaROASChange || 0,
-          decimal: 2,
-        },
-        googleROAS: {
-          label: "Google ROAS",
-          value: summary.googleROAS || 0,
-          change: summary.googleROASChange || 0,
           decimal: 2,
         },
 

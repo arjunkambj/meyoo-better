@@ -34,7 +34,6 @@ export const metricsDaily = defineTable({
   avgOrderCost: v.number(),
   avgOrderProfit: v.number(),
   adSpendPerOrder: v.number(),
-  purchaseFrequency: v.number(),
 
   // 4. Customer Summary
   totalCustomers: v.number(),
@@ -60,7 +59,6 @@ export const metricsDaily = defineTable({
   blendedConversionRate: v.optional(v.number()), // Made optional for existing data
 
   // Session & Conversion Tracking
-  totalSessions: v.optional(v.number()), // Total website sessions
   uniqueVisitors: v.optional(v.number()), // Unique visitors
   shopifySessions: v.optional(v.number()), // Shopify store sessions
   shopifyConversionRate: v.optional(v.number()), // Shopify session to order conversion rate
@@ -79,7 +77,6 @@ export const metricsDaily = defineTable({
   googleSpendPercentage: v.optional(v.number()),
   marketingPercentageOfGross: v.optional(v.number()),
   marketingPercentageOfNet: v.optional(v.number()),
-  marketingEfficiencyRatio: v.optional(v.number()),
   metaROAS: v.optional(v.number()),
   googleROAS: v.optional(v.number()),
 
@@ -102,11 +99,7 @@ export const metricsDaily = defineTable({
   metaLandingPageViews: v.optional(v.number()),
   metaVideoViews: v.optional(v.number()),
   metaVideo3SecViews: v.optional(v.number()),
-  metaVideoThruPlay: v.optional(v.number()),
   metaCostPerThruPlay: v.optional(v.number()),
-  metaQualityRanking: v.optional(v.number()),
-  metaEngagementRateRanking: v.optional(v.number()),
-  metaConversionRateRanking: v.optional(v.number()),
 
   // 8. Cost Structure Percentages
   cogsPercentageOfGross: v.optional(v.number()),
@@ -118,47 +111,33 @@ export const metricsDaily = defineTable({
   handlingFeesPercentage: v.optional(v.number()),
   customCostsPercentage: v.optional(v.number()),
   discountRate: v.optional(v.number()),
-  operatingExpenseRatio: v.optional(v.number()),
 
   // 9. Profitability Margins
   contributionMargin: v.optional(v.number()),
   contributionMarginPercentage: v.optional(v.number()),
   operatingMargin: v.optional(v.number()),
-  ebitdaMargin: v.optional(v.number()),
 
   // 10. Customer Economics
   cacPercentageOfAOV: v.optional(v.number()),
-  cacPercentageOfFirstOrder: v.optional(v.number()),
   cacPaybackPeriod: v.optional(v.number()),
-  customerRetentionCost: v.optional(v.number()),
-  revenuePerCustomer: v.optional(v.number()),
-  ordersPerCustomer: v.optional(v.number()),
   profitPerCustomer: v.optional(v.number()),
 
   // 11. Unit Economics
   profitPerOrder: v.optional(v.number()),
   profitPerUnit: v.optional(v.number()),
-  costPerOrder: v.optional(v.number()),
-  marketingCostPerOrder: v.optional(v.number()),
   fulfillmentCostPerOrder: v.optional(v.number()),
 
   // 12. Operational Efficiency
   inventoryTurnover: v.optional(v.number()),
-  cashConversionCycle: v.optional(v.number()),
-  operatingLeverage: v.optional(v.number()),
   returnProcessingCost: v.optional(v.number()),
-  wastePercentage: v.optional(v.number()),
 
   // 13. Existing Rates & Percentages
   cancelledOrderRate: v.optional(v.number()),
   returnRate: v.optional(v.number()),
   refundRate: v.optional(v.number()),
-  expenseToRevenueRatio: v.optional(v.number()),
 
   // 14. Growth Metrics
   moMRevenueGrowth: v.optional(v.number()),
-  yoYRevenueGrowth: v.optional(v.number()),
-  retentionRate: v.optional(v.number()),
 
   // Metadata
   updatedAt: v.optional(v.number()),
@@ -201,7 +180,6 @@ export const metricsWeekly = defineTable({
   avgOrderCost: v.number(),
   avgOrderProfit: v.number(),
   adSpendPerOrder: v.number(),
-  purchaseFrequency: v.number(),
 
   totalCustomers: v.number(),
   newCustomers: v.number(),
@@ -231,7 +209,6 @@ export const metricsWeekly = defineTable({
   googleSpendPercentage: v.optional(v.number()),
   marketingPercentageOfGross: v.optional(v.number()),
   marketingPercentageOfNet: v.optional(v.number()),
-  marketingEfficiencyRatio: v.optional(v.number()),
   metaROAS: v.optional(v.number()),
   googleROAS: v.optional(v.number()),
 
@@ -257,11 +234,7 @@ export const metricsWeekly = defineTable({
   metaLandingPageViews: v.optional(v.number()),
   metaVideoViews: v.optional(v.number()),
   metaVideo3SecViews: v.optional(v.number()),
-  metaVideoThruPlay: v.optional(v.number()),
   metaCostPerThruPlay: v.optional(v.number()),
-  metaQualityRanking: v.optional(v.number()),
-  metaEngagementRateRanking: v.optional(v.number()),
-  metaConversionRateRanking: v.optional(v.number()),
 
   // Cost Structure Percentages
   cogsPercentageOfGross: v.optional(v.number()),
@@ -273,47 +246,33 @@ export const metricsWeekly = defineTable({
   handlingFeesPercentage: v.optional(v.number()),
   customCostsPercentage: v.optional(v.number()),
   discountRate: v.optional(v.number()),
-  operatingExpenseRatio: v.optional(v.number()),
 
   // Profitability Margins
   contributionMargin: v.optional(v.number()),
   contributionMarginPercentage: v.optional(v.number()),
   operatingMargin: v.optional(v.number()),
-  ebitdaMargin: v.optional(v.number()),
 
   // Customer Economics
   cacPercentageOfAOV: v.optional(v.number()),
-  cacPercentageOfFirstOrder: v.optional(v.number()),
   cacPaybackPeriod: v.optional(v.number()),
-  customerRetentionCost: v.optional(v.number()),
-  revenuePerCustomer: v.optional(v.number()),
-  ordersPerCustomer: v.optional(v.number()),
   profitPerCustomer: v.optional(v.number()),
 
   // Unit Economics
   profitPerOrder: v.optional(v.number()),
   profitPerUnit: v.optional(v.number()),
-  costPerOrder: v.optional(v.number()),
-  marketingCostPerOrder: v.optional(v.number()),
   fulfillmentCostPerOrder: v.optional(v.number()),
 
   // Operational Efficiency
   inventoryTurnover: v.optional(v.number()),
-  cashConversionCycle: v.optional(v.number()),
-  operatingLeverage: v.optional(v.number()),
   returnProcessingCost: v.optional(v.number()),
-  wastePercentage: v.optional(v.number()),
 
   // Existing Rates & Percentages
   cancelledOrderRate: v.optional(v.number()),
   returnRate: v.optional(v.number()),
   refundRate: v.optional(v.number()),
-  expenseToRevenueRatio: v.optional(v.number()),
 
   // Growth Metrics
   moMRevenueGrowth: v.optional(v.number()),
-  yoYRevenueGrowth: v.optional(v.number()),
-  retentionRate: v.optional(v.number()),
 
   updatedAt: v.optional(v.number()),
   lastSyncedAt: v.optional(v.number()),
@@ -353,7 +312,6 @@ export const metricsMonthly = defineTable({
   avgOrderCost: v.number(),
   avgOrderProfit: v.number(),
   adSpendPerOrder: v.number(),
-  purchaseFrequency: v.number(),
 
   totalCustomers: v.number(),
   newCustomers: v.number(),
@@ -383,7 +341,6 @@ export const metricsMonthly = defineTable({
   googleSpendPercentage: v.optional(v.number()),
   marketingPercentageOfGross: v.optional(v.number()),
   marketingPercentageOfNet: v.optional(v.number()),
-  marketingEfficiencyRatio: v.optional(v.number()),
   metaROAS: v.optional(v.number()),
   googleROAS: v.optional(v.number()),
 
@@ -409,11 +366,7 @@ export const metricsMonthly = defineTable({
   metaLandingPageViews: v.optional(v.number()),
   metaVideoViews: v.optional(v.number()),
   metaVideo3SecViews: v.optional(v.number()),
-  metaVideoThruPlay: v.optional(v.number()),
   metaCostPerThruPlay: v.optional(v.number()),
-  metaQualityRanking: v.optional(v.number()),
-  metaEngagementRateRanking: v.optional(v.number()),
-  metaConversionRateRanking: v.optional(v.number()),
 
   // Cost Structure Percentages
   cogsPercentageOfGross: v.optional(v.number()),
@@ -425,47 +378,33 @@ export const metricsMonthly = defineTable({
   handlingFeesPercentage: v.optional(v.number()),
   customCostsPercentage: v.optional(v.number()),
   discountRate: v.optional(v.number()),
-  operatingExpenseRatio: v.optional(v.number()),
 
   // Profitability Margins
   contributionMargin: v.optional(v.number()),
   contributionMarginPercentage: v.optional(v.number()),
   operatingMargin: v.optional(v.number()),
-  ebitdaMargin: v.optional(v.number()),
 
   // Customer Economics
   cacPercentageOfAOV: v.optional(v.number()),
-  cacPercentageOfFirstOrder: v.optional(v.number()),
   cacPaybackPeriod: v.optional(v.number()),
-  customerRetentionCost: v.optional(v.number()),
-  revenuePerCustomer: v.optional(v.number()),
-  ordersPerCustomer: v.optional(v.number()),
   profitPerCustomer: v.optional(v.number()),
 
   // Unit Economics
   profitPerOrder: v.optional(v.number()),
   profitPerUnit: v.optional(v.number()),
-  costPerOrder: v.optional(v.number()),
-  marketingCostPerOrder: v.optional(v.number()),
   fulfillmentCostPerOrder: v.optional(v.number()),
 
   // Operational Efficiency
   inventoryTurnover: v.optional(v.number()),
-  cashConversionCycle: v.optional(v.number()),
-  operatingLeverage: v.optional(v.number()),
   returnProcessingCost: v.optional(v.number()),
-  wastePercentage: v.optional(v.number()),
 
   // Existing Rates & Percentages
   cancelledOrderRate: v.optional(v.number()),
   returnRate: v.optional(v.number()),
   refundRate: v.optional(v.number()),
-  expenseToRevenueRatio: v.optional(v.number()),
 
   // Growth Metrics
   moMRevenueGrowth: v.optional(v.number()),
-  yoYRevenueGrowth: v.optional(v.number()),
-  retentionRate: v.optional(v.number()),
 
   updatedAt: v.optional(v.number()),
   lastSyncedAt: v.optional(v.number()),
@@ -592,7 +531,6 @@ export const customerMetrics = defineTable({
   avgOrderValue: v.number(),
 
   // Frequency
-  purchaseFrequency: v.number(), // orders per month
   daysBetweenPurchases: v.optional(v.number()),
 
   // Attribution
@@ -1138,3 +1076,4 @@ export const customerJourneyMetrics = defineTable({
   .index("by_customer", ["customerId"])
   .index("by_first_touch", ["firstTouchpoint"])
   .index("by_path_length", ["pathLength"]);
+

@@ -395,9 +395,6 @@ export const getMarginAnalysis = query({
     const avgOperatingMargin =
       filteredMetrics.reduce((sum, m) => sum + (m.operatingMargin || 0), 0) /
       filteredMetrics.length;
-    const avgEbitdaMargin =
-      filteredMetrics.reduce((sum, m) => sum + (m.ebitdaMargin || 0), 0) /
-      filteredMetrics.length;
     const avgNetMargin =
       filteredMetrics.reduce((sum, m) => sum + (m.netProfitMargin || 0), 0) /
       filteredMetrics.length;
@@ -412,9 +409,6 @@ export const getMarginAnalysis = query({
       operatingMargin: avgOperatingMargin,
       operatingMarginTarget: 40,
       operatingMarginChange: 3.1,
-      ebitdaMargin: avgEbitdaMargin,
-      ebitdaMarginTarget: 38,
-      ebitdaMarginChange: 1.8,
       netMargin: avgNetMargin,
       netMarginTarget: 30,
       netMarginChange: 2.5,

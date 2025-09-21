@@ -32,14 +32,12 @@ export const getCustomerOverview = query({
       avgOrderValue: v.number(),
       avgOrdersPerCustomer: v.number(),
       customerAcquisitionCost: v.number(),
-      retentionRate: v.number(),
       churnRate: v.number(),
       repeatPurchaseRate: v.number(),
       changes: v.object({
         totalCustomers: v.number(),
         newCustomers: v.number(),
         lifetimeValue: v.number(),
-        retentionRate: v.number(),
       }),
     }),
   ),
@@ -217,10 +215,6 @@ export const getCustomerOverview = query({
     const avgCAC = avgLifetimeValue * 0.3; // Assume 30% of LTV as CAC
 
     // Calculate rates
-    const retentionRate =
-      customersWithOrders.length > 0
-        ? (activeCustomers / customersWithOrders.length) * 100
-        : 0;
     const churnRate =
       customersWithOrders.length > 0
         ? (churnedCustomers / customersWithOrders.length) * 100
@@ -235,7 +229,6 @@ export const getCustomerOverview = query({
       totalCustomers: 0,
       newCustomers: 0,
       lifetimeValue: 0,
-      retentionRate: 0,
     };
 
     // If we have a date range, calculate changes from previous period
@@ -288,7 +281,6 @@ export const getCustomerOverview = query({
           : 0;
       changes.lifetimeValue =
         prevLTV > 0 ? ((avgLifetimeValue - prevLTV) / prevLTV) * 100 : 0;
-      changes.retentionRate = retentionRate * 0.05; // Small positive change for now
     }
 
     return {
@@ -301,7 +293,6 @@ export const getCustomerOverview = query({
       avgOrderValue,
       avgOrdersPerCustomer,
       customerAcquisitionCost: avgCAC,
-      retentionRate,
       churnRate,
       repeatPurchaseRate,
       changes,

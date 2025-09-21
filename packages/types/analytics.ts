@@ -35,7 +35,6 @@ export interface Metrics {
   avgOrderCost: number;
   avgOrderProfit: number;
   adSpendPerOrder: number;
-  purchaseFrequency: number;
 
   // Customer Summary
   totalCustomers: number;
@@ -62,7 +61,6 @@ export interface Metrics {
   blendedConversionRate?: number;
 
   // Session & Conversion Tracking
-  totalSessions?: number;
   uniqueVisitors?: number;
   shopifySessions?: number;
   shopifyConversionRate?: number;
@@ -81,7 +79,6 @@ export interface Metrics {
   googleSpendPercentage?: number;
   marketingPercentageOfGross?: number;
   marketingPercentageOfNet?: number;
-  marketingEfficiencyRatio?: number;
   metaROAS?: number;
   googleROAS?: number;
 
@@ -95,47 +92,33 @@ export interface Metrics {
   handlingFeesPercentage?: number;
   customCostsPercentage?: number;
   discountRate?: number;
-  operatingExpenseRatio?: number;
 
   // Profitability Margins
   contributionMargin?: number;
   contributionMarginPercentage?: number;
   operatingMargin?: number;
-  ebitdaMargin?: number;
 
   // Customer Economics
   cacPercentageOfAOV?: number;
-  cacPercentageOfFirstOrder?: number;
   cacPaybackPeriod?: number;
-  customerRetentionCost?: number;
-  revenuePerCustomer?: number;
-  ordersPerCustomer?: number;
   profitPerCustomer?: number;
 
   // Unit Economics
   profitPerOrder?: number;
   profitPerUnit?: number;
-  costPerOrder?: number;
-  marketingCostPerOrder?: number;
   fulfillmentCostPerOrder?: number;
 
   // Operational Efficiency
   inventoryTurnover?: number;
-  cashConversionCycle?: number;
-  operatingLeverage?: number;
   returnProcessingCost?: number;
-  wastePercentage?: number;
 
   // Existing Rates & Percentages
   cancelledOrderRate?: number;
   returnRate?: number;
   refundRate?: number;
-  expenseToRevenueRatio?: number;
 
   // Growth Metrics
   moMRevenueGrowth?: number;
-  yoYRevenueGrowth?: number;
-  retentionRate?: number;
 
   // Currency information
   currency?: string;
@@ -255,7 +238,6 @@ export interface CustomerMetrics {
   avgOrderValue: number;
 
   // Frequency
-  purchaseFrequency: number;
   daysBetweenPurchases?: number;
 
   // Attribution

@@ -325,7 +325,6 @@ type DailyMetric = {
   metaLandingPageViews: number;
   metaVideoViews: number;
   metaVideo3SecViews: number;
-  metaVideoThruPlay: number;
   metaCostPerThruPlay: number;
   googleAdSpend: number;
   totalAdSpend: number;
@@ -560,7 +559,6 @@ function calculateDailyMetrics(data: AnalyticsData): DailyMetric[] {
     metrics.metaLandingPageViews += insight.landingPageViews || 0;
     metrics.metaVideoViews += insight.videoViews || 0;
     metrics.metaVideo3SecViews += insight.video3SecViews || 0;
-    metrics.metaVideoThruPlay += insight.videoThruPlay || 0;
 
     // Reach and frequency (use max for reach as it's unique users)
     if (insight.reach) {
@@ -589,10 +587,7 @@ function calculateDailyMetrics(data: AnalyticsData): DailyMetric[] {
       metrics.metaConversions > 0
         ? metrics.metaAdSpend / metrics.metaConversions
         : 0;
-    metrics.metaCostPerThruPlay =
-      metrics.metaVideoThruPlay > 0
-        ? metrics.metaAdSpend / metrics.metaVideoThruPlay
-        : 0;
+    metrics.metaCostPerThruPlay = 0;
   }
 
   // Process costs - apply to all dates that have orders
@@ -970,7 +965,6 @@ function initializeMetrics(date: string, organizationId: string): DailyMetric {
     metaLandingPageViews: 0,
     metaVideoViews: 0,
     metaVideo3SecViews: 0,
-    metaVideoThruPlay: 0,
     metaCostPerThruPlay: 0,
     googleAdSpend: 0,
 
@@ -1046,7 +1040,6 @@ export const storeMetric = internalMutation({
       avgOrderCost: args.metrics.avgOrderCost || 0,
       avgOrderProfit: args.metrics.avgOrderProfit || 0,
       adSpendPerOrder: args.metrics.adSpendPerOrder || 0,
-      purchaseFrequency: args.metrics.purchaseFrequency || 0,
 
       // Customer Summary
       totalCustomers: args.metrics.totalCustomers || 0,
@@ -1097,7 +1090,6 @@ export const storeMetric = internalMutation({
       metaLandingPageViews: args.metrics.metaLandingPageViews || 0,
       metaVideoViews: args.metrics.metaVideoViews || 0,
       metaVideo3SecViews: args.metrics.metaVideo3SecViews || 0,
-      metaVideoThruPlay: args.metrics.metaVideoThruPlay || 0,
       metaCostPerThruPlay: args.metrics.metaCostPerThruPlay || 0,
       googleAdSpend: args.metrics.googleAdSpend,
       metaROAS: args.metrics.metaROAS,
@@ -1351,7 +1343,6 @@ type AggregateMetric = {
   metaLandingPageViews?: number;
   metaVideoViews?: number;
   metaVideo3SecViews?: number;
-  metaVideoThruPlay?: number;
   metaCostPerThruPlay?: number; // derived
 };
 
@@ -1412,7 +1403,6 @@ function initializeAggregateMetric(
     metaLandingPageViews: 0,
     metaVideoViews: 0,
     metaVideo3SecViews: 0,
-    metaVideoThruPlay: 0,
   };
 }
 
@@ -1464,8 +1454,6 @@ function aggregateMetric(aggregate: AggregateMetric, daily: DailyMetric): void {
     (aggregate.metaVideoViews || 0) + (daily.metaVideoViews || 0);
   aggregate.metaVideo3SecViews =
     (aggregate.metaVideo3SecViews || 0) + (daily.metaVideo3SecViews || 0);
-  aggregate.metaVideoThruPlay =
-    (aggregate.metaVideoThruPlay || 0) + (daily.metaVideoThruPlay || 0);
   aggregate.shippingCosts += daily.shippingCosts || 0;
   aggregate.customCosts += daily.customCosts || 0;
   aggregate.transactionFees += daily.transactionFees || 0;
@@ -1553,7 +1541,6 @@ export const storeWeeklyMetric = internalMutation({
       avgOrderProfit: metric.orders > 0 ? metric.profit / metric.orders : 0,
       adSpendPerOrder:
         metric.orders > 0 ? metric.totalAdSpend / metric.orders : 0,
-      purchaseFrequency: 0,
 
       // Customer metrics
       totalCustomers: metric.customers?.size || 0,
@@ -1610,11 +1597,7 @@ export const storeWeeklyMetric = internalMutation({
       metaLandingPageViews: metric.metaLandingPageViews || 0,
       metaVideoViews: metric.metaVideoViews || 0,
       metaVideo3SecViews: metric.metaVideo3SecViews || 0,
-      metaVideoThruPlay: metric.metaVideoThruPlay || 0,
-      metaCostPerThruPlay:
-        (metric.metaVideoThruPlay || 0) > 0
-          ? (metric.metaAdSpend || 0) / (metric.metaVideoThruPlay || 1)
-          : 0,
+      metaCostPerThruPlay: 0,
 
       updatedAt: Date.now(),
     };
@@ -1683,7 +1666,6 @@ export const storeMonthlyMetric = internalMutation({
       avgOrderProfit: metric.orders > 0 ? metric.profit / metric.orders : 0,
       adSpendPerOrder:
         metric.orders > 0 ? metric.totalAdSpend / metric.orders : 0,
-      purchaseFrequency: 0,
 
       // Customer metrics
       totalCustomers: metric.customers?.size || 0,
@@ -1740,11 +1722,7 @@ export const storeMonthlyMetric = internalMutation({
       metaLandingPageViews: metric.metaLandingPageViews || 0,
       metaVideoViews: metric.metaVideoViews || 0,
       metaVideo3SecViews: metric.metaVideo3SecViews || 0,
-      metaVideoThruPlay: metric.metaVideoThruPlay || 0,
-      metaCostPerThruPlay:
-        (metric.metaVideoThruPlay || 0) > 0
-          ? (metric.metaAdSpend || 0) / (metric.metaVideoThruPlay || 1)
-          : 0,
+      metaCostPerThruPlay: 0,
 
       updatedAt: Date.now(),
     };

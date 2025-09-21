@@ -18,14 +18,12 @@ interface CustomerOverviewMetrics {
   ltvCacRatio: number; // Added
   avgOrderValue: number;
   avgOrdersPerCustomer: number;
-  retentionRate: number;
   churnRate: number;
   repeatPurchaseRate: number;
   changes: {
     totalCustomers: number;
     newCustomers: number;
     avgLTV: number; // Changed from lifetimeValue
-    retentionRate: number;
     churnRate: number; // Added
   };
 }
@@ -115,14 +113,12 @@ export function useCustomerAnalytics(dateRange?: {
       ltvCacRatio: cac > 0 ? ltv / cac : 0,
       avgOrderValue: overviewData.avgOrderValue,
       avgOrdersPerCustomer: overviewData.avgOrdersPerCustomer,
-      retentionRate: overviewData.retentionRate,
       churnRate: overviewData.churnRate,
       repeatPurchaseRate: overviewData.repeatPurchaseRate,
       changes: {
         totalCustomers: overviewData.changes.totalCustomers,
         newCustomers: overviewData.changes.newCustomers,
         avgLTV: overviewData.changes.lifetimeValue,
-        retentionRate: overviewData.changes.retentionRate,
         churnRate: overviewData.churnRate * -0.1, // Small negative change
       },
     };
@@ -244,7 +240,6 @@ export function useCustomerAnalytics(dateRange?: {
             primaryCurrency
           ),
           "LTV:CAC Ratio": `${overview.ltvCacRatio.toFixed(1)}x`,
-          "Retention Rate": `${overview.retentionRate.toFixed(1)}%`,
           "Churn Rate": `${overview.churnRate.toFixed(1)}%`,
           "Repeat Purchase Rate": `${overview.repeatPurchaseRate.toFixed(1)}%`,
         },

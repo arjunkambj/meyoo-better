@@ -317,7 +317,6 @@ export const getCustomerInsights = query({
       returningCustomers: v.number(),
       avgOrderValue: v.number(),
       avgLifetimeValue: v.number(),
-      retentionRate: v.number(),
     }),
   ),
   handler: async (ctx, args) => {
@@ -363,8 +362,6 @@ export const getCustomerInsights = query({
       returningCustomers,
       avgOrderValue: totalOrders > 0 ? totalRevenue / totalOrders : 0,
       avgLifetimeValue: totalCustomers > 0 ? totalRevenue / totalCustomers : 0,
-      retentionRate:
-        totalCustomers > 0 ? (returningCustomers / totalCustomers) * 100 : 0,
     };
   },
 });
@@ -538,11 +535,7 @@ export const getPlatformMetrics = query({
       metaLandingPageViews: v.number(),
       metaVideoViews: v.number(),
       metaVideo3SecViews: v.number(),
-      metaVideoThruPlay: v.number(),
       metaCostPerThruPlay: v.number(),
-      metaQualityRanking: v.number(),
-      metaEngagementRateRanking: v.number(),
-      metaConversionRateRanking: v.number(),
 
       // Google metrics
       googleSessions: v.number(),
@@ -602,12 +595,8 @@ export const getPlatformMetrics = query({
       metaLandingPageViews: 0,
       metaVideoViews: 0,
       metaVideo3SecViews: 0,
-        metaVideoThruPlay: 0,
-        metaCostPerThruPlay: 0,
-        metaQualityRanking: 0,
-        metaEngagementRateRanking: 0,
-        metaConversionRateRanking: 0,
-        googleSessions: 0,
+      metaCostPerThruPlay: 0,
+      googleSessions: 0,
         googleConversion: 0,
         googleClicks: 0,
         googleCTR: 0,
@@ -659,19 +648,6 @@ export const getPlatformMetrics = query({
     );
 
     // Aggregate Meta insights for more accurate data
-    const rankToScore = (rank?: string): number => {
-      switch (rank) {
-        case "ABOVE_AVERAGE":
-          return 3;
-        case "AVERAGE":
-          return 2;
-        case "BELOW_AVERAGE":
-          return 1;
-        default:
-          return 0;
-      }
-    };
-
     const metaAggregated = metaInsights.reduce(
       (acc, insight) => {
         const impressions = insight.impressions || 0;
@@ -702,23 +678,6 @@ export const getPlatformMetrics = query({
         acc.video3SecViews += insight.video3SecViews || 0;
         acc.videoThruPlay += insight.videoThruPlay || 0;
 
-        // Rankings (map string to numeric score and average later)
-        const q = rankToScore(insight.qualityRanking as any);
-        const e = rankToScore(insight.engagementRateRanking as any);
-        const c = rankToScore(insight.conversionRateRanking as any);
-        if (q) {
-          acc.qualityRanking.total += q;
-          acc.qualityRanking.count += 1;
-        }
-        if (e) {
-          acc.engagementRateRanking.total += e;
-          acc.engagementRateRanking.count += 1;
-        }
-        if (c) {
-          acc.conversionRateRanking.total += c;
-          acc.conversionRateRanking.count += 1;
-        }
-
         return acc;
       },
       {
@@ -739,9 +698,6 @@ export const getPlatformMetrics = query({
         videoViews: 0,
         video3SecViews: 0,
         videoThruPlay: 0,
-        qualityRanking: { total: 0, count: 0 },
-        engagementRateRanking: { total: 0, count: 0 },
-        conversionRateRanking: { total: 0, count: 0 },
       },
     );
 
@@ -829,25 +785,9 @@ export const getPlatformMetrics = query({
       metaLandingPageViews: metaAggregated.landingPageViews,
       metaVideoViews: metaAggregated.videoViews,
       metaVideo3SecViews: metaAggregated.video3SecViews,
-      metaVideoThruPlay: metaAggregated.videoThruPlay,
       metaCostPerThruPlay:
         metaAggregated.videoThruPlay > 0
           ? metaAggregated.spend / metaAggregated.videoThruPlay
-          : 0,
-      metaQualityRanking:
-        metaAggregated.qualityRanking.count > 0
-          ? metaAggregated.qualityRanking.total /
-            metaAggregated.qualityRanking.count
-          : 0,
-      metaEngagementRateRanking:
-        metaAggregated.engagementRateRanking.count > 0
-          ? metaAggregated.engagementRateRanking.total /
-            metaAggregated.engagementRateRanking.count
-          : 0,
-      metaConversionRateRanking:
-        metaAggregated.conversionRateRanking.count > 0
-          ? metaAggregated.conversionRateRanking.total /
-            metaAggregated.conversionRateRanking.count
           : 0,
 
       // Google metrics
@@ -1214,7 +1154,6 @@ export const getCustomerAnalytics = query({
       returningCustomers: v.number(),
       customerLifetimeValue: v.number(),
       averageOrderValue: v.number(),
-      purchaseFrequency: v.number(),
       churnRate: v.number(),
     }),
   ),
@@ -1251,8 +1190,10 @@ export const getCustomerAnalytics = query({
       return lastOrder && lastOrder > thirtyDaysAgo;
     }).length;
 
-    const retentionRate =
-      totalCustomers > 0 ? (activeCustomers / totalCustomers) * 100 : 0;
+    const churnRate =
+      totalCustomers > 0
+        ? ((totalCustomers - activeCustomers) / totalCustomers) * 100
+        : 0;
 
     return {
       totalCustomers,
@@ -1260,8 +1201,7 @@ export const getCustomerAnalytics = query({
       returningCustomers,
       customerLifetimeValue: avgLifetimeValue,
       averageOrderValue: avgOrderValue,
-      purchaseFrequency: 2.5, // Default value, calculate from actual data
-      churnRate: 100 - retentionRate,
+      churnRate,
     };
   },
 });

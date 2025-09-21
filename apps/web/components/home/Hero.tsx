@@ -10,16 +10,13 @@ export default function Hero() {
     <section className="relative w-full min-h-[calc(90vh)] flex items-center justify-center bg-background overflow-hidden pt-[calc(env(safe-area-inset-top)+64px)] sm:pt-[calc(env(safe-area-inset-top)+72px)] md:pt-20">
       {/* Sophisticated background system */}
       <div className="absolute inset-0 pointer-events-none">
-        {/* Base gradient mesh */}
-        <div className="absolute inset-0 bg-gradient-to-br from-indigo-50/20 via-background to-blue-50/20 dark:from-indigo-950/10 dark:via-background dark:to-blue-950/10" />
-
         {/* Floating orbs - positioned strategically */}
         <div
           className="absolute top-1/4 left-1/3 w-64 h-64 bg-primary/5 rounded-full blur-2xl animate-pulse"
           style={{ animationDuration: "4s" }}
         />
         <div
-          className="absolute bottom-1/3 right-1/4 w-80 h-80 bg-secondary/4 rounded-full blur-3xl animate-pulse"
+          className="absolute bottom-1/3 right-1/4 w-80 h-80 bg-primary/4 rounded-full blur-3xl animate-pulse"
           style={{ animationDuration: "6s", animationDelay: "2s" }}
         />
 
@@ -52,7 +49,7 @@ export default function Hero() {
             {/* Heading */}
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold mb-4 sm:mb-6 leading-[1.1]">
               Know Your{" "}
-              <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-primary to-primary bg-clip-text text-transparent">
                 Real Profit
               </span>
             </h1>
@@ -86,28 +83,6 @@ export default function Hero() {
                 Install App
               </Button>
             </div>
-
-            {/* Trust claims — minimal, two items, single line on all breakpoints */}
-            <div className="flex items-center justify-center lg:justify-start gap-x-6 sm:gap-x-8 text-sm sm:text-base flex-nowrap">
-              <div className="inline-flex items-center gap-2 shrink-0">
-                <Icon
-                  className="text-warning"
-                  icon="solar:star-linear"
-                  width={18}
-                />
-                <span className="font-semibold text-foreground">4.9/5</span>
-                <span className="text-default-500">· 500+ founders</span>
-              </div>
-              <div className="inline-flex items-center gap-2 shrink-0">
-                <Icon
-                  className="text-primary"
-                  icon="solar:coins-linear"
-                  width={18}
-                />
-                <span className="font-semibold text-foreground">$10M+</span>
-                <span className="text-default-500">revenue tracked</span>
-              </div>
-            </div>
           </motion.div>
 
           {/* Right: Clean Visual */}
@@ -124,7 +99,7 @@ export default function Hero() {
               <div className="bg-content1/70 dark:bg-content1/40 backdrop-blur-md border border-divider rounded-3xl px-6 sm:px-8 md:px-12 lg:px-16 xl:px-20 py-6 sm:py-8 md:py-10 lg:py-12 shadow-lg w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl">
                 <div className="text-center">
                   {/* Profit amount */}
-                  <div className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-bold mb-3 sm:mb-4 md:mb-5 lg:mb-6 bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text text-transparent leading-none">
+                  <div className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-bold mb-3 sm:mb-4 md:mb-5 lg:mb-6 bg-gradient-to-r from-primary via-primary/80 to-primary bg-clip-text text-transparent leading-none">
                     $24.8K
                   </div>
 

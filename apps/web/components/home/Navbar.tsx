@@ -92,19 +92,15 @@ export default function CenteredNavbar() {
   };
 
   return (
-    <div className="fixed w-full top-2 md:top-4 z-50 px-4 md:px-6 py-2 md:py-3">
-      <div className="max-w-5xl mx-auto">
+    <div className="fixed w-full top-1 z-50 px-4 md:px-6 py-2 md:py-3">
+      <div className="max-w-[80vw] mx-auto">
         <Navbar
           className={`
-            ${
-              hasScrolled
-                ? "bg-content1/80 dark:bg-content1/40 backdrop-blur-md border border-divider ring-1 ring-white/10 dark:ring-white/5 shadow-xs"
-                : "bg-content1/70 dark:bg-content1/20 backdrop-blur-sm border border-divider/70 ring-1 ring-white/5 dark:ring-white/3 shadow-xs"
-            }
-            rounded-2xl transition-all duration-300
+            ${hasScrolled ? "bg-transparent border-1 border-default-300" : "bg-transparent border-1 border-default-300/60"}
+            rounded-xl transition-all duration-300
           `}
           classNames={{
-            base: "px-3 md:px-5 py-2.5 md:py-3 rounded-2xl",
+            base: "px-3 md:px-5 py-2.5 md:py-3 rounded-lg",
             wrapper: "px-0 max-w-none",
           }}
           height="auto"
@@ -127,8 +123,7 @@ export default function CenteredNavbar() {
               {navItems.map((item) => (
                 <NavbarItem key={item.name}>
                   <Button
-                    variant="light"
-                    className={`relative px-2 py-2 transition-all duration-200 font-medium text-sm group h-auto min-w-0 ${
+                    className={`relative px-2 py-2 transition-all bg-transparent hover:bg-transparent duration-200 font-medium text-sm  group h-auto min-w-0 ${
                       activeSection === item.href.substring(1) ||
                       (item.href === "/contact" && currentPath === "/contact")
                         ? "text-primary"
@@ -158,7 +153,7 @@ export default function CenteredNavbar() {
           </NavbarContent>
 
           {/* Right side - CTA */}
-          <NavbarContent className="hidden md:flex shrink-0" justify="end">
+          <NavbarContent className="hidden md:flex  shrink-0" justify="end">
             <NavbarItem>
               <Button
                 as={Link}

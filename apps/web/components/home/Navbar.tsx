@@ -13,7 +13,7 @@ import { Logo } from "@/components/shared/Logo";
 const navItems = [
   { name: "Integrations", href: "#integrations" },
   { name: "Testimonials", href: "#testimonials" },
-  { name: "Pricing", href: "/pricing" },
+  { name: "Pricing", href: "#pricing" },
   { name: "FAQ", href: "#faq" },
   { name: "Contact", href: "/contact" },
 ];

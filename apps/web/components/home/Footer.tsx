@@ -1,95 +1,141 @@
 "use client";
 
-import { Link } from "@heroui/react";
+import { Button } from "@heroui/react";
 import { Icon } from "@iconify/react";
 
-import { Logo } from "@/components/shared/Logo";
 import { footerNavigation } from "@/constants/navigation/footerNavigation";
 
-const footerSections = [
+import { Logo } from "@/components/shared/Logo";
+
+const navigationSections = [
   {
-    title: "Quick Links",
-    links: footerNavigation.main.filter(
-      (item) => item.name !== "Features" && item.name !== "Integrations",
-    ),
+    title: "Product",
+    links: footerNavigation.product.slice(0, 4),
   },
   {
-    title: "Legal",
-    links: footerNavigation.legal,
+    title: "Resources",
+    links: footerNavigation.resources.slice(0, 4),
+  },
+  {
+    title: "Company",
+    links: footerNavigation.company.slice(0, 4),
   },
 ];
 
-export default function Footer() {
-  return (
-    <footer className="relative bg-background border-t border-divider overflow-hidden">
-      {/* Section background unify */}
-      <div className="absolute inset-0 pointer-events-none">
-        {/* Thin 1px gradient line at top */}
-        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent dark:via-primary/25" />
-        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[900px] h-[360px] rounded-full bg-gradient-to-t from-primary/3 to-transparent dark:from-primary/5 opacity-50 blur-3xl" />
-      </div>
+const socialLinks = [
+  { icon: "ri:twitter-x-line", href: "https://x.com/meyoo", label: "X" },
+  {
+    icon: "mdi:linkedin",
+    href: "https://linkedin.com/company/meyoo",
+    label: "LinkedIn",
+  },
+  {
+    icon: "ic:baseline-discord",
+    href: "https://discord.gg/meyoo",
+    label: "Discord",
+  },
+  { icon: "mdi:youtube", href: "https://youtube.com/@meyoo", label: "YouTube" },
+];
 
-      <div className="relative z-10 mx-auto max-w-7xl px-6 md:px-8 lg:px-12 py-12">
-        {/* Main footer content */}
-        <div className="grid grid-cols-1 gap-12 md:grid-cols-4 md:gap-8">
-          {/* Logo and description */}
-          <div className="md:col-span-2">
-            <div className="flex items-center">
-              <Logo size="lg" />
-            </div>
-            <p className="mt-4 text-sm leading-6 text-default-600 max-w-sm">
-              Know your real profit. Connect Shopify + ad platforms and see
-              margins in real time.
-            </p>
-            {/* Social links */}
-            <div className="mt-6 flex space-x-4">
-              {footerNavigation.social.map((item) => (
-                <Link
-                  key={item.name}
-                  isExternal
-                  className="text-default-500 hover:text-primary transition-colors"
-                  href={item.href}
+const Footer = () => {
+  return (
+    <section className="bg-background pt-16 md:pt-24 pb-12">
+      <div className="container mx-auto">
+        <footer>
+          {/* CTA Section */}
+          <div className="mb-24 rounded-2xl max-w-7xl mx-auto bg-default-100 p-8 md:p-12 lg:p-16">
+            <div className="flex flex-col items-center text-center">
+              <h2 className="max-w-[800px] text-3xl leading-tight font-semibold tracking-tight text-balance md:text-4xl lg:text-5xl text-default-900 ">
+                Revolutionize Decision Making for your D2C{" "}
+                <span className="text-primary relative inline-block">
+                  Brand with Meyoo.
+                  <span className="bg-primary/20 absolute bottom-1 left-0 h-1 w-full rounded-full"></span>
+                </span>
+              </h2>
+              <p className="mt-4 max-w-[600px] text-lg text-default-600">
+                Connect every channel and get real-time clarity on true profit.
+              </p>
+              <div className="mt-8 flex flex-col gap-4 sm:flex-row">
+                <Button
+                  as="a"
+                  href="/get-started"
+                  size="lg"
+                  className="group"
+                  variant="solid"
+                  color="primary"
                 >
-                  <span className="sr-only">{item.name}</span>
-                  <Icon className="h-6 w-6" icon={item.icon} />
-                </Link>
+                  <span className="flex items-center gap-2">
+                    Start 14-day free trial
+                    <Icon
+                      icon="solar:arrow-right-linear"
+                      className="h-4 w-4 transition-transform group-hover:translate-x-1"
+                    />
+                  </span>
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Navigation Section */}
+          <nav className="border-divider grid grid-cols-1 gap-y-10 border-b border-t py-10 lg:grid-cols-[0.4fr_0.6fr] lg:gap-x-16 lg:py-16">
+            <div className="max-w-sm">
+              <Logo size="md" />
+              <p className="mt-4  text-default-600">
+                Meyoo centralizes your eCommerce insights so you can act on
+                accurate, real-time profitability.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 gap-y-10 sm:grid-cols-2 lg:grid-cols-3 sm:gap-x-12 lg:gap-x-14">
+              {navigationSections.map((section) => (
+                <div key={section.title}>
+                  <h3 className="mb-5 text-lg font-semibold text-default-900">
+                    {section.title}
+                  </h3>
+                  <ul className="space-y-4">
+                    {section.links.map((link) => (
+                      <li key={link.name}>
+                        <a
+                          href={link.href}
+                          className="inline-block text-default-600 transition-colors duration-200 hover:text-default-900"
+                        >
+                          {link.name}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               ))}
             </div>
-          </div>
+          </nav>
 
-          {/* Navigation sections */}
-          {footerSections.map((section) => (
-            <div key={section.title} className="col-span-1 md:ml-4">
-              <h3 className="text-sm font-semibold leading-6 text-foreground mb-4">
-                {section.title}
-              </h3>
-              <ul className="space-y-2">
-                {section.links.map((item) => (
-                  <li key={item.name}>
-                    <Link
-                      className="text-sm leading-6 text-default-600 hover:text-primary transition-colors"
-                      href={item.href}
-                      size="sm"
-                    >
-                      {item.name}
-                    </Link>
-                  </li>
+          {/* Bottom Section */}
+          <div className="mx-auto mt-4 py-8">
+            <div className="flex flex-col items-center justify-between gap-6 sm:flex-row">
+              <p className="font-medium text-default-600">
+                © 2025 Meyoo Inc. All rights reserved.
+              </p>
+              <div className="flex items-center gap-6">
+                {socialLinks.map((link) => (
+                  <a
+                    aria-label={link.label}
+                    key={link.href}
+                    href={link.href}
+                    className="text-default-600 transition-colors hover:text-default-900"
+                  >
+                    <Icon
+                      icon={link.icon}
+                      width={20}
+                      className="transition-transform hover:scale-110"
+                    />
+                  </a>
                 ))}
-              </ul>
+              </div>
             </div>
-          ))}
-        </div>
-
-        {/* Bottom section */}
-        <div className="mt-12 border-t border-divider pt-8">
-          <div className="flex justify-center">
-            {/* Copyright */}
-            <p className="text-xs text-default-500">
-              &copy; 2025 Meyoo Inc. All rights reserved.
-            </p>
           </div>
-        </div>
+        </footer>
       </div>
-    </footer>
+    </section>
   );
-}
+};
+
+export { Footer };

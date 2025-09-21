@@ -93,7 +93,7 @@ export default function CenteredNavbar() {
 
   return (
     <div className="fixed w-full top-1 z-50 px-4 md:px-6 py-2 md:py-3">
-      <div className="max-w-[80vw] mx-auto">
+      <div className="max-w-6xl mx-auto">
         <Navbar
           className={`
             ${hasScrolled ? "bg-transparent border-1 border-default-300/60" : "bg-transparent border-1 border-default-300/60"}

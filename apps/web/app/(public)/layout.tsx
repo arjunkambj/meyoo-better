@@ -1,6 +1,6 @@
-import Footer from "@/components/home/Footer";
 import CenteredNavbar from "@/components/home/Navbar";
 import { ThemeSwitch } from "@/components/home/ThemeSwitch";
+import { Footer } from "@/components/home/Footer";
 
 export default function HomeLayout({
   children,
@@ -12,7 +12,7 @@ export default function HomeLayout({
       <ThemeSwitch />
 
       <CenteredNavbar />
-      <main className="relative flex-1 z-10">{children}</main>
+      <main className="relative w-full flex-1 z-10">{children}</main>
       <Footer />
     </div>
   );

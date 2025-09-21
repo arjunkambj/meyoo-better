@@ -129,6 +129,7 @@ const KPI = React.memo(function KPI({
       className={cn(
         "bg-content2/90 dark:bg-content1 rounded-2xl border border-default-100  w-full overflow-hidden",
         paddingClass,
+        "shadow-none",
         sizeClasses[size],
         className
       )}

@@ -18,5 +18,13 @@
     "lib": "@/libs",
     "hooks": "@/hooks"
   },
-  "registries": {}
+  "registries": {
+    "@shadcnblocks": {
+      "url": "https://shadcnblocks.com/r/{name}",
+      "headers": {
+        "Authorization": "Bearer sk_live_Vdk8Uvbg_j6yq3MvfqzdsoRB-_68OruV"
+      }
+    },
+    "@magicui": "https://magicui.design/r/{name}.json"
+  }
 }

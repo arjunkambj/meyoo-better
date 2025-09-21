@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { cn } from "@heroui/react";
 import { usePathname, useRouter } from "next/navigation";
 import { PlanUsageAlert } from "../../shared/billing/PlanUsageAlert";
@@ -16,8 +17,16 @@ export default function DashBoardHeader({ className }: { className?: string }) {
 
   // Fast redirect for non-onboarded users
   const isOnboardingRoute = pathname?.startsWith("/onboarding");
-  if (user && user.isOnboarded === false && !isOnboardingRoute) {
-    router.replace("/onboarding/shopify");
+  const shouldRedirectToOnboarding =
+    Boolean(user && user.isOnboarded === false && !isOnboardingRoute);
+
+  useEffect(() => {
+    if (shouldRedirectToOnboarding) {
+      router.replace("/onboarding/shopify");
+    }
+  }, [router, shouldRedirectToOnboarding]);
+
+  if (shouldRedirectToOnboarding) {
     return null;
   }
 

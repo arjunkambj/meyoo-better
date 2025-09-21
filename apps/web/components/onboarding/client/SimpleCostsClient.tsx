@@ -5,7 +5,13 @@ import { Icon } from "@iconify/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { useCost, useOnboarding, useOnboardingCosts, useUpdateOnboardingState, useUser } from "@/hooks";
+import {
+  useCost,
+  useOnboarding,
+  useOnboardingCosts,
+  useUpdateOnboardingState,
+  useUser,
+} from "@/hooks";
 import { getCurrencySymbol } from "@/libs/utils/format";
 import { trackOnboardingAction, trackOnboardingView } from "@/libs/analytics";
 import { useSetAtom } from "jotai";
@@ -17,7 +23,10 @@ export default function SimpleCostsClient() {
   const { saveInitialCosts } = useOnboardingCosts();
   const updateOnboardingState = useUpdateOnboardingState();
   const { primaryCurrency } = useUser();
-  const currencySymbol = useMemo(() => getCurrencySymbol(primaryCurrency), [primaryCurrency]);
+  const currencySymbol = useMemo(
+    () => getCurrencySymbol(primaryCurrency),
+    [primaryCurrency]
+  );
   const setNavigationPending = useSetAtom(setNavigationPendingAtom);
 
   // Guard routing for shopify/billing
@@ -47,18 +56,10 @@ export default function SimpleCostsClient() {
     calculation?: string;
     value?: number;
   };
-  const {
-    costs: operationalCosts,
-    loading: opLoading,
-  } = useCost("OPERATIONAL");
-  const {
-    costs: shippingCosts,
-    loading: shipLoading,
-  } = useCost("SHIPPING");
-  const {
-    costs: paymentCosts,
-    loading: payLoading,
-  } = useCost("PAYMENT");
+  const { costs: operationalCosts, loading: opLoading } =
+    useCost("OPERATIONAL");
+  const { costs: shippingCosts, loading: shipLoading } = useCost("SHIPPING");
+  const { costs: paymentCosts, loading: payLoading } = useCost("PAYMENT");
 
   // Prefill only once when data loads to avoid infinite update loops
   const hasPrefilled = useRef(false);
@@ -71,10 +72,12 @@ export default function SimpleCostsClient() {
       let next = prev;
 
       if (!prev.operatingCosts) {
-        const op = (operationalCosts as CostRow[] | undefined || [])
+        const op = ((operationalCosts as CostRow[] | undefined) || [])
           .filter((c) => c.frequency === "monthly" && !!c.isActive)
           .sort(
-            (a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0),
+            (a, b) =>
+              (b.updatedAt || b.createdAt || 0) -
+              (a.updatedAt || a.createdAt || 0)
           )[0];
         if (op?.value !== undefined) {
           next = { ...next, operatingCosts: String(op.value) };
@@ -83,9 +86,13 @@ export default function SimpleCostsClient() {
       }
 
       if (!prev.shippingCost) {
-        const ship = (shippingCosts as CostRow[] | undefined || [])
+        const ship = ((shippingCosts as CostRow[] | undefined) || [])
           .filter((c) => c.frequency === "per_order" && !!c.isActive)
-          .sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0))[0];
+          .sort(
+            (a, b) =>
+              (b.updatedAt || b.createdAt || 0) -
+              (a.updatedAt || a.createdAt || 0)
+          )[0];
         if (ship?.value !== undefined) {
           next = { ...next, shippingCost: String(ship.value) };
           anySet = true;
@@ -93,9 +100,13 @@ export default function SimpleCostsClient() {
       }
 
       if (!prev.paymentFeePercent) {
-        const pay = (paymentCosts as CostRow[] | undefined || [])
+        const pay = ((paymentCosts as CostRow[] | undefined) || [])
           .filter((c) => c.calculation === "percentage" && !!c.isActive)
-          .sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0))[0];
+          .sort(
+            (a, b) =>
+              (b.updatedAt || b.createdAt || 0) -
+              (a.updatedAt || a.createdAt || 0)
+          )[0];
         if (pay?.value !== undefined) {
           next = { ...next, paymentFeePercent: String(pay.value) };
           anySet = true;
@@ -109,7 +120,14 @@ export default function SimpleCostsClient() {
     if (anySet) {
       hasPrefilled.current = true;
     }
-  }, [opLoading, shipLoading, payLoading, operationalCosts, shippingCosts, paymentCosts]);
+  }, [
+    opLoading,
+    shipLoading,
+    payLoading,
+    operationalCosts,
+    shippingCosts,
+    paymentCosts,
+  ]);
 
   // Analytics: step view
   useEffect(() => {
@@ -138,7 +156,9 @@ export default function SimpleCostsClient() {
         operatingCosts: form.operatingCosts ? Number(form.operatingCosts) : 0,
         shippingCost: form.shippingCost ? Number(form.shippingCost) : 0,
         // Handling fee removed from onboarding cost setup; configure per product instead
-        paymentFeePercent: form.paymentFeePercent ? Number(form.paymentFeePercent) : 0,
+        paymentFeePercent: form.paymentFeePercent
+          ? Number(form.paymentFeePercent)
+          : 0,
       };
       trackOnboardingAction("cost", "save", {
         operatingCosts: payload.operatingCosts,
@@ -168,21 +188,31 @@ export default function SimpleCostsClient() {
       {/* Header */}
       <div className="mb-2">
         <div className="flex items-center gap-2 mb-1">
-          <Icon className="text-primary" icon="solar:settings-minimalistic-bold-duotone" />
-          <h1 className="text-xl lg:text-2xl font-bold text-default-900">Fees & Shipping</h1>
+          <Icon
+            className="text-primary"
+            icon="solar:settings-minimalistic-bold-duotone"
+          />
+          <h1 className="text-xl lg:text-2xl font-bold text-default-900">
+            Fees & Shipping
+          </h1>
         </div>
         <p className="text-default-600 text-sm">
-          Set fixed monthly operating cost and average shipping per order. You can refine later in Cost Management.
+          Set fixed monthly operating cost and average shipping per order. You
+          can refine later in Cost Management.
         </p>
       </div>
 
       {/* Form */}
-      <div className="grid grid-cols-1 gap-4">
+      <div className="grid grid-cols-1 gap-6 mt-6">
         <Input
-          className="w-60 sm:w-72"
+          className="md:w-120"
           label="Fixed Monthly Operating Cost"
           labelPlacement="outside"
-          startContent={<span className="text-default-400 text-small">{currencySymbol}</span>}
+          startContent={
+            <span className="text-default-400 text-small">
+              {currencySymbol}
+            </span>
+          }
           placeholder="5000"
           type="number"
           inputMode="decimal"
@@ -193,11 +223,11 @@ export default function SimpleCostsClient() {
         />
         {/* Global Tax removed; set per product in Products step */}
         <Input
-          className="w-40 sm:w-48"
+          className="md:w-120"
           label="Payment Gateway Fee %"
           labelPlacement="outside"
           endContent={<span className="text-default-400 text-small">%</span>}
-          placeholder="2"
+          placeholder="e.g. 2"
           type="number"
           inputMode="decimal"
           min={0}
@@ -206,20 +236,24 @@ export default function SimpleCostsClient() {
           value={form.paymentFeePercent}
           onValueChange={onChange("paymentFeePercent")}
         />
-        <div className="rounded-medium border border-default-200 p-3">
-          <div className="text-small text-default-500 mb-2">Average Shipping (per order)</div>
-          <Input
-            className="mt-1 w-56 sm:w-64"
-            startContent={<span className="text-default-400 text-small">{currencySymbol}</span>}
-            placeholder="e.g. 20"
-            type="number"
-            inputMode="decimal"
-            min={0}
-            step="0.01"
-            value={form.shippingCost}
-            onValueChange={onChange("shippingCost")}
-          />
-        </div>
+
+        <Input
+          className="mt-1 md:w-120"
+          startContent={
+            <span className="text-default-400 text-small">
+              {currencySymbol}
+            </span>
+          }
+          placeholder="e.g. 25"
+          type="number"
+          label="Average Shipping (per order)"
+          labelPlacement="outside"
+          inputMode="decimal"
+          min={0}
+          step="0.01"
+          value={form.shippingCost}
+          onValueChange={onChange("shippingCost")}
+        />
 
         {/* Handling removed from onboarding; set in Product Costs */}
       </div>
@@ -242,7 +276,12 @@ export default function SimpleCostsClient() {
           Back
         </Button>
         <div className="flex items-center gap-3">
-          <Button color="primary" isLoading={saving} onPress={handleSave} endContent={<Icon icon="solar:alt-arrow-right-linear" />}>
+          <Button
+            color="primary"
+            isLoading={saving}
+            onPress={handleSave}
+            endContent={<Icon icon="solar:alt-arrow-right-linear" />}
+          >
             Save & Continue
           </Button>
         </div>

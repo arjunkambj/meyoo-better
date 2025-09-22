@@ -39,7 +39,11 @@ import {
 import { createLogger } from "@/libs/logging";
 import { getCurrencySymbol } from "@/libs/utils/format";
 import { TableSkeleton } from "@/components/shared/skeletons";
-import { DATA_TABLE_HEADER_CLASS, DATA_TABLE_TABLE_CLASS } from "@/components/shared/table/DataTableCard";
+import {
+  DATA_TABLE_HEADER_CLASS,
+  DATA_TABLE_SIMPLE_ROW_STRIPE_CLASS,
+  DATA_TABLE_TABLE_CLASS,
+} from "@/components/shared/table/DataTableCard";
 import { getLocalTimeZone, parseDate, today, type CalendarDate } from "@internationalized/date";
 
 const logger = createLogger("OtherCostsTable");
@@ -438,7 +442,8 @@ export default function OtherCostsTable() {
             className={DATA_TABLE_TABLE_CLASS}
             classNames={{
               th: DATA_TABLE_HEADER_CLASS,
-              td: "py-2.5 px-3 text-sm text-default-700 align-middle",
+              td: "py-2.5 px-3 text-sm text-default-800 align-middle",
+              table: "text-sm",
             }}
           >
             <TableHeader columns={columns}>
@@ -463,7 +468,10 @@ export default function OtherCostsTable() {
               items={(otherCosts || []) as Cost[]}
             >
               {(item: Cost) => (
-                <TableRow key={item._id as string} className="odd:bg-default-50/40">
+                <TableRow
+                  key={item._id as string}
+                  className={DATA_TABLE_SIMPLE_ROW_STRIPE_CLASS}
+                >
                   {(columnKey) => <TableCell>{renderCell(item, columnKey)}</TableCell>}
                 </TableRow>
               )}

@@ -23,7 +23,17 @@ import {
   useShopifyProductVariantsPaginated,
 } from "@/hooks";
 import { getCurrencySymbol } from "@/libs/utils/format";
-import { DATA_TABLE_HEADER_CLASS, DATA_TABLE_TABLE_CLASS } from "@/components/shared/table/DataTableCard";
+import {
+  DATA_TABLE_GROUP_ROW_BORDER_CLASS,
+  DATA_TABLE_HEADER_CLASS,
+  DATA_TABLE_INPUT_CLASS,
+  DATA_TABLE_INPUT_WRAPPER_CLASS,
+  DATA_TABLE_ROW_BASE_BG,
+  DATA_TABLE_ROW_STRIPE_BG,
+  DATA_TABLE_ROW_STRIPE_CHILD_BG,
+  DATA_TABLE_TABLE_CLASS,
+} from "@/components/shared/table/DataTableCard";
+import { cn } from "@/libs/utils";
 
 type RowEdit = {
   cogs?: string;
@@ -161,8 +171,12 @@ export default function ProductCostTable() {
       <div className="flex-1" />
       <div className="flex flex-wrap items-center gap-2">
         <Input
-          size="sm"
+          size="md"
           className="w-36"
+          classNames={{
+            inputWrapper: DATA_TABLE_INPUT_WRAPPER_CLASS,
+            input: DATA_TABLE_INPUT_CLASS,
+          }}
           type="number"
           placeholder="10"
           endContent={<span className="text-default-500">%</span>}
@@ -170,7 +184,6 @@ export default function ProductCostTable() {
           onValueChange={setBulkPct}
         />
         <Button
-          size="sm"
           variant="flat"
           color="primary"
           isDisabled={!bulkPct || isNaN(Number(bulkPct))}
@@ -203,7 +216,6 @@ export default function ProductCostTable() {
           Apply COGS
         </Button>
         <Button
-          size="sm"
           variant="flat"
           color="secondary"
           isDisabled={!bulkPct || isNaN(Number(bulkPct))}
@@ -223,7 +235,6 @@ export default function ProductCostTable() {
           Apply Tax
         </Button>
         <Button
-          size="sm"
           variant="flat"
           isDisabled={!bulkPct || isNaN(Number(bulkPct))}
           onPress={() => {
@@ -247,7 +258,6 @@ export default function ProductCostTable() {
           Apply Handling
         </Button>
         <Button
-          size="sm"
           color="primary"
           isLoading={savingAll}
           onPress={handleSaveAll}
@@ -435,6 +445,10 @@ export default function ProductCostTable() {
                       min={0}
                       step="0.01"
                       size="sm"
+                      classNames={{
+                        inputWrapper: DATA_TABLE_INPUT_WRAPPER_CLASS,
+                        input: DATA_TABLE_INPUT_CLASS,
+                      }}
                       startContent={
                         <span className="text-default-500">
                           {currencySymbol}
@@ -473,6 +487,10 @@ export default function ProductCostTable() {
                       max={100}
                       step="0.01"
                       size="sm"
+                      classNames={{
+                        inputWrapper: DATA_TABLE_INPUT_WRAPPER_CLASS,
+                        input: DATA_TABLE_INPUT_CLASS,
+                      }}
                       endContent={<span className="text-default-500">%</span>}
                       placeholder="0"
                       value={groupEdits[grp.key]?.tax ?? avgTaxStr}
@@ -503,6 +521,10 @@ export default function ProductCostTable() {
                       min={0}
                       step="0.01"
                       size="sm"
+                      classNames={{
+                        inputWrapper: DATA_TABLE_INPUT_WRAPPER_CLASS,
+                        input: DATA_TABLE_INPUT_CLASS,
+                      }}
                       startContent={
                         <span className="text-default-500">
                           {currencySymbol}
@@ -544,10 +566,10 @@ export default function ProductCostTable() {
                 const header = (
                   <TableRow
                     key={`grp-h-${grp.key}`}
-                    className={
-                      (stripe ? "bg-default-50/60" : "") +
-                      " border-t border-default-200/50"
-                    }
+                    className={cn(
+                      stripe ? DATA_TABLE_ROW_STRIPE_BG : DATA_TABLE_ROW_BASE_BG,
+                      DATA_TABLE_GROUP_ROW_BORDER_CLASS,
+                    )}
                   >
                     {headerCells}
                   </TableRow>
@@ -559,7 +581,10 @@ export default function ProductCostTable() {
                   return (
                     <TableRow
                       key={String(v._id)}
-                      className={stripe ? "bg-default-50/40" : ""}
+                      className={cn(
+                        DATA_TABLE_ROW_BASE_BG,
+                        stripe && DATA_TABLE_ROW_STRIPE_CHILD_BG,
+                      )}
                     >
                       <TableCell>
                         <div className="min-w-0">
@@ -584,6 +609,10 @@ export default function ProductCostTable() {
                           min={0}
                           step="0.01"
                           size="sm"
+                          classNames={{
+                            inputWrapper: DATA_TABLE_INPUT_WRAPPER_CLASS,
+                            input: DATA_TABLE_INPUT_CLASS,
+                          }}
                           startContent={
                             <span className="text-default-500">
                               {currencySymbol}
@@ -617,6 +646,10 @@ export default function ProductCostTable() {
                           max={100}
                           step="0.01"
                           size="sm"
+                          classNames={{
+                            inputWrapper: DATA_TABLE_INPUT_WRAPPER_CLASS,
+                            input: DATA_TABLE_INPUT_CLASS,
+                          }}
                           endContent={
                             <span className="text-default-500">%</span>
                           }
@@ -647,6 +680,10 @@ export default function ProductCostTable() {
                           min={0}
                           step="0.01"
                           size="sm"
+                          classNames={{
+                            inputWrapper: DATA_TABLE_INPUT_WRAPPER_CLASS,
+                            input: DATA_TABLE_INPUT_CLASS,
+                          }}
                           startContent={
                             <span className="text-default-500">
                               {currencySymbol}

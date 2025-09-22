@@ -1,6 +1,14 @@
 "use client";
 
-import { Button, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/react";
+import {
+  Button,
+  Input,
+  Modal,
+  ModalBody,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+} from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { useState } from "react";
 
@@ -89,7 +97,8 @@ export default function CreateApiKeyModal({
                         Important
                       </p>
                       <p className="text-warning-600 dark:text-warning-500 text-xs mt-1">
-                        The API key will only be shown once. Make sure to copy and save it securely.
+                        The API key will only be shown once. Make sure to copy
+                        and save it securely.
                       </p>
                     </div>
                   </div>
@@ -99,7 +108,7 @@ export default function CreateApiKeyModal({
             <ModalFooter>
               <Button
                 color="default"
-                variant="light"
+                variant="flat"
                 onPress={handleClose}
                 isDisabled={isCreating}
               >
@@ -110,7 +119,11 @@ export default function CreateApiKeyModal({
                 onPress={handleCreate}
                 isDisabled={!name.trim() || isCreating}
                 isLoading={isCreating}
-                startContent={!isCreating && <Icon icon="solar:add-circle-bold" width={18} />}
+                startContent={
+                  !isCreating && (
+                    <Icon icon="solar:add-circle-bold" width={18} />
+                  )
+                }
               >
                 Create API Key
               </Button>

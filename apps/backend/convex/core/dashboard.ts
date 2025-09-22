@@ -80,7 +80,7 @@ export const getDashboardLayout = query({
         "netProfitMargin",
         "orders",
         "avgOrderValue",
-        "blendedRoas", // MER
+        "blendedRoas", // ROAS
         "totalAdSpend",
         "shopifyConversionRate",
         "repeatCustomerRate",

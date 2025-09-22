@@ -27,7 +27,7 @@ const DEFAULT_METRICS = [
   "netProfitMargin",
   "orders",
   "avgOrderValue",
-  "blendedRoas", // MER
+  "blendedRoas", // ROAS
   "totalAdSpend",
   "shopifyConversionRate",
   "repeatCustomerRate",

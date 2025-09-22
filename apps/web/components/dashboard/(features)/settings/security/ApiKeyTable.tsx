@@ -41,9 +41,17 @@ export default function ApiKeyTable({
   const renderCell = (item: ApiKey, columnKey: string) => {
     switch (columnKey) {
       case "name":
-        return <span className="text-sm font-medium text-foreground">{item.name}</span>;
+        return (
+          <span className="text-sm font-medium text-foreground">
+            {item.name}
+          </span>
+        );
       case "key":
-        return <span className="font-mono text-xs text-default-500">{item.prefix}…</span>;
+        return (
+          <span className="font-mono text-xs text-default-500">
+            {item.prefix}…
+          </span>
+        );
       case "status":
         return (
           <Chip
@@ -69,7 +77,12 @@ export default function ApiKeyTable({
       case "actions":
         return (
           <div className="flex items-center gap-2">
-            <Tooltip content="Delete API key" color="danger" delay={0}>
+            <Tooltip
+              content="Delete API key"
+              color="danger"
+              placement="bottom"
+              closeDelay={0}
+            >
               <Button
                 isIconOnly
                 size="sm"
@@ -108,9 +121,7 @@ export default function ApiKeyTable({
   return (
     <Table aria-label="API keys table">
       <TableHeader columns={columns}>
-        {(column) => (
-          <TableColumn key={column.key}>{column.label}</TableColumn>
-        )}
+        {(column) => <TableColumn key={column.key}>{column.label}</TableColumn>}
       </TableHeader>
       <TableBody items={apiKeys}>
         {(item) => (

@@ -15,13 +15,6 @@ interface WidgetsContainerProps {
   isLoading: boolean;
 }
 
-// Default widgets if none are selected
-const DEFAULT_WIDGETS = [
-  "adSpendSummary",
-  "customerSummary",
-  "orderSummary",
-];
-
 export function WidgetsContainer({
   widgets,
   metricsData,
@@ -30,67 +23,77 @@ export function WidgetsContainer({
   showCostSetupWarning,
   isLoading,
 }: WidgetsContainerProps) {
-  // Use provided widgets or default widgets if none provided
-  const displayWidgets = widgets.length > 0 ? widgets : DEFAULT_WIDGETS;
-
-  if (isLoading) {
-    return (
-      <div className="space-y-4">
-        <h2 className="text-lg font-semibold">Analytics Widgets</h2>
-        <div className="space-y-4">
-          {/* Check if costBreakdown is included */}
-          {displayWidgets.includes("costBreakdown") && (
-            <WidgetSkeleton variant="large" />
-          )}
-
-          {/* Other widgets skeleton */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-            {displayWidgets
-              .filter((w) => w !== "costBreakdown")
-              .map((_, index) => (
-                <WidgetSkeleton key={index} />
-              ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const displayWidgets = Array.isArray(widgets) ? widgets : [];
+  const showSkeletons = isLoading && displayWidgets.length > 0;
 
   return (
     <div className="space-y-4">
       <h2 className="text-lg font-semibold">Analytics Widgets</h2>
       <div className="space-y-4">
-        {/* Cost Breakdown takes full width */}
-        {displayWidgets.includes("costBreakdown") && (
-          <div className="w-full">
-            <WidgetRenderer
-              isLoading={false}
-              metricsData={metricsData}
-              overviewMetrics={overviewMetrics}
-              primaryCurrency={primaryCurrency}
-              showCostSetupWarning={showCostSetupWarning}
-              widgetId="costBreakdown"
-            />
-          </div>
-        )}
+        {showSkeletons ? (
+          <>
+            {/* Check if costBreakdown is included */}
+            {displayWidgets.includes("costBreakdown") && (
+              <WidgetSkeleton variant="large" />
+            )}
 
-        {/* Grid for non-costBreakdown widgets */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-          {displayWidgets
-            .filter((widgetId) => widgetId !== "costBreakdown")
-            .map((widgetId) => (
-              <WidgetRenderer
-                key={widgetId}
-                isLoading={false}
-                metricsData={metricsData}
-                overviewMetrics={overviewMetrics}
-                primaryCurrency={primaryCurrency}
-                showCostSetupWarning={showCostSetupWarning}
-                widgetId={widgetId}
-              />
-            ))}
-        </div>
+            {/* Other widgets skeleton */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+              {displayWidgets
+                .filter((w) => w !== "costBreakdown")
+                .map((_, index) => (
+                  <WidgetSkeleton key={index} />
+                ))}
+            </div>
+          </>
+        ) : displayWidgets.length === 0 ? (
+          <EmptyState />
+        ) : (
+          <>
+            {/* Cost Breakdown takes full width */}
+            {displayWidgets.includes("costBreakdown") && (
+              <div className="w-full">
+                <WidgetRenderer
+                  isLoading={false}
+                  metricsData={metricsData}
+                  overviewMetrics={overviewMetrics}
+                  primaryCurrency={primaryCurrency}
+                  showCostSetupWarning={showCostSetupWarning}
+                  widgetId="costBreakdown"
+                />
+              </div>
+            )}
+
+            {/* Grid for non-costBreakdown widgets */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+              {displayWidgets
+                .filter((widgetId) => widgetId !== "costBreakdown")
+                .map((widgetId) => (
+                  <WidgetRenderer
+                    key={widgetId}
+                    isLoading={false}
+                    metricsData={metricsData}
+                    overviewMetrics={overviewMetrics}
+                    primaryCurrency={primaryCurrency}
+                    showCostSetupWarning={showCostSetupWarning}
+                    widgetId={widgetId}
+                  />
+                ))}
+            </div>
+          </>
+        )}
       </div>
+    </div>
+  );
+}
+
+function EmptyState() {
+  return (
+    <div className="flex flex-col items-center justify-center rounded-medium border border-dashed border-divider py-16 text-center text-default-400">
+      <p className="text-sm font-medium">No widgets selected</p>
+      <p className="text-xs mt-1 max-w-xs">
+        Use Customize Dashboard to add widgets or reset to the default layout.
+      </p>
     </div>
   );
 }

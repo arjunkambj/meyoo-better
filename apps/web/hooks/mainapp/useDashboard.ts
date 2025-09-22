@@ -16,7 +16,7 @@ const DEFAULT_DASHBOARD_CONFIG: DashboardConfig = {
     "netProfitMargin",
     "orders",
     "avgOrderValue",
-    "blendedRoas", // MER
+    "blendedRoas", // ROAS
     "totalAdSpend",
     "shopifyConversionRate",
     "repeatCustomerRate",

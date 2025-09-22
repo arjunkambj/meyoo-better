@@ -1,6 +1,6 @@
 "use client";
 
-import { Card, Skeleton, Tab, Tabs } from "@heroui/react";
+import { Skeleton, Tab, Tabs } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import React, { useCallback, useMemo } from "react";
 import {
@@ -10,6 +10,13 @@ import {
   useUser,
 } from "@/hooks";
 import { formatCurrency } from "@/libs/utils/format";
+import { cn } from "@/libs/utils";
+import {
+  DATA_TABLE_HEADER_CLASS,
+  DATA_TABLE_ROW_BASE_BG,
+  DATA_TABLE_ROW_STRIPE_CHILD_BG,
+  DATA_TABLE_TABLE_CLASS,
+} from "@/components/shared/table/DataTableCard";
 
 interface PnLTableProps {
   periods: PnLTablePeriod[] | undefined;

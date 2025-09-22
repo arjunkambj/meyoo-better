@@ -14,7 +14,7 @@ export const METRIC_CATEGORIES: Record<string, MetricCategory> = {
       "netProfitMargin",       // Profit Margin %
       "orders",                // Orders
       "avgOrderValue",         // AOV
-      "blendedRoas",           // MER (Revenue ÷ Total Ad Spend)
+      "blendedRoas",           // ROAS (Revenue ÷ Total Ad Spend)
       "totalAdSpend",          // Total Ad Spend
       "shopifyConversionRate", // Conversion Rate (Overall)
       "repeatCustomerRate",    // Returning Customers % (proxy for New vs Returning)
@@ -206,12 +206,12 @@ export const METRICS: Record<string, MetricDefinition> = {
   },
   blendedRoas: {
     id: "blendedRoas",
-    label: "MER",
+    label: "ROAS",
     icon: "solar:graph-up-bold-duotone",
     category: "coreKPIs",
     format: "decimal",
     decimal: 2,
-    description: "MER = Revenue ÷ Total Ad Spend",
+    description: "ROAS (blended) = Revenue ÷ Total Ad Spend",
   },
 
   // Revenue & Margins

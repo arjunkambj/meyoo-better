@@ -21,9 +21,14 @@ import { useUser } from "@/hooks";
 import { getStockStatusConfig } from "@/libs/utils/dashboard-formatters";
 import { getCurrencySymbol, formatNumber } from "@/libs/utils/format";
 import {
+  DATA_TABLE_GROUP_ROW_BORDER_CLASS,
   DATA_TABLE_HEADER_CLASS,
+  DATA_TABLE_ROW_BASE_BG,
+  DATA_TABLE_ROW_STRIPE_BG,
+  DATA_TABLE_ROW_STRIPE_CHILD_BG,
   DATA_TABLE_TABLE_CLASS,
 } from "@/components/shared/table/DataTableCard";
+import { cn } from "@/libs/utils";
 
 export interface ProductVariant {
   id: string;
@@ -340,11 +345,10 @@ export const ProductsTable = React.memo(function ProductsTable({
                   const header = (
                     <TableRow
                       key={`p-h-${item.id}`}
-                      className={
-                        (stripe
-                          ? "bg-default-50 dark:bg-content1/50"
-                          : "bg-background") + " border-t border-default-border"
-                      }
+                      className={cn(
+                        stripe ? DATA_TABLE_ROW_STRIPE_BG : DATA_TABLE_ROW_BASE_BG,
+                        DATA_TABLE_GROUP_ROW_BORDER_CLASS,
+                      )}
                     >
                       <TableCell>
                         <div className="min-w-0 flex items-center gap-3 py-1">
@@ -424,11 +428,11 @@ export const ProductsTable = React.memo(function ProductsTable({
                   const children = item.variants.map((v) => (
                     <TableRow
                       key={`v-${v.id}`}
-                      className={
-                        stripe
-                          ? "pointer-events-none bg-default-50/40"
-                          : "pointer-events-none"
-                      }
+                      className={cn(
+                        "pointer-events-none",
+                        DATA_TABLE_ROW_BASE_BG,
+                        stripe && DATA_TABLE_ROW_STRIPE_CHILD_BG,
+                      )}
                     >
                       <TableCell>
                         <div className="min-w-0">

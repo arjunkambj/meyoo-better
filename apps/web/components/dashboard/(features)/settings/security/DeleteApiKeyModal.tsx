@@ -32,7 +32,11 @@ export default function DeleteApiKeyModal({
           <>
             <ModalHeader className="flex flex-col gap-1">
               <div className="flex items-center gap-2">
-                <Icon icon="solar:trash-bin-trash-bold" className="text-danger" width={20} />
+                <Icon
+                  icon="solar:trash-bin-trash-bold"
+                  className="text-danger"
+                  width={20}
+                />
                 Delete API Key
               </div>
             </ModalHeader>
@@ -40,7 +44,10 @@ export default function DeleteApiKeyModal({
               <div className="space-y-3">
                 <p className="text-sm text-default-600">
                   Are you sure you want to delete the API key{" "}
-                  <span className="font-medium text-default-900">&ldquo;{keyName}&rdquo;</span>?
+                  <span className="font-medium text-default-900">
+                    &ldquo;{keyName}&rdquo;
+                  </span>
+                  ?
                 </p>
 
                 <div className="bg-danger-50 dark:bg-danger-100/10 p-3 rounded-lg">
@@ -55,7 +62,8 @@ export default function DeleteApiKeyModal({
                         This action cannot be undone
                       </p>
                       <p className="text-danger-600 dark:text-danger-500 text-xs mt-1">
-                        Any applications or services using this API key will immediately lose access.
+                        Any applications or services using this API key will
+                        immediately lose access.
                       </p>
                     </div>
                   </div>
@@ -65,7 +73,7 @@ export default function DeleteApiKeyModal({
             <ModalFooter>
               <Button
                 color="default"
-                variant="light"
+                variant="flat"
                 onPress={onModalClose}
                 isDisabled={isDeleting}
               >
@@ -75,7 +83,11 @@ export default function DeleteApiKeyModal({
                 color="danger"
                 onPress={onConfirm}
                 isLoading={isDeleting}
-                startContent={!isDeleting && <Icon icon="solar:trash-bin-trash-bold" width={18} />}
+                startContent={
+                  !isDeleting && (
+                    <Icon icon="solar:trash-bin-trash-bold" width={18} />
+                  )
+                }
               >
                 Delete API Key
               </Button>

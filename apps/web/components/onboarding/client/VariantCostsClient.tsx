@@ -30,7 +30,17 @@ import NavigationButtons from "@/components/onboarding/NavigationButtons";
 import { getCurrencySymbol } from "@/libs/utils/format";
 import { sanitizeDecimal } from "@/components/shared/table/sanitize";
 import { NumericInput } from "@/components/shared/table/NumericInput";
-import { DATA_TABLE_HEADER_CLASS, DATA_TABLE_TABLE_CLASS } from "@/components/shared/table/DataTableCard";
+import {
+  DATA_TABLE_GROUP_ROW_BORDER_CLASS,
+  DATA_TABLE_HEADER_CLASS,
+  DATA_TABLE_INPUT_CLASS,
+  DATA_TABLE_INPUT_WRAPPER_CLASS,
+  DATA_TABLE_ROW_BASE_BG,
+  DATA_TABLE_ROW_STRIPE_BG,
+  DATA_TABLE_ROW_STRIPE_CHILD_BG,
+  DATA_TABLE_TABLE_CLASS,
+} from "@/components/shared/table/DataTableCard";
+import { cn } from "@/libs/utils";
 
 type RowEdit = {
   cogs?: string;
@@ -207,6 +217,10 @@ export default function VariantCostsClient({
             <Input
               size={compact ? "sm" : "md"}
               className="max-w-[12rem]"
+              classNames={{
+                inputWrapper: DATA_TABLE_INPUT_WRAPPER_CLASS,
+                input: DATA_TABLE_INPUT_CLASS,
+              }}
               placeholder="Search..."
               startContent={<Icon icon="solar:search-outline" width={16} />}
               value={search}
@@ -216,6 +230,10 @@ export default function VariantCostsClient({
         <Input
           size={compact ? "sm" : "md"}
           className="w-48"
+          classNames={{
+            inputWrapper: DATA_TABLE_INPUT_WRAPPER_CLASS,
+            input: DATA_TABLE_INPUT_CLASS,
+          }}
           type="number"
           placeholder="10"
           endContent={<span className="text-default-500">%</span>}
@@ -544,6 +562,10 @@ export default function VariantCostsClient({
                         min={0}
                         step="0.01"
                         size={compact ? "sm" : "md"}
+                        classNames={{
+                          inputWrapper: DATA_TABLE_INPUT_WRAPPER_CLASS,
+                          input: DATA_TABLE_INPUT_CLASS,
+                        }}
                         startContent={
                           <span className="text-default-500">
                             {currencySymbol}
@@ -582,6 +604,10 @@ export default function VariantCostsClient({
                         max={100}
                         step="0.01"
                         size={compact ? "sm" : "md"}
+                        classNames={{
+                          inputWrapper: DATA_TABLE_INPUT_WRAPPER_CLASS,
+                          input: DATA_TABLE_INPUT_CLASS,
+                        }}
                         endContent={<span className="text-default-500">%</span>}
                         placeholder="0"
                         value={groupEdits[grp.key]?.tax ?? avgTaxStr}
@@ -616,6 +642,10 @@ export default function VariantCostsClient({
                           min={0}
                           step="0.01"
                           size={compact ? "sm" : "md"}
+                          classNames={{
+                            inputWrapper: DATA_TABLE_INPUT_WRAPPER_CLASS,
+                            input: DATA_TABLE_INPUT_CLASS,
+                          }}
                           startContent={
                             <span className="text-default-500">
                               {currencySymbol}
@@ -661,6 +691,10 @@ export default function VariantCostsClient({
                           min={0}
                           step="0.01"
                           size={compact ? "sm" : "md"}
+                          classNames={{
+                            inputWrapper: DATA_TABLE_INPUT_WRAPPER_CLASS,
+                            input: DATA_TABLE_INPUT_CLASS,
+                          }}
                           startContent={
                             <span className="text-default-500">
                               {currencySymbol}
@@ -710,10 +744,10 @@ export default function VariantCostsClient({
                   const header = (
                     <TableRow
                       key={`grp-h-${grp.key}`}
-                      className={
-                        (stripe ? "bg-default-50/60" : "") +
-                        " border-t border-default-200/70"
-                      }
+                      className={cn(
+                        stripe ? DATA_TABLE_ROW_STRIPE_BG : DATA_TABLE_ROW_BASE_BG,
+                        DATA_TABLE_GROUP_ROW_BORDER_CLASS,
+                      )}
                     >
                       {headerCells}
                     </TableRow>
@@ -727,7 +761,10 @@ export default function VariantCostsClient({
                     rows.push(
                       <TableRow
                         key={String(v._id)}
-                        className={stripe ? "bg-default-50/40" : ""}
+                        className={cn(
+                          DATA_TABLE_ROW_BASE_BG,
+                          stripe && DATA_TABLE_ROW_STRIPE_CHILD_BG,
+                        )}
                       >
                         {(() => {
                           const cells: any[] = [];
@@ -775,6 +812,10 @@ export default function VariantCostsClient({
                                 min={0}
                                 step="0.01"
                                 size={compact ? "sm" : "md"}
+                                classNames={{
+                                  inputWrapper: DATA_TABLE_INPUT_WRAPPER_CLASS,
+                                  input: DATA_TABLE_INPUT_CLASS,
+                                }}
                                 startContent={
                                   <span className="text-default-500">
                                     {currencySymbol}
@@ -813,6 +854,10 @@ export default function VariantCostsClient({
                                 max={100}
                                 step="0.01"
                                 size={compact ? "sm" : "md"}
+                                classNames={{
+                                  inputWrapper: DATA_TABLE_INPUT_WRAPPER_CLASS,
+                                  input: DATA_TABLE_INPUT_CLASS,
+                                }}
                                 endContent={
                                   <span className="text-default-500">%</span>
                                 }
@@ -849,6 +894,10 @@ export default function VariantCostsClient({
                                   min={0}
                                   step="0.01"
                                   size={compact ? "sm" : "md"}
+                                  classNames={{
+                                    inputWrapper: DATA_TABLE_INPUT_WRAPPER_CLASS,
+                                    input: DATA_TABLE_INPUT_CLASS,
+                                  }}
                                   startContent={
                                     <span className="text-default-500">
                                       {currencySymbol}
@@ -890,6 +939,10 @@ export default function VariantCostsClient({
                                   min={0}
                                   step="0.01"
                                   size={compact ? "sm" : "md"}
+                                  classNames={{
+                                    inputWrapper: DATA_TABLE_INPUT_WRAPPER_CLASS,
+                                    input: DATA_TABLE_INPUT_CLASS,
+                                  }}
                                   startContent={
                                     <span className="text-default-500">
                                       {currencySymbol}

@@ -12,6 +12,18 @@ export const DATA_TABLE_TABLE_CLASS =
   "rounded-2xl border border-default-200/60 bg-content1 overflow-hidden";
 export const DATA_TABLE_HEADER_CLASS =
   "bg-transparent text-default-600 font-semibold uppercase tracking-wide text-[11px]";
+export const DATA_TABLE_GROUP_ROW_BORDER_CLASS =
+  "border-t border-default-border";
+export const DATA_TABLE_ROW_BASE_BG = "bg-background";
+export const DATA_TABLE_ROW_STRIPE_BG =
+  "bg-default-50 dark:bg-content1/50";
+export const DATA_TABLE_ROW_STRIPE_CHILD_BG =
+  "bg-default-50/40 dark:bg-content1/30";
+export const DATA_TABLE_SIMPLE_ROW_STRIPE_CLASS =
+  "bg-background even:bg-default-50 dark:even:bg-content1/50 border-t border-default-border";
+export const DATA_TABLE_INPUT_WRAPPER_CLASS =
+  "bg-default-100 dark:bg-content2 focus-within:ring-1 focus-within:ring-default-200";
+export const DATA_TABLE_INPUT_CLASS = "text-sm text-default-900";
 
 interface DataTableCardProps {
   children: ReactNode;

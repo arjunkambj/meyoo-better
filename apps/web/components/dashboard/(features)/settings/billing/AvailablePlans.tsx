@@ -72,17 +72,13 @@ export default function AvailablePlans() {
   const availablePlans = tiers;
 
   return (
-    <div className="space-y-4 bg-background">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-base font-semibold text-foreground">
+        <h3 className="text-base font-semibold text-default-800">
           Upgrade Plan
         </h3>
         {/* Frequency Toggle - Inline */}
-        <Tabs
-          radius="full"
-          size="sm"
-          onSelectionChange={onFrequencyChange}
-        >
+        <Tabs radius="full" size="sm" onSelectionChange={onFrequencyChange}>
           <Tab key={FrequencyEnum.Monthly} title="Monthly" />
           <Tab
             key={FrequencyEnum.Yearly}
@@ -129,32 +125,36 @@ export default function AvailablePlans() {
       {/* Plans Grid with Full Features - Matching Home Pricing Style */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {availablePlans.map((tier) => {
-          const isCurrentPlan = tier.title.toLowerCase() === currentPlan.toLowerCase();
+          const isCurrentPlan =
+            tier.title.toLowerCase() === currentPlan.toLowerCase();
 
           return (
             <div
               key={tier.key}
-              className={`relative flex flex-col rounded-3xl pb-2 border bg-background ${
-                tier.mostPopular ? "border-2 border-primary" : isCurrentPlan ? "border-2 border-success" : "border border-default-200/50"
+              className={`relative flex flex-col rounded-3xl pb-2 shadow-none bg-content2/90 dark:bg-content1 transition-colors ${
+                tier.mostPopular
+                  ? "border-2 border-primary"
+                  : isCurrentPlan
+                    ? "border-2 border-success"
+                    : "border border-default-100"
               }`}
             >
-
               <div className="flex flex-col px-6 py-4">
-                <h3 className="text-lg font-medium text-foreground">
+                <h3 className="text-xl font-semibold text-default-800">
                   {tier.title}
                 </h3>
                 <div className="mt-4 gap-2 flex flex-col">
-                  <div className="text-4xl font-semibold tracking-tight text-foreground/90">
+                  <div className="text-4xl font-semibold tracking-tight text-default-800">
                     {typeof tier.price === "string"
                       ? tier.price
                       : tier.price[selectedFrequency.key]}
                   </div>
-                  <div className="text-xs text-default-500">
-                    per {selectedFrequency.priceSuffix}
+                  <div className="text-xs font-medium text-default-500">
+                    {selectedFrequency.priceSuffix}
                   </div>
                 </div>
 
-                <p className="text-sm mt-4 text-muted-foreground">
+                <p className="mt-4 text-sm text-default-500">
                   {tier.description}
                 </p>
 
@@ -185,13 +185,15 @@ export default function AvailablePlans() {
                     const currentPlanIndex = planOrder.indexOf(
                       currentPlan.toLowerCase()
                     );
-                    const tierIndex = planOrder.indexOf(tier.title.toLowerCase());
+                    const tierIndex = planOrder.indexOf(
+                      tier.title.toLowerCase()
+                    );
                     const isDowngrade = tierIndex < currentPlanIndex;
 
                     // Disable if downgrading and usage exceeds lower plan limit
                     return isDowngrade && currentOrderUsage > tierLimit;
                   })()}
-                  isLoading={loadingTier === (tier.title + " Plan")}
+                  isLoading={loadingTier === tier.title + " Plan"}
                   endContent={
                     !isCurrentPlan && (
                       <Icon icon="solar:arrow-right-linear" width={14} />
@@ -257,7 +259,9 @@ export default function AvailablePlans() {
                     const currentPlanIndex = planOrder.indexOf(
                       currentPlan.toLowerCase()
                     );
-                    const tierIndex = planOrder.indexOf(tier.title.toLowerCase());
+                    const tierIndex = planOrder.indexOf(
+                      tier.title.toLowerCase()
+                    );
                     const isDowngrade = tierIndex < currentPlanIndex;
 
                     // Prevent downgrade if current usage exceeds the lower plan's limit
@@ -266,7 +270,9 @@ export default function AvailablePlans() {
                     }
 
                     if (isLoading) return "Processing...";
-                    return isDowngrade ? `Switch to ${tier.title}` : `Upgrade to ${tier.title}`;
+                    return isDowngrade
+                      ? `Switch to ${tier.title}`
+                      : `Upgrade to ${tier.title}`;
                   })()}
                 </Button>
               </div>
@@ -277,8 +283,8 @@ export default function AvailablePlans() {
                 <ul className="space-y-3">
                   {tier.features?.map((feature) => (
                     <li key={feature} className="flex items-center">
-                      <BadgeCheck className="size-5 text-muted-foreground shrink-0" />
-                      <span className="ml-3 text-sm text-muted-foreground">
+                      <BadgeCheck className="size-5 shrink-0 text-default-600" />
+                      <span className="ml-3 text-sm text-default-600">
                         {feature}
                       </span>
                     </li>
@@ -288,7 +294,6 @@ export default function AvailablePlans() {
             </div>
           );
         })}
-
       </div>
 
       {/* Free Tier Notice - Compact */}
@@ -299,9 +304,12 @@ export default function AvailablePlans() {
             icon="solar:gift-bold"
             width={16}
           />
-          <p className="text-xs text-default-600">
-            <span className="font-medium text-foreground">Free for small stores:</span>{" "}
-            Meyoo is free for stores with less than 300 orders/month. No credit card required.
+          <p className="text-xs text-default-700">
+            <span className="font-medium text-foreground">
+              Free for small stores:
+            </span>{" "}
+            Meyoo is free for stores with less than 300 orders/month. No credit
+            card required.
           </p>
         </div>
       </div>

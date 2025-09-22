@@ -32,7 +32,6 @@ export const tiers: Array<Tier> = [
       "1 Marketing Channel",
       "$10 Per Extra Seat (AI included)",
       "Email Support",
-      "Real-time Shopify sync",
       "$0.30 per extra order",
     ],
     buttonText: "Start for Free",
@@ -57,7 +56,7 @@ export const tiers: Array<Tier> = [
     features: [
       "Up to 1,200 orders/month",
       "Custom Profit Dashboard",
-      "3 Free Team Members",
+      "1 Free Team Members",
       "Email Support",
       "$0.20 Per Extra Order",
       "Max $299 Overage Charge",
@@ -83,7 +82,8 @@ export const tiers: Array<Tier> = [
     },
     features: [
       "Advanced Analytics",
-      "5 Free Team Members",
+      "MCP Support",
+      "3 Free Team Members",
       "Email Support",
       "$0.10 Per Extra Order",
       "Max $399 Overage Charge",
@@ -110,7 +110,7 @@ export const tiers: Array<Tier> = [
     features: [
       "Up to 7,500 orders/month",
       "AI-powered Insights",
-      "10 Free Team Members",
+      "5 Free Team Members",
       "$0.05 Per Extra Order",
       "Max $499 Overage Charge",
       "Priority Support",

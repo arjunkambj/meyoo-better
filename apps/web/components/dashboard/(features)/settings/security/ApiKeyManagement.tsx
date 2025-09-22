@@ -69,11 +69,11 @@ export default function ApiKeyManagement() {
 
   return (
     <>
-      <Card className="bg-content2 dark:bg-content1 rounded-xl border border-default-200/50 shadow-none">
+      <Card className="rounded-2xl border border-default-100 shadow-none bg-content2/90 dark:bg-content1">
         <CardHeader className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Icon icon="solar:key-bold" width={20} />
-            <h3 className="text-lg font-semibold">API Keys</h3>
+            <h3 className="text-lg font-semibold text-default-800">API Keys</h3>
           </div>
           <Button
             color="primary"
@@ -83,7 +83,7 @@ export default function ApiKeyManagement() {
             Generate New Key
           </Button>
         </CardHeader>
-        <CardBody>
+        <CardBody className="px-5 py-5">
           {isLoading ? (
             <div className="space-y-3">
               <Skeleton className="h-12 w-full rounded-lg" />

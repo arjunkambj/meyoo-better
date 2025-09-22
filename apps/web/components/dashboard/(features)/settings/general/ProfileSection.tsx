@@ -3,9 +3,11 @@
 import {
   Avatar,
   Button,
+  Card,
+  CardBody,
   Input,
-  useDisclosure,
   addToast,
+  useDisclosure,
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { useAction } from "convex/react";
@@ -18,7 +20,6 @@ import { useUser } from "@/hooks";
 import { usePassword } from "@/hooks/usePassword";
 import EmailChangeModal from "./EmailChangeModal";
 import PasswordChangeModal from "./PasswordChangeModal";
-
 export default function ProfileSection() {
   const { user, updateProfile } = useUser();
   const { hasPassword, changePassword } = usePassword();
@@ -151,14 +152,13 @@ export default function ProfileSection() {
   }
 
   return (
-    <div className="space-y-6 px-1">
-
+    <>
       {/* Avatar Section */}
       <div className="flex items-center gap-6">
         <div className="relative">
           <Avatar
             isBordered
-            className="w-20 h-20"
+            className="h-20 w-20"
             color="primary"
             name={fullName || formData.email}
             src={user?.image || ""}
@@ -175,7 +175,7 @@ export default function ProfileSection() {
       </div>
 
       {/* Form Fields */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         <Input
           classNames={{
             label: "text-sm font-medium text-foreground",
@@ -282,7 +282,6 @@ export default function ProfileSection() {
           setFormData((prev) => ({ ...prev, email: newEmail }));
         }}
       />
-      {/* End */}
-    </div>
+    </>
   );
 }

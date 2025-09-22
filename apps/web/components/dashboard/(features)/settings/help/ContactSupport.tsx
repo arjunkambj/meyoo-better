@@ -1,10 +1,17 @@
 "use client";
-import { Button, Divider, Input, Textarea, Spacer } from "@heroui/react";
+import {
+  Button,
+  Card,
+  CardBody,
+  Divider,
+  Input,
+  Spacer,
+  Textarea,
+} from "@heroui/react";
 import { Icon } from "@iconify/react";
 import React, { useState } from "react";
 
 import { useCreateTicket, useUser } from "@/hooks";
-
 export default function ContactSupport() {
   const { user } = useUser();
   const { createTicket } = useCreateTicket();
@@ -167,210 +174,216 @@ export default function ContactSupport() {
       {/* Content Grid: Left form card, Right info panel */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left: Support Form Card */}
-        <div className="lg:col-span-2 rounded-xl shadow-none">
-          <form className="space-y-6" onSubmit={handleSubmit}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Input
-                isRequired
-                classNames={{
-                  label: "text-sm font-medium text-foreground mb-2",
-                }}
-                errorMessage={formErrors.name}
-                isDisabled={isSubmitting}
-                isInvalid={!!formErrors.name}
-                label="Full Name"
-                labelPlacement="outside"
-                placeholder="John Doe"
-                startContent={
-                  <Icon
-                    className="text-default-400"
-                    icon="solar:user-bold"
-                    width={18}
-                  />
-                }
-                value={formData.name}
-                onChange={(e) => handleInputChange("name", e.target.value)}
-              />
-
-              <Input
-                isRequired
-                classNames={{
-                  label: "text-sm font-medium text-foreground mb-2",
-                }}
-                errorMessage={formErrors.email}
-                isDisabled={isSubmitting}
-                isInvalid={!!formErrors.email}
-                label="Email Address"
-                labelPlacement="outside"
-                placeholder="john@example.com"
-                startContent={
-                  <Icon
-                    className="text-default-400"
-                    icon="solar:letter-bold"
-                    width={18}
-                  />
-                }
-                type="email"
-                value={formData.email}
-                onChange={(e) => handleInputChange("email", e.target.value)}
-              />
-            </div>
-
-            <Spacer y={4} />
-
-            <Input
-              isRequired
-              classNames={{
-                label: "text-sm font-medium text-foreground mb-2",
-              }}
-              errorMessage={formErrors.subject}
-              isDisabled={isSubmitting}
-              isInvalid={!!formErrors.subject}
-              label="Subject"
-              labelPlacement="outside"
-              placeholder="Brief description of your issue"
-              startContent={
-                <Icon
-                  className="text-default-400"
-                  icon="solar:chat-square-bold"
-                  width={18}
+        <Card className="rounded-2xl bg-background lg:col-span-2">
+          <CardBody className="px-5 py-5">
+            <form className="space-y-6" onSubmit={handleSubmit}>
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                <Input
+                  isRequired
+                  classNames={{
+                    label: "text-sm font-medium text-foreground mb-2",
+                  }}
+                  errorMessage={formErrors.name}
+                  isDisabled={isSubmitting}
+                  isInvalid={!!formErrors.name}
+                  label="Full Name"
+                  labelPlacement="outside"
+                  placeholder="John Doe"
+                  startContent={
+                    <Icon
+                      className="text-default-400"
+                      icon="solar:user-bold"
+                      width={18}
+                    />
+                  }
+                  value={formData.name}
+                  onChange={(e) => handleInputChange("name", e.target.value)}
                 />
-              }
-              value={formData.subject}
-              onChange={(e) => handleInputChange("subject", e.target.value)}
-            />
 
-            <Textarea
-              isRequired
-              classNames={{
-                label: "text-sm font-medium text-foreground mb-2",
-              }}
-              errorMessage={formErrors.message}
-              isDisabled={isSubmitting}
-              isInvalid={!!formErrors.message}
-              label="Message"
-              labelPlacement="outside"
-              minRows={8}
-              placeholder="Please provide as much detail as possible about your issue or question..."
-              value={formData.message}
-              onChange={(e) => handleInputChange("message", e.target.value)}
-            />
-
-            {/* Actions */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
-              <div className="flex items-center gap-3 text-xs text-default-500">
-                <div className="flex items-center gap-1">
-                  <Icon
-                    className="text-success"
-                    icon="solar:shield-check-bold"
-                    width={16}
-                  />
-                  <span>Secure & private</span>
-                </div>
-                <div className="hidden sm:block h-3 w-px bg-divider" />
-                <div className="flex items-center gap-1">
-                  <Icon
-                    className="text-primary"
-                    icon="solar:clock-circle-bold"
-                    width={16}
-                  />
-                  <span>Avg. response 2–4 hrs</span>
-                </div>
+                <Input
+                  isRequired
+                  classNames={{
+                    label: "text-sm font-medium text-foreground mb-2",
+                  }}
+                  errorMessage={formErrors.email}
+                  isDisabled={isSubmitting}
+                  isInvalid={!!formErrors.email}
+                  label="Email Address"
+                  labelPlacement="outside"
+                  placeholder="john@example.com"
+                  startContent={
+                    <Icon
+                      className="text-default-400"
+                      icon="solar:letter-bold"
+                      width={18}
+                    />
+                  }
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => handleInputChange("email", e.target.value)}
+                />
               </div>
 
-              <Button
-                className="px-6"
-                color="primary"
-                isLoading={isSubmitting}
-                size="md"
+              <Spacer y={4} />
+
+              <Input
+                isRequired
+                classNames={{
+                  label: "text-sm font-medium text-foreground mb-2",
+                }}
+                errorMessage={formErrors.subject}
+                isDisabled={isSubmitting}
+                isInvalid={!!formErrors.subject}
+                label="Subject"
+                labelPlacement="outside"
+                placeholder="Brief description of your issue"
                 startContent={
-                  !isSubmitting && (
-                    <Icon icon="solar:letter-send-bold" width={18} />
-                  )
+                  <Icon
+                    className="text-default-400"
+                    icon="solar:chat-square-bold"
+                    width={18}
+                  />
                 }
-                type="submit"
-              >
-                {isSubmitting ? "Sending..." : "Send Message"}
-              </Button>
-            </div>
-          </form>
-        </div>
+                value={formData.subject}
+                onChange={(e) => handleInputChange("subject", e.target.value)}
+              />
+
+              <Textarea
+                isRequired
+                classNames={{
+                  label: "text-sm font-medium text-foreground mb-2",
+                }}
+                errorMessage={formErrors.message}
+                isDisabled={isSubmitting}
+                isInvalid={!!formErrors.message}
+                label="Message"
+                labelPlacement="outside"
+                minRows={8}
+                placeholder="Please provide as much detail as possible about your issue or question..."
+                value={formData.message}
+                onChange={(e) => handleInputChange("message", e.target.value)}
+              />
+
+              {/* Actions */}
+              <div className="flex flex-col items-center justify-between gap-3 pt-2 sm:flex-row">
+                <div className="flex items-center gap-3 text-xs text-default-500">
+                  <div className="flex items-center gap-1">
+                    <Icon
+                      className="text-success"
+                      icon="solar:shield-check-bold"
+                      width={16}
+                    />
+                    <span>Secure & private</span>
+                  </div>
+                  <div className="hidden sm:block h-3 w-px bg-divider" />
+                  <div className="flex items-center gap-1">
+                    <Icon
+                      className="text-primary"
+                      icon="solar:clock-circle-bold"
+                      width={16}
+                    />
+                    <span>Avg. response 2–4 hrs</span>
+                  </div>
+                </div>
+
+                <Button
+                  className="px-6"
+                  color="primary"
+                  isLoading={isSubmitting}
+                  size="md"
+                  startContent={
+                    !isSubmitting && (
+                      <Icon icon="solar:letter-send-bold" width={18} />
+                    )
+                  }
+                  type="submit"
+                >
+                  {isSubmitting ? "Sending..." : "Send Message"}
+                </Button>
+              </div>
+            </form>
+          </CardBody>
+        </Card>
 
         {/* Right: Info Panel */}
-        <aside className="bg-content2 dark:bg-content1 border border-default-200/50 rounded-xl shadow-none p-6 space-y-4">
-          {/* Response Time */}
-          <div className="flex items-start gap-3">
-            <span className="p-2 rounded-md bg-success/10">
-              <Icon
-                className="text-success"
-                icon="solar:clock-circle-bold"
-                width={18}
-              />
-            </span>
-            <div>
-              <p className="text-sm font-medium text-foreground">
-                Response Time
-              </p>
-              <p className="text-xs text-default-700">
-                Typically 2–4 hours (Mon–Fri)
+        <Card className="rounded-2xl border border-default-100 shadow-none bg-content2/90 dark:bg-content1">
+          <CardBody className="px-5 py-5 space-y-4">
+            {/* Response Time */}
+            <div className="flex items-start gap-3">
+              <span className="p-2 rounded-md bg-success/10">
+                <Icon
+                  className="text-success"
+                  icon="solar:clock-circle-bold"
+                  width={18}
+                />
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-default-800">
+                  Response Time
+                </p>
+                <p className="text-xs text-default-700">
+                  Typically 2–4 hours (Mon–Fri)
+                </p>
+              </div>
+            </div>
+
+            {/* Email CTA */}
+            <a
+              className="flex items-center gap-3 rounded-xl border border-default-200 bg-content1 px-4 py-3 hover:bg-content2 transition-colors"
+              href="mailto:support@meyoo.com"
+            >
+              <span className="p-2 rounded-md bg-primary/10">
+                <Icon
+                  className="text-primary"
+                  icon="solar:letter-bold-duotone"
+                  width={18}
+                />
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-default-800">
+                  Email Support
+                </p>
+                <p className="text-xs text-primary truncate">
+                  support@meyoo.com
+                </p>
+              </div>
+            </a>
+
+            {/* Support Hours */}
+            <div className="flex items-start gap-3">
+              <span className="p-2 rounded-md bg-warning/10">
+                <Icon
+                  className="text-warning"
+                  icon="solar:calendar-bold"
+                  width={18}
+                />
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-default-800">
+                  Support Hours
+                </p>
+                <p className="text-xs text-default-500">
+                  9AM–6PM EST, Monday–Friday
+                </p>
+              </div>
+            </div>
+
+            {/* Privacy Note */}
+            <div className="flex items-start gap-3">
+              <span className="p-2 rounded-md bg-default/10">
+                <Icon
+                  className="text-default-500"
+                  icon="solar:shield-keyhole-bold"
+                  width={18}
+                />
+              </span>
+              <p className="text-xs text-default-500 leading-relaxed">
+                We only use your details to assist with your request and never
+                share your information.
               </p>
             </div>
-          </div>
-
-          {/* Email CTA */}
-          <a
-            className="flex items-center gap-3 rounded-xl border border-default-200 bg-content1 px-4 py-3 hover:bg-content2 transition-colors"
-            href="mailto:support@meyoo.com"
-          >
-            <span className="p-2 rounded-md bg-primary/10">
-              <Icon
-                className="text-primary"
-                icon="solar:letter-bold-duotone"
-                width={18}
-              />
-            </span>
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-foreground">
-                Email Support
-              </p>
-              <p className="text-xs text-primary truncate">support@meyoo.com</p>
-            </div>
-          </a>
-
-          {/* Support Hours */}
-          <div className="flex items-start gap-3">
-            <span className="p-2 rounded-md bg-warning/10">
-              <Icon
-                className="text-warning"
-                icon="solar:calendar-bold"
-                width={18}
-              />
-            </span>
-            <div>
-              <p className="text-sm font-medium text-foreground">
-                Support Hours
-              </p>
-              <p className="text-xs text-default-500">
-                9AM–6PM EST, Monday–Friday
-              </p>
-            </div>
-          </div>
-
-          {/* Privacy Note */}
-          <div className="flex items-start gap-3">
-            <span className="p-2 rounded-md bg-default/10">
-              <Icon
-                className="text-default-500"
-                icon="solar:shield-keyhole-bold"
-                width={18}
-              />
-            </span>
-            <p className="text-xs text-default-500 leading-relaxed">
-              We only use your details to assist with your request and never
-              share your information.
-            </p>
-          </div>
-        </aside>
+          </CardBody>
+        </Card>
       </div>
     </div>
   );

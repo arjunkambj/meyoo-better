@@ -9,8 +9,8 @@ import {
   ModalContent,
   ModalFooter,
   ModalHeader,
-  useDisclosure,
   addToast,
+  useDisclosure,
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { useCallback, useState } from "react";
@@ -18,7 +18,6 @@ import type { GenericId as Id } from "convex/values";
 import { useDeleteTicket, useUserTickets } from "@/hooks";
 
 import ContactSupport from "./ContactSupport";
-
 export default function HelpSettingsView() {
   const userTickets = useUserTickets();
   const tickets = userTickets.tickets;
@@ -141,10 +140,10 @@ export default function HelpSettingsView() {
     <div className="space-y-6 pb-8">
       {/* Previous Tickets */}
       {tickets && tickets.length > 0 && (
-        <Card className="bg-content2 dark:bg-content1 rounded-xl border border-default-200/50 shadow-none">
-          <CardBody className="p-6">
+        <Card className="rounded-2xl border border-default-100 shadow-none bg-content2/90 dark:bg-content1">
+          <CardBody className="px-6 py-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-semibold text-foreground">
+              <h3 className="text-base font-semibold text-default-800">
                 Your Support Tickets
               </h3>
               {stats && (
@@ -195,7 +194,7 @@ export default function HelpSettingsView() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex-1">
-                              <p className="text-sm font-medium text-foreground truncate">
+                              <p className="text-sm font-semibold text-default-800 truncate">
                                 {ticket.subject}
                               </p>
                               <p className="text-xs text-default-500 line-clamp-2 mt-1">

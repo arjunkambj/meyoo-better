@@ -4,7 +4,6 @@ import { Icon } from "@iconify/react";
 import { useState } from "react";
 
 import { useInvoices } from "@/hooks";
-
 export default function InvoicesList() {
   const [offset, setOffset] = useState(0);
   const limit = 5;
@@ -36,7 +35,7 @@ export default function InvoicesList() {
       {/* Compact Header */}
       <div className="px-4 py-3 border-b border-divider">
         <div className="flex items-center justify-between">
-          <h3 className="text-base font-semibold text-foreground">
+          <h3 className="text-base font-semibold text-default-800">
             Billing History
           </h3>
           <span className="text-xs text-default-500">
@@ -77,7 +76,8 @@ export default function InvoicesList() {
           </div>
         ) : (
           invoices.map(
-            (invoice: {
+            (
+              invoice: {
               id: string;
               invoiceNumber: string;
               description: string;
@@ -85,15 +85,21 @@ export default function InvoicesList() {
               amount: number;
               currency: string;
               status: string;
-            }) => (
+            },
+              index,
+            ) => (
               <div
                 key={invoice.id}
-                className="px-4 py-2.5 hover:bg-content1 transition-colors"
+                className={`px-4 py-2.5 transition-colors ${
+                  index % 2 === 0
+                    ? "bg-content1/40 dark:bg-content1/10"
+                    : "bg-transparent dark:bg-transparent"
+                } hover:bg-content1/60 dark:hover:bg-content1/20`}
               >
                 <div className="grid grid-cols-12 gap-3 items-center">
                   {/* Invoice ID */}
                   <div className="col-span-4">
-                    <p className="text-xs font-medium text-foreground truncate">
+                    <p className="text-xs font-semibold text-default-800 truncate">
                       {invoice.invoiceNumber}
                     </p>
                     <p className="text-xs text-default-400 truncate">
@@ -114,7 +120,7 @@ export default function InvoicesList() {
 
                   {/* Amount */}
                   <div className="col-span-2">
-                    <p className="text-xs font-medium text-foreground">
+                    <p className="text-xs font-semibold text-default-800">
                       {formatAmount(invoice.amount, invoice.currency)}
                     </p>
                   </div>

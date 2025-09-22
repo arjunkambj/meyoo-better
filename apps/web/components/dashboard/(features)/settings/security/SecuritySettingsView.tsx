@@ -1,7 +1,6 @@
 "use client";
 
-import { Card, CardBody, CardHeader } from "@heroui/card";
-import { Switch } from "@heroui/switch";
+import { Card, CardBody, CardHeader, Switch } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { useAtom } from "jotai";
 import { devToolsVisibleAtom } from "@/store/atoms";
@@ -12,15 +11,19 @@ export default function SecuritySettingsView() {
 
   return (
     <div className="space-y-6">
-      <Card className="bg-content2 dark:bg-content1 rounded-xl border border-default-200/50 shadow-none">
+      <Card className="rounded-2xl border border-default-100 shadow-none bg-content2/90 dark:bg-content1">
         <CardHeader className="flex items-center gap-2">
           <Icon icon="solar:code-bold" width={20} />
-          <h3 className="text-lg font-semibold">Developer Tools</h3>
+          <h3 className="text-lg font-semibold text-default-800">
+            Developer Tools
+          </h3>
         </CardHeader>
-        <CardBody className="space-y-4">
+        <CardBody className="px-5 py-5 space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex flex-col gap-1">
-              <span className="text-sm font-medium">Show Developer Tools</span>
+              <span className="text-sm font-semibold text-default-800">
+                Show Developer Tools
+              </span>
               <span className="text-xs text-default-500">
                 Display developer tools and debugging information on the overview page
               </span>

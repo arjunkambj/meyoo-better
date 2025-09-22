@@ -11,7 +11,6 @@ import { useBilling } from "@/hooks";
 import { toUtcRangeStrings } from "@/libs/dateRange";
 import { useOrganizationTimeZone } from "@/hooks/mainapp/useUser";
 import { formatNumber } from "@/libs/utils/format";
-
 export default function PlanOverview() {
   const { timezone } = useOrganizationTimeZone();
   const { currentUsage: billingUsage, upgradeRecommendation } = useBilling();
@@ -26,21 +25,24 @@ export default function PlanOverview() {
       startOfMonth: new Date(
         currentDate.getFullYear(),
         currentDate.getMonth(),
-        1,
+        1
       ),
       endOfMonth: new Date(
         currentDate.getFullYear(),
         currentDate.getMonth() + 1,
-        0,
+        0
       ),
     };
   }, []);
 
   const dashboardSummary = useQuery(api.web.dashboard.getDashboardSummary, {
-    ...toUtcRangeStrings({
-      startDate: startOfMonth.toISOString().slice(0, 10),
-      endDate: endOfMonth.toISOString().slice(0, 10),
-    }, timezone),
+    ...toUtcRangeStrings(
+      {
+        startDate: startOfMonth.toISOString().slice(0, 10),
+        endDate: endOfMonth.toISOString().slice(0, 10),
+      },
+      timezone
+    ),
   });
 
   // Get current plan from billing usage (more accurate)
@@ -48,9 +50,9 @@ export default function PlanOverview() {
   const currentPlan = useMemo(
     () =>
       tiers.find(
-        (tier) => tier.title.toLowerCase() === currentPlanName.toLowerCase(),
+        (tier) => tier.title.toLowerCase() === currentPlanName.toLowerCase()
       ),
-    [currentPlanName],
+    [currentPlanName]
   );
 
   // Get plan limits based on current plan (matching database/constants)
@@ -65,7 +67,7 @@ export default function PlanOverview() {
 
       return limits[plan] || 300;
     },
-    [],
+    []
   );
 
   const currentUsage = useMemo(
@@ -79,7 +81,7 @@ export default function PlanOverview() {
       dashboardSummary?.orders,
       getPlanOrderLimit,
       currentPlanName,
-    ],
+    ]
   );
 
   // Calculate next billing date (first day of next month)
@@ -96,7 +98,7 @@ export default function PlanOverview() {
         year: "numeric",
       });
     },
-    [],
+    []
   );
 
   // Get plan price (matching constants)
@@ -111,14 +113,14 @@ export default function PlanOverview() {
 
       return prices[plan] || "$0/month";
     },
-    [],
+    []
   );
 
   const getUsagePercentage = useMemo(
     () => (current: number, limit: number) => {
       return (current / limit) * 100;
     },
-    [],
+    []
   );
 
   // Show skeleton while loading
@@ -130,7 +132,7 @@ export default function PlanOverview() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <h3 className="text-base font-semibold text-foreground">
+          <h3 className="text-base font-semibold text-default-800">
             Current Plan
           </h3>
           <Chip
@@ -159,19 +161,16 @@ export default function PlanOverview() {
           )}
         </div>
         <div className="text-right">
-          <p className="text-sm font-medium text-foreground">
+          <p className="text-sm font-semibold text-default-800">
             {getPlanPrice(currentPlanName)}
           </p>
           <p className="text-xs text-default-500">
             {billingUsage?.isOnTrial ? "Trial ends" : "Next billing"}:{" "}
             {billingUsage?.isOnTrial && billingUsage.trialEndsAt
-              ? new Date(billingUsage.trialEndsAt).toLocaleDateString(
-                  "en-US",
-                  {
-                    month: "short",
-                    day: "numeric",
-                  },
-                )
+              ? new Date(billingUsage.trialEndsAt).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                })
               : new Date(getNextBillingDate()).toLocaleDateString("en-US", {
                   month: "short",
                   day: "numeric",
@@ -181,18 +180,23 @@ export default function PlanOverview() {
       </div>
 
       {/* Compact Usage Display */}
-      <div className="bg-content1 rounded-lg px-3 py-2.5">
-        <div className="flex justify-between items-center mb-1.5">
-          <span className="text-xs text-default-600">Monthly Usage</span>
-          <span className="text-xs font-medium text-foreground">
-            {formatNumber(currentUsage.orders)} / {formatNumber(currentUsage.ordersLimit)} orders
-            <span className="text-default-500 ml-2">
-              ({Math.round(
+      <div className="rounded-lg px-3 py-2.5">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-xs text-default-600">
+            Monthly Usage
+          </span>
+          <span className="text-xs font-semibold text-default-800">
+            {formatNumber(currentUsage.orders)} /{" "}
+            {formatNumber(currentUsage.ordersLimit)} orders
+            <span className="text-xs text-default-500 ml-2">
+              (
+              {Math.round(
                 getUsagePercentage(
                   currentUsage.orders,
-                  currentUsage.ordersLimit,
-                ),
-              )}%)
+                  currentUsage.ordersLimit
+                )
+              )}
+              %)
             </span>
           </span>
         </div>
@@ -202,17 +206,15 @@ export default function PlanOverview() {
             indicator: "bg-gradient-to-r",
           }}
           color={
-            getUsagePercentage(
-              currentUsage.orders,
-              currentUsage.ordersLimit,
-            ) > 80
+            getUsagePercentage(currentUsage.orders, currentUsage.ordersLimit) >
+            80
               ? "warning"
               : "primary"
           }
           size="sm"
           value={getUsagePercentage(
             currentUsage.orders,
-            currentUsage.ordersLimit,
+            currentUsage.ordersLimit
           )}
         />
       </div>
@@ -227,40 +229,18 @@ export default function PlanOverview() {
               width={16}
             />
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-foreground">
+              <p className="text-xs font-semibold text-default-800">
                 Consider upgrading to{" "}
-                {upgradeRecommendation.planName.replace(" Plan", "")}
-                {" "}
-                <span className="text-default-500">
-                  ({formatNumber(upgradeRecommendation.orderLimit)} orders/mo
-                  at ${upgradeRecommendation.amount}/mo)
+                {upgradeRecommendation.planName.replace(" Plan", "")}{" "}
+                <span className="text-xs text-default-500">
+                  ({formatNumber(upgradeRecommendation.orderLimit)} orders/mo at
+                  ${upgradeRecommendation.amount}/mo)
                 </span>
               </p>
             </div>
           </div>
         </div>
       )}
-
-      {/* Key Features - Compact */}
-      <div className="flex flex-wrap gap-2">
-        {currentPlan?.features?.map((feature) => (
-          <Chip
-            key={`current-plan-feature-${feature}`}
-            size="sm"
-            startContent={
-              <Icon
-                className="text-success"
-                icon="solar:check-circle-bold"
-                width={12}
-              />
-            }
-            variant="flat"
-            className="bg-content2 text-xs"
-          >
-            {feature}
-          </Chip>
-        ))}
-      </div>
     </div>
   );
 }

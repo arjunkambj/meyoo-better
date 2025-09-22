@@ -19,9 +19,9 @@ export default function TeamSettingsView() {
       {[1, 2, 3].map((i) => (
         <Card
           key={i}
-          className="bg-content2 dark:bg-content1 rounded-xl border border-default-200/50 shadow-none"
+          className="rounded-2xl border border-default-100 shadow-none bg-content2/90 dark:bg-content1"
         >
-          <CardBody className="p-4">
+          <CardBody className="px-5 py-5">
             <Skeleton className="rounded-lg">
               <div className="h-16 rounded-lg bg-default-200" />
             </Skeleton>
@@ -36,7 +36,7 @@ export default function TeamSettingsView() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h2 className="text-2xl font-semibold text-foreground">
+          <h2 className="text-2xl font-semibold text-default-800">
             Team Management
           </h2>
           <p className="text-sm text-default-500 mt-1">
@@ -51,8 +51,8 @@ export default function TeamSettingsView() {
         <StatsLoader />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Card className="bg-content2 dark:bg-content1 rounded-xl border border-default-200/50 shadow-none">
-            <CardBody className="p-4">
+          <Card className="rounded-2xl border border-default-100 shadow-none bg-content2/90 dark:bg-content1">
+            <CardBody className="px-5 py-5">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-primary/10 rounded-lg">
                   <Icon
@@ -62,7 +62,7 @@ export default function TeamSettingsView() {
                   />
                 </div>
                 <div>
-                  <p className="text-2xl font-semibold text-foreground">
+                  <p className="text-2xl font-semibold text-default-800">
                     {teamStats?.totalMembers ?? 0}
                   </p>
                   <p className="text-xs text-default-500">Total Members</p>
@@ -71,8 +71,8 @@ export default function TeamSettingsView() {
             </CardBody>
           </Card>
 
-          <Card className="bg-content2 dark:bg-content1 rounded-xl border border-default-200/50 shadow-none">
-            <CardBody className="p-4">
+          <Card className="rounded-2xl border border-default-100 shadow-none bg-content2/90 dark:bg-content1">
+            <CardBody className="px-5 py-5">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-success/10 rounded-lg">
                   <Icon
@@ -82,7 +82,7 @@ export default function TeamSettingsView() {
                   />
                 </div>
                 <div>
-                  <p className="text-2xl font-semibold text-foreground">
+                  <p className="text-2xl font-semibold text-default-800">
                     {teamStats?.activeMembers ?? 0}
                   </p>
                   <p className="text-xs text-default-500">Active Members</p>
@@ -91,8 +91,8 @@ export default function TeamSettingsView() {
             </CardBody>
           </Card>
 
-          <Card className="bg-content2 dark:bg-content1 rounded-xl border border-default-200/50 shadow-none">
-            <CardBody className="p-4">
+          <Card className="rounded-2xl border border-default-100 shadow-none bg-content2/90 dark:bg-content1">
+            <CardBody className="px-5 py-5">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-warning/10 rounded-lg">
                   <Icon
@@ -102,7 +102,7 @@ export default function TeamSettingsView() {
                   />
                 </div>
                 <div>
-                  <p className="text-2xl font-semibold text-foreground">
+                  <p className="text-2xl font-semibold text-default-800">
                     {teamStats?.pendingInvites ?? 0}
                   </p>
                   <p className="text-xs text-default-500">Pending Invites</p>
@@ -114,7 +114,7 @@ export default function TeamSettingsView() {
       )}
 
       {/* Team Members List */}
-      <Card className="bg-content2 dark:bg-content1 rounded-xl border border-default-200/50 shadow-none">
+      <Card className="rounded-2xl border border-default-100 shadow-none bg-content2/90 dark:bg-content1">
         <CardBody className="p-0">
           <TeamMembersList />
         </CardBody>
@@ -122,8 +122,8 @@ export default function TeamSettingsView() {
 
       {/* Info for non-owners */}
       {!canManageTeam && (
-        <Card className="bg-content2 dark:bg-content1 rounded-xl border border-default-200/50 shadow-none">
-          <CardBody className="p-4">
+        <Card className="rounded-2xl border border-default-100 shadow-none bg-content2/90 dark:bg-content1">
+          <CardBody className="px-5 py-5">
             <div className="flex items-start gap-3">
               <Icon
                 className="text-default-500 mt-1"
@@ -131,7 +131,7 @@ export default function TeamSettingsView() {
                 width={20}
               />
               <div className="space-y-1">
-                <p className="text-sm font-medium text-foreground">
+                <p className="text-sm font-semibold text-default-800">
                   Team Member Access
                 </p>
                 <p className="text-sm text-default-500">

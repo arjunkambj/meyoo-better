@@ -167,23 +167,7 @@ export default function InviteTeamModal() {
                       onValueChange={setEmail}
                     />
 
-                    <div className="space-y-10">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-success/10 rounded-lg">
-                          <Icon
-                            className="text-success"
-                            icon="solar:shield-check-bold"
-                            width={18}
-                          />
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-sm font-medium">Instant Access</p>
-                          <p className="text-xs text-default-500">
-                            Team member can login immediately with Google
-                          </p>
-                        </div>
-                      </div>
-
+                    <div className="space-y-6">
                       <div className="flex items-center gap-3">
                         <div className="p-2 bg-warning/10 rounded-lg">
                           <Icon
@@ -204,26 +188,6 @@ export default function InviteTeamModal() {
                       </div>
                     </div>
 
-                    <div className="p-3 bg-default-50 dark:bg-default-100/50 rounded-lg border border-default-200">
-                      <div className="flex items-center gap-2">
-                        <Chip
-                          color="primary"
-                          size="sm"
-                          startContent={
-                            <Icon
-                              icon="solar:user-check-rounded-bold"
-                              width={14}
-                            />
-                          }
-                          variant="flat"
-                        >
-                          StoreTeam Role
-                        </Chip>
-                        <span className="text-xs text-default-500">
-                          will be assigned
-                        </span>
-                      </div>
-                    </div>
                   </ModalBody>
                   <Divider />
                   <ModalFooter className="pt-4">

@@ -3,7 +3,11 @@
 import { Card, Tooltip } from "@heroui/react";
 import { Icon } from "@iconify/react";
 
-import { formatCurrency, formatCurrencyCompact } from "@/libs/utils/format";
+import {
+  formatCurrency,
+  formatCurrencyCompact,
+  formatNumber,
+} from "@/libs/utils/format";
 
 interface MetricProps {
   label: string;
@@ -36,7 +40,7 @@ function Metric({
       case "percentage":
         return `${value.toFixed(0)}%`;
       default:
-        return value.toLocaleString();
+        return formatNumber(value);
     }
   };
 

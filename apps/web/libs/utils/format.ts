@@ -71,6 +71,20 @@ export function formatNumber(value: number): string {
   return new Intl.NumberFormat("en-US").format(value);
 }
 
+export function formatDate(
+  value: Date | string | number,
+  options?: Intl.DateTimeFormatOptions,
+  locale: string = "en-US",
+): string {
+  const date = value instanceof Date ? value : new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat(locale, options).format(date);
+}
+
 // Compact number formatter (e.g., 1.2K, 3.4M)
 export function formatCompactNumber(
   value: number,

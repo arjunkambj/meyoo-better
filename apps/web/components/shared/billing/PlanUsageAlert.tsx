@@ -6,6 +6,7 @@ import { Progress } from "@heroui/progress";
 import { Icon } from "@iconify/react";
 
 import { useBilling, useOrganization } from "@/hooks";
+import { formatNumber } from "@/libs/utils/format";
 
 interface PlanUsageAlertProps {
   showDetails?: boolean;
@@ -114,7 +115,7 @@ export function PlanUsageAlert({
           />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-foreground truncate">
-              {usage.toLocaleString()}/{limit.toLocaleString()} orders (
+              {formatNumber(usage)}/{formatNumber(limit)} orders (
               {Math.round(percentage)}%)
             </p>
           </div>
@@ -165,7 +166,7 @@ export function PlanUsageAlert({
 
               <div className="flex items-center justify-between">
                 <span className="text-xs text-default-600">
-                  {usage.toLocaleString()} / {limit.toLocaleString()} orders
+                  {formatNumber(usage)} / {formatNumber(limit)} orders
                 </span>
                 <Button
                   color={config.color}
@@ -200,10 +201,10 @@ export function PlanUsageAlert({
                 {config.title}
               </h4>
               <p className="text-sm text-default-600">
-                You&apos;re using {usage.toLocaleString()} of {limit.toLocaleString()} orders ({Math.round(percentage)}%) on the {planLabel}.
+                You&apos;re using {formatNumber(usage)} of {formatNumber(limit)} orders ({Math.round(percentage)}%) on the {planLabel}.
                 {upgradeRecommendation &&
                   ` Consider upgrading to ${upgradeRecommendation.planName.replace(" Plan", "")} 
-                  for ${upgradeRecommendation.orderLimit.toLocaleString()} orders/month.`}
+                  for ${formatNumber(upgradeRecommendation.orderLimit)} orders/month.`}
               </p>
             </div>
 
@@ -212,7 +213,7 @@ export function PlanUsageAlert({
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-default-600">Current usage</span>
                   <span className="font-medium text-foreground">
-                    {usage.toLocaleString()} orders
+                    {formatNumber(usage)} orders
                   </span>
                 </div>
 
@@ -229,7 +230,7 @@ export function PlanUsageAlert({
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-default-600">Plan limit</span>
                   <span className="font-medium text-foreground">
-                    {limit.toLocaleString()} orders
+                    {formatNumber(limit)} orders
                   </span>
                 </div>
               </div>

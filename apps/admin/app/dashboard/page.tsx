@@ -1,5 +1,7 @@
 import KPICard from "@/components/shared/KPICard";
 
+const numberFormatter = new Intl.NumberFormat("en-US");
+
 export default function DashboardPage() {
   // Mock data - replace with actual Convex queries
   const metrics = {
@@ -25,21 +27,21 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <KPICard
           title="Total Users"
-          value={metrics.totalUsers.toLocaleString()}
+          value={numberFormatter.format(metrics.totalUsers)}
           change={metrics.userChange}
           icon="solar:users-group-two-rounded-linear"
           iconColor="text-blue-500"
         />
         <KPICard
           title="Trial Users"
-          value={metrics.trialUsers.toLocaleString()}
+          value={numberFormatter.format(metrics.trialUsers)}
           change={metrics.trialChange}
           icon="solar:clock-circle-linear"
           iconColor="text-yellow-500"
         />
         <KPICard
           title="Paid Users"
-          value={metrics.paidUsers.toLocaleString()}
+          value={numberFormatter.format(metrics.paidUsers)}
           change={metrics.paidChange}
           icon="solar:verified-check-linear"
           iconColor="text-green-500"

@@ -3,7 +3,7 @@
  * These functions are pure and can be reused across components
  */
 
-import { getCurrencySymbol } from "./format";
+import { getCurrencySymbol, formatDate } from "./format";
 
 /**
  * Format currency values with K/M suffixes
@@ -87,7 +87,7 @@ export const formatRelativeTime = (timestamp: number): string => {
   if (diff < 3600000) return `${Math.floor(diff / 60000)} minutes ago`;
   if (diff < 86400000) return `${Math.floor(diff / 3600000)} hours ago`;
 
-  return date.toLocaleDateString();
+  return formatDate(date);
 };
 
 /**
@@ -102,7 +102,7 @@ export const formatFutureTime = (timestamp: number): string => {
   if (diff < 3600000) return `In ${Math.floor(diff / 60000)} minutes`;
   if (diff < 86400000) return `In ${Math.floor(diff / 3600000)} hours`;
 
-  return next.toLocaleDateString();
+  return formatDate(next);
 };
 
 /**

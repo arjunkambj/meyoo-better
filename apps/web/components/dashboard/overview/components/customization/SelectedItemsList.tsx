@@ -45,7 +45,7 @@ export const SelectedItemsList = React.memo(function SelectedItemsList({
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
-    }),
+    })
   );
 
   const handleDragEnd = useCallback(
@@ -59,14 +59,17 @@ export const SelectedItemsList = React.memo(function SelectedItemsList({
         onItemsReorder(arrayMove(items, oldIndex, newIndex));
       }
     },
-    [items, onItemsReorder],
+    [items, onItemsReorder]
   );
 
   const pinnedItems = useMemo(() => items.slice(0, 10), [items]);
   const additionalItems = useMemo(() => items.slice(10), [items]);
 
   return (
-    <div className={`border-l pl-4 overflow-hidden ${className || ''}`} style={style}>
+    <div
+      className={`border-l pl-4 overflow-hidden ${className || ""}`}
+      style={style}
+    >
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold text-default-700">
           {type === "kpi" ? "Selected KPIs" : "Selected Widgets"}

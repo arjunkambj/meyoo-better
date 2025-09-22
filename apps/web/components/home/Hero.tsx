@@ -5,14 +5,15 @@ import { Icon } from "@iconify/react";
 import React from "react";
 
 import { Button, Card, CardBody } from "@heroui/react";
+import Link from "next/link";
 
 const Hero = () => {
   return (
-    <section className="relative w-full min-h-[calc(90vh)] flex items-center justify-center bg-background overflow-hidden pt-[calc(env(safe-area-inset-top)+56px)] sm:pt-[calc(env(safe-area-inset-top)+72px)] md:pt-10">
-      <div className="container py-20 md:py-28 lg:py-36 mx-auto">
+    <section className="relative w-full min-h-[calc(90vh)] flex items-center justify-center bg-background overflow-hidden pt-[calc(env(safe-area-inset-top)+56px)] sm:pt-[calc(env(safe-area-inset-top)+72px)] md:pt-6">
+      <div className="container py-16 sm:py-20 md:py-28 lg:py-36 mx-auto">
         <div className="text-center flex flex-col items-center">
           {/* Chip Badge */}
-          <div className="inline-flex items-center gap-2.5 bg-default-200/50 border border-default-100  rounded-full px-5 py-2 mb-3">
+          <div className="inline-flex items-center gap-2.5 bg-default-200/50 border border-default-200/50 dark:bg-default-100 dark:border-default-200/50  rounded-full px-5 py-2 mb-3">
             <Icon
               icon="solar:code-scan-bold-duotone"
               width={16}
@@ -24,30 +25,41 @@ const Hero = () => {
           </div>
 
           {/* Header  */}
-          <h1 className="text-5xl leading-tight tracking-tighter md:text-6xl lg:text-7xl">
-            <span className="font-semibold">Track, Manage, and Optimize</span>
+          <h1 className="text-3xl leading-tight tracking-tighter text-balance sm:text-5xl md:text-6xl lg:text-7xl">
+            <span className="font-semibold">
+              Track,<span> </span>Manage And{" "}
+              <span className="text-primary">Optimize</span>
+            </span>
             <br />
-            <span className="font-playfair italic">Built for D2C Brands.</span>
+            <span className="font-playfair italic">
+              Built for <span className="text-primary">D2C</span> Brands.
+            </span>
           </h1>
 
           {/* Professional info */}
-          <p className="mt-4 md:mt-6 text-lg md:text-xl lg:text-2xl text-default-600 max-w-3xl mx-auto">
+          <p className="mt-2 text-base sm:text-lg md:text-xl lg:text-2xl text-default-600 max-w-3xl mx-auto text-balance">
             Forget about outdated spreadsheets, From orders to expenses with 10+
             Integrations. Everything your brand needs in one place
           </p>
           {/* CTA Buttons */}
-          <div className="mt-8 md:mt-10 lg:mt-12 flex flex-col items-center gap-4 md:flex-row">
+          <div className="mt-8  flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-center sm:gap-4">
             <Button
-              className="font-semibold px-8"
+              as={Link}
+              href="/signin"
+              className="w-full sm:w-auto font-semibold px-6 sm:px-8"
               color="primary"
               endContent={<Icon icon="solar:arrow-right-linear" width={20} />}
               size="lg"
               variant="shadow"
             >
-              Start Tracking
+              Get Started
             </Button>
-            <Button className="font-medium px-8" size="lg" variant="bordered">
-              Watch Demo
+            <Button
+              className="w-full sm:w-auto font-medium px-6 sm:px-8"
+              size="lg"
+              variant="bordered"
+            >
+              Install App
             </Button>
           </div>
 
@@ -62,10 +74,11 @@ const Hero = () => {
 
         <motion.div
           initial={{ opacity: 0, y: 200 }}
+          className="px-2"
           animate={{ opacity: 100, y: 0 }}
           transition={{ ease: [0, 0.71, 0.2, 1.01], duration: 0.8 }}
         >
-          <Card className="group mx-auto mt-16  h-100 w-full rounded-4xl border border-default-200 bg-content2/30 p-2 shadow-none md:h-190 md:p-3">
+          <Card className="group mx-auto mt-12  h-[320px] sm:h-[360px] w-full rounded-4xl border border-default-200 bg-content2/30 p-2 shadow-none md:h-190 md:p-3">
             <CardBody className="size-full rounded-3xl border-2 border-background bg-content2">
               <img
                 src="https://deifkwefumgah.cloudfront.net/shadcnblocks/block/placeholder-1.svg"

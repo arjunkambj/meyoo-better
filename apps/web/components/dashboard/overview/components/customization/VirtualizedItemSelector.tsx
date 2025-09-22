@@ -14,7 +14,7 @@ interface Item {
 }
 
 type SectionHeader = {
-  type: 'section';
+  type: "section";
   id: string;
   label: string;
   icon: string;
@@ -46,7 +46,7 @@ const ItemRow = React.memo(
       (checked: boolean) => {
         onToggle(item.id, checked);
       },
-      [item.id, onToggle],
+      [item.id, onToggle]
     );
 
     return (
@@ -83,11 +83,10 @@ const ItemRow = React.memo(
         </Checkbox>
       </div>
     );
-  },
+  }
 );
 
 ItemRow.displayName = "ItemRow";
-
 
 export function VirtualizedItemSelector({
   items,
@@ -104,32 +103,35 @@ export function VirtualizedItemSelector({
     (id: string, checked: boolean) => {
       onItemToggle(id, checked);
     },
-    [onItemToggle],
+    [onItemToggle]
   );
 
   // Process items into renderable rows
   const renderableRows = useMemo(() => {
-    const rows: Array<{ type: 'section'; section: SectionHeader } | { type: 'items'; items: Item[] }> = [];
+    const rows: Array<
+      | { type: "section"; section: SectionHeader }
+      | { type: "items"; items: Item[] }
+    > = [];
     let currentRowItems: Item[] = [];
 
     items.forEach((item) => {
-      const isSection = 'type' in item && item.type === 'section';
+      const isSection = "type" in item && item.type === "section";
 
       if (isSection) {
         // Flush current row if it has items
         if (currentRowItems.length > 0) {
-          rows.push({ type: 'items', items: currentRowItems });
+          rows.push({ type: "items", items: currentRowItems });
           currentRowItems = [];
         }
         // Add section header
-        rows.push({ type: 'section', section: item as SectionHeader });
+        rows.push({ type: "section", section: item as SectionHeader });
       } else {
         // Add item to current row
         currentRowItems.push(item as Item);
 
         // If we have 2 items, flush the row
         if (currentRowItems.length === 2) {
-          rows.push({ type: 'items', items: currentRowItems });
+          rows.push({ type: "items", items: currentRowItems });
           currentRowItems = [];
         }
       }
@@ -137,7 +139,7 @@ export function VirtualizedItemSelector({
 
     // Flush any remaining items
     if (currentRowItems.length > 0) {
-      rows.push({ type: 'items', items: currentRowItems });
+      rows.push({ type: "items", items: currentRowItems });
     }
 
     return rows;
@@ -148,13 +150,10 @@ export function VirtualizedItemSelector({
       <ScrollShadow hideScrollBar className="h-[430px]" visibility="none">
         <div className="">
           {renderableRows.map((row, index) => {
-            if (row.type === 'section') {
+            if (row.type === "section") {
               const section = row.section;
               return (
-                <div
-                  key={section.id}
-                  className="w-full mt-5 mb-3 first:mt-0"
-                >
+                <div key={section.id} className="w-full mt-5 mb-3 first:mt-0">
                   <div className="flex items-center justify-between px-3 py-2 bg-gradient-to-r from-default-100 to-default-50 rounded-lg border border-default-200">
                     <div className="flex items-center gap-2.5">
                       <Icon

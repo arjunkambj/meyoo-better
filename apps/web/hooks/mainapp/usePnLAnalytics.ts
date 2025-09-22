@@ -42,8 +42,8 @@ export function usePnLAnalytics(dateRange?: {
   endDate: string;
 }) {
   const [granularity, setGranularity] = useState<PnLGranularity>("monthly");
-  const { offsetMinutes } = useShopifyTime();
-  const { timezone } = useOrganizationTimeZone();
+  const { offsetMinutes, isLoading: isShopTimeLoading } = useShopifyTime();
+  const { timezone, loading: isTimezoneLoading } = useOrganizationTimeZone();
 
   // Default date range: last 30 days
   const defaultDateRange = useMemo<{ startDate: string; endDate: string }>(() => {
@@ -58,29 +58,40 @@ export function usePnLAnalytics(dateRange?: {
     };
   }, []);
 
-  const effectiveDateRange: { startDate: string; endDate: string } = {
-    startDate: dateRange?.startDate ?? defaultDateRange.startDate,
-    endDate: dateRange?.endDate ?? defaultDateRange.endDate,
-  };
+  const startDate = dateRange?.startDate ?? defaultDateRange.startDate;
+  const endDate = dateRange?.endDate ?? defaultDateRange.endDate;
+
+  const canRunQueries = !isShopTimeLoading && !isTimezoneLoading;
+
+  const utcDateRange = useMemo(() => {
+    if (!canRunQueries) return undefined;
+
+    return dateRangeToUtcWithShopPreference(
+      { startDate, endDate },
+      offsetMinutes,
+      timezone
+    );
+  }, [canRunQueries, startDate, endDate, offsetMinutes, timezone]);
 
   // Fetch P&L metrics - this single call gives us most of what we need
-  const metricsData = useQuery(api.web.pnl.getMetrics, {
-    dateRange: dateRangeToUtcWithShopPreference(
-      effectiveDateRange,
-      offsetMinutes,
-      timezone
-    ),
-  });
+  const metricsArgs = useMemo(
+    () => (utcDateRange ? { dateRange: utcDateRange } : ("skip" as const)),
+    [utcDateRange]
+  );
+  const metricsData = useQuery(api.web.pnl.getMetrics, metricsArgs);
 
   // Fetch table data based on granularity
-  const tableData = useQuery(api.web.pnl.getTableData, {
-    dateRange: dateRangeToUtcWithShopPreference(
-      effectiveDateRange,
-      offsetMinutes,
-      timezone
-    ),
-    granularity,
-  });
+  const tableArgs = useMemo(
+    () =>
+      utcDateRange
+        ? {
+            dateRange: utcDateRange,
+            granularity,
+          }
+        : ("skip" as const),
+    [utcDateRange, granularity]
+  );
+  const tableData = useQuery(api.web.pnl.getTableData, tableArgs);
 
   // Process KPI metrics
   const kpiMetrics: PnLKPIMetrics | undefined = useMemo(() => {
@@ -243,8 +254,8 @@ export function usePnLAnalytics(dateRange?: {
 
   // Granular loading states for each data type
   const loadingStates = {
-    metrics: metricsData === undefined,
-    table: tableData === undefined,
+    metrics: metricsData === undefined || !utcDateRange,
+    table: tableData === undefined || !utcDateRange,
   };
 
   // Check if any data is loading (for backward compatibility)

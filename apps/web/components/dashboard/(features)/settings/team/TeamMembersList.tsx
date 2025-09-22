@@ -21,6 +21,7 @@ import { setSettingsPendingAtom } from "@/store/atoms";
 import { api } from "@/libs/convexApi";
 import type { GenericId as Id } from "convex/values";
 import { useTeamMembersWithManagement, useUser } from "@/hooks";
+import { formatDate } from "@/libs/utils/format";
 
 // Use inferred return type from Convex API; no local TeamMember type
 
@@ -150,7 +151,7 @@ export default function TeamMembersList() {
             <TableCell>
               <p className="text-sm text-default-500">
                 {member.createdAt
-                  ? new Date(member.createdAt).toLocaleDateString()
+                  ? formatDate(member.createdAt)
                   : "—"}
               </p>
             </TableCell>

@@ -5,7 +5,7 @@ import { Icon } from "@iconify/react";
 import { useMemo } from "react";
 
 import { useUser } from "@/hooks";
-import { getCurrencySymbol } from "@/libs/utils/format";
+import { getCurrencySymbol, formatNumber } from "@/libs/utils/format";
 
 export interface FulfillmentData {
   avgProcessingTime: number;
@@ -139,7 +139,7 @@ export function FulfillmentAnalysis({ metrics }: FulfillmentAnalysisProps) {
         <div className="flex items-center gap-2">
           {metrics?.totalOrders && (
             <Chip color="primary" size="sm" variant="flat">
-              {metrics.totalOrders.toLocaleString()} orders
+              {formatNumber(metrics.totalOrders)} orders
             </Chip>
           )}
           <Button

@@ -38,25 +38,25 @@ const faqs = [
 
 const Faq = () => {
   return (
-    <section className="py-24">
+    <section className="py-16 sm:py-20 md:py-24 px-4 sm:px-6 lg:px-8">
       <div className="container">
         <div className="mx-auto grid max-w-7xl gap-10 md:grid-cols-2">
           <div className="flex flex-col gap-6">
-            <h2 className="text-4xl font-semibold">
+            <h2 className="text-3xl font-semibold text-balance sm:text-4xl">
               Need Help?
               <br />
               <span className="text-muted-foreground/70">
                 We&apos;re here to assist.
               </span>
             </h2>
-            <p className="text-lg text-muted-foreground md:text-xl">
+            <p className="text-base text-muted-foreground sm:text-lg md:text-xl">
               Still have questions? Feel free to contact our friendly
               <a href="#" className="mx-1 whitespace-nowrap underline">
                 support team
               </a>
               specialists.
             </p>
-            <Button size="lg" variant="bordered" className="w-fit">
+            <Button size="lg" variant="bordered" className="w-full sm:w-fit">
               View all FAQs
             </Button>
           </div>
@@ -67,9 +67,9 @@ const Faq = () => {
               base: "w-full min-w-full max-w-full block transition-none data-[open=true]:w-full data-[open=false]:w-full",
               title: "font-medium text-foreground w-full min-w-full",
               trigger:
-                "px-6 py-6 w-full min-w-full flex items-center justify-between transition-colors",
+                "px-4 sm:px-6 py-5 sm:py-6 w-full min-w-full flex items-center justify-between transition-colors",
               indicator: "text-primary shrink-0",
-              content: "text-default-600 px-6 pb-6 pt-2 w-full",
+              content: "text-default-600 px-4 sm:px-6 pb-5 sm:pb-6 pt-2 w-full",
             }}
             variant="light"
           >

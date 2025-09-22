@@ -17,10 +17,10 @@ import {
   Tooltip,
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useUser } from "@/hooks";
 import { getStockStatusConfig } from "@/libs/utils/dashboard-formatters";
-import { getCurrencySymbol } from "@/libs/utils/format";
+import { getCurrencySymbol, formatNumber } from "@/libs/utils/format";
 
 export interface ProductVariant {
   id: string;
@@ -62,6 +62,8 @@ interface ProductsTableProps {
     setPage: (page: number) => void;
     total: number;
   };
+  searchValue?: string;
+  onSearchSubmit?: (term: string) => void;
 }
 
 const columns = [
@@ -81,13 +83,28 @@ export const ProductsTable = React.memo(function ProductsTable({
   products,
   loading,
   pagination,
+  searchValue,
+  onSearchSubmit,
 }: ProductsTableProps) {
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(searchValue ?? "");
   const [page, setPage] = useState(pagination?.page || 1);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const { primaryCurrency } = useUser();
   const currencySymbol = getCurrencySymbol(primaryCurrency);
   const searchTerm = search.trim().toLowerCase();
+
+  useEffect(() => {
+    setSearch(searchValue ?? "");
+  }, [searchValue]);
+
+  useEffect(() => {
+    const nextPage = pagination?.page;
+
+    if (typeof nextPage === "number") {
+      setPage(nextPage);
+    }
+  }, [pagination?.page]);
+
   const filteredProducts = useMemo(() => {
     if (!searchTerm) return products;
 
@@ -103,6 +120,25 @@ export const ProductsTable = React.memo(function ProductsTable({
       );
     });
   }, [products, searchTerm]);
+
+  const handleSearchSubmit = useCallback(() => {
+    if (!onSearchSubmit) return;
+
+    const next = search.trim();
+    const previous = (searchValue ?? "").trim();
+
+    if (next === previous) return;
+
+    onSearchSubmit(next);
+  }, [onSearchSubmit, search, searchValue]);
+
+  const handleSearchClear = useCallback(() => {
+    setSearch("");
+
+    if (onSearchSubmit && (searchValue ?? "").trim() !== "") {
+      onSearchSubmit("");
+    }
+  }, [onSearchSubmit, searchValue]);
 
   const renderCell = useCallback(
     (item: Product, columnKey: React.Key) => {
@@ -189,9 +225,7 @@ export const ProductsTable = React.memo(function ProductsTable({
         case "unitsSold":
           return (
             <div className="text-sm font-medium">
-              {item.unitsSold !== undefined && item.unitsSold !== null
-                ? item.unitsSold.toLocaleString()
-                : "0"}
+              {formatNumber(item.unitsSold ?? 0)}
             </div>
           );
 
@@ -293,10 +327,19 @@ export const ProductsTable = React.memo(function ProductsTable({
         </div>
 
         <Input
+          isClearable
           className="max-w-xs"
           placeholder="Search products, SKU, or vendor..."
           startContent={<Icon icon="solar:search-outline" width={18} />}
           value={search}
+          onBlur={handleSearchSubmit}
+          onClear={handleSearchClear}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              handleSearchSubmit();
+            }
+          }}
           onValueChange={setSearch}
         />
 

@@ -24,7 +24,7 @@ export function InventoryView() {
     dateRange,
     stockLevel: stockFilter,
     category: categoryFilter,
-    searchTerm,
+    searchTerm: searchTerm ? searchTerm : undefined,
     page: currentPage,
   });
 
@@ -33,9 +33,13 @@ export function InventoryView() {
       setStockFilter((value as string) || "all");
     } else if (key === "category") {
       setCategoryFilter((value as string) || "all");
-    } else if (key === "search") {
-      setSearchTerm((value as string) || "");
     }
+  }, []);
+
+  const handleSearchSubmit = useCallback((term: string) => {
+    const normalized = term.trim();
+    setSearchTerm(normalized);
+    setCurrentPage(1);
   }, []);
 
   const categoryOptions = useMemo(
@@ -69,18 +73,11 @@ export function InventoryView() {
       type: "select" as const,
       options: [{ value: "all", label: "All Categories" }, ...categoryOptions],
     },
-    {
-      key: "search",
-      label: "Search",
-      type: "search" as const,
-      placeholder: "Search by product name, SKU, or vendor...",
-    },
   ];
 
   const filterValues = {
     stock: stockFilter,
     category: categoryFilter,
-    search: searchTerm,
   };
 
   if (isLoading) {
@@ -198,6 +195,8 @@ export function InventoryView() {
             : undefined
         }
         products={products?.data || []}
+        searchValue={searchTerm}
+        onSearchSubmit={handleSearchSubmit}
       />
     </div>
   );

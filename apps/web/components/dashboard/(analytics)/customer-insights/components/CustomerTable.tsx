@@ -25,7 +25,7 @@ import { CustomerStatusBadge } from "@/components/shared/badges/StatusBadge";
 import { FilterBar } from "@/components/shared/filters/FilterBar";
 import { useUser } from "@/hooks";
 import { getSegmentStyle } from "@/libs/utils/dashboard-formatters";
-import { getCurrencySymbol } from "@/libs/utils/format";
+import { getCurrencySymbol, formatNumber } from "@/libs/utils/format";
 
 export interface Customer {
   id: string;
@@ -36,8 +36,8 @@ export interface Customer {
   lifetimeValue: number;
   orders: number;
   avgOrderValue: number;
-  lastOrderDate: string;
-  firstOrderDate: string;
+  lastOrderDate?: string | null;
+  firstOrderDate?: string | null;
   segment: string;
   city?: string;
   country?: string;
@@ -63,6 +63,8 @@ const columns = [
   { name: "Location", uid: "location" },
   { name: "Actions", uid: "actions" },
 ];
+
+const dateFormatter = new Intl.DateTimeFormat("en-US");
 
 export const CustomerTable = React.memo(function CustomerTable({
   customers,
@@ -167,7 +169,7 @@ export const CustomerTable = React.memo(function CustomerTable({
           return (
             <span className="font-medium text-sm">
               {currencySymbol}
-              {item.lifetimeValue.toLocaleString()}
+              {formatNumber(item.lifetimeValue)}
             </span>
           );
 
@@ -194,16 +196,30 @@ export const CustomerTable = React.memo(function CustomerTable({
           );
 
         case "lastOrder": {
-          const daysAgo = Math.floor(
-            (Date.now() - new Date(item.lastOrderDate).getTime()) /
-              (1000 * 60 * 60 * 24)
+          const rawDate = item.lastOrderDate;
+          const parsedDate = rawDate ? new Date(rawDate) : undefined;
+          const isValidDate =
+            parsedDate !== undefined && !Number.isNaN(parsedDate.getTime());
+
+          if (!isValidDate) {
+            return (
+              <div>
+                <p className="text-sm text-default-500">No orders yet</p>
+                <p className="text-xs text-default-400">—</p>
+              </div>
+            );
+          }
+
+          const daysAgo = Math.max(
+            0,
+            Math.floor(
+              (Date.now() - parsedDate.getTime()) / (1000 * 60 * 60 * 24)
+            )
           );
 
           return (
             <div>
-              <p className="text-sm">
-                {new Date(item.lastOrderDate).toLocaleDateString()}
-              </p>
+              <p className="text-sm">{dateFormatter.format(parsedDate)}</p>
               <p className="text-xs text-default-500">{daysAgo} days ago</p>
             </div>
           );

@@ -5,6 +5,7 @@ import { createContext, useContext, useMemo } from "react";
 import type { ReactNode } from "react";
 
 import { api } from "@/libs/convexApi";
+import { formatNumber } from "@/libs/utils/format";
 
 import { useBilling } from "./useBilling";
 
@@ -73,7 +74,7 @@ function evaluateFeatureAccess(
   if (requiresUpgrade && usage > limit) {
     return {
       hasAccess: false,
-      reason: `Order limit exceeded (${usage.toLocaleString()}/${limit.toLocaleString()}). Upgrade your plan to continue.`,
+      reason: `Order limit exceeded (${formatNumber(usage)}/${formatNumber(limit)}). Upgrade your plan to continue.`,
       upgradeRequired: true,
       currentPlan: plan ?? "free",
       requiredPlan: getNextPlan(plan ?? "free"),

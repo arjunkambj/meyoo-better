@@ -32,16 +32,20 @@ export const OrdersView = memo(function OrdersView() {
     useOrdersAnalytics({
       dateRange,
       status: selectedStatus,
-      searchTerm,
+      searchTerm: searchTerm ? searchTerm : undefined,
       page: currentPage,
     });
 
   const handleFilterChange = useCallback((key: string, value: unknown) => {
     if (key === "status") {
       setSelectedStatus(value === "all" ? undefined : (value as string));
-    } else if (key === "search") {
-      setSearchTerm(value as string);
     }
+  }, []);
+
+  const handleSearchSubmit = useCallback((term: string) => {
+    const normalized = term.trim();
+    setSearchTerm(normalized);
+    setCurrentPage(1);
   }, []);
 
   const handleAnalyticsRangeChange = useCallback(
@@ -65,17 +69,10 @@ export const OrdersView = memo(function OrdersView() {
         { value: "refunded", label: "Refunded" },
       ],
     },
-    {
-      key: "search",
-      label: "Search",
-      type: "search" as const,
-      placeholder: "Search by order ID, customer name, or email...",
-    },
   ];
 
   const filterValues = {
     status: selectedStatus || "all",
-    search: searchTerm,
   };
 
   // Remove the early return loading state - we'll handle loading inline
@@ -133,6 +130,8 @@ export const OrdersView = memo(function OrdersView() {
               }
             : undefined
         }
+        onSearchSubmit={handleSearchSubmit}
+        searchValue={searchTerm}
       />
     </div>
   );

@@ -1,4 +1,4 @@
-import { getCurrencySymbol } from "@/libs/utils/format";
+import { getCurrencySymbol, formatNumber } from "@/libs/utils/format";
 
 import type { MetricCategory, MetricDefinition } from "./types";
 
@@ -1089,5 +1089,5 @@ export function formatMetricValue(
   }
 
   // format === "number"
-  return numValue.toLocaleString();
+  return formatNumber(numValue);
 }

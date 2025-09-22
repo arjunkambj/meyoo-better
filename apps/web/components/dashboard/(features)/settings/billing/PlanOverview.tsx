@@ -10,6 +10,7 @@ import { api } from "@/libs/convexApi";
 import { useBilling } from "@/hooks";
 import { toUtcRangeStrings } from "@/libs/dateRange";
 import { useOrganizationTimeZone } from "@/hooks/mainapp/useUser";
+import { formatNumber } from "@/libs/utils/format";
 
 export default function PlanOverview() {
   const { timezone } = useOrganizationTimeZone();
@@ -174,8 +175,7 @@ export default function PlanOverview() {
           <div className="space-y-2">
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium text-foreground">
-                {currentUsage.orders.toLocaleString()} /{" "}
-                {currentUsage.ordersLimit.toLocaleString()} orders
+                {formatNumber(currentUsage.orders)} / {formatNumber(currentUsage.ordersLimit)} orders
               </span>
               <span className="text-xs text-default-500">
                 {Math.round(
@@ -257,7 +257,7 @@ export default function PlanOverview() {
               <p className="text-xs text-default-500">
                 You&apos;re approaching your plan limit. Upgrade to{" "}
                 {upgradeRecommendation.planName.replace(" Plan", "")}
-                for {upgradeRecommendation.orderLimit.toLocaleString()}{" "}
+                for {formatNumber(upgradeRecommendation.orderLimit)}{" "}
                 orders/month at ${upgradeRecommendation.amount}/month.
               </p>
             </div>

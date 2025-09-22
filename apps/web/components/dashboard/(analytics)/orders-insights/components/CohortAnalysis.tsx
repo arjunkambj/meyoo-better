@@ -5,7 +5,7 @@ import { Icon } from "@iconify/react";
 import { memo, useMemo, useState } from "react";
 
 import { useUser } from "@/hooks";
-import { getCurrencySymbol } from "@/libs/utils/format";
+import { getCurrencySymbol, formatNumber } from "@/libs/utils/format";
 
 export interface CohortData {
   cohort: string;
@@ -212,7 +212,7 @@ export const CohortAnalysis = memo(function CohortAnalysis({
           <div className="bg-default-100 rounded-lg p-3 border border-default-200/50 cursor-help">
             <p className="text-xs text-default-500 mb-1">Total Cohort Size</p>
             <p className="text-lg font-bold">
-              {data.reduce((sum, c) => sum + c.size, 0).toLocaleString()}
+              {formatNumber(data.reduce((sum, c) => sum + c.size, 0))}
             </p>
           </div>
         </Tooltip>

@@ -6,6 +6,7 @@ import type { Order } from "@/components/dashboard/(analytics)/orders/components
 
 import { api } from "@/libs/convexApi";
 import { toUtcRangeStrings } from "@/libs/dateRange";
+import { formatDate } from "@/libs/utils/format";
 import { useOrganizationTimeZone } from "./useUser";
 
 // Import types from components
@@ -148,8 +149,8 @@ export function useOrdersAnalytics(params: UseOrdersAnalyticsParams = {}) {
       Items: order.items,
       Total: `$${order.totalPrice.toFixed(2)}`,
       "Ship To": `${order.shippingAddress.city}, ${order.shippingAddress.country}`,
-      "Created At": new Date(order.createdAt).toLocaleDateString(),
-      "Updated At": new Date(order.updatedAt).toLocaleDateString(),
+      "Created At": formatDate(order.createdAt),
+      "Updated At": formatDate(order.updatedAt),
     }));
   }, [ordersData]);
 

@@ -227,10 +227,10 @@ export function CustomizationModalUnified({
                 </Button>
               </div>
 
-              <div className="flex gap-4 h-[450px]">
+              <div className="flex gap-4 pr-4 h-[450px]">
                 {/* Left: Items selection with 2 per row (70%) */}
                 <MemoizedVirtualizedItemSelector
-                  style={{ flex: "0 0 70%" }}
+                  style={{ flex: "0 0 65%" }}
                   items={displayItems}
                   selectedIds={
                     activeTab === "kpi" ? selectedKpis : selectedWidgets
@@ -242,7 +242,7 @@ export function CustomizationModalUnified({
 
                 {/* Right: Selected Items with Position Control (30%) */}
                 <MemoizedSelectedItemsList
-                  style={{ flex: "0 0 30%" }}
+                  style={{ flex: "0 0 35%" }}
                   items={activeTab === "kpi" ? selectedKpis : selectedWidgets}
                   type={activeTab}
                   onItemRemove={handleItemRemove}

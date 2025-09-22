@@ -2,7 +2,7 @@
 
 import KPI from "@/components/shared/cards/KPI";
 import { useUser } from "@/hooks";
-import { getCurrencySymbol } from "@/libs/utils/format";
+import { getCurrencySymbol, formatNumber } from "@/libs/utils/format";
 
 interface InventoryMetrics {
   totalValue: number;
@@ -52,7 +52,7 @@ export function InventoryOverviewCards({
   const cards = [
     {
       title: "Inventory Value",
-      value: `${currencySymbol}${metrics.totalCOGS.toLocaleString()}`,
+      value: `${currencySymbol}${formatNumber(metrics.totalCOGS)}`,
       change: metrics.changes.totalCOGS,
       icon: "solar:box-bold-duotone",
       subtitle: `Cost value of ${metrics.totalSKUs} SKUs`,
@@ -73,7 +73,7 @@ export function InventoryOverviewCards({
     },
     {
       title: "Dead Stock",
-      value: metrics.deadStock.toLocaleString(),
+      value: formatNumber(metrics.deadStock),
       change: 0,
       icon: "solar:trash-bin-minimalistic-bold-duotone",
       iconColor: metrics.deadStock > 0 ? "text-danger" : "text-primary",
@@ -104,5 +104,4 @@ export function InventoryOverviewCards({
     </div>
   );
 }
-
 

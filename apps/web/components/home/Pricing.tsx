@@ -1,34 +1,46 @@
-'use client';
+"use client";
 
-import { BadgeCheck } from 'lucide-react';
-import React, { useMemo, useState } from 'react';
+import { BadgeCheck } from "lucide-react";
+import React, { useMemo, useState } from "react";
 
-import { Button, Card, CardBody, CardHeader, Divider, Switch } from '@heroui/react';
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Divider,
+  Switch,
+} from "@heroui/react";
 
-import { frequencies, tiers } from './pricing/constants';
-import { type Frequency, FrequencyEnum, TiersEnum } from './pricing/types';
+import { frequencies, tiers } from "./pricing/constants";
+import { type Frequency, FrequencyEnum, TiersEnum } from "./pricing/types";
 
-const showcasedTiers = tiers.filter((tier) => tier.key !== TiersEnum.Enterprise);
+const showcasedTiers = tiers.filter(
+  (tier) => tier.key !== TiersEnum.Enterprise
+);
 
 const Pricing = () => {
   const defaultFrequency = frequencies[0];
 
   if (!defaultFrequency) {
-    throw new Error('No pricing frequencies configured');
+    throw new Error("No pricing frequencies configured");
   }
 
-  const [billingCycle, setBillingCycle] = useState<FrequencyEnum>(FrequencyEnum.Monthly);
+  const [billingCycle, setBillingCycle] = useState<FrequencyEnum>(
+    FrequencyEnum.Monthly
+  );
 
   const selectedFrequency = useMemo<Frequency>(
     () =>
-      frequencies.find((frequency) => frequency.key === billingCycle) ?? defaultFrequency,
-    [billingCycle, defaultFrequency],
+      frequencies.find((frequency) => frequency.key === billingCycle) ??
+      defaultFrequency,
+    [billingCycle, defaultFrequency]
   );
 
   return (
-    <section className="bg-background py-32">
-      <div className="container mx-auto flex flex-col gap-13">
-        <h1 className="text-center text-6xl font-bold tracking-tighter text-foreground">
+    <section className="bg-background py-16 sm:py-24 md:py-32">
+      <div className="container mx-auto flex flex-col gap-8 sm:gap-10 md:gap-13 px-4 sm:px-6 lg:px-8">
+        <h1 className="text-center text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tighter text-foreground">
           Simple Pricing Plans
         </h1>
 
@@ -37,60 +49,71 @@ const Pricing = () => {
           <Switch
             isSelected={billingCycle === FrequencyEnum.Yearly}
             onValueChange={(isSelected) => {
-              setBillingCycle(isSelected ? FrequencyEnum.Yearly : FrequencyEnum.Monthly);
+              setBillingCycle(
+                isSelected ? FrequencyEnum.Yearly : FrequencyEnum.Monthly
+              );
             }}
             size="sm"
           />
           <span className="text-sm text-muted-foreground">Yearly</span>
         </div>
 
-        <div className="flex items-stretch justify-center gap-6">
+        <div className="flex flex-col sm:flex-row items-stretch justify-center gap-4 sm:gap-6">
           {showcasedTiers.map((tier) => {
             const price =
-              typeof tier.price === 'string' ? tier.price : tier.price[billingCycle];
+              typeof tier.price === "string"
+                ? tier.price
+                : tier.price[billingCycle];
             const periodCopy =
-              typeof tier.price === 'string'
-                ? tier.period?.[billingCycle] ?? 'Custom pricing'
-                : tier.period?.[billingCycle] ?? selectedFrequency.priceSuffix;
+              typeof tier.price === "string"
+                ? (tier.period?.[billingCycle] ?? "Custom pricing")
+                : (tier.period?.[billingCycle] ??
+                  selectedFrequency.priceSuffix);
 
             return (
               <Card
                 key={tier.key}
-                className={`h-full w-80 rounded-3xl border px-4 py-3 ${
-                  tier.mostPopular ? 'border-2 border-primary' : 'border-border'
+                className={`h-full w-full sm:w-80 rounded-3xl pb-2 border ${
+                  tier.mostPopular ? "border-2 border-primary" : "border-border"
                 }`}
               >
-                <CardHeader className="flex flex-col items-start">
-                  <h3 className="text-lg font-medium text-foreground">{tier.title}</h3>
-                  <div className="mt-4">
+                <CardHeader className="flex flex-col  px-6 py-4  items-start">
+                  <h3 className="text-lg font-medium text-foreground">
+                    {tier.title}
+                  </h3>
+                  <div className="mt-4 gap-2 flex flex-col">
                     <div className="text-5xl font-semibold tracking-tight text-foreground/90">
                       {price}
                     </div>
                     <div className="text-xs">{periodCopy}</div>
                   </div>
+
+                  <p className="text-sm mt-4 text-muted-foreground">
+                    {tier.description}
+                  </p>
+
+                  <Button
+                    className="mt-2 w-full"
+                    color={tier.buttonColor}
+                    as="a"
+                    href={tier.href}
+                    variant={tier.buttonVariant}
+                  >
+                    {tier.buttonText}
+                  </Button>
                 </CardHeader>
 
-                <CardBody className="flex flex-col justify-between px-3 pt-2">
+                <Divider className="my-2" />
+
+                <CardBody className="flex flex-col justify-between px-6 pt-2">
                   <div className="flex-1">
-                    <p className="text-sm text-muted-foreground">{tier.description}</p>
-
-                    <Button
-                      className="mt-3 w-full"
-                      color={tier.buttonColor}
-                      as="a"
-                      href={tier.href}
-                      variant={tier.buttonVariant}
-                    >
-                      {tier.buttonText}
-                    </Button>
-
-                    <Divider className="my-4" />
-
                     <ul className="space-y-4">
                       {tier.features?.map((feature) => (
                         <li key={feature} className="flex items-center">
                           <BadgeCheck className="size-5 text-muted-foreground" />
-                          <span className="ml-3 text-sm text-muted-foreground">{feature}</span>
+                          <span className="ml-3 text-sm text-muted-foreground">
+                            {feature}
+                          </span>
                         </li>
                       ))}
                     </ul>

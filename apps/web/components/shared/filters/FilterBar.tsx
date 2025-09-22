@@ -14,12 +14,11 @@ import {
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { parseDate } from "@internationalized/date";
-import React, { useCallback, useState } from "react";
+import React from "react";
 
 export type FilterType =
   | "select"
   | "multiselect"
-  | "search"
   | "date"
   | "daterange"
   | "number"
@@ -74,21 +73,8 @@ export function FilterBar({
   onPresetSelect,
   className,
 }: FilterBarProps) {
-  const [searchValues, setSearchValues] = useState<Record<string, string>>({});
-
   // Check if we should display inline (for header usage) - moved to top
   const isInline = className?.includes("inline");
-
-  const handleSearchChange = useCallback((key: string, value: string) => {
-    setSearchValues((prev) => ({ ...prev, [key]: value }));
-  }, []);
-
-  const handleSearchSubmit = useCallback(
-    (key: string) => {
-      onFilterChange(key, searchValues[key] || "");
-    },
-    [searchValues, onFilterChange],
-  );
 
   const getActiveFiltersCount = () => {
     return Object.entries(values).filter(([key, value]) => {
@@ -118,6 +104,7 @@ export function FilterBar({
           <Dropdown>
             <DropdownTrigger>
               <Button
+                className="w-full"
                 endContent={
                   <Icon
                     className="w-4 h-4"
@@ -210,31 +197,6 @@ export function FilterBar({
           </Dropdown>
         );
       }
-
-      case "search":
-        return (
-          <Input
-            isClearable
-            className={isInline ? "w-40" : "max-w-xs"}
-            placeholder={filter.placeholder || `Search...`}
-            size={isInline ? "sm" : "md"}
-            startContent={
-              <Icon className="w-4 h-4" icon="solar:magnifer-linear" />
-            }
-            value={(searchValues[filter.key] || value || "") as string}
-            onBlur={() => handleSearchSubmit(filter.key)}
-            onClear={() => {
-              handleSearchChange(filter.key, "");
-              onFilterChange(filter.key, "");
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                handleSearchSubmit(filter.key);
-              }
-            }}
-            onValueChange={(val) => handleSearchChange(filter.key, val)}
-          />
-        );
 
       case "date":
         return (

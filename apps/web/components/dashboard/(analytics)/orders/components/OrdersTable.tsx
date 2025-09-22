@@ -8,6 +8,7 @@ import {
   DropdownItem,
   DropdownMenu,
   DropdownTrigger,
+  Input,
   Pagination,
   Skeleton,
   Table,
@@ -18,11 +19,12 @@ import {
   TableRow,
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 
 import { OrderStatusBadge } from "@/components/shared/badges/StatusBadge";
 import { useUser } from "@/hooks";
 import { formatCurrencyPrecise } from "@/libs/utils/dashboard-formatters";
+import { formatDate } from "@/libs/utils/format";
 
 export interface Order {
   id: string;
@@ -66,6 +68,8 @@ interface OrdersTableProps {
     total: number;
   };
   loading?: boolean;
+  searchValue?: string;
+  onSearchSubmit?: (term: string) => void;
 }
 
 const columns = [
@@ -84,8 +88,10 @@ export const OrdersTable = React.memo(function OrdersTable({
   orders,
   pagination,
   loading,
+  searchValue,
+  onSearchSubmit,
 }: OrdersTableProps) {
-  const [search, _setSearch] = useState("");
+  const [search, setSearch] = useState(searchValue ?? "");
   const [selectedKeys, setSelectedKeys] = useState<
     "all" | Set<never> | Set<string>
   >(new Set<string>());
@@ -93,17 +99,50 @@ export const OrdersTable = React.memo(function OrdersTable({
 
   const { primaryCurrency } = useUser();
 
-  // Filter orders based on search
-  const filteredOrders = orders.filter((order) => {
-    if (!search) return true;
-    const searchLower = search.toLowerCase();
+  useEffect(() => {
+    setSearch(searchValue ?? "");
+  }, [searchValue]);
 
-    return (
-      order.orderNumber.toLowerCase().includes(searchLower) ||
-      order.customer.name.toLowerCase().includes(searchLower) ||
-      order.customer.email.toLowerCase().includes(searchLower)
-    );
-  });
+  useEffect(() => {
+    const nextPage = pagination?.page;
+
+    if (typeof nextPage === "number") {
+      setPage(nextPage);
+    }
+  }, [pagination?.page]);
+
+  const normalizedSearch = search.trim().toLowerCase();
+
+  const filteredOrders = useMemo(() => {
+    if (!normalizedSearch) return orders;
+
+    return orders.filter((order) => {
+      return (
+        order.orderNumber.toLowerCase().includes(normalizedSearch) ||
+        order.customer.name.toLowerCase().includes(normalizedSearch) ||
+        order.customer.email.toLowerCase().includes(normalizedSearch)
+      );
+    });
+  }, [orders, normalizedSearch]);
+
+  const handleSearchSubmit = useCallback(() => {
+    if (!onSearchSubmit) return;
+
+    const next = search.trim();
+    const previous = (searchValue ?? "").trim();
+
+    if (next === previous) return;
+
+    onSearchSubmit(next);
+  }, [onSearchSubmit, search, searchValue]);
+
+  const handleSearchClear = useCallback(() => {
+    setSearch("");
+
+    if (onSearchSubmit && (searchValue ?? "").trim() !== "") {
+      onSearchSubmit("");
+    }
+  }, [onSearchSubmit, searchValue]);
 
   // Helper functions for selection
   const isItemsSelected = useCallback(() => {
@@ -132,7 +171,7 @@ export const OrdersTable = React.memo(function OrdersTable({
             <div>
               <p className="font-medium text-sm">#{item.orderNumber}</p>
               <p className="text-xs text-default-500">
-                {new Date(item.createdAt).toLocaleDateString()}
+                {formatDate(item.createdAt)}
               </p>
               {item.tags && item.tags.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-1">
@@ -260,6 +299,23 @@ export const OrdersTable = React.memo(function OrdersTable({
             Create Order
           </Button>
         </div>
+
+        <Input
+          isClearable
+          className="max-w-xs"
+          placeholder="Search orders by ID, customer, or email..."
+          startContent={<Icon icon="solar:search-outline" width={18} />}
+          value={search}
+          onBlur={handleSearchSubmit}
+          onClear={handleSearchClear}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              handleSearchSubmit();
+            }
+          }}
+          onValueChange={setSearch}
+        />
 
         {isItemsSelected() && (
           <div className="flex items-center gap-4 p-3 bg-default-100 rounded-lg">

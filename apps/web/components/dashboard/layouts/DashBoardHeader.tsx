@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { cn } from "@heroui/react";
+
 import { usePathname, useRouter } from "next/navigation";
 import { PlanUsageAlert } from "../../shared/billing/PlanUsageAlert";
 import UserProfile from "../../shared/UserProfile";
@@ -17,8 +17,9 @@ export default function DashBoardHeader({ className }: { className?: string }) {
 
   // Fast redirect for non-onboarded users
   const isOnboardingRoute = pathname?.startsWith("/onboarding");
-  const shouldRedirectToOnboarding =
-    Boolean(user && user.isOnboarded === false && !isOnboardingRoute);
+  const shouldRedirectToOnboarding = Boolean(
+    user && user.isOnboarded === false && !isOnboardingRoute
+  );
 
   useEffect(() => {
     if (shouldRedirectToOnboarding) {
@@ -58,10 +59,7 @@ export default function DashBoardHeader({ className }: { className?: string }) {
 
   return (
     <header
-      className={cn(
-        "flex bg-content2 dark:bg-content1 px-6 py-4 rounded-2xl justify-between items-center w-full h-[68px] ",
-        className
-      )}
+      className={`flex bg-content2/90 dark:bg-content1 px-6 py-4 rounded-2xl justify-between items-center w-full h-[68px] ${className || ""}`}
     >
       {/* Left side - Sidebar toggle and page title */}
       <div className="flex items-center gap-4 min-w-0">

@@ -5,7 +5,7 @@ import { Icon } from "@iconify/react";
 import { memo, useMemo } from "react";
 
 import { useUser } from "@/hooks";
-import { getCurrencySymbol } from "@/libs/utils/format";
+import { getCurrencySymbol, formatNumber } from "@/libs/utils/format";
 
 export interface ZipData {
   zipCode: string;
@@ -160,7 +160,7 @@ export const GeographicDistribution = memo(function GeographicDistribution({
           </p>
         </div>
         <Chip color="primary" size="sm" variant="flat">
-          {totals.customers.toLocaleString()} customers
+          {formatNumber(totals.customers)} customers
         </Chip>
       </div>
 
@@ -187,7 +187,7 @@ export const GeographicDistribution = memo(function GeographicDistribution({
                     <div>
                       <Tooltip
                         closeDelay={0}
-                        content={`${zip.customers.toLocaleString()} customers from postal code ${zip.zipCode}`}
+                        content={`${formatNumber(zip.customers)} customers from postal code ${zip.zipCode}`}
                       >
                         <p className="font-medium text-sm cursor-help">
                           {zip.zipCode}
@@ -195,7 +195,7 @@ export const GeographicDistribution = memo(function GeographicDistribution({
                       </Tooltip>
                       <p className="text-xs text-default-500">
                         {zip.city && `${zip.city}, `}
-                        {zip.country} • {zip.customers.toLocaleString()}{" "}
+                        {zip.country} • {formatNumber(zip.customers)}{" "}
                         customers
                       </p>
                     </div>

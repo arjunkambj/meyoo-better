@@ -1211,12 +1211,6 @@ export const getCustomerJourney = query({
       return orders.length >= 5;
     }).length;
 
-    const vipCustomers = customersWithOrders.filter((c) => {
-      const orders = customerOrdersMap.get(c._id) || [];
-
-      return orders.length >= 10;
-    }).length;
-
     // Calculate average days between stages
     const avgDaysToFirstPurchase = 7; // Default estimate
     const avgDaysBetweenPurchases =
@@ -1295,17 +1289,6 @@ export const getCustomerJourney = query({
         ),
         icon: "solar:refresh-circle-bold-duotone",
         color: "info",
-      },
-      {
-        stage: "Advocacy",
-        customers: loyalCustomers,
-        percentage: Math.round((loyalCustomers / estimatedVisitors) * 100),
-        avgDays: 90,
-        conversionRate: Math.round(
-          (vipCustomers / Math.max(loyalCustomers, 1)) * 100,
-        ),
-        icon: "solar:star-bold-duotone",
-        color: "danger",
       },
     ];
 

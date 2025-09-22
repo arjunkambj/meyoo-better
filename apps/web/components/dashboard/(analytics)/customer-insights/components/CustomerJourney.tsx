@@ -4,6 +4,8 @@ import { Card, Chip, Progress, Tooltip } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { memo } from "react";
 
+import { formatNumber } from "@/libs/utils/format";
+
 export interface JourneyStage {
   stage: string;
   customers: number;
@@ -37,8 +39,6 @@ export const CustomerJourney = memo(function CustomerJourney({
       "Shoppers who added items to cart or wishlist, comparing options",
     Purchase: "Customers who completed their first order with you",
     Retention: "Happy customers who came back and bought again",
-    Advocacy:
-      "Your biggest fans who recommend you to friends and leave reviews",
   };
 
   const defaultData: JourneyStage[] = [
@@ -97,17 +97,6 @@ export const CustomerJourney = memo(function CustomerJourney({
       bgColor: "bg-primary/10",
       textColor: "text-primary",
     },
-    {
-      stage: "Advocacy",
-      customers: 439,
-      percentage: 8,
-      avgDays: 90,
-      conversionRate: 100,
-      icon: "solar:star-shine-bold-duotone",
-      color: "danger",
-      bgColor: "bg-danger/10",
-      textColor: "text-danger",
-    },
   ];
 
   const journeyData = data || defaultData;
@@ -122,14 +111,14 @@ export const CustomerJourney = memo(function CustomerJourney({
           </p>
         </div>
         <Chip size="sm" variant="flat">
-          {journeyData[0]?.customers.toLocaleString()} total visitors
+          {formatNumber(journeyData[0]?.customers ?? 0)} total visitors
         </Chip>
       </div>
 
       <div className="space-y-6">
         {/* Journey Stages */}
         <div className="relative">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             {journeyData.map((stage, index) => (
               <div key={stage.stage} className="relative">
                 {/* Connecting line with arrow - positioned at middle of icon */}
@@ -165,7 +154,7 @@ export const CustomerJourney = memo(function CustomerJourney({
                     </p>
                   </Tooltip>
                   <p className="text-xs text-default-500 mb-2">
-                    {stage.customers.toLocaleString()} ({stage.percentage}%)
+                    {formatNumber(stage.customers)} ({stage.percentage}%)
                   </p>
                   <Chip
                     className="font-medium"

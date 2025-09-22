@@ -8,6 +8,7 @@ import { useOnboarding, useUpdateOnboardingState } from "@/hooks";
 import { Card, CardBody, CardHeader, Button, RadioGroup, Radio, Spinner, addToast } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { trackOnboardingAction, trackOnboardingView } from "@/libs/analytics";
+import { formatDate } from "@/libs/utils/format";
 import { useSetAtom } from "jotai";
 import { setNavigationPendingAtom } from "@/store/onboarding";
 
@@ -170,7 +171,7 @@ export default function AccountSelectionClient() {
                 value={account.accountId}
                 description={
                   account.lastSyncAt
-                    ? `Last synced: ${new Date(account.lastSyncAt).toLocaleDateString()}`
+                    ? `Last synced: ${formatDate(account.lastSyncAt)}`
                     : "Not synced yet"
                 }
               >

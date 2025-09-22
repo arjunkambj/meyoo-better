@@ -41,8 +41,8 @@ const AuthLayoutClient = React.memo(function AuthLayoutClient({
       <div className="hidden w-1/2 p-6 lg:flex">
         <div className="relative flex flex-col justify-end rounded-2xl p-10 w-full bg-content2 dark:bg-content1 overflow-hidden">
           {/* Customer Feedback Card - Bottom Right */}
-          <div className="absolute bottom-8 right-8 max-w-sm">
-            <div className="bg-background/80 backdrop-blur-md rounded-xl p-6 shadow-md">
+          <div className="absolute 0 bottom-8 right-8 max-w-sm">
+            <div className="bg-background backdrop-blur-lg rounded-xl px-6 py-4 shadow-lg">
               {/* Quote icon */}
               <Icon
                 className="text-primary/30 mb-4"

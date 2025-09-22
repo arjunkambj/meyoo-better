@@ -4,7 +4,7 @@ import { memo } from "react";
 
 import KPI from "@/components/shared/cards/KPI";
 import { useUser } from "@/hooks";
-import { getCurrencySymbol } from "@/libs/utils/format";
+import { getCurrencySymbol, formatNumber } from "@/libs/utils/format";
 
 export interface OrdersOverviewMetrics {
   totalOrders: number;
@@ -62,7 +62,7 @@ export const OrdersOverviewCards = memo(function OrdersOverviewCards({
   const cards = [
     {
       title: "Total Orders",
-      value: metrics.totalOrders.toLocaleString(),
+      value: formatNumber(metrics.totalOrders),
       change: metrics.changes.totalOrders,
       icon: "solar:bag-4-bold-duotone",
       subtitle: `AOV: ${formatCurrency(metrics.avgOrderValue)}`,
@@ -112,5 +112,4 @@ export const OrdersOverviewCards = memo(function OrdersOverviewCards({
     </div>
   );
 });
-
 

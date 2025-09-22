@@ -151,23 +151,25 @@ export const GeographicDistribution = memo(function GeographicDistribution({
   };
 
   return (
-    <Card className="p-6 bg-white dark:bg-content1 border-none shadow-sm rounded-2xl">
+    <Card className="p-6 bg-default-100/90 dark:bg-content1 border border-default-50 rounded-2xl">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h3 className="text-lg font-medium text-default-900">Geographic Distribution</h3>
+          <h3 className="text-lg font-medium text-default-900">
+            Geographic Distribution
+          </h3>
           <p className="text-sm text-default-500 mt-0.5">
             Customer locations by postal code
           </p>
         </div>
-        <div className="text-sm text-default-600">
+        <div className="text-sm text-default-800">
           <span className="font-medium">{formatNumber(totals.customers)}</span>
           <span className="text-default-400 ml-1">customers</span>
         </div>
       </div>
 
       {/* Top 5 Zip Codes */}
-      <div className="space-y-3 mb-6">
-        <p className="text-sm font-medium text-default-900">
+      <div className="space-y-3 bg-background p-3 rounded-xl mb-6">
+        <p className="text-sm font-medium bg-background text-default-900">
           Top Postal Codes
         </p>
         {topZipCodes.length > 0 ? (
@@ -178,7 +180,7 @@ export const GeographicDistribution = memo(function GeographicDistribution({
             return (
               <div
                 key={`${zip.zipCode}-${zip.country}`}
-                className="p-3 rounded-xl bg-white dark:bg-default-50 border border-default-100"
+                className="p-3 rounded-xl bg-background border border-default-50"
               >
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-3">
@@ -196,8 +198,7 @@ export const GeographicDistribution = memo(function GeographicDistribution({
                       </Tooltip>
                       <p className="text-xs text-default-500">
                         {zip.city && `${zip.city}, `}
-                        {zip.country} • {formatNumber(zip.customers)}{" "}
-                        customers
+                        {zip.country} • {formatNumber(zip.customers)} customers
                       </p>
                     </div>
                   </div>
@@ -238,7 +239,7 @@ export const GeographicDistribution = memo(function GeographicDistribution({
           {geoData.slice(0, 4).map((country) => (
             <div
               key={country.country}
-              className="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-default-50 border border-default-100 text-xs"
+              className="flex items-center justify-between p-3 rounded-xl bg-background border border-default-50 text-xs"
             >
               <span className="text-default-600">{country.country}</span>
               <span className="font-medium text-default-900">
@@ -250,11 +251,13 @@ export const GeographicDistribution = memo(function GeographicDistribution({
       </div>
 
       {/* Summary Footer */}
-      <div className="mt-6 pt-4 border-t border-default-100">
+      <div className="mt-6 pt-4 border-t ">
         <div className="grid grid-cols-3 gap-4">
           <div>
             <p className="text-xs text-default-500">Postal Codes</p>
-            <p className="font-medium text-sm text-default-900">{totals.zipCodes}</p>
+            <p className="font-medium text-sm text-default-900">
+              {totals.zipCodes}
+            </p>
           </div>
           <div>
             <p className="text-xs text-default-500">Total Revenue</p>

@@ -102,16 +102,20 @@ export const CustomerJourney = memo(function CustomerJourney({
   const journeyData = data || defaultData;
 
   return (
-    <Card className="p-6 rounded-2xl border border-default-100/60 bg-content2/90 dark:bg-content1/80 shadow-none backdrop-blur-sm">
+    <Card className="p-6 rounded-2xl border border-default-100/60 bg-content2/90 dark:bg-content1 shadow-none backdrop-blur-sm">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h3 className="text-lg font-medium text-default-900">Customer Journey</h3>
+          <h3 className="text-lg font-medium text-default-900">
+            Customer Journey
+          </h3>
           <p className="text-sm text-default-500 mt-0.5">
             Track customer progression through your sales funnel
           </p>
         </div>
-        <div className="text-sm text-default-600">
-          <span className="font-medium">{formatNumber(journeyData[0]?.customers ?? 0)}</span>
+        <div className="text-sm bg-background border border-default-50 rounded-full px-4 py-2 text-default-600">
+          <span className="font-medium">
+            {formatNumber(journeyData[0]?.customers ?? 0)}
+          </span>
           <span className="text-default-400 ml-1">visitors</span>
         </div>
       </div>
@@ -119,7 +123,7 @@ export const CustomerJourney = memo(function CustomerJourney({
       <div className="space-y-8">
         {/* Journey Stages */}
         <div className="relative">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2  lg:grid-cols-5 gap-3">
             {journeyData.map((stage, index) => (
               <div key={stage.stage} className="relative">
                 {/* Simple connecting line */}
@@ -128,7 +132,7 @@ export const CustomerJourney = memo(function CustomerJourney({
                     <div className="h-px bg-default-100 w-full" />
                   </div>
                 )}
-                <div className="relative z-10 rounded-xl border border-default-100/70 bg-content2/80 dark:bg-content1/80 p-4">
+                <div className="relative z-10 rounded-xl border border-default-100/70 bg-background border-default-50 p-4">
                   <div className="flex flex-col items-center text-center space-y-3">
                     <div
                       className={`flex h-10 w-10 items-center justify-center rounded-xl ${stage.bgColor}`}
@@ -153,7 +157,9 @@ export const CustomerJourney = memo(function CustomerJourney({
                       </p>
                     </div>
                     <div className="w-full pt-2 border-t border-default-100/70">
-                      <p className="text-xs text-default-400 mb-1">Conversion</p>
+                      <p className="text-xs text-default-400 mb-1">
+                        Conversion
+                      </p>
                       <p className="text-sm font-medium text-default-700">
                         {stage.conversionRate}%
                       </p>
@@ -167,8 +173,10 @@ export const CustomerJourney = memo(function CustomerJourney({
 
         {/* Key Metrics */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="rounded-xl p-4 border border-default-100/70 bg-content2/60 dark:bg-content1/60">
-            <p className="text-xs font-medium text-default-600 mb-2">Overall Conversion</p>
+          <div className="rounded-xl p-4 border bg-background border-default-50">
+            <p className="text-xs font-medium text-default-600 mb-2">
+              Overall Conversion
+            </p>
             <p className="text-xl font-semibold text-default-900">
               {(() => {
                 const visitors = journeyData[0]?.customers || 0;
@@ -179,8 +187,10 @@ export const CustomerJourney = memo(function CustomerJourney({
             </p>
             <p className="text-xs text-default-400 mt-1">Visitor to customer</p>
           </div>
-          <div className="rounded-xl p-4 border border-default-100/70 bg-content2/60 dark:bg-content1/60">
-            <p className="text-xs font-medium text-default-600 mb-2">Repeat Rate</p>
+          <div className="rounded-xl p-4 border bg-background border-default-50">
+            <p className="text-xs font-medium text-default-600 mb-2">
+              Repeat Rate
+            </p>
             <p className="text-xl font-semibold text-default-900">
               {(() => {
                 const purchasers = journeyData[3]?.customers || 0;
@@ -192,21 +202,31 @@ export const CustomerJourney = memo(function CustomerJourney({
             <p className="text-xs text-default-400 mt-1">Buy again</p>
           </div>
 
-          <div className="rounded-xl p-4 border border-default-100/70 bg-content2/60 dark:bg-content1/60">
-            <p className="text-xs font-medium text-default-600 mb-2">Cancel Rate</p>
-            <p className="text-xl font-semibold text-default-900">{cancelRate.toFixed(1)}%</p>
+          <div className="rounded-xl p-4 border bg-background border-default-50">
+            <p className="text-xs font-medium text-default-600 mb-2">
+              Cancel Rate
+            </p>
+            <p className="text-xl font-semibold text-default-900">
+              {cancelRate.toFixed(1)}%
+            </p>
             <p className="text-xs text-default-400 mt-1">Orders cancelled</p>
           </div>
-          <div className="rounded-xl p-4 border border-default-100/70 bg-content2/60 dark:bg-content1/60">
-            <p className="text-xs font-medium text-default-600 mb-2">Return Rate</p>
-            <p className="text-xl font-semibold text-default-900">{returnRate.toFixed(1)}%</p>
+          <div className="rounded-xl p-4 border bg-background border-default-50">
+            <p className="text-xs font-medium text-default-600 mb-2">
+              Return Rate
+            </p>
+            <p className="text-xl font-semibold text-default-900">
+              {returnRate.toFixed(1)}%
+            </p>
             <p className="text-xs text-default-400 mt-1">Products returned</p>
           </div>
         </div>
 
         {/* Conversion Breakdown */}
-        <div className="rounded-xl p-5 border border-default-100/70 bg-content2/60 dark:bg-content1/60">
-          <p className="text-sm font-medium text-default-900 mb-4">Stage Progression</p>
+        <div className="rounded-xl p-5 border bg-background border-default-50">
+          <p className="text-sm font-medium text-default-900 mb-4">
+            Stage Progression
+          </p>
           <div className="space-y-3">
             {journeyData.slice(0, -1).map((stage, index) => {
               const nextStage = journeyData[index + 1] ?? {

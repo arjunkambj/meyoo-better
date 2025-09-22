@@ -150,7 +150,7 @@ export const CohortAnalysis = memo(function CohortAnalysis({
   };
 
   return (
-    <Card className="p-6 bg-white dark:bg-content1 border-none shadow-sm rounded-2xl">
+    <Card className="p-6 bg-default-100/90 dark:bg-content1 border border-default-50 rounded-2xl">
       <div className="flex items-center justify-between mb-6">
         <div>
           <Tooltip
@@ -173,7 +173,8 @@ export const CohortAnalysis = memo(function CohortAnalysis({
         </div>
         <Tabs
           selectedKey={view}
-          size="sm"
+          radius="lg"
+          color="primary"
           onSelectionChange={(key) => setView(key as "retention" | "revenue")}
         >
           <Tab key="retention" title="Retention %" />
@@ -183,20 +184,20 @@ export const CohortAnalysis = memo(function CohortAnalysis({
 
       {/* Summary Stats */}
       <div className="grid grid-cols-3 gap-3 mb-6">
-        <div className="bg-white dark:bg-default-50 rounded-xl p-3 border border-default-100">
-          <p className="text-xs text-default-600 mb-1">Month 1 Avg</p>
+        <div className="bg-background rounded-xl p-3 border border-default-50">
+          <p className="text-xs text-default-800 mb-1">Month 1 Avg</p>
           <p className="text-lg font-semibold text-default-900">
             {avgRetentionByMonth[1]?.toFixed(0) || "0"}%
           </p>
         </div>
-        <div className="bg-white dark:bg-default-50 rounded-xl p-3 border border-default-100">
-          <p className="text-xs text-default-600 mb-1">Month 3 Avg</p>
+        <div className="bg-background rounded-xl p-3 border border-default-50">
+          <p className="text-xs text-default-800 mb-1">Month 3 Avg</p>
           <p className="text-lg font-semibold text-default-900">
             {avgRetentionByMonth[3]?.toFixed(0) || "0"}%
           </p>
         </div>
-        <div className="bg-white dark:bg-default-50 rounded-xl p-3 border border-default-100">
-          <p className="text-xs text-default-600 mb-1">Total Size</p>
+        <div className="bg-background rounded-xl p-3 border border-default-50">
+          <p className="text-xs text-default-800 mb-1">Total Size</p>
           <p className="text-lg font-semibold text-default-900">
             {formatNumber(data.reduce((sum, c) => sum + c.size, 0))}
           </p>
@@ -204,11 +205,11 @@ export const CohortAnalysis = memo(function CohortAnalysis({
       </div>
 
       {/* Cohort Table */}
-      <div className="overflow-x-auto bg-white dark:bg-default-50 rounded-xl border border-default-100">
+      <div className="overflow-x-auto bg-background rounded-xl border border-default-50">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-default-100">
-              <th className="text-left p-3 font-medium text-default-600 sticky left-0 bg-white dark:bg-default-50">
+            <tr className="border-b border-default-50">
+              <th className="text-left p-3 font-medium text-default-800 sticky left-0 bg-background">
                 Cohort
               </th>
               <th className="text-center p-3 font-medium text-default-600 min-w-[60px]">
@@ -217,7 +218,7 @@ export const CohortAnalysis = memo(function CohortAnalysis({
               {[0, 1, 2, 3, 4, 5].map((month) => (
                 <th
                   key={month}
-                  className="text-center p-3 font-medium text-default-600 min-w-[70px]"
+                  className="text-center p-3 font-medium text-default-800 min-w-[70px]"
                 >
                   <span className="text-xs">Month {month}</span>
                 </th>
@@ -226,15 +227,14 @@ export const CohortAnalysis = memo(function CohortAnalysis({
           </thead>
           <tbody>
             {data.map((cohort) => (
-              <tr
-                key={cohort.cohort}
-                className="border-b border-default-50"
-              >
-                <td className="p-3 font-medium text-xs sticky left-0 bg-white dark:bg-default-50 text-default-700">
+              <tr key={cohort.cohort} className="border-b border-default-50">
+                <td className="p-3 font-medium text-xs sticky left-0 bg-background text-default-800">
                   {cohort.cohort}
                 </td>
                 <td className="text-center p-3">
-                  <span className="text-xs font-medium text-default-700">{cohort.size}</span>
+                  <span className="text-xs font-medium  text-default-800">
+                    {cohort.size}
+                  </span>
                 </td>
                 {[0, 1, 2, 3, 4, 5].map((monthIndex) => {
                   const monthData = cohort.months.find(
@@ -244,7 +244,7 @@ export const CohortAnalysis = memo(function CohortAnalysis({
                   if (!monthData) {
                     return (
                       <td key={monthIndex} className="p-2 text-center">
-                        <div className="text-default-300 text-xs">-</div>
+                        <div className="text-default-800 text-xs">-</div>
                       </td>
                     );
                   }
@@ -259,7 +259,7 @@ export const CohortAnalysis = memo(function CohortAnalysis({
                   return (
                     <td key={monthIndex} className="p-2">
                       <div
-                        className={`rounded-lg p-1.5 text-center text-xs font-medium ${getHeatmapColor(
+                        className={`rounded-lg p-1.5 text-center text-xs bg-default-100 font-medium ${getHeatmapColor(
                           value,
                           view === "retention" ? 100 : maxRevenue
                         )}`}
@@ -276,23 +276,26 @@ export const CohortAnalysis = memo(function CohortAnalysis({
       </div>
 
       {/* Legend */}
-      <div className="mt-6 flex items-center justify-between text-xs text-default-500">
+      <div className="mt-6 flex items-center justify-between text-xs text-default-800">
         <div className="flex items-center gap-3">
           <span>Scale:</span>
           <div className="flex items-center gap-2">
-            <div className="w-8 h-3 rounded bg-primary-50 border border-default-100" />
+            <div className="w-8 h-3 rounded bg-primary-500 border border-default-50" />
             <span>High</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-8 h-3 rounded bg-default-50 border border-default-100" />
+            <div className="w-8 h-3 rounded bg-default-300 border border-default-50" />
             <span>Low</span>
           </div>
         </div>
         <div>
-          <span>Avg drop: {Math.abs(
-            (avgRetentionByMonth[1] || 100) -
-              (avgRetentionByMonth[3] || 0)
-          ).toFixed(0)}% by Month 3</span>
+          <span>
+            Avg drop:{" "}
+            {Math.abs(
+              (avgRetentionByMonth[1] || 100) - (avgRetentionByMonth[3] || 0)
+            ).toFixed(0)}
+            % by Month 3
+          </span>
         </div>
       </div>
     </Card>

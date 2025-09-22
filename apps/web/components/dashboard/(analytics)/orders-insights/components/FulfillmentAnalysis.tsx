@@ -111,13 +111,19 @@ export function FulfillmentAnalysis({ metrics }: FulfillmentAnalysisProps) {
     return (
       <Card className="p-6 bg-white dark:bg-content1 border-none shadow-sm rounded-2xl">
         <div className="mb-6">
-          <h3 className="text-lg font-medium text-default-900">Fulfillment Analysis</h3>
+          <h3 className="text-lg font-medium text-default-900">
+            Fulfillment Analysis
+          </h3>
           <p className="text-sm text-default-500 mt-0.5">
             Performance metrics and delivery times
           </p>
         </div>
         <div className="flex flex-col items-center justify-center h-48 text-default-400">
-          <Icon className="mb-4 text-default-300" icon="solar:delivery-linear" width={32} />
+          <Icon
+            className="mb-4 text-default-300"
+            icon="solar:delivery-linear"
+            width={32}
+          />
           <p className="text-sm">No fulfillment data available</p>
           <p className="text-xs text-default-400 mt-1">
             Metrics will appear once you have order fulfillment data
@@ -128,17 +134,21 @@ export function FulfillmentAnalysis({ metrics }: FulfillmentAnalysisProps) {
   }
 
   return (
-    <Card className="p-6 bg-white dark:bg-content1 border-none shadow-sm rounded-2xl">
+    <Card className="p-6 bg-default-100/90 dark:bg-content1 border border-default-50 rounded-2xl">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h3 className="text-lg font-medium text-default-900">Fulfillment Analysis</h3>
+          <h3 className="text-lg font-medium text-default-900">
+            Fulfillment Analysis
+          </h3>
           <p className="text-sm text-default-500 mt-0.5">
             Performance metrics and delivery times
           </p>
         </div>
         {metrics?.totalOrders && (
           <div className="text-sm text-default-600">
-            <span className="font-medium">{formatNumber(metrics.totalOrders)}</span>
+            <span className="font-medium">
+              {formatNumber(metrics.totalOrders)}
+            </span>
             <span className="text-default-400 ml-1">orders</span>
           </div>
         )}
@@ -152,7 +162,9 @@ export function FulfillmentAnalysis({ metrics }: FulfillmentAnalysisProps) {
             className="p-4 bg-white dark:bg-default-50 rounded-xl border border-default-100"
           >
             <div className="mb-3">
-              <p className="text-sm font-medium text-default-900">{metric.label}</p>
+              <p className="text-sm font-medium text-default-900">
+                {metric.label}
+              </p>
               <p className="text-xs text-default-500 mt-0.5">
                 {metric.description}
               </p>
@@ -164,15 +176,18 @@ export function FulfillmentAnalysis({ metrics }: FulfillmentAnalysisProps) {
               </p>
               <div className="mt-2 flex items-center justify-between">
                 <span className="text-xs text-default-500">
-                  Target: {metric.inverse ? "<" : ">"}{metric.benchmark}%
+                  Target: {metric.inverse ? "<" : ">"}
+                  {metric.benchmark}%
                 </span>
-                <span className={`text-xs font-medium ${
-                  metric.status === "success"
-                    ? "text-success-600"
-                    : metric.status === "warning"
-                      ? "text-warning-600"
-                      : "text-danger-600"
-                }`}>
+                <span
+                  className={`text-xs font-medium ${
+                    metric.status === "success"
+                      ? "text-success-600"
+                      : metric.status === "warning"
+                        ? "text-warning-600"
+                        : "text-danger-600"
+                  }`}
+                >
                   {metric.status === "success"
                     ? "Good"
                     : metric.status === "warning"
@@ -198,34 +213,21 @@ export function FulfillmentAnalysis({ metrics }: FulfillmentAnalysisProps) {
                 className="flex items-center justify-between p-3 bg-white dark:bg-default-50 rounded-xl border border-default-100"
               >
                 <div>
-                  <p className="text-sm font-medium text-default-900">{metric.label}</p>
+                  <p className="text-sm font-medium text-default-900">
+                    {metric.label}
+                  </p>
                   <p className="text-xs text-default-500">
                     {metric.description}
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-lg font-semibold text-default-900">{metric.value.toFixed(1)}</p>
+                  <p className="text-lg font-semibold text-default-900">
+                    {metric.value.toFixed(1)}
+                  </p>
                   <p className="text-xs text-default-400">days</p>
                 </div>
               </div>
             ))}
-
-            {metrics.avgFulfillmentCost && (
-              <div className="flex items-center justify-between p-3 bg-white dark:bg-default-50 rounded-xl border border-default-100">
-                <div>
-                  <p className="text-sm font-medium text-default-900">Avg Cost</p>
-                  <p className="text-xs text-default-500">
-                    Per order
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-lg font-semibold text-default-900">
-                    {currencySymbol}{metrics.avgFulfillmentCost.toFixed(2)}
-                  </p>
-                  <p className="text-xs text-default-400">per order</p>
-                </div>
-              </div>
-            )}
           </div>
         </div>
 
@@ -236,7 +238,9 @@ export function FulfillmentAnalysis({ metrics }: FulfillmentAnalysisProps) {
           </h4>
           <div className="p-4 bg-white dark:bg-default-50 rounded-xl border border-default-100">
             <div className="mb-3">
-              <p className="text-sm font-medium text-default-900">Order to Delivery</p>
+              <p className="text-sm font-medium text-default-900">
+                Order to Delivery
+              </p>
             </div>
 
             <div className="flex items-center justify-between text-xs text-default-500 mb-2">
@@ -252,13 +256,13 @@ export function FulfillmentAnalysis({ metrics }: FulfillmentAnalysisProps) {
 
             <div className="relative h-2 bg-default-100 rounded-full overflow-hidden">
               <div
-                className="absolute left-0 top-0 h-full bg-primary-400 rounded-full"
+                className="absolute left-0 top-0 h-full bg-primary-500 rounded-full"
                 style={{
                   width: `${Math.min(100, (metrics.avgProcessingTime / metrics.avgDeliveryTime) * 100)}%`,
                 }}
               />
               <div
-                className="absolute top-0 h-full bg-primary-300"
+                className="absolute top-0 h-full bg-primary-500"
                 style={{
                   left: `${Math.min(100, (metrics.avgProcessingTime / metrics.avgDeliveryTime) * 100)}%`,
                   width: `${Math.min(100 - (metrics.avgProcessingTime / metrics.avgDeliveryTime) * 100, Math.max(0, ((metrics.avgShippingTime - metrics.avgProcessingTime) / metrics.avgDeliveryTime) * 100))}%`,
@@ -276,15 +280,15 @@ export function FulfillmentAnalysis({ metrics }: FulfillmentAnalysisProps) {
             <div className="flex justify-between mt-3">
               <div className="flex items-center gap-3 text-xs text-default-500">
                 <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 bg-primary-400 rounded-full" />
+                  <div className="w-2 h-2 bg-primary-600 rounded-full" />
                   <span>Processing</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 bg-primary-300 rounded-full" />
+                  <div className="w-2 h-2 bg-primary-400 rounded-full" />
                   <span>Shipping</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 bg-primary-200 rounded-full" />
+                  <div className="w-2 h-2 bg-primary-400 rounded-full" />
                   <span>Delivery</span>
                 </div>
               </div>

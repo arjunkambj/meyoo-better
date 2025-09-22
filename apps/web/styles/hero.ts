@@ -20,20 +20,20 @@ const heroConfig = heroui({
           foreground: "#000000",
           DEFAULT: "#d4d4d8",
         },
-        // Tailwind Blue
+        // Tailwind Indigo
         primary: {
-          50: "#eff6ff",
-          100: "#dbeafe",
-          200: "#bfdbfe",
-          300: "#93c5fd",
-          400: "#60a5fa",
-          500: "#3b82f6",
-          600: "#2563eb",
-          700: "#1d4ed8",
-          800: "#1e40af",
-          900: "#1e3a8a",
+          50: "#eef2ff",
+          100: "#e0e7ff",
+          200: "#c7d2fe",
+          300: "#a5b4fc",
+          400: "#818cf8",
+          500: "#6366f1",
+          600: "#4f46e5",
+          700: "#4338ca",
+          800: "#3730a3",
+          900: "#312e81",
           foreground: "#fff",
-          DEFAULT: "#3b82f6",
+          DEFAULT: "#6366f1",
         },
         secondary: {
           50: "#eee4f8",
@@ -112,7 +112,7 @@ const heroConfig = heroui({
         },
         // Align borders with settings UI usage
         divider: "#e4e4e7", // zinc-200
-        focus: "#3b82f6",
+        focus: "#6366f1",
         overlay: "#000000",
       },
     },
@@ -133,20 +133,20 @@ const heroConfig = heroui({
           foreground: "#ffffff",
           DEFAULT: "#3f3f46",
         },
-        // Tailwind Blue inverted for dark
+        // Tailwind Indigo inverted for dark
         primary: {
-          50: "#1e3a8a",
-          100: "#1e40af",
-          200: "#1d4ed8",
-          300: "#2563eb",
-          400: "#3b82f6",
-          500: "#60a5fa",
-          600: "#93c5fd",
-          700: "#bfdbfe",
-          800: "#dbeafe",
-          900: "#eff6ff",
+          50: "#312e81",
+          100: "#3730a3",
+          200: "#4338ca",
+          300: "#4f46e5",
+          400: "#6366f1",
+          500: "#818cf8",
+          600: "#a5b4fc",
+          700: "#c7d2fe",
+          800: "#e0e7ff",
+          900: "#eef2ff",
           foreground: "#ffffff",
-          DEFAULT: "#3b82f6",
+          DEFAULT: "#6366f1",
         },
         secondary: {
           50: "#240c3c",
@@ -224,7 +224,7 @@ const heroConfig = heroui({
         },
         // Align borders with settings UI usage
         divider: "#27272a", // zinc-800 -> subtle border on dark
-        focus: "#3b82f6",
+        focus: "#6366f1",
         overlay: "#0a0a0a",
       },
     },

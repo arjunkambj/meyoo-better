@@ -6,12 +6,12 @@ import type { ReactNode } from "react";
 import { cn } from "@/libs/utils";
 
 export const DATA_TABLE_CONTAINER_CLASS =
-  "rounded-3xl bg-content2/80 backdrop-blur-md";
+  "rounded-3xl bg-content2 dark:bg-content1 backdrop-blur-md";
 export const DATA_TABLE_INNER_CLASS = "space-y-4 p-5 sm:p-6";
 export const DATA_TABLE_TABLE_CLASS =
   "rounded-2xl border border-default-200/60 bg-content1 overflow-hidden";
 export const DATA_TABLE_HEADER_CLASS =
-  "bg-default-100 text-default-600 font-semibold uppercase tracking-wide text-[11px]";
+  "bg-transparent text-default-600 font-semibold uppercase tracking-wide text-[11px]";
 
 interface DataTableCardProps {
   children: ReactNode;
@@ -42,7 +42,7 @@ export function DataTableCard({
       <div className={DATA_TABLE_INNER_CLASS}>
         {topContent}
         {loading
-          ? skeletonContent ?? (
+          ? (skeletonContent ?? (
               <div className="space-y-3">
                 {Array.from({ length: skeletonRows }, (_, index) => (
                   <Skeleton
@@ -51,7 +51,7 @@ export function DataTableCard({
                   />
                 ))}
               </div>
-            )
+            ))
           : children}
         {footerContent}
       </div>

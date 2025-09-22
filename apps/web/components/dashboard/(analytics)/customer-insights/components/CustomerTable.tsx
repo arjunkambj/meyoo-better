@@ -24,7 +24,10 @@ import { CustomerStatusBadge } from "@/components/shared/badges/StatusBadge";
 import { useUser } from "@/hooks";
 import { getSegmentStyle } from "@/libs/utils/dashboard-formatters";
 import { getCurrencySymbol, formatNumber } from "@/libs/utils/format";
-import { DATA_TABLE_HEADER_CLASS, DATA_TABLE_TABLE_CLASS } from "@/components/shared/table/DataTableCard";
+import {
+  DATA_TABLE_HEADER_CLASS,
+  DATA_TABLE_TABLE_CLASS,
+} from "@/components/shared/table/DataTableCard";
 
 export interface Customer {
   id: string;
@@ -150,7 +153,9 @@ export const CustomerTable = React.memo(function CustomerTable({
         case "orders":
           return (
             <div>
-              <p className="text-sm font-medium text-default-900">{item.orders}</p>
+              <p className="text-sm font-medium text-default-900">
+                {item.orders}
+              </p>
               <p className="text-xs text-default-500">
                 AOV: {currencySymbol}
                 {item.avgOrderValue.toFixed(0)}
@@ -191,17 +196,17 @@ export const CustomerTable = React.memo(function CustomerTable({
             )
           );
 
-            return (
-              <div>
-                <p className="text-sm font-medium text-default-900">
-                  {dateFormatter.format(parsedDate)}
-                </p>
-                <p className="mt-0.5 flex items-center gap-1 text-xs text-default-500">
-                  <Icon icon="solar:clock-circle-linear" width={14} />
-                  {daysAgo} days ago
-                </p>
-              </div>
-            );
+          return (
+            <div>
+              <p className="text-sm font-medium text-default-900">
+                {dateFormatter.format(parsedDate)}
+              </p>
+              <p className="mt-0.5 flex items-center gap-1 text-xs text-default-500">
+                <Icon icon="solar:clock-circle-linear" width={14} />
+                {daysAgo} days ago
+              </p>
+            </div>
+          );
         }
 
         case "location":
@@ -284,7 +289,9 @@ export const CustomerTable = React.memo(function CustomerTable({
         <DropdownTrigger>
           <Button
             size="sm"
-            startContent={<Icon icon="solar:bolt-circle-bold-duotone" width={16} />}
+            startContent={
+              <Icon icon="solar:bolt-circle-bold-duotone" width={16} />
+            }
             variant="flat"
           >
             Bulk Actions
@@ -329,7 +336,9 @@ export const CustomerTable = React.memo(function CustomerTable({
           </DropdownItem>
           <DropdownItem
             key="add_tag"
-            startContent={<Icon icon="solar:tag-horizontal-linear" width={16} />}
+            startContent={
+              <Icon icon="solar:tag-horizontal-linear" width={16} />
+            }
           >
             Add Tags
           </DropdownItem>
@@ -353,9 +362,7 @@ export const CustomerTable = React.memo(function CustomerTable({
   ) : null;
 
   const paginationNode =
-    !loading &&
-    pagination &&
-    filteredCustomers.length > 0 ? (
+    !loading && pagination && filteredCustomers.length > 0 ? (
       <div className="flex justify-center py-3">
         <Pagination
           showControls
@@ -399,7 +406,7 @@ export const CustomerTable = React.memo(function CustomerTable({
           className={DATA_TABLE_TABLE_CLASS}
           classNames={{
             th: DATA_TABLE_HEADER_CLASS,
-            td: "py-2.5 px-3 text-sm text-default-700",
+            td: "py-2.5 px-3 text-sm text-default-800",
             table: "text-xs",
           }}
           selectedKeys={selectedKeys}
@@ -414,7 +421,9 @@ export const CustomerTable = React.memo(function CustomerTable({
           }}
         >
           <TableHeader columns={columns}>
-            {(column) => <TableColumn key={column.uid}>{column.name}</TableColumn>}
+            {(column) => (
+              <TableColumn key={column.uid}>{column.name}</TableColumn>
+            )}
           </TableHeader>
           <TableBody>
             {filteredCustomers.length === 0 ? (
@@ -441,7 +450,7 @@ export const CustomerTable = React.memo(function CustomerTable({
                 return (
                   <TableRow
                     key={item.id}
-                    className={`${stripe ? "bg-default-50/60" : ""} border-t border-default-200/50`}
+                    className={`${stripe ? "bg-default-50 dark:bg-content1/50" : "bg-background"} border-t border-default-border`}
                   >
                     {columns.map((column) => (
                       <TableCell key={column.uid}>

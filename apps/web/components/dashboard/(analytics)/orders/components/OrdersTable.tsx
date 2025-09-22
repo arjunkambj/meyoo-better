@@ -24,7 +24,10 @@ import { OrderStatusBadge } from "@/components/shared/badges/StatusBadge";
 import { useUser } from "@/hooks";
 import { formatCurrencyPrecise } from "@/libs/utils/dashboard-formatters";
 import { formatDate } from "@/libs/utils/format";
-import { DATA_TABLE_HEADER_CLASS, DATA_TABLE_TABLE_CLASS } from "@/components/shared/table/DataTableCard";
+import {
+  DATA_TABLE_HEADER_CLASS,
+  DATA_TABLE_TABLE_CLASS,
+} from "@/components/shared/table/DataTableCard";
 
 export interface Order {
   id: string;
@@ -251,7 +254,9 @@ export const OrdersTable = React.memo(function OrdersTable({
         <DropdownTrigger>
           <Button
             size="sm"
-            startContent={<Icon icon="solar:bolt-circle-bold-duotone" width={16} />}
+            startContent={
+              <Icon icon="solar:bolt-circle-bold-duotone" width={16} />
+            }
             variant="flat"
           >
             Bulk Actions
@@ -343,10 +348,12 @@ export const OrdersTable = React.memo(function OrdersTable({
   return (
     <div className="space-y-4">
       {selectionToolbarContent ? (
-      <div className={`${DATA_TABLE_TABLE_CLASS} flex flex-wrap items-center gap-3 p-4`}>
-        {selectionToolbarContent}
-      </div>
-    ) : null}
+        <div
+          className={`${DATA_TABLE_TABLE_CLASS} flex flex-wrap items-center gap-3 p-4`}
+        >
+          {selectionToolbarContent}
+        </div>
+      ) : null}
       {loading ? (
         <div className={DATA_TABLE_TABLE_CLASS}>
           <div className="space-y-2 p-4">
@@ -365,7 +372,7 @@ export const OrdersTable = React.memo(function OrdersTable({
           className={DATA_TABLE_TABLE_CLASS}
           classNames={{
             th: DATA_TABLE_HEADER_CLASS,
-            td: "py-2.5 px-3 text-sm text-default-700 align-middle",
+            td: "py-2.5 px-3 text-sm text-default-800 align-middle",
             table: "text-xs",
           }}
           selectedKeys={selectedKeys}
@@ -380,7 +387,9 @@ export const OrdersTable = React.memo(function OrdersTable({
           }}
         >
           <TableHeader columns={columns}>
-            {(column) => <TableColumn key={column.uid}>{column.name}</TableColumn>}
+            {(column) => (
+              <TableColumn key={column.uid}>{column.name}</TableColumn>
+            )}
           </TableHeader>
           <TableBody>
             {orders.length === 0 ? (
@@ -405,7 +414,7 @@ export const OrdersTable = React.memo(function OrdersTable({
                 return (
                   <TableRow
                     key={item.id}
-                    className={`${stripe ? "bg-default-50/60" : ""} border-t border-default-200/50`}
+                    className={`${stripe ? "bg-default-50 dark:bg-content1/50" : "bg-background"} border-t border-default-border`}
                   >
                     {columns.map((column) => (
                       <TableCell key={column.uid}>

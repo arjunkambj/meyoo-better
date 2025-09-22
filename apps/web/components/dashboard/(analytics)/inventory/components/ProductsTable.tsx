@@ -20,7 +20,10 @@ import React, { useCallback, useEffect, useState } from "react";
 import { useUser } from "@/hooks";
 import { getStockStatusConfig } from "@/libs/utils/dashboard-formatters";
 import { getCurrencySymbol, formatNumber } from "@/libs/utils/format";
-import { DATA_TABLE_HEADER_CLASS, DATA_TABLE_TABLE_CLASS } from "@/components/shared/table/DataTableCard";
+import {
+  DATA_TABLE_HEADER_CLASS,
+  DATA_TABLE_TABLE_CLASS,
+} from "@/components/shared/table/DataTableCard";
 
 export interface ProductVariant {
   id: string;
@@ -297,12 +300,14 @@ export const ProductsTable = React.memo(function ProductsTable({
             className={DATA_TABLE_TABLE_CLASS}
             classNames={{
               th: DATA_TABLE_HEADER_CLASS,
-              td: "py-2.5 px-3 text-sm text-default-700 align-middle",
+              td: "py-2.5 px-3 text-sm text-default-800 align-middle",
               table: "text-xs",
             }}
           >
             <TableHeader columns={columns}>
-              {(column) => <TableColumn key={column.uid}>{column.name}</TableColumn>}
+              {(column) => (
+                <TableColumn key={column.uid}>{column.name}</TableColumn>
+              )}
             </TableHeader>
             <TableBody>
               {products.length === 0 ? (
@@ -322,124 +327,152 @@ export const ProductsTable = React.memo(function ProductsTable({
                 </TableRow>
               ) : (
                 products.flatMap((item, idx) => {
-              const isOpen = expanded.has(item.id);
-              const stripe = idx % 2 === 1;
-              const avgPrice =
-                Array.isArray(item.variants) && item.variants.length > 0
-                  ? item.variants.reduce(
-                      (sum, v) => sum + (Number(v.price ?? 0) || 0),
-                      0,
-                    ) / item.variants.length
-                  : item.price;
+                  const isOpen = expanded.has(item.id);
+                  const stripe = idx % 2 === 1;
+                  const avgPrice =
+                    Array.isArray(item.variants) && item.variants.length > 0
+                      ? item.variants.reduce(
+                          (sum, v) => sum + (Number(v.price ?? 0) || 0),
+                          0
+                        ) / item.variants.length
+                      : item.price;
 
-              const header = (
-              <TableRow
-                key={`p-h-${item.id}`}
-                className={(stripe ? "bg-default-50/60" : "") + " border-t border-default-200/50"}
-              >
-                <TableCell>
-                    <div className="min-w-0 flex items-center gap-3 py-1">
-                      <button
-                        type="button"
-                        className="flex-none text-default-500 transition hover:text-default-900"
-                        onClick={() => {
-                          setExpanded((prev) => {
-                            const next = new Set(prev);
-                            if (next.has(item.id)) next.delete(item.id);
-                            else next.add(item.id);
-                            return next;
-                          });
-                        }}
-                        aria-label={isOpen ? "Collapse" : "Expand"}
-                      >
-                        <Icon
-                          icon={isOpen ? "solar:alt-arrow-up-bold" : "solar:alt-arrow-down-bold"}
-                          width={18}
-                        />
-                      </button>
-                      <Avatar
-                        size="sm"
-                        className="flex-none"
-                        radius="md"
-                        name={item.name}
-                        src={item.image}
-                      />
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-default-900">{item.name}</p>
-                        <p className="truncate text-xs text-default-500">{formatVariantLabel(item)}</p>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm">{item.category}</span>
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <p className="text-sm font-medium">{item.available}</p>
-                      {item.reserved > 0 && (
-                        <p className="text-xs text-default-500">{item.reserved} reserved</p>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>{renderCell(item, "status")}</TableCell>
-                  <TableCell>
-                    <p className="text-sm font-medium">
-                      {currencySymbol}
-                      {avgPrice.toFixed(2)}
-                    </p>
-                  </TableCell>
-                  <TableCell>{renderCell(item, "cogs")}</TableCell>
-                  <TableCell>{renderCell(item, "margin")}</TableCell>
-                  <TableCell>{renderCell(item, "unitsSold")}</TableCell>
-                  <TableCell>{renderCell(item, "turnover")}</TableCell>
-                  <TableCell>{renderCell(item, "actions")}</TableCell>
-                </TableRow>
-              );
+                  const header = (
+                    <TableRow
+                      key={`p-h-${item.id}`}
+                      className={
+                        (stripe
+                          ? "bg-default-50 dark:bg-content1/50"
+                          : "bg-background") + " border-t border-default-border"
+                      }
+                    >
+                      <TableCell>
+                        <div className="min-w-0 flex items-center gap-3 py-1">
+                          <button
+                            type="button"
+                            className="flex-none text-default-500 transition hover:text-default-900"
+                            onClick={() => {
+                              setExpanded((prev) => {
+                                const next = new Set(prev);
+                                if (next.has(item.id)) next.delete(item.id);
+                                else next.add(item.id);
+                                return next;
+                              });
+                            }}
+                            aria-label={isOpen ? "Collapse" : "Expand"}
+                          >
+                            <Icon
+                              icon={
+                                isOpen
+                                  ? "solar:alt-arrow-up-bold"
+                                  : "solar:alt-arrow-down-bold"
+                              }
+                              width={18}
+                            />
+                          </button>
+                          <Avatar
+                            size="sm"
+                            className="flex-none"
+                            radius="md"
+                            name={item.name}
+                            src={item.image}
+                          />
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-default-900">
+                              {item.name}
+                            </p>
+                            <p className="truncate text-xs text-default-500">
+                              {formatVariantLabel(item)}
+                            </p>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm">{item.category}</span>
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          <p className="text-sm font-medium">
+                            {item.available}
+                          </p>
+                          {item.reserved > 0 && (
+                            <p className="text-xs text-default-500">
+                              {item.reserved} reserved
+                            </p>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>{renderCell(item, "status")}</TableCell>
+                      <TableCell>
+                        <p className="text-sm font-medium">
+                          {currencySymbol}
+                          {avgPrice.toFixed(2)}
+                        </p>
+                      </TableCell>
+                      <TableCell>{renderCell(item, "cogs")}</TableCell>
+                      <TableCell>{renderCell(item, "margin")}</TableCell>
+                      <TableCell>{renderCell(item, "unitsSold")}</TableCell>
+                      <TableCell>{renderCell(item, "turnover")}</TableCell>
+                      <TableCell>{renderCell(item, "actions")}</TableCell>
+                    </TableRow>
+                  );
 
-              if (!isOpen || !item.variants || item.variants.length === 0) {
-                return [header];
-              }
+                  if (!isOpen || !item.variants || item.variants.length === 0) {
+                    return [header];
+                  }
 
-              const children = item.variants.map((v) => (
-                <TableRow
-                  key={`v-${v.id}`}
-                  className={stripe ? "pointer-events-none bg-default-50/40" : "pointer-events-none"}
-                >
-                  <TableCell>
-                    <div className="min-w-0">
-                      <div className="truncate text-sm text-default-900">{v.title || "Variant"}</div>
-                      <div className="truncate text-xs text-default-500">{v.sku || ""}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm text-default-500">{item.category}</span>
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <p className="text-sm font-medium">{v.available}</p>
-                      {v.reserved > 0 && (
-                        <p className="text-xs text-default-500">{v.reserved} reserved</p>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>{renderCell(item, "status")}</TableCell>
-                  <TableCell>
-                    <p className="text-sm font-medium">
-                      {currencySymbol}
-                      {Number(v.price || 0).toFixed(2)}
-                    </p>
-                  </TableCell>
-                  <TableCell>—</TableCell>
-                  <TableCell>—</TableCell>
-                  <TableCell>—</TableCell>
-                  <TableCell>—</TableCell>
-                  <TableCell>—</TableCell>
-                </TableRow>
-              ));
+                  const children = item.variants.map((v) => (
+                    <TableRow
+                      key={`v-${v.id}`}
+                      className={
+                        stripe
+                          ? "pointer-events-none bg-default-50/40"
+                          : "pointer-events-none"
+                      }
+                    >
+                      <TableCell>
+                        <div className="min-w-0">
+                          <div className="truncate text-sm text-default-900">
+                            {v.title || "Variant"}
+                          </div>
+                          <div className="truncate text-xs text-default-500">
+                            {v.sku || ""}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm text-default-500">
+                          {item.category}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          <p className="text-sm font-medium">{v.available}</p>
+                          {v.reserved > 0 && (
+                            <p className="text-xs text-default-500">
+                              {v.reserved} reserved
+                            </p>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>{renderCell(item, "status")}</TableCell>
+                      <TableCell>
+                        <p className="text-sm font-medium">
+                          {currencySymbol}
+                          {Number(v.price || 0).toFixed(2)}
+                        </p>
+                      </TableCell>
+                      <TableCell>—</TableCell>
+                      <TableCell>—</TableCell>
+                      <TableCell>—</TableCell>
+                      <TableCell>—</TableCell>
+                      <TableCell>—</TableCell>
+                    </TableRow>
+                  ));
 
-              return [header, ...children];
-            })
-          )}
+                  return [header, ...children];
+                })
+              )}
             </TableBody>
           </Table>
           {paginationContent}

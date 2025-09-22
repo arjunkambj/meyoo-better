@@ -94,7 +94,7 @@ export default function ProfileSection() {
       addToast({
         title: "Profile updated",
         description: "Your changes have been saved",
-        color: "success",
+        color: "default",
       });
     } catch (_error) {
       addToast({

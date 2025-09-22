@@ -9,11 +9,11 @@ import Link from "next/link";
 
 const Hero = () => {
   return (
-    <section className="relative w-full min-h-[calc(90vh)] flex items-center justify-center bg-background overflow-hidden pt-[calc(env(safe-area-inset-top)+56px)] sm:pt-[calc(env(safe-area-inset-top)+72px)] md:pt-6">
-      <div className="container py-16 sm:py-20 md:py-28 lg:py-36 mx-auto">
+    <section className="relative w-full min-h-[calc(90vh)] flex items-center justify-center overflow-hidden bg-gradient-to-b from-background via-primary/5 to-background pt-[calc(env(safe-area-inset-top)+56px)] sm:pt-[calc(env(safe-area-inset-top)+72px)] md:pt-6">
+      <div className="container relative z-10 mx-auto py-16 sm:py-20 md:py-28 lg:py-36">
         <div className="text-center flex flex-col items-center">
           {/* Chip Badge */}
-          <div className="inline-flex items-center gap-2.5 bg-default-200/50 border border-default-200/50 dark:bg-default-100 dark:border-default-200/50  rounded-full px-5 py-2 mb-3">
+          <div className="inline-flex items-center gap-2.5 bg-default-50 border border-default-100 rounded-full px-5 py-2 mb-3">
             <Icon
               icon="solar:code-scan-bold-duotone"
               width={16}
@@ -50,7 +50,6 @@ const Hero = () => {
               color="primary"
               endContent={<Icon icon="solar:arrow-right-linear" width={20} />}
               size="lg"
-              variant="shadow"
             >
               Get Started
             </Button>
@@ -78,8 +77,9 @@ const Hero = () => {
           animate={{ opacity: 100, y: 0 }}
           transition={{ ease: [0, 0.71, 0.2, 1.01], duration: 0.8 }}
         >
-          <Card className="group mx-auto mt-12  h-[320px] sm:h-[360px] w-full rounded-4xl border border-default-200 bg-content2/30 p-2 shadow-none md:h-190 md:p-3">
-            <CardBody className="size-full rounded-3xl border-2 border-background bg-content2">
+          <Card className="group relative mx-auto mt-12 h-[320px] w-full max-w-7xl rounded-4xl border border-default-200/70 bg-background/70 p-3 shadow-xl shadow-primary/10 backdrop-blur md:h-190">
+            <div className="pointer-events-none absolute inset-0 rounded-4xl bg-gradient-to-br from-primary/10 via-transparent to-primary/5 opacity-80" />
+            <CardBody className="relative size-full rounded-3xl border border-default-200/60 bg-gradient-to-br from-background via-content1 to-content2">
               <img
                 src="https://deifkwefumgah.cloudfront.net/shadcnblocks/block/placeholder-1.svg"
                 className="size-full"

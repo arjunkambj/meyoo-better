@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "../_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { requireUserAndOrg } from "../utils/auth";
 
 const KEY_LENGTH = 48;
 const PREFIX_LENGTH = 8;
@@ -46,25 +47,7 @@ export const createApiKey = mutation({
     id: v.id("apiKeys"),
   }),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) {
-      throw new Error("Unauthorized");
-    }
-
-    // Get user and organization
-    const user = await ctx.db.get(userId);
-    if (!user) {
-      throw new Error("User not found");
-    }
-
-    const membership = await ctx.db
-      .query("memberships")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .first();
-
-    if (!membership) {
-      throw new Error("No active organization found");
-    }
+    const { user, orgId } = await requireUserAndOrg(ctx);
 
     // Generate the API key
     const apiKey = generateApiKey();
@@ -73,8 +56,8 @@ export const createApiKey = mutation({
 
     // Store the key
     const id = await ctx.db.insert("apiKeys", {
-      userId,
-      organizationId: membership.organizationId,
+      userId: user._id,
+      organizationId: orgId,
       name: args.name,
       key: hashedKey,
       prefix,

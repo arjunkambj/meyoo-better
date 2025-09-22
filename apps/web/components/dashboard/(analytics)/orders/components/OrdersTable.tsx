@@ -24,6 +24,7 @@ import { OrderStatusBadge } from "@/components/shared/badges/StatusBadge";
 import { useUser } from "@/hooks";
 import { formatCurrencyPrecise } from "@/libs/utils/dashboard-formatters";
 import { formatDate } from "@/libs/utils/format";
+import { DATA_TABLE_HEADER_CLASS, DATA_TABLE_TABLE_CLASS } from "@/components/shared/table/DataTableCard";
 
 export interface Order {
   id: string;
@@ -125,17 +126,20 @@ export const OrdersTable = React.memo(function OrdersTable({
       switch (columnKey) {
         case "order":
           return (
-            <div>
-              <p className="font-medium text-sm">#{item.orderNumber}</p>
-              <p className="text-xs text-default-500">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-default-900">
+                #{item.orderNumber}
+              </p>
+              <p className="mt-0.5 flex items-center gap-1 text-xs text-default-500">
+                <Icon icon="solar:calendar-linear" width={14} />
                 {formatDate(item.createdAt)}
               </p>
-              {item.tags && item.tags.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-1">
+              {item.tags && item.tags.length > 0 ? (
+                <div className="mt-2 flex flex-wrap gap-1">
                   {item.tags.map((tag) => (
                     <Chip
                       key={tag}
-                      className="text-xs h-5"
+                      className="h-5 text-xs"
                       color="secondary"
                       size="sm"
                       variant="flat"
@@ -144,15 +148,19 @@ export const OrdersTable = React.memo(function OrdersTable({
                     </Chip>
                   ))}
                 </div>
-              )}
+              ) : null}
             </div>
           );
 
         case "customer":
           return (
-            <div>
-              <p className="font-medium text-sm">{item.customer.name}</p>
-              <p className="text-xs text-default-500">{item.customer.email}</p>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-default-900">
+                {item.customer.name}
+              </p>
+              <p className="truncate text-xs text-default-500">
+                {item.customer.email}
+              </p>
             </div>
           );
 
@@ -236,129 +244,148 @@ export const OrdersTable = React.memo(function OrdersTable({
     [primaryCurrency]
   );
 
-  return (
-    <section className="flex flex-col gap-4">
-      {isItemsSelected() && (
-        <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-divider bg-content2 px-4 py-3">
-          <span className="text-sm">{getSelectedCount()} orders selected</span>
-          <Dropdown>
-            <DropdownTrigger>
-              <Button
-                size="sm"
-                startContent={
-                  <Icon icon="solar:bolt-circle-bold-duotone" width={16} />
-                }
-                variant="flat"
-              >
-                Bulk Actions
-              </Button>
-            </DropdownTrigger>
-            <DropdownMenu
-              aria-label="Bulk actions"
-              onAction={(key) => {
-                switch (key) {
-                  case "fulfill":
-                    addToast({
-                      title: "Fulfilling orders",
-                      description: "Selected orders are being fulfilled",
-                      color: "success",
-                      timeout: 3000,
-                    });
-                    break;
-                  case "cancel":
-                    addToast({
-                      title: "Cancelling orders",
-                      description: "Selected orders are being cancelled",
-                      color: "warning",
-                      timeout: 3000,
-                    });
-                    break;
-                  case "export":
-                    addToast({
-                      title: "Export selected",
-                      description: "Exporting selected orders...",
-                      color: "success",
-                      timeout: 3000,
-                    });
-                    break;
-                }
-                setSelectedKeys(new Set<string>());
-              }}
-            >
-              <DropdownItem
-                key="fulfill"
-                startContent={
-                  <Icon icon="solar:check-circle-outline" width={16} />
-                }
-              >
-                Mark as Fulfilled
-              </DropdownItem>
-              <DropdownItem
-                key="cancel"
-                className="text-danger"
-                color="danger"
-                startContent={
-                  <Icon icon="solar:close-circle-outline" width={16} />
-                }
-              >
-                Cancel Orders
-              </DropdownItem>
-              <DropdownItem
-                key="export"
-                startContent={<Icon icon="solar:export-outline" width={16} />}
-              >
-                Export Selected
-              </DropdownItem>
-            </DropdownMenu>
-          </Dropdown>
+  const selectionToolbarContent = isItemsSelected() ? (
+    <div className="flex flex-wrap items-center gap-3">
+      <span className="text-sm">{getSelectedCount()} orders selected</span>
+      <Dropdown>
+        <DropdownTrigger>
           <Button
-            color="danger"
             size="sm"
+            startContent={<Icon icon="solar:bolt-circle-bold-duotone" width={16} />}
             variant="flat"
-            onPress={() => setSelectedKeys(new Set())}
           >
-            Clear Selection
+            Bulk Actions
           </Button>
-        </div>
-      )}
+        </DropdownTrigger>
+        <DropdownMenu
+          aria-label="Bulk actions"
+          onAction={(key) => {
+            switch (key) {
+              case "fulfill":
+                addToast({
+                  title: "Fulfilling orders",
+                  description: "Selected orders are being fulfilled",
+                  color: "default",
+                  timeout: 3000,
+                });
+                break;
+              case "cancel":
+                addToast({
+                  title: "Cancelling orders",
+                  description: "Selected orders are being cancelled",
+                  color: "warning",
+                  timeout: 3000,
+                });
+                break;
+              case "export":
+                addToast({
+                  title: "Export selected",
+                  description: "Exporting selected orders...",
+                  color: "default",
+                  timeout: 3000,
+                });
+                break;
+            }
+            setSelectedKeys(new Set<string>());
+          }}
+        >
+          <DropdownItem
+            key="fulfill"
+            startContent={<Icon icon="solar:check-circle-outline" width={16} />}
+          >
+            Mark as Fulfilled
+          </DropdownItem>
+          <DropdownItem
+            key="cancel"
+            className="text-danger"
+            color="danger"
+            startContent={<Icon icon="solar:close-circle-outline" width={16} />}
+          >
+            Cancel Orders
+          </DropdownItem>
+          <DropdownItem
+            key="export"
+            startContent={<Icon icon="solar:export-outline" width={16} />}
+          >
+            Export Selected
+          </DropdownItem>
+        </DropdownMenu>
+      </Dropdown>
+      <Button
+        color="danger"
+        size="sm"
+        variant="flat"
+        onPress={() => setSelectedKeys(new Set<string>())}
+      >
+        Clear Selection
+      </Button>
+    </div>
+  ) : null;
 
-      <div className="rounded-2xl border border-divider bg-content2 p-6">
-        {loading ? (
-          <div className="space-y-3">
-            {[...Array(5)].map((_, i) => (
+  const paginationNode =
+    !loading && pagination && orders.length > 0 ? (
+      <div className="flex justify-center py-3">
+        <Pagination
+          showControls
+          boundaries={1}
+          page={page}
+          siblings={1}
+          size="sm"
+          total={Math.ceil(pagination.total / 50)}
+          onChange={(newPage) => {
+            setPage(newPage);
+            pagination.setPage(newPage);
+          }}
+        />
+      </div>
+    ) : null;
+
+  return (
+    <div className="space-y-4">
+      {selectionToolbarContent ? (
+      <div className={`${DATA_TABLE_TABLE_CLASS} flex flex-wrap items-center gap-3 p-4`}>
+        {selectionToolbarContent}
+      </div>
+    ) : null}
+      {loading ? (
+        <div className={DATA_TABLE_TABLE_CLASS}>
+          <div className="space-y-2 p-4">
+            {Array.from({ length: 5 }).map((_, index) => (
               <Skeleton
-                key={`orders-table-skeleton-${i + 1}`}
-                className="h-12 w-full rounded-lg"
+                key={`orders-loading-${index}`}
+                className="h-8 w-full rounded-lg"
               />
             ))}
           </div>
-        ) : (
-          <>
-            <Table
-              removeWrapper
-              aria-label="Orders table"
-              className="rounded-xl border border-divider bg-default-50 overflow-hidden"
-              classNames={{
-                th: "bg-default-100 text-default-600 font-medium",
-              }}
-              selectedKeys={selectedKeys}
-              selectionMode="multiple"
-              shadow="none"
-              onSelectionChange={(keys) => {
-                if (keys === "all") {
-                  setSelectedKeys("all");
-                } else {
-                  setSelectedKeys(new Set(Array.from(keys).map(String)));
-                }
-              }}
-            >
-              <TableHeader columns={columns}>
-                {(column) => (
-                  <TableColumn key={column.uid}>{column.name}</TableColumn>
-                )}
-              </TableHeader>
-              <TableBody
-                emptyContent={
+        </div>
+      ) : (
+        <Table
+          removeWrapper
+          aria-label="Orders table"
+          className={DATA_TABLE_TABLE_CLASS}
+          classNames={{
+            th: DATA_TABLE_HEADER_CLASS,
+            td: "py-2.5 px-3 text-sm text-default-700 align-middle",
+            table: "text-xs",
+          }}
+          selectedKeys={selectedKeys}
+          selectionMode="multiple"
+          shadow="none"
+          onSelectionChange={(keys) => {
+            if (keys === "all") {
+              setSelectedKeys("all");
+            } else {
+              setSelectedKeys(new Set(Array.from(keys).map(String)));
+            }
+          }}
+        >
+          <TableHeader columns={columns}>
+            {(column) => <TableColumn key={column.uid}>{column.name}</TableColumn>}
+          </TableHeader>
+          <TableBody>
+            {orders.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={columns.length}>
                   <div className="py-10 text-center">
                     <Icon
                       className="mx-auto mb-4 text-default-300"
@@ -369,38 +396,30 @@ export const OrdersTable = React.memo(function OrdersTable({
                       No orders found. Orders will sync from Shopify.
                     </p>
                   </div>
-                }
-                items={orders || []}
-              >
-                {(item: Order) => (
-                  <TableRow key={item.id}>
-                    {(columnKey) => (
-                      <TableCell>{renderCell(item, columnKey)}</TableCell>
-                    )}
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                </TableCell>
+              </TableRow>
+            ) : (
+              orders.map((item, index) => {
+                const stripe = index % 2 === 1;
 
-            {pagination && orders.length > 0 && (
-              <div className="flex justify-center pt-2">
-                <Pagination
-                  showControls
-                  boundaries={1}
-                  page={page}
-                  siblings={1}
-                  size="sm"
-                  total={Math.ceil(pagination.total / 50)}
-                  onChange={(newPage) => {
-                    setPage(newPage);
-                    pagination.setPage(newPage);
-                  }}
-                />
-              </div>
+                return (
+                  <TableRow
+                    key={item.id}
+                    className={`${stripe ? "bg-default-50/60" : ""} border-t border-default-200/50`}
+                  >
+                    {columns.map((column) => (
+                      <TableCell key={column.uid}>
+                        {renderCell(item, column.uid)}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                );
+              })
             )}
-          </>
-        )}
-      </div>
-    </section>
+          </TableBody>
+        </Table>
+      )}
+      {paginationNode}
+    </div>
   );
 });

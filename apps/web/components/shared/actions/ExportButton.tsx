@@ -228,7 +228,7 @@ export function ExportButton({
         if (onExport) {
           await onExport({ format, columns: selectedColumns, filters: {} });
           setExportProgress(100);
-          addToast({ title: `Export completed successfully`, color: "success" });
+          addToast({ title: `Export completed successfully`, color: "default" });
           return;
         }
 
@@ -244,7 +244,7 @@ export function ExportButton({
         setExportProgress(100);
         addToast({
           title: `Exported ${limitedData.length} rows as ${formatLabels[format]}`,
-          color: "success",
+          color: "default",
         });
       } catch (error) {
         console.error("Export error:", error);
@@ -465,4 +465,3 @@ const handleQuickExport = (format: ExportFormat) => {
     </>
   );
 }
-

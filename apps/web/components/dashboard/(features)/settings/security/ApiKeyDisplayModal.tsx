@@ -35,7 +35,7 @@ export default function ApiKeyDisplayModal({
       addToast({
         title: "API key copied",
         description: "The API key has been copied to your clipboard",
-        color: "success",
+        color: "default",
       });
       setTimeout(() => setCopied(false), 2000);
     } catch (_error) {

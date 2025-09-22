@@ -31,7 +31,7 @@ export default function LeaveOrganizationButton() {
     try {
       const res = await leaveOrg({});
       if (res.success) {
-        addToast({ title: "Left organization successfully", color: "success" });
+        addToast({ title: "Left organization successfully", color: "default" });
         // Redirect to onboarding
         router.push("/onboarding/shopify");
       } else {

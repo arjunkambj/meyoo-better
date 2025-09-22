@@ -96,7 +96,7 @@ export default function CenteredNavbar() {
       <div className="max-w-6xl mx-auto">
         <Navbar
           className={`
-            ${hasScrolled ? "bg-transparent border-1 border-default-300/60" : "bg-transparent border-1 border-default-300/60"}
+            ${hasScrolled ? " border-1 border-default-300/60" : " border-1 border-default-300/60"}
             rounded-xl transition-all duration-300
           `}
           classNames={{

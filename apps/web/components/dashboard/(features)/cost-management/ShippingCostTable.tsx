@@ -29,6 +29,7 @@ import {
 } from "@/hooks";
 import { getCurrencySymbol } from "@/libs/utils/format";
 import { TableSkeleton } from "@/components/shared/skeletons";
+import { DATA_TABLE_HEADER_CLASS, DATA_TABLE_TABLE_CLASS } from "@/components/shared/table/DataTableCard";
 
 const columns = [
   { name: "Name", uid: "name" },
@@ -87,7 +88,7 @@ export default function ShippingCostTable() {
       });
       addToast({
         title: formData._id ? "Shipping cost updated" : "Shipping cost added",
-        color: "success",
+        color: "default",
         timeout: 3000,
       });
       onOpenChange();
@@ -125,7 +126,7 @@ export default function ShippingCostTable() {
               variant="light"
               onPress={() => handleEdit(item)}
             >
-              <Icon icon="solar:pen-2-linear" width={16} />
+              <Icon icon="lucide:edit" width={16} />
             </Button>
           </div>
         );
@@ -135,59 +136,61 @@ export default function ShippingCostTable() {
     }
   };
 
-  return (
+  const topContent = (
     <div className="space-y-4">
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
-          <h2 className="text-xl font-semibold">Shipping Costs</h2>
-          {shippingCosts.length === 0 ? (
-            <Button
-              color="primary"
-              startContent={<Icon icon="solar:add-square-bold" width={16} />}
-              isDisabled={loading}
-              onPress={handleAdd}
-            >
-              Set Shipping Cost
-            </Button>
-          ) : null}
-        </div>
-
-        {loading ? <Skeleton className="h-10 w-64 rounded-lg" /> : null}
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold">Shipping Costs</h2>
+        {shippingCosts.length === 0 ? (
+          <Button
+            color="primary"
+            startContent={<Icon icon="solar:add-square-bold" width={16} />}
+            isDisabled={loading}
+            onPress={handleAdd}
+          >
+            Set Shipping Cost
+          </Button>
+        ) : null}
       </div>
+      {loading ? <Skeleton className="h-10 w-64 rounded-lg" /> : null}
+    </div>
+  );
 
-      <div>
+  return (
+    <>
+      <div className="space-y-4">
+        {topContent}
         {loading ? (
-          <TableSkeleton
-            rows={3}
-            columns={3}
-            showHeader={false}
-            showPagination={false}
-            className="border border-divider"
-          />
+          <div className={DATA_TABLE_TABLE_CLASS}>
+            <TableSkeleton
+              rows={3}
+              columns={3}
+              showHeader={false}
+              showPagination={false}
+              className="border border-default-200/60"
+            />
+          </div>
         ) : (
           <Table
             removeWrapper
             aria-label="Shipping costs table"
-            className="rounded-xl border border-divider overflow-hidden"
+            className={DATA_TABLE_TABLE_CLASS}
             classNames={{
-              th: "bg-default-100 text-default-600 font-medium",
+              th: DATA_TABLE_HEADER_CLASS,
+              td: "py-2.5 px-3 text-sm text-default-700 align-middle",
             }}
-            shadow="none"
           >
             <TableHeader columns={columns}>
-              {(column) => (
-                <TableColumn key={column.uid}>{column.name}</TableColumn>
-              )}
+              {(column) => <TableColumn key={column.uid}>{column.name}</TableColumn>}
             </TableHeader>
             <TableBody
               emptyContent={
-                <div className="text-center py-10">
+                <div className="py-10 text-center">
                   <Icon
-                    className="mx-auto text-default-300 mb-4"
+                    className="mx-auto mb-4 text-default-300"
                     icon="solar:delivery-bold-duotone"
                     width={48}
                   />
-                  <p className="text-default-500 mb-2">No shipping costs added yet</p>
+                  <p className="mb-2 text-default-500">No shipping costs added yet</p>
                   <p className="text-small text-default-400">
                     Add shipping costs to track delivery expenses
                   </p>
@@ -197,9 +200,7 @@ export default function ShippingCostTable() {
             >
               {(item: ShippingCostItem) => (
                 <TableRow key={item._id} className="odd:bg-default-50/40">
-                  {(columnKey) => (
-                    <TableCell>{renderCell(item, columnKey)}</TableCell>
-                  )}
+                  {(columnKey) => <TableCell>{renderCell(item, columnKey)}</TableCell>}
                 </TableRow>
               )}
             </TableBody>
@@ -259,8 +260,6 @@ export default function ShippingCostTable() {
           )}
         </ModalContent>
       </Modal>
-
-      
-    </div>
+    </>
   );
 }

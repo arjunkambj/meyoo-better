@@ -26,6 +26,7 @@ import {
   useTransactionFees,
 } from "@/hooks";
 import { TableSkeleton } from "@/components/shared/skeletons";
+import { DATA_TABLE_HEADER_CLASS, DATA_TABLE_TABLE_CLASS } from "@/components/shared/table/DataTableCard";
 // Local types to avoid tight coupling to domain Cost
 type TransactionCost = {
   _id?: string;
@@ -107,7 +108,7 @@ export default function PaymentFeesTable() {
       });
       addToast({
         title: formData._id ? "Payment fee updated" : "Payment fee added",
-        color: "success",
+        color: "default",
         timeout: 3000,
       });
       onOpenChange();
@@ -126,9 +127,11 @@ export default function PaymentFeesTable() {
     switch (columnKey) {
       case "provider":
         return (
-          <div>
-            <p className="font-medium">{item.provider}</p>
-            <p className="text-xs text-default-500">{item.name}</p>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-default-900">
+              {item.provider || item.name || "Payment Processor"}
+            </p>
+            <p className="truncate text-xs text-default-500">{item.name}</p>
           </div>
         );
 
@@ -153,7 +156,7 @@ export default function PaymentFeesTable() {
               variant="light"
               onPress={() => handleEdit(item)}
             >
-              <Icon icon="solar:pen-2-linear" width={16} />
+              <Icon icon="lucide:edit" width={16} />
             </Button>
             
           </div>
@@ -164,59 +167,61 @@ export default function PaymentFeesTable() {
     }
   };
 
-  return (
+  const topContent = (
     <div className="space-y-4">
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
-          <h2 className="text-xl font-semibold">Payment Processing Fee</h2>
-          {(transactionCosts?.length || 0) === 0 ? (
-            <Button
-              color="primary"
-              startContent={<Icon icon="solar:add-square-bold" width={16} />}
-              isDisabled={loading}
-              onPress={handleAdd}
-            >
-              Set Fee
-            </Button>
-          ) : null}
-        </div>
-
-        {loading ? <Skeleton className="h-10 w-64 rounded-lg" /> : null}
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold">Payment Processing Fee</h2>
+        {(transactionCosts?.length || 0) === 0 ? (
+          <Button
+            color="primary"
+            startContent={<Icon icon="solar:add-square-bold" width={16} />}
+            isDisabled={loading}
+            onPress={handleAdd}
+          >
+            Set Fee
+          </Button>
+        ) : null}
       </div>
+      {loading ? <Skeleton className="h-10 w-64 rounded-lg" /> : null}
+    </div>
+  );
 
-      <div>
+  return (
+    <>
+      <div className="space-y-4">
+        {topContent}
         {loading ? (
-          <TableSkeleton
-            rows={3}
-            columns={3}
-            showHeader={false}
-            showPagination={false}
-            className="border border-divider"
-          />
+          <div className={DATA_TABLE_TABLE_CLASS}>
+            <TableSkeleton
+              rows={3}
+              columns={3}
+              showHeader={false}
+              showPagination={false}
+              className="border border-default-200/60"
+            />
+          </div>
         ) : (
           <Table
             removeWrapper
             aria-label="Payment fees table"
-            className="rounded-xl border border-divider overflow-hidden"
+            className={DATA_TABLE_TABLE_CLASS}
             classNames={{
-              th: "bg-default-100 text-default-600 font-medium",
+              th: DATA_TABLE_HEADER_CLASS,
+              td: "py-2.5 px-3 text-sm text-default-700 align-middle",
             }}
-            shadow="none"
           >
             <TableHeader columns={columns}>
-              {(column) => (
-                <TableColumn key={column.uid}>{column.name}</TableColumn>
-              )}
+              {(column) => <TableColumn key={column.uid}>{column.name}</TableColumn>}
             </TableHeader>
             <TableBody
               emptyContent={
-                <div className="text-center py-10">
+                <div className="py-10 text-center">
                   <Icon
-                    className="mx-auto text-default-300 mb-4"
+                    className="mx-auto mb-4 text-default-300"
                     icon="solar:card-bold-duotone"
                     width={48}
                   />
-                  <p className="text-default-500 mb-2">
+                  <p className="mb-2 text-default-500">
                     No payment fee configured yet
                   </p>
                   <p className="text-small text-default-400">
@@ -228,9 +233,7 @@ export default function PaymentFeesTable() {
             >
               {(item: TransactionCost) => (
                 <TableRow key={item._id} className="odd:bg-default-50/40">
-                  {(columnKey) => (
-                    <TableCell>{renderCell(item, columnKey)}</TableCell>
-                  )}
+                  {(columnKey) => <TableCell>{renderCell(item, columnKey)}</TableCell>}
                 </TableRow>
               )}
             </TableBody>
@@ -293,7 +296,6 @@ export default function PaymentFeesTable() {
           )}
         </ModalContent>
       </Modal>
-      
-    </div>
+    </>
   );
 }

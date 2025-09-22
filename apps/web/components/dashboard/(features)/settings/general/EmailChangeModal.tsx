@@ -97,7 +97,7 @@ export default function EmailChangeModal({
       addToast({
         title: "Email updated",
         description: "Your login email has been changed",
-        color: "success",
+        color: "default",
         timeout: 4000,
       });
       onOpenChange(false);

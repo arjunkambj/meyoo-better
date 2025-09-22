@@ -66,7 +66,7 @@ export const OTPAuthForm = React.memo(function OTPAuthForm({
         addToast({
           title: "Code sent!",
           description: "Check your email for the verification code",
-          color: "success",
+          color: "default",
           timeout: 4000,
         });
       } catch (err) {
@@ -111,7 +111,7 @@ export const OTPAuthForm = React.memo(function OTPAuthForm({
 
         addToast({
           title: mode === "signin" ? "Welcome back!" : "Account created!",
-          color: "success",
+          color: "default",
           timeout: 3000,
         });
 
@@ -146,7 +146,7 @@ export const OTPAuthForm = React.memo(function OTPAuthForm({
       addToast({
         title: "New code sent!",
         description: "Check your email",
-        color: "success",
+        color: "default",
         timeout: 4000,
       });
     } catch (_err) {
@@ -255,5 +255,4 @@ export const OTPAuthForm = React.memo(function OTPAuthForm({
     </form>
   );
 });
-
 

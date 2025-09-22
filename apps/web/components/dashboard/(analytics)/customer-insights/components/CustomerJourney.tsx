@@ -102,7 +102,7 @@ export const CustomerJourney = memo(function CustomerJourney({
   const journeyData = data || defaultData;
 
   return (
-    <Card className="p-6 bg-white dark:bg-content1 border-none shadow-sm rounded-2xl">
+    <Card className="p-6 rounded-2xl border border-default-100/60 bg-content2/90 dark:bg-content1/80 shadow-none backdrop-blur-sm">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h3 className="text-lg font-medium text-default-900">Customer Journey</h3>
@@ -128,12 +128,16 @@ export const CustomerJourney = memo(function CustomerJourney({
                     <div className="h-px bg-default-100 w-full" />
                   </div>
                 )}
-                <div className="relative z-10 bg-white dark:bg-default-50 rounded-xl p-4 border border-default-100">
+                <div className="relative z-10 rounded-xl border border-default-100/70 bg-default-100/60 dark:bg-content1/60 p-4 shadow-sm">
                   <div className="flex flex-col items-center text-center space-y-3">
-                    <Icon
-                      className={`w-5 h-5 ${stage.textColor}`}
-                      icon={stage.icon}
-                    />
+                    <div
+                      className={`flex h-10 w-10 items-center justify-center rounded-xl ${stage.bgColor} shadow-inner`}
+                    >
+                      <Icon
+                        className={`w-5 h-5 ${stage.textColor}`}
+                        icon={stage.icon}
+                      />
+                    </div>
                     <div>
                       <Tooltip
                         closeDelay={0}
@@ -148,7 +152,7 @@ export const CustomerJourney = memo(function CustomerJourney({
                         {formatNumber(stage.customers)}
                       </p>
                     </div>
-                    <div className="w-full pt-2 border-t border-default-100">
+                    <div className="w-full pt-2 border-t border-default-100/70">
                       <p className="text-xs text-default-400 mb-1">Conversion</p>
                       <p className="text-sm font-medium text-default-700">
                         {stage.conversionRate}%
@@ -163,7 +167,7 @@ export const CustomerJourney = memo(function CustomerJourney({
 
         {/* Key Metrics */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="bg-white dark:bg-default-50 rounded-xl p-4 border border-default-100">
+          <div className="rounded-xl p-4 border border-default-100/70 bg-default-100/70 dark:bg-content1/60">
             <p className="text-xs font-medium text-default-600 mb-2">Overall Conversion</p>
             <p className="text-xl font-semibold text-default-900">
               {(() => {
@@ -175,8 +179,7 @@ export const CustomerJourney = memo(function CustomerJourney({
             </p>
             <p className="text-xs text-default-400 mt-1">Visitor to customer</p>
           </div>
-
-          <div className="bg-white dark:bg-default-50 rounded-xl p-4 border border-default-100">
+          <div className="rounded-xl p-4 border border-default-100/70 bg-default-100/70 dark:bg-content1/60">
             <p className="text-xs font-medium text-default-600 mb-2">Repeat Rate</p>
             <p className="text-xl font-semibold text-default-900">
               {(() => {
@@ -189,13 +192,12 @@ export const CustomerJourney = memo(function CustomerJourney({
             <p className="text-xs text-default-400 mt-1">Buy again</p>
           </div>
 
-          <div className="bg-white dark:bg-default-50 rounded-xl p-4 border border-default-100">
+          <div className="rounded-xl p-4 border border-default-100/70 bg-default-100/70 dark:bg-content1/60">
             <p className="text-xs font-medium text-default-600 mb-2">Cancel Rate</p>
             <p className="text-xl font-semibold text-default-900">{cancelRate.toFixed(1)}%</p>
             <p className="text-xs text-default-400 mt-1">Orders cancelled</p>
           </div>
-
-          <div className="bg-white dark:bg-default-50 rounded-xl p-4 border border-default-100">
+          <div className="rounded-xl p-4 border border-default-100/70 bg-default-100/70 dark:bg-content1/60">
             <p className="text-xs font-medium text-default-600 mb-2">Return Rate</p>
             <p className="text-xl font-semibold text-default-900">{returnRate.toFixed(1)}%</p>
             <p className="text-xs text-default-400 mt-1">Products returned</p>
@@ -203,7 +205,7 @@ export const CustomerJourney = memo(function CustomerJourney({
         </div>
 
         {/* Conversion Breakdown */}
-        <div className="bg-white dark:bg-default-50 rounded-xl p-5 border border-default-100">
+        <div className="rounded-xl p-5 border border-default-100/70 bg-default-100/70 dark:bg-content1/60">
           <p className="text-sm font-medium text-default-900 mb-4">Stage Progression</p>
           <div className="space-y-3">
             {journeyData.slice(0, -1).map((stage, index) => {
@@ -224,9 +226,9 @@ export const CustomerJourney = memo(function CustomerJourney({
                       {conversionRate.toFixed(1)}%
                     </span>
                   </div>
-                  <div className="h-1.5 bg-default-100 rounded-full overflow-hidden">
+                  <div className="h-1.5 bg-default-200/70 rounded-full overflow-hidden">
                     <div
-                      className="h-full rounded-full bg-primary-400"
+                      className="h-full rounded-full bg-gradient-to-r from-primary-400 via-primary-500 to-primary-400"
                       style={{ width: `${conversionRate}%` }}
                     />
                   </div>

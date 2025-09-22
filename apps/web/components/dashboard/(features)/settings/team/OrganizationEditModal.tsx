@@ -61,7 +61,7 @@ export default function OrganizationEditModal({
       addToast({
         title: "Organization updated",
         description: "Organization name has been updated successfully",
-        color: "success",
+        color: "default",
         timeout: 3000,
       });
 

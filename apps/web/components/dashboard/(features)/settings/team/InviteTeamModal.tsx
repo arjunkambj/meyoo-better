@@ -68,7 +68,7 @@ export default function InviteTeamModal() {
         setEmail("");
         addToast({
           title: "Team member added successfully!",
-          color: "success",
+          color: "default",
           timeout: 3000,
         });
       } else {

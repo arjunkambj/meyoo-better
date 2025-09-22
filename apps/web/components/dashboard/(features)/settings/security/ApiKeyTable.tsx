@@ -69,7 +69,7 @@ export default function ApiKeyTable({
       case "actions":
         return (
           <div className="flex items-center gap-2">
-            <Tooltip content="Delete API key" color="danger">
+            <Tooltip content="Delete API key" color="danger" delay={0}>
               <Button
                 isIconOnly
                 size="sm"

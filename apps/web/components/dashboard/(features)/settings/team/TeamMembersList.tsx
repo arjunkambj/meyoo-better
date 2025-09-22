@@ -51,7 +51,7 @@ export default function TeamMembersList() {
         const result = await removeTeamMember({ memberId: userId });
 
         if (result.success) {
-          addToast({ title: result.message, color: "success" });
+          addToast({ title: result.message, color: "default" });
         } else {
           addToast({ title: result.message, color: "danger" });
         }

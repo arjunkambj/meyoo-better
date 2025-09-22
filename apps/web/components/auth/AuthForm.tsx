@@ -122,7 +122,7 @@ export const AuthForm = React.memo(function AuthForm({
 
         addToast({
           title: mode === "signup" ? "Account created!" : "Welcome back!",
-          color: "success",
+          color: "default",
           timeout: 3000,
         });
 
@@ -336,5 +336,4 @@ export const AuthForm = React.memo(function AuthForm({
     </div>
   );
 });
-
 

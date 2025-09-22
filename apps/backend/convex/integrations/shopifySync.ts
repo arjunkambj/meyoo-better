@@ -495,21 +495,40 @@ export const initial = internalAction({
                       if (variant && node.inventoryLevels?.edges) {
                         variant.inventoryLevels =
                           node.inventoryLevels.edges.map(
-                            (edge: { node: Record<string, unknown> }) => {
-                              const location = edge.node.location as
-                                | { id?: string; name?: string }
-                                | undefined;
-                              const quantities = edge.node.quantities as
-                                | Array<{ quantity?: number }>
-                                | undefined;
+                            (edge: {
+                              node: {
+                                available?: number | null;
+                                incoming?: number | null;
+                                committed?: number | null;
+                                location?:
+                                  | {
+                                      id?: string | null;
+                                      name?: string | null;
+                                    }
+                                  | null;
+                              };
+                            }) => {
+                              const location = edge.node.location;
                               return {
                                 locationId:
                                   location?.id?.replace(
                                     "gid://shopify/Location/",
                                     ""
                                   ) || "",
-                                locationName: location?.name || undefined,
-                                available: quantities?.[0]?.quantity || 0,
+                                locationName:
+                                  location?.name?.trim() || undefined,
+                                available:
+                                  typeof edge.node.available === "number"
+                                    ? edge.node.available
+                                    : 0,
+                                incoming:
+                                  typeof edge.node.incoming === "number"
+                                    ? edge.node.incoming
+                                    : 0,
+                                committed:
+                                  typeof edge.node.committed === "number"
+                                    ? edge.node.committed
+                                    : 0,
                               };
                             }
                           );

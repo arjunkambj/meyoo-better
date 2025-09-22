@@ -57,7 +57,7 @@ export default function ContactForm() {
       addToast({
         title: "Message sent!",
         description: "We'll get back to you within 24 hours.",
-        color: "success",
+        color: "default",
         timeout: 5000,
       });
 

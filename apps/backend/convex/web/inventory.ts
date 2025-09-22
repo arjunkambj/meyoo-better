@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import { query } from "../_generated/server";
 import { getUserAndOrg } from "../utils/auth";
 
@@ -7,6 +7,39 @@ import { getUserAndOrg } from "../utils/auth";
  * Inventory Management API
  * Provides product inventory data, stock health metrics, and ABC analysis
  */
+
+const aggregateInventoryLevels = (
+  levels: Array<Doc<"shopifyInventory">>,
+): Map<
+  Id<"shopifyProductVariants">,
+  { available: number; incoming: number; committed: number }
+> => {
+  const totals = new Map<
+    Id<"shopifyProductVariants">,
+    { available: number; incoming: number; committed: number }
+  >();
+
+  for (const level of levels) {
+    const current = totals.get(level.variantId);
+    const available = typeof level.available === "number" ? level.available : 0;
+    const incoming = typeof level.incoming === "number" ? level.incoming : 0;
+    const committed = typeof level.committed === "number" ? level.committed : 0;
+
+    if (current) {
+      current.available += available;
+      current.incoming += incoming;
+      current.committed += committed;
+    } else {
+      totals.set(level.variantId, {
+        available,
+        incoming,
+        committed,
+      });
+    }
+  }
+
+  return totals;
+};
 
 /**
  * Get inventory overview metrics
@@ -73,6 +106,8 @@ export const getInventoryOverview = query({
       .withIndex("by_organization", (q) => q.eq("organizationId", _orgId))
       .collect();
 
+    const inventoryTotals = aggregateInventoryLevels(inventory);
+
     // Calculate metrics
     const totalProducts = products.length;
     const totalSKUs = variants.length;
@@ -82,8 +117,8 @@ export const getInventoryOverview = query({
     let totalCOGS = 0;
 
     variants.forEach((variant) => {
-      const inv = inventory.find((i) => i.variantId === variant._id);
-      const available = inv?.available || 0;
+      const totals = inventoryTotals.get(variant._id);
+      const available = totals?.available ?? 0;
       const price = variant.price || 0;
       // Use actual cost if available, otherwise estimate at 60% of price
       const cost =
@@ -101,8 +136,8 @@ export const getInventoryOverview = query({
     let healthyItems = 0;
 
     variants.forEach((variant) => {
-      const inv = inventory.find((i) => i.variantId === variant._id);
-      const available = inv?.available || 0;
+      const totals = inventoryTotals.get(variant._id);
+      const available = totals?.available ?? 0;
 
       if (available === 0) {
         outOfStockItems++;
@@ -150,8 +185,8 @@ export const getInventoryOverview = query({
     let deadStock = 0;
 
     variants.forEach((variant) => {
-      const inv = inventory.find((i) => i.variantId === variant._id);
-      const hasStock = (inv?.available || 0) > 0;
+      const totals = inventoryTotals.get(variant._id);
+      const hasStock = (totals?.available ?? 0) > 0;
       const notSold = !soldVariantIds.has(variant._id);
 
       if (hasStock && notSold) {
@@ -467,6 +502,8 @@ export const getProductsList = query({
       .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
       .collect();
 
+    const inventoryTotals = aggregateInventoryLevels(inventory);
+
     // Get order data for turnover calculation
     const thirtyDaysAgo = new Date();
 
@@ -506,16 +543,18 @@ export const getProductsList = query({
         (v) => v.productId === product._id,
       );
       const variantInventory = productVariants.map((variant) => {
-        const inv = inventory.find((i) => i.variantId === variant._id);
+        const totals = inventoryTotals.get(variant._id);
+        const available = totals?.available ?? 0;
+        const committed = totals?.committed ?? 0;
 
         return {
           id: variant._id,
           sku: variant.sku || "N/A",
           title: variant.title || "Default",
           price: variant.price || 0,
-          stock: inv?.available || 0,
-          reserved: inv?.committed || 0,
-          available: inv?.available || 0,
+          stock: available,
+          reserved: committed,
+          available,
         };
       });
 
@@ -715,6 +754,8 @@ export const getStockHealth = query({
       .withIndex("by_organization", (q) => q.eq("organizationId", auth.orgId as Id<"organizations">))
       .collect();
 
+    const inventoryTotals = aggregateInventoryLevels(inventory);
+
     // Count by stock status
     let healthy = 0;
     let low = 0;
@@ -725,8 +766,8 @@ export const getStockHealth = query({
     let criticalValue = 0;
 
     variants.forEach((variant) => {
-      const inv = inventory.find((i) => i.variantId === variant._id);
-      const available = inv?.available || 0;
+      const totals = inventoryTotals.get(variant._id);
+      const available = totals?.available ?? 0;
       const value = available * (variant.price || 0);
 
       if (available === 0) {
@@ -926,6 +967,8 @@ export const getStockAlerts = query({
       .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
       .collect();
 
+    const inventoryTotals = aggregateInventoryLevels(inventory);
+
     const alerts: {
       id: string;
       type: "critical" | "low" | "reorder" | "overstock";
@@ -943,8 +986,8 @@ export const getStockAlerts = query({
       );
 
       productVariants.forEach((variant) => {
-        const inv = inventory.find((i) => i.variantId === variant._id);
-        const available = inv?.available || 0;
+        const totals = inventoryTotals.get(variant._id);
+        const available = totals?.available ?? 0;
 
         if (available === 0) {
           alerts.push({

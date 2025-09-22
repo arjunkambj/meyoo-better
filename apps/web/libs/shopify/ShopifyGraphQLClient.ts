@@ -438,9 +438,9 @@ export class ShopifyGraphQLClient {
           inventoryLevels(first: 50) {
             edges {
               node {
-                quantities(names: ["available"]) {
-                  quantity
-                }
+                available
+                incoming
+                committed
                 location {
                   id
                   name
@@ -460,7 +460,17 @@ export class ShopifyGraphQLClient {
       inventoryItem: {
         id: string;
         inventoryLevels: {
-          edges: Array<{ node: ShopifyProduct }>;
+          edges: Array<{
+            node: {
+              available?: number | null;
+              incoming?: number | null;
+              committed?: number | null;
+              location?: {
+                id?: string | null;
+                name?: string | null;
+              } | null;
+            };
+          }>;
         };
       };
     }>(query, variables);
@@ -1257,9 +1267,9 @@ export class ShopifyGraphQLClient {
             inventoryLevels(first: 10) {
               edges {
                 node {
-                  quantities(names: ["available"]) {
-                    quantity
-                  }
+                  available
+                  incoming
+                  committed
                   location {
                     id
                     name
@@ -1278,11 +1288,13 @@ export class ShopifyGraphQLClient {
         inventoryLevels: {
           edges: Array<{
             node: {
-              quantities: Array<{ quantity: number }>;
-              location: {
-                id: string;
-                name: string;
-              };
+              available?: number | null;
+              incoming?: number | null;
+              committed?: number | null;
+              location?: {
+                id?: string | null;
+                name?: string | null;
+              } | null;
             };
           }>;
         };

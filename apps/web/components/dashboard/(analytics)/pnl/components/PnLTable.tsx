@@ -198,20 +198,20 @@ export const PnLTable = React.memo(function PnLTable({
       <div className="w-full overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b-2 border-divider">
-              <th className="text-left py-3 px-4 font-semibold text-default-900 sticky left-0 bg-background min-w-[180px] z-10">
+            <tr className="border-b-2 border-default-100/70">
+              <th className="text-left py-3 px-4 font-semibold text-default-900 sticky left-0 bg-default-100/80 dark:bg-content1/70 min-w-[180px] z-10">
                 Metric
               </th>
               {regularPeriods.map((period) => (
                 <th
                   key={period.label}
-                  className="text-right py-3 px-3 font-medium text-sm text-default-700 min-w-[100px] border-r border-default-100"
+                  className="text-right py-3 px-3 font-medium text-sm text-default-700 min-w-[100px] border-r border-default-100/60"
                 >
                   {formatPeriodLabel(period)}
                 </th>
               ))}
               {totalPeriod && (
-                <th className="text-right py-3 px-3 font-semibold text-sm text-foreground bg-default-100 min-w-[100px] border-l-2 border-divider">
+                <th className="text-right py-3 px-3 font-semibold text-sm text-foreground bg-default-200/70 dark:bg-content1/70 min-w-[100px] border-l-2 border-default-100/80">
                   TOTAL
                 </th>
               )}
@@ -230,13 +230,13 @@ export const PnLTable = React.memo(function PnLTable({
                 <tr
                   key={metricKey}
                   className={`
-                    border-b border-default-100
-                    hover:bg-default-50/50 transition-colors
-                    ${isNewSection ? "border-t-2 border-divider" : ""}
-                    ${isBoldRow ? "bg-default-50/30" : ""}
+                    border-b border-default-100/60
+                    hover:bg-default-100/50 transition-colors
+                    ${isNewSection ? "border-t-2 border-default-100/80" : ""}
+                    ${isBoldRow ? "bg-default-100/40" : ""}
                   `}
                 >
-                  <td className="py-3 px-4 sticky left-0 bg-background z-10">
+                  <td className="py-3 px-4 sticky left-0 bg-default-100/80 dark:bg-content1/70 z-10">
                     <div className="flex items-center gap-2">
                       {config.icon && (
                         <Icon
@@ -264,7 +264,7 @@ export const PnLTable = React.memo(function PnLTable({
                     return (
                       <td
                         key={period.label}
-                        className="text-right py-3 px-3 border-r border-default-100"
+                        className="text-right py-3 px-3 border-r border-default-100/60"
                       >
                         <span className={`
                           text-sm
@@ -277,7 +277,7 @@ export const PnLTable = React.memo(function PnLTable({
                     );
                   })}
                   {totalPeriod && (
-                    <td className="text-right py-3 px-3 bg-default-100 border-l-2 border-divider">
+                    <td className="text-right py-3 px-3 bg-default-200/70 dark:bg-content1/70 border-l-2 border-default-100/80">
                       <span className={`
                         text-sm font-bold
                         ${metricKey === "netProfit" || metricKey === "grossProfit"
@@ -342,9 +342,9 @@ export const PnLTable = React.memo(function PnLTable({
   }, [periods]);
 
   return (
-    <Card className="bg-content2 dark:bg-content1 rounded-xl border border-default-200/50" shadow="none">
+    <Card className="bg-content2/90 dark:bg-content1/80 rounded-xl border border-default-100/60 shadow-none backdrop-blur-sm" shadow="none">
       {/* Header with integrated granularity tabs */}
-      <div className="px-6 py-4 border-b border-divider bg-gradient-to-r from-background/50 to-background/30">
+      <div className="px-6 py-4 border-b border-default-100/60 bg-default-100/60 dark:bg-content1/60 rounded-t-xl">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold text-foreground">Profit & Loss Statement</h3>
           {setGranularity && (
@@ -374,7 +374,7 @@ export const PnLTable = React.memo(function PnLTable({
         <>
           {/* Summary metrics bar */}
           {summaryMetrics && (
-            <div className="mx-6 my-4 flex items-center divide-x divide-divider px-3 py-3 bg-default-100 dark:bg-default-50 rounded-lg text-sm">
+            <div className="mx-6 my-4 flex items-center divide-x divide-default-200 px-3 py-3 rounded-lg border border-default-100/70 bg-default-100/60 dark:bg-content1/60 text-sm">
               <div className="flex items-center gap-1.5 px-3 first:pl-2">
                 <span className="text-default-600">Revenue:</span>
                 <span className="font-semibold text-primary">

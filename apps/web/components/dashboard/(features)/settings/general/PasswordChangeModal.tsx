@@ -97,7 +97,7 @@ export default function PasswordChangeModal({
         description: hasPassword
           ? "Your password has been updated successfully"
           : "Your password has been set successfully",
-        color: "success",
+        color: "default",
         timeout: 4000,
       });
 

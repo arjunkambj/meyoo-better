@@ -30,6 +30,24 @@ export function useApiKeys() {
   const deleteApiKeyMutation = useMutation(api.web.security.deleteApiKey);
   const revokeApiKeyMutation = useMutation(api.web.security.revokeApiKey);
 
+  const showToast = ({
+    title,
+    description,
+    color = "default",
+  }: {
+    title: string;
+    description?: string;
+    color?: "default" | "danger";
+  }) => {
+    addToast({
+      title,
+      description,
+      color,
+      variant: "solid",
+      timeout: 2000,
+    });
+  };
+
   const createApiKey = async (name: string) => {
     setIsCreating(true);
     try {
@@ -40,15 +58,14 @@ export function useApiKeys() {
         name,
       });
 
-      addToast({
+      showToast({
         title: "API key created successfully",
         description: "Copy this key now. It won’t be shown again.",
-        color: "success",
       });
 
       return result;
     } catch (error) {
-      addToast({
+      showToast({
         title: "Failed to create API key",
         description: error instanceof Error ? error.message : "Unknown error",
         color: "danger",
@@ -64,13 +81,12 @@ export function useApiKeys() {
     try {
       await deleteApiKeyMutation({ id });
 
-      addToast({
+      showToast({
         title: "API key deleted",
         description: "The API key has been permanently deleted.",
-        color: "success",
       });
     } catch (error) {
-      addToast({
+      showToast({
         title: "Failed to delete API key",
         description: error instanceof Error ? error.message : "Unknown error",
         color: "danger",
@@ -85,13 +101,12 @@ export function useApiKeys() {
     try {
       await revokeApiKeyMutation({ id });
 
-      addToast({
+      showToast({
         title: "API key revoked",
         description: "The API key has been deactivated.",
-        color: "success",
       });
     } catch (error) {
-      addToast({
+      showToast({
         title: "Failed to revoke API key",
         description: error instanceof Error ? error.message : "Unknown error",
         color: "danger",

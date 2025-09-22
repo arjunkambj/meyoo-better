@@ -115,7 +115,7 @@ export default function HelpSettingsView() {
         addToast({
           title: "Ticket deleted",
           description: "Ticket deleted successfully",
-          color: "success",
+          color: "default",
         });
         onOpenChange();
         // The ticket list will automatically update via Convex real-time sync

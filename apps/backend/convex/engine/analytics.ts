@@ -6,6 +6,7 @@ import {
   internalAction,
   internalMutation,
   internalQuery,
+  type ActionCtx,
 } from "../_generated/server";
 /**
  * Main analytics calculation engine (for workpool onComplete callbacks)
@@ -112,10 +113,7 @@ export const calculateAnalytics = internalAction({
     }
 
     // Calculate aggregations (weekly/monthly)
-    await ctx.runMutation(internal.engine.analytics.calculateAggregations, {
-      organizationId: args.organizationId,
-      dateRange,
-    });
+    await persistAggregations(ctx, args.organizationId, dailyMetrics);
 
     // Update realtime metrics
     await ctx.runMutation(internal.engine.analytics.updateRealtimeMetrics, {
@@ -1110,69 +1108,155 @@ export const storeMetric = internalMutation({
 });
 
 /**
+ * Fetch daily metrics for aggregation use cases.
+ */
+export const listMetricsDailyForAggregation = internalQuery({
+  args: {
+    organizationId: v.string(),
+    startDate: v.optional(v.string()),
+    endDate: v.optional(v.string()),
+  },
+  returns: v.array(v.any()),
+  handler: async (ctx, args) => {
+    const orgId = args.organizationId as Id<"organizations">;
+
+    const results = await ctx.db
+      .query("metricsDaily")
+      .withIndex("by_org_date", (q) => {
+        const base = q.eq("organizationId", orgId);
+
+        if (args.startDate && args.endDate) {
+          return base
+            .gte("date", args.startDate)
+            .lte("date", args.endDate);
+        }
+
+        if (args.startDate) {
+          return base.gte("date", args.startDate);
+        }
+
+        if (args.endDate) {
+          return base.lte("date", args.endDate);
+        }
+
+        return base;
+      })
+      .collect();
+
+    if (args.startDate || args.endDate) {
+      return results.filter((metric) => {
+        if (args.startDate && metric.date < args.startDate) {
+          return false;
+        }
+        if (args.endDate && metric.date > args.endDate) {
+          return false;
+        }
+        return true;
+      });
+    }
+
+    return results;
+  },
+});
+
+async function persistAggregations(
+  ctx: ActionCtx,
+  organizationId: string,
+  metrics: ReadonlyArray<Record<string, any>>,
+): Promise<void> {
+  if (!metrics.length) return;
+
+  const weeklyMetrics: Record<string, AggregateMetric> = {};
+  const monthlyMetrics: Record<string, AggregateMetric> = {};
+
+  for (const metric of metrics) {
+    if (!metric?.date) continue;
+
+    const metricOrgId =
+      typeof metric.organizationId === "string"
+        ? metric.organizationId
+        : organizationId;
+
+    const weekKey = getWeekKey(metric.date);
+
+    if (!weeklyMetrics[weekKey]) {
+      weeklyMetrics[weekKey] = initializeAggregateMetric(
+        weekKey,
+        "week",
+        metricOrgId,
+      ) as AggregateMetric;
+    }
+    aggregateMetric(weeklyMetrics[weekKey], metric as any);
+
+    const monthKey = getMonthKey(metric.date);
+
+    if (!monthlyMetrics[monthKey]) {
+      monthlyMetrics[monthKey] = initializeAggregateMetric(
+        monthKey,
+        "month",
+        metricOrgId,
+      ) as AggregateMetric;
+    }
+    aggregateMetric(monthlyMetrics[monthKey], metric as any);
+  }
+
+  for (const metric of Object.values(weeklyMetrics)) {
+    await ctx.runMutation(internal.engine.analytics.storeWeeklyMetric, {
+      metric,
+    });
+  }
+
+  for (const metric of Object.values(monthlyMetrics)) {
+    await ctx.runMutation(internal.engine.analytics.storeMonthlyMetric, {
+      metric,
+    });
+  }
+}
+
+/**
  * Calculate weekly and monthly aggregations
  */
-export const calculateAggregations = internalMutation({
+export const calculateAggregations = internalAction({
   args: {
     organizationId: v.string(),
     dateRange: v.object({
       startDate: v.string(),
       endDate: v.string(),
     }),
+    metrics: v.optional(v.array(v.any())),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    // Get daily metrics for the range
-    const dailyMetrics = await ctx.db
-      .query("metricsDaily")
-      .withIndex("by_org_date", (q) =>
-        q.eq("organizationId", args.organizationId as Id<"organizations">),
-      )
-      .collect();
+    let dailyMetrics = args.metrics;
 
-    // Group by week and month
-    const weeklyMetrics: Record<string, AggregateMetric> = {};
-    const monthlyMetrics: Record<string, AggregateMetric> = {};
+    if (!dailyMetrics) {
+      const queryArgs: {
+        organizationId: string;
+        startDate?: string;
+        endDate?: string;
+      } = {
+        organizationId: args.organizationId,
+      };
 
-    for (const metric of dailyMetrics) {
-      // Weekly aggregation
-      const weekKey = getWeekKey(metric.date);
-
-      if (!weeklyMetrics[weekKey]) {
-        weeklyMetrics[weekKey] = initializeAggregateMetric(
-          weekKey,
-          "week",
-          args.organizationId,
-        ) as AggregateMetric;
+      if (args.dateRange?.startDate) {
+        queryArgs.startDate = args.dateRange.startDate;
       }
-      aggregateMetric(weeklyMetrics[weekKey], metric as any);
 
-      // Monthly aggregation
-      const monthKey = getMonthKey(metric.date);
-
-      if (!monthlyMetrics[monthKey]) {
-        monthlyMetrics[monthKey] = initializeAggregateMetric(
-          monthKey,
-          "month",
-          args.organizationId,
-        ) as AggregateMetric;
+      if (args.dateRange?.endDate) {
+        queryArgs.endDate = args.dateRange.endDate;
       }
-      aggregateMetric(monthlyMetrics[monthKey], metric as any);
+
+      dailyMetrics = await ctx.runQuery(
+        internal.engine.analytics.listMetricsDailyForAggregation,
+        queryArgs,
+      );
     }
 
-    // Store aggregations
-    for (const metric of Object.values(weeklyMetrics)) {
-      await ctx.runMutation(internal.engine.analytics.storeWeeklyMetric, {
-        metric,
-      });
+    if (!dailyMetrics?.length) {
+      return null;
     }
 
-    for (const metric of Object.values(monthlyMetrics)) {
-      await ctx.runMutation(internal.engine.analytics.storeMonthlyMetric, {
-        metric,
-      });
-    }
-
+    await persistAggregations(ctx, args.organizationId, dailyMetrics);
     return null;
   },
 });

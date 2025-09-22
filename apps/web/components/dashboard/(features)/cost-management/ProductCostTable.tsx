@@ -23,6 +23,7 @@ import {
   useShopifyProductVariantsPaginated,
 } from "@/hooks";
 import { getCurrencySymbol } from "@/libs/utils/format";
+import { DATA_TABLE_HEADER_CLASS, DATA_TABLE_TABLE_CLASS } from "@/components/shared/table/DataTableCard";
 
 type RowEdit = {
   cogs?: string;
@@ -152,148 +153,134 @@ export default function ProductCostTable() {
     }
   };
 
-  return (
-    <div className="space-y-6">
-      {/* Header + Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-        <div className="flex items-start gap-2">
-          <Icon
-            icon="solar:box-minimalistic-bold"
-            className="text-primary mt-1"
-          />
-          <div>
-            <h2 className="text-xl font-semibold">Product Costs</h2>
-            <p className="text-xs text-default-500">
-              Edit COGS, tax, and handling per variant.
-            </p>
-          </div>
-        </div>
-        <div className="flex-1" />
-        <div className="flex items-center gap-2">
-          <Input
-            size="sm"
-            className="w-36"
-            type="number"
-            placeholder="10"
-            endContent={<span className="text-default-500">%</span>}
-            value={bulkPct}
-            onValueChange={setBulkPct}
-          />
-          <Button
-            size="sm"
-            variant="flat"
-            color="primary"
-            isDisabled={!bulkPct || isNaN(Number(bulkPct))}
-            onPress={() => {
-              if (!variants.length || !bulkPct) return;
-              const pct = Number(bulkPct);
-              setEdits((prev) => {
-                const next = { ...prev } as Record<string, RowEdit>;
-                variants.forEach((v) => {
-                  const id = String(v._id);
-                  const original = (
-                    prev[id]?.cogs ??
-                    v.costPerItem ??
-                    ""
-                  ).toString();
-                  const originalVal = Number(original || 0);
-                  if (!isFinite(originalVal) || originalVal === 0) {
-                    const price = Number(v.price ?? 0) || 0;
-                    const computed = (price * pct) / 100;
-                    const fixed = isFinite(computed)
-                      ? computed.toFixed(2)
-                      : "0.00";
-                    next[id] = { ...(next[id] || {}), cogs: fixed };
-                  }
-                });
-                return next;
-              });
-            }}
-          >
-            Apply COGS
-          </Button>
-          <Button
-            size="sm"
-            variant="flat"
-            color="secondary"
-            isDisabled={!bulkPct || isNaN(Number(bulkPct))}
-            onPress={() => {
-              if (!variants.length || !bulkPct) return;
-              const pct = Number(bulkPct);
-              setEdits((prev) => {
-                const next = { ...prev } as Record<string, RowEdit>;
-                variants.forEach((v) => {
-                  const id = String(v._id);
-                  next[id] = { ...(next[id] || {}), tax: String(pct) };
-                });
-                return next;
-              });
-            }}
-          >
-            Apply Tax
-          </Button>
-          <Button
-            size="sm"
-            variant="flat"
-            isDisabled={!bulkPct || isNaN(Number(bulkPct))}
-            onPress={() => {
-              if (!variants.length || !bulkPct) return;
-              const pct = Number(bulkPct);
-              setEdits((prev) => {
-                const next = { ...prev } as Record<string, RowEdit>;
-                variants.forEach((v) => {
-                  const id = String(v._id);
+  const topContent = (
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+      <div>
+        <h2 className="text-xl font-semibold">Product Costs</h2>
+      </div>
+      <div className="flex-1" />
+      <div className="flex flex-wrap items-center gap-2">
+        <Input
+          size="sm"
+          className="w-36"
+          type="number"
+          placeholder="10"
+          endContent={<span className="text-default-500">%</span>}
+          value={bulkPct}
+          onValueChange={setBulkPct}
+        />
+        <Button
+          size="sm"
+          variant="flat"
+          color="primary"
+          isDisabled={!bulkPct || isNaN(Number(bulkPct))}
+          onPress={() => {
+            if (!variants.length || !bulkPct) return;
+            const pct = Number(bulkPct);
+            setEdits((prev) => {
+              const next = { ...prev } as Record<string, RowEdit>;
+              variants.forEach((v) => {
+                const id = String(v._id);
+                const original = (
+                  prev[id]?.cogs ??
+                  v.costPerItem ??
+                  ""
+                ).toString();
+                const originalVal = Number(original || 0);
+                if (!isFinite(originalVal) || originalVal === 0) {
                   const price = Number(v.price ?? 0) || 0;
                   const computed = (price * pct) / 100;
                   const fixed = isFinite(computed)
                     ? computed.toFixed(2)
                     : "0.00";
-                  next[id] = { ...(next[id] || {}), handling: fixed };
-                });
-                return next;
+                  next[id] = { ...(next[id] || {}), cogs: fixed };
+                }
               });
-            }}
-          >
-            Apply Handling
-          </Button>
-          <Button
-            size="sm"
-            variant="flat"
-            onPress={() => {
-              if (!variants.length) {
-                setEdits({});
-                return;
-              }
-              setEdits((prev) => {
-                const next: Record<string, RowEdit> = { ...prev };
-                variants.forEach((v) => {
-                  const id = String(v._id);
-                  next[id] = { cogs: "", tax: "", handling: "" };
-                });
-                return next;
+              return next;
+            });
+          }}
+        >
+          Apply COGS
+        </Button>
+        <Button
+          size="sm"
+          variant="flat"
+          color="secondary"
+          isDisabled={!bulkPct || isNaN(Number(bulkPct))}
+          onPress={() => {
+            if (!variants.length || !bulkPct) return;
+            const pct = Number(bulkPct);
+            setEdits((prev) => {
+              const next = { ...prev } as Record<string, RowEdit>;
+              variants.forEach((v) => {
+                const id = String(v._id);
+                next[id] = { ...(next[id] || {}), tax: String(pct) };
               });
-            }}
-          >
-            Clear All
-          </Button>
-          <Button
-            size="sm"
-            color="primary"
-            isLoading={savingAll}
-            onPress={handleSaveAll}
-          >
-            Save All Changes
-          </Button>
-        </div>
+              return next;
+            });
+          }}
+        >
+          Apply Tax
+        </Button>
+        <Button
+          size="sm"
+          variant="flat"
+          isDisabled={!bulkPct || isNaN(Number(bulkPct))}
+          onPress={() => {
+            if (!variants.length || !bulkPct) return;
+            const pct = Number(bulkPct);
+            setEdits((prev) => {
+              const next = { ...prev } as Record<string, RowEdit>;
+              variants.forEach((v) => {
+                const id = String(v._id);
+                const price = Number(v.price ?? 0) || 0;
+                const computed = (price * pct) / 100;
+                const fixed = isFinite(computed)
+                  ? computed.toFixed(2)
+                  : "0.00";
+                next[id] = { ...(next[id] || {}), handling: fixed };
+              });
+              return next;
+            });
+          }}
+        >
+          Apply Handling
+        </Button>
+        <Button
+          size="sm"
+          color="primary"
+          isLoading={savingAll}
+          onPress={handleSaveAll}
+        >
+          Save All Changes
+        </Button>
       </div>
+    </div>
+  );
 
-      {/* Table */}
+  const paginationContent =
+    !loading && totalPages > 1 ? (
+      <div className="flex justify-center">
+        <Pagination
+          page={page}
+          total={totalPages}
+          showControls
+          onChange={setPage}
+        />
+      </div>
+    ) : null;
+
+  return (
+    <div className="space-y-4">
+      {topContent}
       <Table
+        removeWrapper
         aria-label="Product costs table"
+        className={DATA_TABLE_TABLE_CLASS}
         classNames={{
-          wrapper: "shadow-none border border-divider rounded-xl",
+          th: DATA_TABLE_HEADER_CLASS,
+          td: "py-2.5 px-3 text-sm text-default-700 align-middle",
           table: "text-xs",
-          th: "bg-default-100 text-default-600 font-medium",
         }}
       >
         <TableHeader>
@@ -697,20 +684,7 @@ export default function ProductCostTable() {
           )}
         </TableBody>
       </Table>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex justify-center">
-          <Pagination
-            page={page}
-            total={totalPages}
-            size="sm"
-            showControls
-            onChange={setPage}
-          />
-        </div>
-      )}
-
+      {paginationContent}
       {/* CSV Import removed for this view */}
     </div>
   );

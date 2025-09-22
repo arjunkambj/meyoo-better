@@ -30,6 +30,7 @@ import NavigationButtons from "@/components/onboarding/NavigationButtons";
 import { getCurrencySymbol } from "@/libs/utils/format";
 import { sanitizeDecimal } from "@/components/shared/table/sanitize";
 import { NumericInput } from "@/components/shared/table/NumericInput";
+import { DATA_TABLE_HEADER_CLASS, DATA_TABLE_TABLE_CLASS } from "@/components/shared/table/DataTableCard";
 
 type RowEdit = {
   cogs?: string;
@@ -186,173 +187,199 @@ export default function VariantCostsClient({
     }
   };
 
-  return (
-    <div className="space-y-6">
-      {!hideTitle ? (
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-          <div className="flex items-start gap-2">
-            <Icon
-              icon="solar:box-minimalistic-bold"
-              className="text-primary mt-1"
-            />
-            <div>
-              <h2 className="text-xl font-semibold">Variant Costs</h2>
-              <p className="text-xs text-default-500">
-                Set COGS for accurate profit calculation.
-              </p>
-            </div>
-          </div>
-          <div className="flex-1" />
-          <div className="flex items-center gap-2">
-            {!hideSearch &&
-              (loading ? (
-                <Skeleton className="h-9 w-48 rounded-lg" />
-              ) : (
-                <Input
-                  size={compact ? "sm" : "md"}
-                  className="max-w-[12rem]"
-                  placeholder="Search..."
-                  startContent={<Icon icon="solar:search-outline" width={16} />}
-                  value={search}
-                  onValueChange={setSearch}
-                />
-              ))}
-            {/* Compact bulk % editor */}
+  const headerContent = hideTitle ? null : (
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+      <div className="flex items-start gap-2">
+        <Icon icon="solar:box-minimalistic-bold" className="mt-1 text-primary" />
+        <div>
+          <h2 className="text-xl font-semibold">Variant Costs</h2>
+          <p className="text-xs text-default-500">
+            Set COGS for accurate profit calculation.
+          </p>
+        </div>
+      </div>
+      <div className="flex-1" />
+      <div className="flex flex-wrap items-center gap-2">
+        {!hideSearch &&
+          (loading ? (
+            <Skeleton className="h-9 w-48 rounded-lg" />
+          ) : (
             <Input
               size={compact ? "sm" : "md"}
-              className="w-48"
-              type="number"
-              placeholder="10"
-              endContent={<span className="text-default-500">%</span>}
-              value={bulkPct}
-              onValueChange={setBulkPct}
+              className="max-w-[12rem]"
+              placeholder="Search..."
+              startContent={<Icon icon="solar:search-outline" width={16} />}
+              value={search}
+              onValueChange={setSearch}
             />
-            <Button
-              size={compact ? "sm" : "md"}
-              variant="flat"
-              color="primary"
-              isDisabled={!bulkPct || isNaN(Number(bulkPct))}
-              onPress={() => {
-                if (!data || !bulkPct) return;
-                const pct = Number(bulkPct);
-                setEdits((prev) => {
-                  const next = { ...prev } as Record<string, RowEdit>;
-                  (data as VariantRow[]).forEach((v) => {
-                    const id = String(v._id);
-                    const original = (
-                      prev[id]?.cogs ??
-                      v.costPerItem ??
-                      ""
-                    ).toString();
-                    const originalVal = Number(original || 0);
-                    if (!isFinite(originalVal) || originalVal === 0) {
-                      const price = Number(v.price ?? 0) || 0;
-                      const computed = (price * pct) / 100;
-                      const fixed = isFinite(computed)
-                        ? computed.toFixed(2)
-                        : "0.00";
-                      next[id] = { ...(next[id] || {}), cogs: fixed };
-                    }
-                  });
-                  return next;
-                });
-                trackOnboardingAction("products", "apply_cogs", {
-                  pct: Number(bulkPct),
-                });
-              }}
-            >
-              Apply COGS
-            </Button>
-            <Button
-              size={compact ? "sm" : "md"}
-              variant="flat"
-              color="secondary"
-              isDisabled={!bulkPct || isNaN(Number(bulkPct))}
-              onPress={() => {
-                if (!data || !bulkPct) return;
-                const pct = Number(bulkPct);
-                setEdits((prev) => {
-                  const next = { ...prev } as Record<string, RowEdit>;
-                  (data as VariantRow[]).forEach((v) => {
-                    const id = String(v._id);
-                    next[id] = { ...(next[id] || {}), tax: String(pct) };
-                  });
-                  return next;
-                });
-                trackOnboardingAction("products", "apply_tax", {
-                  pct: Number(bulkPct),
-                });
-              }}
-            >
-              Apply Tax
-            </Button>
-            <Button
-              size={compact ? "sm" : "md"}
-              variant="flat"
-              isDisabled={!bulkPct || isNaN(Number(bulkPct))}
-              onPress={() => {
-                if (!data || !bulkPct) return;
-                const pct = Number(bulkPct);
-                setEdits((prev) => {
-                  const next = { ...prev } as Record<string, RowEdit>;
-                  (data as VariantRow[]).forEach((v) => {
-                    const id = String(v._id);
-                    const price = Number(v.price ?? 0) || 0;
-                    const computed = (price * pct) / 100;
-                    const fixed = isFinite(computed)
-                      ? computed.toFixed(2)
-                      : "0.00";
-                    next[id] = { ...(next[id] || {}), handling: fixed };
-                  });
-                  return next;
-                });
-                trackOnboardingAction("products", "apply_handling", {
-                  pct: Number(bulkPct),
-                });
-              }}
-            >
-              Apply Handling
-            </Button>
-            <Button
-              size={compact ? "sm" : "md"}
-              variant="flat"
-              onPress={() => {
-                // Clear all pending edits (COGS, Tax, Shipping, Handling) for current page
-                if (!data) {
-                  setEdits({});
-                  return;
+          ))}
+        <Input
+          size={compact ? "sm" : "md"}
+          className="w-48"
+          type="number"
+          placeholder="10"
+          endContent={<span className="text-default-500">%</span>}
+          value={bulkPct}
+          onValueChange={setBulkPct}
+        />
+        <Button
+          size={compact ? "sm" : "md"}
+          variant="flat"
+          color="primary"
+          isDisabled={!bulkPct || isNaN(Number(bulkPct))}
+          onPress={() => {
+            if (!data || !bulkPct) return;
+            const pct = Number(bulkPct);
+            setEdits((prev) => {
+              const next = { ...prev } as Record<string, RowEdit>;
+              (data as VariantRow[]).forEach((v) => {
+                const id = String(v._id);
+                const original = (
+                  prev[id]?.cogs ??
+                  v.costPerItem ??
+                  ""
+                ).toString();
+                const originalVal = Number(original || 0);
+                if (!isFinite(originalVal) || originalVal === 0) {
+                  const price = Number(v.price ?? 0) || 0;
+                  const computed = (price * pct) / 100;
+                  const fixed = isFinite(computed)
+                    ? computed.toFixed(2)
+                    : "0.00";
+                  next[id] = { ...(next[id] || {}), cogs: fixed };
                 }
-                setEdits((prev) => {
-                  const next: Record<string, RowEdit> = { ...prev };
-                  (data as VariantRow[]).forEach((v) => {
-                    const id = String(v._id);
-                    next[id] = {
-                      cogs: "",
-                      tax: "",
-                      shipping: "",
-                      handling: "",
-                    };
-                  });
-                  return next;
-                });
-                trackOnboardingAction("products", "clear_all");
-              }}
-            >
-              Clear All
-            </Button>
-          </div>
-        </div>
-      ) : null}
+              });
+              return next;
+            });
+            trackOnboardingAction("products", "apply_cogs", {
+              pct: Number(bulkPct),
+            });
+          }}
+        >
+          Apply COGS
+        </Button>
+        <Button
+          size={compact ? "sm" : "md"}
+          variant="flat"
+          color="secondary"
+          isDisabled={!bulkPct || isNaN(Number(bulkPct))}
+          onPress={() => {
+            if (!data || !bulkPct) return;
+            const pct = Number(bulkPct);
+            setEdits((prev) => {
+              const next = { ...prev } as Record<string, RowEdit>;
+              (data as VariantRow[]).forEach((v) => {
+                const id = String(v._id);
+                next[id] = { ...(next[id] || {}), tax: String(pct) };
+              });
+              return next;
+            });
+            trackOnboardingAction("products", "apply_tax", {
+              pct: Number(bulkPct),
+            });
+          }}
+        >
+          Apply Tax
+        </Button>
+        <Button
+          size={compact ? "sm" : "md"}
+          variant="flat"
+          isDisabled={!bulkPct || isNaN(Number(bulkPct))}
+          onPress={() => {
+            if (!data || !bulkPct) return;
+            const pct = Number(bulkPct);
+            setEdits((prev) => {
+              const next = { ...prev } as Record<string, RowEdit>;
+              (data as VariantRow[]).forEach((v) => {
+                const id = String(v._id);
+                const price = Number(v.price ?? 0) || 0;
+                const computed = (price * pct) / 100;
+                const fixed = isFinite(computed)
+                  ? computed.toFixed(2)
+                  : "0.00";
+                next[id] = { ...(next[id] || {}), handling: fixed };
+              });
+              return next;
+            });
+            trackOnboardingAction("products", "apply_handling", {
+              pct: Number(bulkPct),
+            });
+          }}
+        >
+          Apply Handling
+        </Button>
+        <Button
+          size={compact ? "sm" : "md"}
+          variant="flat"
+          onPress={() => {
+            if (!data) {
+              setEdits({});
+              return;
+            }
+            setEdits((prev) => {
+              const next: Record<string, RowEdit> = { ...prev };
+              (data as VariantRow[]).forEach((v) => {
+                const id = String(v._id);
+                next[id] = {
+                  cogs: "",
+                  tax: "",
+                  shipping: "",
+                  handling: "",
+                };
+              });
+              return next;
+            });
+            trackOnboardingAction("products", "clear_all");
+          }}
+        >
+          Clear All
+        </Button>
+      </div>
+    </div>
+  );
+
+  const paginationContent =
+    totalPages > 1 ? (
+      <div className="flex justify-center pt-2">
+        <Pagination
+          page={page}
+          total={totalPages}
+          size="sm"
+          showControls
+          onChange={setPage}
+        />
+      </div>
+    ) : undefined;
+
+  return (
+    <div className="space-y-6">
+      {headerContent}
       {(() => {
         const columnCount = columns.length;
+        if (loading) {
+          return (
+            <div className={DATA_TABLE_TABLE_CLASS}>
+              <div className="space-y-2 p-4">
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <Skeleton
+                    key={`variant-loading-${index}`}
+                    className="h-8 w-full rounded-lg"
+                  />
+                ))}
+              </div>
+            </div>
+          );
+        }
+
         return (
           <Table
+            removeWrapper
             aria-label="Variant costs table"
+            className={DATA_TABLE_TABLE_CLASS}
             classNames={{
-              // Remove container-level scroll; use page-level scrolling
-              wrapper: "shadow-none border border-divider rounded-xl",
               table: compact ? "text-xs" : "",
-              th: "bg-default-100 text-default-600 font-medium",
+              th: DATA_TABLE_HEADER_CLASS,
+              td: "py-2.5 px-3 text-sm text-default-700 align-middle",
             }}
           >
             <TableHeader columns={columns}>
@@ -362,16 +389,6 @@ export default function VariantCostsClient({
             </TableHeader>
             <TableBody>
               {(() => {
-                if (loading) {
-                  return Array.from({ length: 5 }).map((_, i) => (
-                    <TableRow key={`skeleton-${i}`}>
-                      <TableCell colSpan={columnCount}>
-                        <Skeleton className="h-8 rounded-md" />
-                      </TableCell>
-                    </TableRow>
-                  ));
-                }
-
                 const list = (data || []) as VariantRow[];
                 if (list.length === 0) {
                   return (
@@ -385,7 +402,7 @@ export default function VariantCostsClient({
                   );
                 }
 
-                const rows: React.ReactElement[] = [];
+                const rows: Array<React.ReactElement> = [];
                 grouped.forEach((grp, grpIndex) => {
                   const count = grp.items.length;
                   const isOpen = expandedGroups.has(grp.key);
@@ -934,17 +951,8 @@ export default function VariantCostsClient({
         );
       })()}
 
-      {totalPages > 1 && (
-        <div className="flex justify-center">
-          <Pagination
-            page={page}
-            total={totalPages}
-            size="sm"
-            showControls
-            onChange={setPage}
-          />
-        </div>
-      )}
+      {paginationContent}
+
       {!hideNavigation && (
         <NavigationButtons
           nextLabel="Save & Continue"

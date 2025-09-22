@@ -18,12 +18,13 @@ import {
   TableRow,
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 
 import { CustomerStatusBadge } from "@/components/shared/badges/StatusBadge";
 import { useUser } from "@/hooks";
 import { getSegmentStyle } from "@/libs/utils/dashboard-formatters";
 import { getCurrencySymbol, formatNumber } from "@/libs/utils/format";
+import { DATA_TABLE_HEADER_CLASS, DATA_TABLE_TABLE_CLASS } from "@/components/shared/table/DataTableCard";
 
 export interface Customer {
   id: string;
@@ -78,6 +79,14 @@ export const CustomerTable = React.memo(function CustomerTable({
   const { primaryCurrency } = useUser();
   const currencySymbol = getCurrencySymbol(primaryCurrency);
 
+  useEffect(() => {
+    const nextPage = pagination?.page;
+
+    if (typeof nextPage === "number") {
+      setPage(nextPage);
+    }
+  }, [pagination?.page]);
+
   // Filter customers based on search and status
   const filteredCustomers = customers.filter((customer) => {
     // Status filter
@@ -119,9 +128,11 @@ export const CustomerTable = React.memo(function CustomerTable({
       switch (columnKey) {
         case "customer":
           return (
-            <div className="flex flex-col">
-              <p className="font-medium text-sm">{item.name}</p>
-              <p className="text-xs text-default-500">{item.email}</p>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-default-900">
+                {item.name}
+              </p>
+              <p className="truncate text-xs text-default-500">{item.email}</p>
             </div>
           );
 
@@ -130,7 +141,7 @@ export const CustomerTable = React.memo(function CustomerTable({
 
         case "ltv":
           return (
-            <span className="font-medium text-sm">
+            <span className="text-sm font-semibold text-default-900">
               {currencySymbol}
               {formatNumber(item.lifetimeValue)}
             </span>
@@ -139,7 +150,7 @@ export const CustomerTable = React.memo(function CustomerTable({
         case "orders":
           return (
             <div>
-              <p className="font-medium text-sm">{item.orders}</p>
+              <p className="text-sm font-medium text-default-900">{item.orders}</p>
               <p className="text-xs text-default-500">
                 AOV: {currencySymbol}
                 {item.avgOrderValue.toFixed(0)}
@@ -180,17 +191,22 @@ export const CustomerTable = React.memo(function CustomerTable({
             )
           );
 
-          return (
-            <div>
-              <p className="text-sm">{dateFormatter.format(parsedDate)}</p>
-              <p className="text-xs text-default-500">{daysAgo} days ago</p>
-            </div>
-          );
+            return (
+              <div>
+                <p className="text-sm font-medium text-default-900">
+                  {dateFormatter.format(parsedDate)}
+                </p>
+                <p className="mt-0.5 flex items-center gap-1 text-xs text-default-500">
+                  <Icon icon="solar:clock-circle-linear" width={14} />
+                  {daysAgo} days ago
+                </p>
+              </div>
+            );
         }
 
         case "location":
           return (
-            <p className="text-sm">
+            <p className="text-sm text-default-700">
               {item.city ? `${item.city}, ` : ""}
               {item.country || "Unknown"}
             </p>
@@ -261,131 +277,152 @@ export const CustomerTable = React.memo(function CustomerTable({
     [currencySymbol]
   );
 
+  const selectionToolbarContent = isItemsSelected() ? (
+    <>
+      <span className="text-sm">{getSelectedCount()} customers selected</span>
+      <Dropdown>
+        <DropdownTrigger>
+          <Button
+            size="sm"
+            startContent={<Icon icon="solar:bolt-circle-bold-duotone" width={16} />}
+            variant="flat"
+          >
+            Bulk Actions
+          </Button>
+        </DropdownTrigger>
+        <DropdownMenu
+          aria-label="Bulk actions"
+          onAction={(key) => {
+            switch (key) {
+              case "send_email":
+                addToast({
+                  title: "Bulk email",
+                  description: "This feature is coming soon",
+                  color: "primary",
+                  timeout: 3000,
+                });
+                break;
+              case "add_tag":
+                addToast({
+                  title: "Tag customers",
+                  description: "This feature is coming soon",
+                  color: "primary",
+                  timeout: 3000,
+                });
+                break;
+              case "export":
+                addToast({
+                  title: "Export selected",
+                  description: "Exporting selected customers...",
+                  color: "default",
+                  timeout: 3000,
+                });
+                break;
+            }
+          }}
+        >
+          <DropdownItem
+            key="send_email"
+            startContent={<Icon icon="solar:letter-linear" width={16} />}
+          >
+            Send Email Campaign
+          </DropdownItem>
+          <DropdownItem
+            key="add_tag"
+            startContent={<Icon icon="solar:tag-horizontal-linear" width={16} />}
+          >
+            Add Tags
+          </DropdownItem>
+          <DropdownItem
+            key="export"
+            startContent={<Icon icon="solar:export-outline" width={16} />}
+          >
+            Export Selected
+          </DropdownItem>
+        </DropdownMenu>
+      </Dropdown>
+      <Button
+        color="danger"
+        size="sm"
+        variant="flat"
+        onPress={() => setSelectedKeys(new Set<string>())}
+      >
+        Clear Selection
+      </Button>
+    </>
+  ) : null;
+
+  const paginationNode =
+    !loading &&
+    pagination &&
+    filteredCustomers.length > 0 ? (
+      <div className="flex justify-center py-3">
+        <Pagination
+          showControls
+          boundaries={1}
+          page={page}
+          siblings={1}
+          size="sm"
+          total={Math.ceil(pagination.total / 50)}
+          onChange={(newPage) => {
+            setPage(newPage);
+            pagination.setPage(newPage);
+          }}
+        />
+      </div>
+    ) : null;
+
   return (
     <div className="space-y-4">
-      <div className="space-y-4">
-        {isItemsSelected() && (
-          <div className="flex items-center gap-4 p-3 bg-default-100 rounded-lg">
-            <span className="text-sm">
-              {getSelectedCount()} customers selected
-            </span>
-            <Dropdown>
-              <DropdownTrigger>
-                <Button
-                  size="sm"
-                  startContent={
-                    <Icon icon="solar:bolt-circle-bold-duotone" width={16} />
-                  }
-                  variant="flat"
-                >
-                  Bulk Actions
-                </Button>
-              </DropdownTrigger>
-              <DropdownMenu
-                aria-label="Bulk actions"
-                onAction={(key) => {
-                  switch (key) {
-                    case "send_email":
-                      addToast({
-                        title: "Bulk email",
-                        description: "This feature is coming soon",
-                        color: "primary",
-                        timeout: 3000,
-                      });
-                      break;
-                    case "add_tag":
-                      addToast({
-                        title: "Tag customers",
-                        description: "This feature is coming soon",
-                        color: "primary",
-                        timeout: 3000,
-                      });
-                      break;
-                    case "export":
-                      addToast({
-                        title: "Export selected",
-                        description: "Exporting selected customers...",
-                        color: "success",
-                        timeout: 3000,
-                      });
-                      break;
-                  }
-                }}
-              >
-                <DropdownItem
-                  key="send_email"
-                  startContent={<Icon icon="solar:letter-linear" width={16} />}
-                >
-                  Send Email Campaign
-                </DropdownItem>
-                <DropdownItem
-                  key="add_tag"
-                  startContent={
-                    <Icon icon="solar:tag-horizontal-linear" width={16} />
-                  }
-                >
-                  Add Tags
-                </DropdownItem>
-                <DropdownItem
-                  key="export"
-                  startContent={<Icon icon="solar:export-outline" width={16} />}
-                >
-                  Export Selected
-                </DropdownItem>
-              </DropdownMenu>
-            </Dropdown>
-            <Button
-              color="danger"
-              size="sm"
-              variant="flat"
-              onPress={() => setSelectedKeys(new Set<string>())}
-            >
-              Clear Selection
-            </Button>
-          </div>
-        )}
-      </div>
-
-      <div className="relative">
-        {loading ? (
-          <div className="space-y-3">
-            {[...Array(5)].map((_, i) => (
+      {selectionToolbarContent ? (
+        <div
+          className={`${DATA_TABLE_TABLE_CLASS} flex flex-wrap items-center gap-3 p-4`}
+        >
+          {selectionToolbarContent}
+        </div>
+      ) : null}
+      {loading ? (
+        <div className={DATA_TABLE_TABLE_CLASS}>
+          <div className="space-y-2 p-4">
+            {Array.from({ length: 5 }).map((_, index) => (
               <Skeleton
-                key={`customer-skeleton-row-${i + 1}`}
-                className="h-12 w-full rounded-lg"
+                key={`customers-loading-${index}`}
+                className="h-8 w-full rounded-lg"
               />
             ))}
           </div>
-        ) : (
-          <>
-            <Table
-              removeWrapper
-              aria-label="Customers table"
-              className="rounded-xl border border-divider overflow-hidden"
-              classNames={{
-                th: "bg-default-100 text-default-600 font-medium",
-              }}
-              selectedKeys={selectedKeys}
-              selectionMode="multiple"
-              shadow="none"
-              onSelectionChange={(keys) => {
-                if (keys === "all") {
-                  setSelectedKeys("all");
-                } else {
-                  setSelectedKeys(new Set(Array.from(keys).map(String)));
-                }
-              }}
-            >
-              <TableHeader columns={columns}>
-                {(column) => (
-                  <TableColumn key={column.uid}>{column.name}</TableColumn>
-                )}
-              </TableHeader>
-              <TableBody
-                emptyContent={
-                  <div className="text-center py-10">
+        </div>
+      ) : (
+        <Table
+          removeWrapper
+          aria-label="Customers table"
+          className={DATA_TABLE_TABLE_CLASS}
+          classNames={{
+            th: DATA_TABLE_HEADER_CLASS,
+            td: "py-2.5 px-3 text-sm text-default-700",
+            table: "text-xs",
+          }}
+          selectedKeys={selectedKeys}
+          selectionMode="multiple"
+          shadow="none"
+          onSelectionChange={(keys) => {
+            if (keys === "all") {
+              setSelectedKeys("all");
+            } else {
+              setSelectedKeys(new Set(Array.from(keys).map(String)));
+            }
+          }}
+        >
+          <TableHeader columns={columns}>
+            {(column) => <TableColumn key={column.uid}>{column.name}</TableColumn>}
+          </TableHeader>
+          <TableBody>
+            {filteredCustomers.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={columns.length}>
+                  <div className="py-10 text-center">
                     <Icon
-                      className="mx-auto text-default-300 mb-4"
+                      className="mx-auto mb-4 text-default-300"
                       icon="solar:users-group-two-rounded-linear"
                       width={48}
                     />
@@ -395,38 +432,30 @@ export const CustomerTable = React.memo(function CustomerTable({
                         : "No customers found. Try adjusting your filters."}
                     </p>
                   </div>
-                }
-                items={filteredCustomers || []}
-              >
-                {(item: Customer) => (
-                  <TableRow key={item.id}>
-                    {(columnKey) => (
-                      <TableCell>{renderCell(item, columnKey)}</TableCell>
-                    )}
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredCustomers.map((item, index) => {
+                const stripe = index % 2 === 1;
 
-            {pagination && filteredCustomers.length > 0 && (
-              <div className="flex justify-center py-4">
-                <Pagination
-                  showControls
-                  boundaries={1}
-                  page={page}
-                  siblings={1}
-                  size="sm"
-                  total={Math.ceil(pagination.total / 50)}
-                  onChange={(newPage) => {
-                    setPage(newPage);
-                    pagination.setPage(newPage);
-                  }}
-                />
-              </div>
+                return (
+                  <TableRow
+                    key={item.id}
+                    className={`${stripe ? "bg-default-50/60" : ""} border-t border-default-200/50`}
+                  >
+                    {columns.map((column) => (
+                      <TableCell key={column.uid}>
+                        {renderCell(item, column.uid)}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                );
+              })
             )}
-          </>
-        )}
-      </div>
+          </TableBody>
+        </Table>
+      )}
+      {paginationNode}
     </div>
   );
 });

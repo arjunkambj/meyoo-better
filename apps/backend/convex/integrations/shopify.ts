@@ -1910,7 +1910,18 @@ export const storeProductsInternal = internalMutation({
             variantId,
             locationId: invLevel.locationId,
             locationName: invLevel.locationName,
-            available: invLevel.available,
+            available:
+              typeof invLevel.available === "number"
+                ? invLevel.available
+                : 0,
+            incoming:
+              typeof invLevel.incoming === "number"
+                ? invLevel.incoming
+                : 0,
+            committed:
+              typeof invLevel.committed === "number"
+                ? invLevel.committed
+                : 0,
           });
         }
       }

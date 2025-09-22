@@ -1,6 +1,10 @@
 "use client";
 
 import {
+  Calendar,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
   addToast,
   Button,
   Chip,
@@ -18,11 +22,11 @@ import {
   TableColumn,
   TableHeader,
   TableRow,
-  useDisclosure,
   Skeleton,
+  useDisclosure,
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ConfirmationModal } from "@/components/shared/ConfirmationModal";
 import type { GenericId as Id } from "convex/values";
 import {
@@ -35,6 +39,8 @@ import {
 import { createLogger } from "@/libs/logging";
 import { getCurrencySymbol } from "@/libs/utils/format";
 import { TableSkeleton } from "@/components/shared/skeletons";
+import { DATA_TABLE_HEADER_CLASS, DATA_TABLE_TABLE_CLASS } from "@/components/shared/table/DataTableCard";
+import { getLocalTimeZone, parseDate, today, type CalendarDate } from "@internationalized/date";
 
 const logger = createLogger("OtherCostsTable");
 
@@ -112,8 +118,8 @@ interface FormData {
   amount: number;
   value?: number;
   frequency: string;
-  effectiveFrom?: Date | string;
-  effectiveTo?: Date | string;
+  effectiveFrom?: string;
+  effectiveTo?: string;
   paymentStatus?: "paid" | "pending" | "overdue";
   isRecurring?: boolean;
   vendorName?: string;
@@ -136,6 +142,42 @@ const frequencies = [
 
 // Payment status options removed from Other Expenses
 
+const dateFormatter = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+});
+
+const calendarDateToString = (date: CalendarDate): string => {
+  return `${date.year}-${String(date.month).padStart(2, "0")}-${String(date.day).padStart(2, "0")}`;
+};
+
+const getEffectiveFromCalendarValue = (value?: string): CalendarDate => {
+  if (value) {
+    try {
+      return parseDate(value);
+    } catch {
+      // fall through to today
+    }
+  }
+
+  return today(getLocalTimeZone());
+};
+
+const formatEffectiveFromLabel = (value?: string): string => {
+  if (!value) {
+    return "Select date";
+  }
+
+  const jsDate = new Date(value);
+
+  if (Number.isNaN(jsDate.getTime())) {
+    return value;
+  }
+
+  return dateFormatter.format(jsDate);
+};
+
 export default function OtherCostsTable() {
   
   const [formData, setFormData] = useState<FormData>({
@@ -147,6 +189,7 @@ export default function OtherCostsTable() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isEffectiveFromOpen, setIsEffectiveFromOpen] = useState(false);
 
   const user = useCurrentUser();
   const currency = user?.primaryCurrency || "USD";
@@ -168,9 +211,11 @@ export default function OtherCostsTable() {
       value: item.value,
       frequency: (cfg.frequency as string) || item.frequency || "monthly",
       effectiveFrom: item.effectiveFrom
-        ? new Date(item.effectiveFrom)
+        ? new Date(item.effectiveFrom).toISOString().split("T")[0]
         : undefined,
-      effectiveTo: item.effectiveTo ? new Date(item.effectiveTo) : undefined,
+      effectiveTo: item.effectiveTo
+        ? new Date(item.effectiveTo).toISOString().split("T")[0]
+        : undefined,
       isActive: typeof item.isActive === "boolean" ? item.isActive : true,
       isRecurring: cfg.isRecurring ?? true,
     });
@@ -209,7 +254,7 @@ export default function OtherCostsTable() {
         if (result.success) {
           addToast({
             title: "Expense updated",
-            color: "success",
+            color: "default",
             timeout: 3000,
           });
           onOpenChange();
@@ -228,7 +273,9 @@ export default function OtherCostsTable() {
           name: formData.name,
           value: formData.amount,
           calculation: "FIXED",
-          effectiveFrom: formData.effectiveFrom || new Date().toISOString(),
+          effectiveFrom: formData.effectiveFrom
+            ? new Date(formData.effectiveFrom).toISOString()
+            : new Date().toISOString(),
           frequency:
             formData.frequency === "monthly"
               ? "MONTHLY"
@@ -241,7 +288,7 @@ export default function OtherCostsTable() {
         });
         addToast({
           title: "Expense added successfully",
-          color: "success",
+          color: "default",
           timeout: 3000,
         });
         onOpenChange();
@@ -270,7 +317,7 @@ export default function OtherCostsTable() {
       await deleteOtherCost(itemToDelete as Id<"costs">);
       addToast({
         title: "Expense deleted",
-        color: "success",
+        color: "default",
         timeout: 3000,
       });
       setDeleteModalOpen(false);
@@ -285,6 +332,11 @@ export default function OtherCostsTable() {
       setIsDeleting(false);
     }
   };
+
+  const effectiveFromCalendarValue = useMemo(
+    () => getEffectiveFromCalendarValue(formData.effectiveFrom),
+    [formData.effectiveFrom],
+  );
 
   const renderCell = (item: Cost, columnKey: React.Key) => {
     switch (columnKey) {
@@ -329,7 +381,7 @@ export default function OtherCostsTable() {
               variant="light"
               onPress={() => handleEdit(item)}
             >
-              <Icon icon="solar:pen-2-linear" width={16} />
+              <Icon icon="lucide:edit" width={16} />
             </Button>
             <Button
               isIconOnly
@@ -338,7 +390,7 @@ export default function OtherCostsTable() {
               variant="light"
               onPress={() => handleDeleteClick(item._id as string)}
             >
-              <Icon icon="solar:trash-bin-linear" width={16} />
+              <Icon icon="solar:trash-bin-trash-bold" width={16} />
             </Button>
           </div>
         );
@@ -348,57 +400,59 @@ export default function OtherCostsTable() {
     }
   };
 
-  return (
+  const topContent = (
     <div className="space-y-4">
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
-          <h2 className="text-xl font-semibold">Other Expenses</h2>
-          <Button
-            color="primary"
-            startContent={<Icon icon="solar:add-square-bold" width={16} />}
-            isDisabled={isLoading}
-            onPress={handleAdd}
-          >
-            Add Expense
-          </Button>
-        </div>
-
-        {isLoading ? <Skeleton className="h-10 w-64 rounded-lg" /> : null}
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold">Other Expenses</h2>
+        <Button
+          color="primary"
+          startContent={<Icon icon="solar:add-square-bold" width={16} />}
+          isDisabled={isLoading}
+          onPress={handleAdd}
+        >
+          Add Expense
+        </Button>
       </div>
+      {isLoading ? <Skeleton className="h-10 w-64 rounded-lg" /> : null}
+    </div>
+  );
 
-      <div>
+  return (
+    <>
+      <div className="space-y-4">
+        {topContent}
         {isLoading ? (
-          <TableSkeleton
-            rows={6}
-            columns={4}
-            showHeader={false}
-            showPagination={false}
-            className="border border-divider"
-          />
+          <div className={DATA_TABLE_TABLE_CLASS}>
+            <TableSkeleton
+              rows={6}
+              columns={4}
+              showHeader={false}
+              showPagination={false}
+              className="border border-default-200/60"
+            />
+          </div>
         ) : (
           <Table
             removeWrapper
             aria-label="Other costs table"
-            className="rounded-xl border border-divider overflow-hidden"
+            className={DATA_TABLE_TABLE_CLASS}
             classNames={{
-              th: "bg-default-100 text-default-600 font-medium",
+              th: DATA_TABLE_HEADER_CLASS,
+              td: "py-2.5 px-3 text-sm text-default-700 align-middle",
             }}
-            shadow="none"
           >
             <TableHeader columns={columns}>
-              {(column) => (
-                <TableColumn key={column.uid}>{column.name}</TableColumn>
-              )}
+              {(column) => <TableColumn key={column.uid}>{column.name}</TableColumn>}
             </TableHeader>
             <TableBody
               emptyContent={
-                <div className="text-center py-10">
+                <div className="py-10 text-center">
                   <Icon
-                    className="mx-auto text-default-300 mb-4"
+                    className="mx-auto mb-4 text-default-300"
                     icon="solar:wallet-bold-duotone"
                     width={48}
                   />
-                  <p className="text-default-500 mb-2">
+                  <p className="mb-2 text-default-500">
                     No other expenses added yet
                   </p>
                   <p className="text-small text-default-400">
@@ -410,9 +464,7 @@ export default function OtherCostsTable() {
             >
               {(item: Cost) => (
                 <TableRow key={item._id as string} className="odd:bg-default-50/40">
-                  {(columnKey) => (
-                    <TableCell>{renderCell(item, columnKey)}</TableCell>
-                  )}
+                  {(columnKey) => <TableCell>{renderCell(item, columnKey)}</TableCell>}
                 </TableRow>
               )}
             </TableBody>
@@ -500,23 +552,46 @@ export default function OtherCostsTable() {
                 </div>
 
                 <div className="grid sm:grid-cols-2 gap-4">
-                  <Input
-                    label="Effective From"
-                    size="sm"
-                    labelPlacement="outside"
-                    type="date"
-                    value={
-                      (typeof formData.effectiveFrom === "string"
-                        ? formData.effectiveFrom
-                        : formData.effectiveFrom
-                            ?.toISOString()
-                            .split("T")[0]) ||
-                      new Date().toISOString().split("T")[0]
-                    }
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, effectiveFrom: value })
-                    }
-                  />
+                  <div className="flex flex-col gap-2">
+                    <span className="text-sm font-medium text-default-600">
+                      Effective From
+                    </span>
+                    <Popover
+                      isOpen={isEffectiveFromOpen}
+                      placement="bottom-start"
+                      onOpenChange={setIsEffectiveFromOpen}
+                    >
+                      <PopoverTrigger>
+                        <Button
+                          className="w-full justify-between text-left"
+                          size="sm"
+                          variant="bordered"
+                        >
+                          <span className="flex items-center gap-2">
+                            <Icon icon="solar:calendar-linear" width={16} />
+                            {formatEffectiveFromLabel(formData.effectiveFrom)}
+                          </span>
+                          <Icon icon="solar:alt-arrow-down-bold" width={14} />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="p-2">
+                        <Calendar
+                          aria-label="Effective from date"
+                          className="w-full"
+                          value={effectiveFromCalendarValue}
+                          onChange={(date) => {
+                            if (!date) return;
+                            setFormData((prev) => ({
+                              ...prev,
+                              effectiveFrom: calendarDateToString(date),
+                            }));
+                            setIsEffectiveFromOpen(false);
+                          }}
+                          weekdayStyle="short"
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
                   
                 </div>
               </ModalBody>
@@ -554,6 +629,6 @@ export default function OtherCostsTable() {
         }}
         onConfirm={handleDeleteConfirm}
       />
-    </div>
+    </>
   );
 }

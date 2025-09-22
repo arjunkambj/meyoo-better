@@ -2,6 +2,7 @@
 
 export * from "./analytics";
 export * from "./src/onboarding";
+export * from "./src/agentToolsMetadata";
 // API types
 export * from "./api/responses";
 export * from "./core";

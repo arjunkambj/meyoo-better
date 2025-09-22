@@ -26,6 +26,10 @@ export function WidgetsContainer({
   const displayWidgets = Array.isArray(widgets) ? widgets : [];
   const showSkeletons = isLoading && displayWidgets.length > 0;
 
+  if (displayWidgets.length === 0) {
+    return null;
+  }
+
   return (
     <div className="space-y-4">
       <h2 className="text-lg font-semibold">Analytics Widgets</h2>
@@ -46,8 +50,6 @@ export function WidgetsContainer({
                 ))}
             </div>
           </>
-        ) : displayWidgets.length === 0 ? (
-          <EmptyState />
         ) : (
           <>
             {/* Cost Breakdown takes full width */}
@@ -83,17 +85,6 @@ export function WidgetsContainer({
           </>
         )}
       </div>
-    </div>
-  );
-}
-
-function EmptyState() {
-  return (
-    <div className="flex flex-col items-center justify-center rounded-medium border border-dashed border-divider py-16 text-center text-default-400">
-      <p className="text-sm font-medium">No widgets selected</p>
-      <p className="text-xs mt-1 max-w-xs">
-        Use Customize Dashboard to add widgets or reset to the default layout.
-      </p>
     </div>
   );
 }

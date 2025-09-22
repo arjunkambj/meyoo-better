@@ -6,8 +6,13 @@ import { useAtom } from "jotai";
 import { useEffect, useState } from "react";
 import { agentSidebarOpenAtom } from "@/store/atoms";
 import { cn } from "@heroui/theme";
+import { ChatSidebar } from "@/components/agent/ai-elements";
 
-export default function AgentSidebar() {
+export default function AgentSidebar({
+  children,
+}: {
+  children?: React.ReactNode;
+}) {
   const [isOpen, setIsOpen] = useAtom(agentSidebarOpenAtom);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -29,15 +34,13 @@ export default function AgentSidebar() {
   return (
     <aside
       className={cn(
-        "h-full bg-content1 border-l border-default-100",
+        "h-full bg-background border-l border-default-100",
         "flex flex-col transition-all duration-300 ease-in-out",
-        isMobile ? "w-full absolute inset-0 z-50" : "w-[28rem]"
+        isMobile ? "w-full absolute inset-0 z-50" : "w-[32rem]"
       )}
     >
-      <div className="flex items-center justify-between p-4 border-b border-default-100">
-        <span className="font-semibold">What are you working on?</span>
-        {/* Only show close button on mobile */}
-        {isMobile && (
+      {isMobile && (
+        <div className="absolute top-4 right-4 z-10">
           <Button
             isIconOnly
             size="sm"
@@ -46,13 +49,10 @@ export default function AgentSidebar() {
           >
             <Icon icon="solar:close-circle-line-duotone" width={20} />
           </Button>
-        )}
-      </div>
-      <div className="flex-1 p-4 overflow-auto">
-        <div className="flex items-center justify-center h-full text-default-500">
-          <p>AI features coming soon...</p>
         </div>
-      </div>
+      )}
+      <ChatSidebar className="h-full" />
+      {children}
     </aside>
   );
 }

@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internal } from "../_generated/api";
+import { internal, api } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { mutation, query } from "../_generated/server";
@@ -13,6 +13,22 @@ import { ONBOARDING_STEPS } from "@repo/types";
  * Onboarding flow management
  * Handles the 5-step onboarding process and triggers initial 60-day sync
  */
+
+const FIRECRAWL_SEED_URL = process.env.FIRECRAWL_SEED_URL || null;
+const FIRECRAWL_SEED_INCLUDE_PATHS = process.env.FIRECRAWL_SEED_INCLUDE_PATHS
+  ?.split(",")
+  .map((path) => path.trim())
+  .filter((path) => path.length > 0);
+const FIRECRAWL_SEED_EXCLUDE_PATHS = process.env.FIRECRAWL_SEED_EXCLUDE_PATHS
+  ?.split(",")
+  .map((path) => path.trim())
+  .filter((path) => path.length > 0);
+const FIRECRAWL_SEED_MAX_PAGES = (() => {
+  const raw = process.env.FIRECRAWL_SEED_MAX_PAGES;
+  if (!raw) return undefined;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : undefined;
+})();
 
 // ============ QUERIES ============
 
@@ -974,6 +990,29 @@ export const connectShopifyStore = mutation({
     console.log(
       `[ONBOARDING] Successfully connected Shopify store for ${user.email}. Sync will be triggered by callback.`,
     );
+
+    const seedUrl = FIRECRAWL_SEED_URL
+      ? FIRECRAWL_SEED_URL
+      : domain.startsWith("http")
+        ? domain
+        : `https://${domain}`;
+
+    if (seedUrl) {
+      try {
+        await ctx.scheduler.runAfter(0, api.agent.firecrawl.seedDocsFromFirecrawl, {
+          url: seedUrl,
+          includePaths: FIRECRAWL_SEED_INCLUDE_PATHS,
+          excludePaths: FIRECRAWL_SEED_EXCLUDE_PATHS,
+          maxPages: FIRECRAWL_SEED_MAX_PAGES,
+        });
+        await ctx.scheduler.runAfter(0, api.agent.brandSummary.upsertBrandSummary, {});
+      } catch (error) {
+        console.error(
+          "[ONBOARDING] Firecrawl documentation seeding failed",
+          error,
+        );
+      }
+    }
 
     return {
       success: true,

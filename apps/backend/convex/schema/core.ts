@@ -367,6 +367,8 @@ export const onboarding = defineTable({
       referralSource: v.optional(v.string()),
       setupDate: v.optional(v.string()),
       completedSteps: v.optional(v.array(v.string())),
+      firecrawlSeededAt: v.optional(v.string()),
+      firecrawlSeededUrl: v.optional(v.string()),
     }),
   ),
 

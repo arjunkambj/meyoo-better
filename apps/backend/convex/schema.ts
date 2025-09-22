@@ -1,6 +1,5 @@
 import { authTables } from "@convex-dev/auth/server";
 import { defineSchema } from "convex/server";
-import { chatThreads, messages } from "./schema/agent";
 import {
   customerMetrics,
   metricsDaily,
@@ -117,7 +116,4 @@ export default defineSchema({
   // Notifications
   notifications,
 
-  // Agent/AI tables
-  chatThreads,
-  messages,
 });

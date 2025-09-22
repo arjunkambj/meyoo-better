@@ -1,6 +1,33 @@
 import { defineTable } from "convex/server";
 import { v } from "convex/values";
 
+export const apiKeys = defineTable({
+  userId: v.id("users"),
+  organizationId: v.id("organizations"),
+
+  // Key metadata
+  name: v.string(),
+  key: v.string(), // Hashed API key
+  prefix: v.string(), // First characters for identification
+
+  // Usage tracking
+  lastUsed: v.optional(v.number()),
+  usageCount: v.number(),
+
+  // Lifecycle
+  revokedAt: v.optional(v.number()),
+  isActive: v.boolean(),
+
+  // Timestamps
+  createdAt: v.number(),
+})
+  .index("by_user", ["userId"])
+  .index("by_organization", ["organizationId"])
+  .index("by_key", ["key"])
+  .index("by_prefix", ["prefix"])
+  .index("by_active", ["isActive"])
+  .index("by_user_active", ["userId", "isActive"]);
+
 export const auditLogs = defineTable({
   organizationId: v.id("organizations"),
   userId: v.optional(v.id("users")),

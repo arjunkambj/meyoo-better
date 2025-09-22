@@ -8,7 +8,6 @@ import {
   DropdownItem,
   DropdownMenu,
   DropdownTrigger,
-  Input,
   Pagination,
   Skeleton,
   Table,
@@ -22,7 +21,6 @@ import { Icon } from "@iconify/react";
 import React, { useCallback, useState } from "react";
 
 import { CustomerStatusBadge } from "@/components/shared/badges/StatusBadge";
-import { FilterBar } from "@/components/shared/filters/FilterBar";
 import { useUser } from "@/hooks";
 import { getSegmentStyle } from "@/libs/utils/dashboard-formatters";
 import { getCurrencySymbol, formatNumber } from "@/libs/utils/format";
@@ -51,6 +49,7 @@ interface CustomerTableProps {
     total: number;
   };
   loading?: boolean;
+  statusFilter?: string;
 }
 
 const columns = [
@@ -70,9 +69,8 @@ export const CustomerTable = React.memo(function CustomerTable({
   customers,
   pagination,
   loading,
+  statusFilter = "all",
 }: CustomerTableProps) {
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
   const [selectedKeys, setSelectedKeys] = useState<
     "all" | Set<never> | Set<string>
   >(new Set<string>());
@@ -80,43 +78,8 @@ export const CustomerTable = React.memo(function CustomerTable({
   const { primaryCurrency } = useUser();
   const currencySymbol = getCurrencySymbol(primaryCurrency);
 
-  const handleFilterChange = useCallback((key: string, value: unknown) => {
-    if (key === "status") {
-      setStatusFilter((value as string) || "all");
-    }
-  }, []);
-
-  const filters = [
-    {
-      key: "status",
-      label: "Status",
-      type: "select" as const,
-      options: [
-        { value: "all", label: "All Customers" },
-        { value: "converted", label: "Converted" },
-        { value: "abandoned_cart", label: "Abandoned Cart" },
-      ],
-    },
-  ];
-
-  const filterValues = {
-    status: statusFilter,
-  };
-
   // Filter customers based on search and status
   const filteredCustomers = customers.filter((customer) => {
-    // Search filter
-    if (search && search.trim() !== "") {
-      const searchLower = search.toLowerCase();
-      const matchesSearch =
-        customer.name.toLowerCase().includes(searchLower) ||
-        customer.email.toLowerCase().includes(searchLower) ||
-        customer.city?.toLowerCase().includes(searchLower) ||
-        customer.country?.toLowerCase().includes(searchLower);
-
-      if (!matchesSearch) return false;
-    }
-
     // Status filter
     if (statusFilter && statusFilter !== "all") {
       // Map the filter values to actual status values
@@ -300,26 +263,7 @@ export const CustomerTable = React.memo(function CustomerTable({
 
   return (
     <div className="space-y-4">
-      <div className="pt-6 space-y-4">
-        <div className="flex justify-between items-center">
-          <h2 className="text-xl font-semibold">Customers</h2>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Input
-            className="max-w-xs"
-            placeholder="Search customers, email, or location..."
-            startContent={<Icon icon="solar:magnifer-linear" width={18} />}
-            value={search}
-            onValueChange={setSearch}
-          />
-          <FilterBar
-            filters={filters}
-            values={filterValues}
-            onFilterChange={handleFilterChange}
-          />
-        </div>
-
+      <div className="space-y-4">
         {isItemsSelected() && (
           <div className="flex items-center gap-4 p-3 bg-default-100 rounded-lg">
             <span className="text-sm">

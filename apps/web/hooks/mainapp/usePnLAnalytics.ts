@@ -179,7 +179,7 @@ export function usePnLAnalytics(dateRange?: {
   const exportData = async () => {
     if (!kpiMetrics || !tablePeriods) return [];
 
-    const exportRows: unknown[] = [];
+    const exportRows: Record<string, unknown>[] = [];
 
     // Add KPI Metrics
     exportRows.push(

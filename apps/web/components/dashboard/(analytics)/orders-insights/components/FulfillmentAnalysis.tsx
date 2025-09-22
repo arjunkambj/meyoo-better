@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Card, Chip, CircularProgress, Tooltip } from "@heroui/react";
+import { Card } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { useMemo } from "react";
 
@@ -109,15 +109,15 @@ export function FulfillmentAnalysis({ metrics }: FulfillmentAnalysisProps) {
 
   if (!metrics) {
     return (
-      <Card className="p-5 bg-default-50 rounded-2xl border border-divider">
-        <div className="mb-3">
-          <h3 className="text-lg font-semibold">Fulfillment Analysis</h3>
-          <p className="text-sm text-default-500 mt-1">
+      <Card className="p-6 bg-white dark:bg-content1 border-none shadow-sm rounded-2xl">
+        <div className="mb-6">
+          <h3 className="text-lg font-medium text-default-900">Fulfillment Analysis</h3>
+          <p className="text-sm text-default-500 mt-0.5">
             Performance metrics and delivery times
           </p>
         </div>
         <div className="flex flex-col items-center justify-center h-48 text-default-400">
-          <Icon className="mb-4" icon="solar:delivery-linear" width={48} />
+          <Icon className="mb-4 text-default-300" icon="solar:delivery-linear" width={32} />
           <p className="text-sm">No fulfillment data available</p>
           <p className="text-xs text-default-400 mt-1">
             Metrics will appear once you have order fulfillment data
@@ -128,116 +128,57 @@ export function FulfillmentAnalysis({ metrics }: FulfillmentAnalysisProps) {
   }
 
   return (
-    <Card className="p-5 bg-default-50 rounded-2xl border border-divider">
-      <div className="flex items-center justify-between mb-4">
+    <Card className="p-6 bg-white dark:bg-content1 border-none shadow-sm rounded-2xl">
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <h3 className="text-lg font-semibold">Fulfillment Analysis</h3>
-          <p className="text-sm text-default-500 mt-1">
+          <h3 className="text-lg font-medium text-default-900">Fulfillment Analysis</h3>
+          <p className="text-sm text-default-500 mt-0.5">
             Performance metrics and delivery times
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          {metrics?.totalOrders && (
-            <Chip color="primary" size="sm" variant="flat">
-              {formatNumber(metrics.totalOrders)} orders
-            </Chip>
-          )}
-          <Button
-            isIconOnly
-            className="text-default-400"
-            size="sm"
-            variant="light"
-          >
-            <Icon icon="solar:export-bold-duotone" width={18} />
-          </Button>
-        </div>
+        {metrics?.totalOrders && (
+          <div className="text-sm text-default-600">
+            <span className="font-medium">{formatNumber(metrics.totalOrders)}</span>
+            <span className="text-default-400 ml-1">orders</span>
+          </div>
+        )}
       </div>
 
       {/* Performance Metric Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
         {performanceMetrics.map((metric) => (
           <div
             key={metric.label}
-            className="p-4 bg-content2 dark:bg-content1 rounded-lg border border-default-200/50 hover:border-primary/20 transition-colors"
+            className="p-4 bg-white dark:bg-default-50 rounded-xl border border-default-100"
           >
-            <div className="flex items-start justify-between mb-3">
-              <div className="flex items-center gap-2">
-                {(() => {
-                  const bg =
-                    metric.status === "success"
-                      ? "bg-success/10"
-                      : metric.status === "warning"
-                        ? "bg-warning/10"
-                        : "bg-danger/10";
-                  const text =
-                    metric.status === "success"
-                      ? "text-success"
-                      : metric.status === "warning"
-                        ? "text-warning"
-                        : "text-danger";
-                  return (
-                    <div className={`p-2 rounded-lg ${bg}`}>
-                      <Icon className={text} icon={metric.icon} width={20} />
-                    </div>
-                  );
-                })()}
-                <div>
-                  <p className="text-sm font-medium">{metric.label}</p>
-                  <p className="text-xs text-default-400">
-                    {metric.description}
-                  </p>
-                </div>
-              </div>
+            <div className="mb-3">
+              <p className="text-sm font-medium text-default-900">{metric.label}</p>
+              <p className="text-xs text-default-500 mt-0.5">
+                {metric.description}
+              </p>
             </div>
 
-            <div className="flex items-center justify-between">
-              <CircularProgress
-                classNames={{
-                  svg: "w-16 h-16",
-                  indicator:
-                    metric.status === "success"
-                      ? "stroke-success"
-                      : metric.status === "warning"
-                        ? "stroke-warning"
-                        : "stroke-danger",
-                  track: "stroke-default-200",
-                  value: "text-sm font-bold",
-                }}
-                formatOptions={{ style: "decimal", maximumFractionDigits: 1 }}
-                maxValue={100}
-                showValueLabel={true}
-                strokeWidth={3}
-                value={metric.value}
-              />
-
-              <div className="text-right">
-                <Chip
-                  className="mb-2"
-                  color={
-                    metric.status as
-                      | "primary"
-                      | "secondary"
-                      | "success"
-                      | "warning"
-                      | "danger"
-                      | "default"
-                  }
-                  size="sm"
-                  variant="flat"
-                >
+            <div>
+              <p className="text-2xl font-semibold text-default-900">
+                {metric.value.toFixed(1)}%
+              </p>
+              <div className="mt-2 flex items-center justify-between">
+                <span className="text-xs text-default-500">
+                  Target: {metric.inverse ? "<" : ">"}{metric.benchmark}%
+                </span>
+                <span className={`text-xs font-medium ${
+                  metric.status === "success"
+                    ? "text-success-600"
+                    : metric.status === "warning"
+                      ? "text-warning-600"
+                      : "text-danger-600"
+                }`}>
                   {metric.status === "success"
-                    ? "Excellent"
+                    ? "Good"
                     : metric.status === "warning"
                       ? "Fair"
-                      : "Needs Work"}
-                </Chip>
-                <div className="flex items-center gap-1 text-xs text-default-500">
-                  <Icon icon="solar:target-bold" width={12} />
-                  <span>
-                    Target: {metric.inverse ? "<" : ">"}
-                    {metric.benchmark}%
-                  </span>
-                </div>
+                      : "Low"}
+                </span>
               </div>
             </div>
           </div>
@@ -247,98 +188,55 @@ export function FulfillmentAnalysis({ metrics }: FulfillmentAnalysisProps) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Time Metrics with Cost */}
         <div>
-          <h4 className="text-sm font-medium text-default-600 mb-4">
-            Average Times & Costs
+          <h4 className="text-sm font-medium text-default-900 mb-4">
+            Average Times
           </h4>
           <div className="space-y-3">
             {timeMetrics.map((metric) => (
               <div
                 key={metric.label}
-                className="group relative flex items-center justify-between p-3 bg-default-50 hover:bg-default-100 rounded-lg transition-all duration-200 hover:shadow-sm"
+                className="flex items-center justify-between p-3 bg-white dark:bg-default-50 rounded-xl border border-default-100"
               >
-                <div className="flex items-center gap-3">
-                  {(() => {
-                    const bg =
-                      metric.color === "primary"
-                        ? "bg-primary/10"
-                        : metric.color === "secondary"
-                          ? "bg-secondary/10"
-                          : "bg-success/10";
-                    const text =
-                      metric.color === "primary"
-                        ? "text-primary"
-                        : metric.color === "secondary"
-                          ? "text-secondary"
-                          : "text-success";
-                    return (
-                      <div className={`p-2 rounded-lg ${bg}`}>
-                        <Icon className={text} icon={metric.icon} width={20} />
-                      </div>
-                    );
-                  })()}
-                  <div>
-                    <p className="text-sm font-medium">{metric.label}</p>
-                    <p className="text-xs text-default-500">
-                      {metric.description ||
-                        (metric.days < 1
-                          ? "< 1 day"
-                          : metric.days === 1
-                            ? "1 day"
-                            : `${metric.days.toFixed(1)} days`)}
-                    </p>
-                  </div>
+                <div>
+                  <p className="text-sm font-medium text-default-900">{metric.label}</p>
+                  <p className="text-xs text-default-500">
+                    {metric.description}
+                  </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-xl font-bold">{metric.value.toFixed(1)}</p>
-                  <p className="text-xs text-default-400">days avg</p>
+                  <p className="text-lg font-semibold text-default-900">{metric.value.toFixed(1)}</p>
+                  <p className="text-xs text-default-400">days</p>
                 </div>
               </div>
             ))}
 
             {metrics.avgFulfillmentCost && (
-              <div className="p-3 bg-primary/10 rounded-lg border border-primary/20">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Icon
-                      className="text-primary"
-                      icon="solar:wallet-money-bold-duotone"
-                      width={20}
-                    />
-                    <div>
-                      <p className="text-sm font-medium">Avg Cost per Order</p>
-                      <p className="text-xs text-default-500">
-                        Fulfillment expenses
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xl font-bold text-primary">
-                      {currencySymbol}
-                      {metrics.avgFulfillmentCost.toFixed(2)}
-                    </p>
-                    <p className="text-xs text-default-400">per order</p>
-                  </div>
+              <div className="flex items-center justify-between p-3 bg-white dark:bg-default-50 rounded-xl border border-default-100">
+                <div>
+                  <p className="text-sm font-medium text-default-900">Avg Cost</p>
+                  <p className="text-xs text-default-500">
+                    Per order
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-lg font-semibold text-default-900">
+                    {currencySymbol}{metrics.avgFulfillmentCost.toFixed(2)}
+                  </p>
+                  <p className="text-xs text-default-400">per order</p>
                 </div>
               </div>
             )}
           </div>
         </div>
 
-        {/* Enhanced Delivery Timeline Visual */}
+        {/* Delivery Timeline Visual */}
         <div>
-          <h4 className="text-sm font-medium text-default-600 mb-4">
+          <h4 className="text-sm font-medium text-default-900 mb-4">
             Delivery Timeline
           </h4>
-          <div className="p-4 bg-gradient-to-br from-default-50 to-default-100 rounded-lg border border-default-200/50">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm font-medium">Order to Delivery Flow</p>
-              <Tooltip content="Average time from order placement to delivery">
-                <Icon
-                  className="text-default-400 cursor-help"
-                  icon="solar:info-circle-bold"
-                  width={16}
-                />
-              </Tooltip>
+          <div className="p-4 bg-white dark:bg-default-50 rounded-xl border border-default-100">
+            <div className="mb-3">
+              <p className="text-sm font-medium text-default-900">Order to Delivery</p>
             </div>
 
             <div className="flex items-center justify-between text-xs text-default-500 mb-2">
@@ -352,54 +250,51 @@ export function FulfillmentAnalysis({ metrics }: FulfillmentAnalysisProps) {
               </span>
             </div>
 
-            <div className="relative h-3 bg-default-200 rounded-full overflow-hidden shadow-inner">
+            <div className="relative h-2 bg-default-100 rounded-full overflow-hidden">
               <div
-                className="absolute left-0 top-0 h-full bg-gradient-to-r from-primary to-primary/80 rounded-full transition-all duration-500"
+                className="absolute left-0 top-0 h-full bg-primary-400 rounded-full"
                 style={{
                   width: `${Math.min(100, (metrics.avgProcessingTime / metrics.avgDeliveryTime) * 100)}%`,
                 }}
-                title="Processing Time"
               />
               <div
-                className="absolute top-0 h-full bg-gradient-to-r from-secondary to-secondary/80 rounded-full transition-all duration-500"
+                className="absolute top-0 h-full bg-primary-300"
                 style={{
                   left: `${Math.min(100, (metrics.avgProcessingTime / metrics.avgDeliveryTime) * 100)}%`,
                   width: `${Math.min(100 - (metrics.avgProcessingTime / metrics.avgDeliveryTime) * 100, Math.max(0, ((metrics.avgShippingTime - metrics.avgProcessingTime) / metrics.avgDeliveryTime) * 100))}%`,
                 }}
-                title="Shipping Time"
               />
               <div
-                className="absolute top-0 h-full bg-gradient-to-r from-success to-success/80 rounded-full transition-all duration-500"
+                className="absolute top-0 h-full bg-primary-200 rounded-r-full"
                 style={{
                   left: `${Math.min(100, (metrics.avgShippingTime / metrics.avgDeliveryTime) * 100)}%`,
                   width: `${Math.max(0, Math.min(100 - (metrics.avgShippingTime / metrics.avgDeliveryTime) * 100, ((metrics.avgDeliveryTime - metrics.avgShippingTime) / metrics.avgDeliveryTime) * 100))}%`,
                 }}
-                title="Final Delivery"
               />
             </div>
 
             <div className="flex justify-between mt-3">
-              <div className="flex items-center gap-3 text-xs">
+              <div className="flex items-center gap-3 text-xs text-default-500">
                 <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
+                  <div className="w-2 h-2 bg-primary-400 rounded-full" />
                   <span>Processing</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 bg-secondary rounded-full animate-pulse" />
+                  <div className="w-2 h-2 bg-primary-300 rounded-full" />
                   <span>Shipping</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 bg-success rounded-full animate-pulse" />
+                  <div className="w-2 h-2 bg-primary-200 rounded-full" />
                   <span>Delivery</span>
                 </div>
               </div>
             </div>
 
-            <div className="mt-3 pt-3 border-t border-default-200/50">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-default-500">Total Time</span>
-                <span className="font-semibold text-primary">
-                  {metrics.avgDeliveryTime.toFixed(1)} days average
+            <div className="mt-4 pt-3 border-t border-default-100">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-default-500">Total Time</span>
+                <span className="text-sm font-medium text-default-900">
+                  {metrics.avgDeliveryTime.toFixed(1)} days
                 </span>
               </div>
             </div>

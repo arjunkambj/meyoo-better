@@ -88,19 +88,19 @@ export const CohortAnalysis = memo(function CohortAnalysis({
 
   const data = cohorts || defaultCohorts;
 
-  // Softer color function matching Customer Journey style
+  // Minimal color function for heatmap
   const getHeatmapColor = (value: number | undefined, max: number = 100) => {
     if (value === undefined || Number.isNaN(value))
-      return "bg-default-100 text-default-400";
+      return "bg-default-50 text-default-400";
 
     const intensity = value / max;
 
-    if (intensity >= 0.8) return "bg-success/20 text-success-600";
-    if (intensity >= 0.6) return "bg-primary/20 text-primary-600";
-    if (intensity >= 0.4) return "bg-warning/20 text-warning-600";
-    if (intensity >= 0.2) return "bg-default-200 text-default-600";
+    if (intensity >= 0.8) return "bg-primary-50 text-primary-600";
+    if (intensity >= 0.6) return "bg-primary-50/70 text-primary-500";
+    if (intensity >= 0.4) return "bg-default-100 text-default-600";
+    if (intensity >= 0.2) return "bg-default-50 text-default-500";
 
-    return "bg-danger/10 text-danger-500";
+    return "bg-default-50 text-default-400";
   };
 
   const maxRevenue = useMemo(
@@ -150,25 +150,25 @@ export const CohortAnalysis = memo(function CohortAnalysis({
   };
 
   return (
-    <Card className="p-5 border bg-default-50 border-default-200  rounded-2xl">
-      <div className="flex items-center justify-between mb-3">
+    <Card className="p-6 bg-white dark:bg-content1 border-none shadow-sm rounded-2xl">
+      <div className="flex items-center justify-between mb-6">
         <div>
           <Tooltip
             closeDelay={0}
             content="Shows how many customers from each month come back to buy again. Higher percentages mean better customer loyalty."
             placement="top"
           >
-            <h3 className="text-lg font-semibold cursor-help inline-flex items-center gap-1">
+            <h3 className="text-lg font-medium text-default-900 cursor-help inline-flex items-center gap-1">
               Cohort Analysis
               <Icon
                 className="text-default-400"
                 icon="solar:info-circle-linear"
-                width={16}
+                width={14}
               />
             </h3>
           </Tooltip>
-          <p className="text-sm text-default-500 mt-1">
-            Track how customers behave over time
+          <p className="text-sm text-default-500 mt-0.5">
+            Customer retention over time
           </p>
         </div>
         <Tabs
@@ -183,60 +183,43 @@ export const CohortAnalysis = memo(function CohortAnalysis({
 
       {/* Summary Stats */}
       <div className="grid grid-cols-3 gap-3 mb-6">
-        <Tooltip
-          closeDelay={0}
-          content="Average percentage of customers still active after 1 month"
-        >
-          <div className="bg-default-100 rounded-lg p-3 border border-default-200/50 cursor-help">
-            <p className="text-xs text-default-500 mb-1">Avg 1st Month</p>
-            <p className="text-lg font-bold">
-              {avgRetentionByMonth[1]?.toFixed(0) || "0"}%
-            </p>
-          </div>
-        </Tooltip>
-        <Tooltip
-          closeDelay={0}
-          content="Average percentage of customers still active after 3 months"
-        >
-          <div className="bg-default-100 rounded-lg p-3 border border-default-200/50 cursor-help">
-            <p className="text-xs text-default-500 mb-1">Avg 3rd Month</p>
-            <p className="text-lg font-bold">
-              {avgRetentionByMonth[3]?.toFixed(0) || "0"}%
-            </p>
-          </div>
-        </Tooltip>
-        <Tooltip
-          closeDelay={0}
-          content="Total number of customers in all cohorts combined"
-        >
-          <div className="bg-default-100 rounded-lg p-3 border border-default-200/50 cursor-help">
-            <p className="text-xs text-default-500 mb-1">Total Cohort Size</p>
-            <p className="text-lg font-bold">
-              {formatNumber(data.reduce((sum, c) => sum + c.size, 0))}
-            </p>
-          </div>
-        </Tooltip>
+        <div className="bg-white dark:bg-default-50 rounded-xl p-3 border border-default-100">
+          <p className="text-xs text-default-600 mb-1">Month 1 Avg</p>
+          <p className="text-lg font-semibold text-default-900">
+            {avgRetentionByMonth[1]?.toFixed(0) || "0"}%
+          </p>
+        </div>
+        <div className="bg-white dark:bg-default-50 rounded-xl p-3 border border-default-100">
+          <p className="text-xs text-default-600 mb-1">Month 3 Avg</p>
+          <p className="text-lg font-semibold text-default-900">
+            {avgRetentionByMonth[3]?.toFixed(0) || "0"}%
+          </p>
+        </div>
+        <div className="bg-white dark:bg-default-50 rounded-xl p-3 border border-default-100">
+          <p className="text-xs text-default-600 mb-1">Total Size</p>
+          <p className="text-lg font-semibold text-default-900">
+            {formatNumber(data.reduce((sum, c) => sum + c.size, 0))}
+          </p>
+        </div>
       </div>
 
       {/* Cohort Table */}
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto bg-white dark:bg-default-50 rounded-xl border border-default-100">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-default-200/50">
-              <th className="text-left p-2 font-medium text-default-600 sticky left-0 bg-content1">
+            <tr className="border-b border-default-100">
+              <th className="text-left p-3 font-medium text-default-600 sticky left-0 bg-white dark:bg-default-50">
                 Cohort
               </th>
-              <th className="text-center p-2 font-medium text-default-600 min-w-[60px]">
+              <th className="text-center p-3 font-medium text-default-600 min-w-[60px]">
                 Size
               </th>
               {[0, 1, 2, 3, 4, 5].map((month) => (
                 <th
                   key={month}
-                  className="text-center p-2 font-medium text-default-600 min-w-[70px]"
+                  className="text-center p-3 font-medium text-default-600 min-w-[70px]"
                 >
-                  <div className="flex flex-col items-center">
-                    <span className="text-xs">M{month}</span>
-                  </div>
+                  <span className="text-xs">Month {month}</span>
                 </th>
               ))}
             </tr>
@@ -245,13 +228,13 @@ export const CohortAnalysis = memo(function CohortAnalysis({
             {data.map((cohort) => (
               <tr
                 key={cohort.cohort}
-                className="border-b border-default-200/50 hover:bg-default-50/50 transition-colors"
+                className="border-b border-default-50"
               >
-                <td className="p-2 font-medium text-xs sticky left-0 bg-content1">
+                <td className="p-3 font-medium text-xs sticky left-0 bg-white dark:bg-default-50 text-default-700">
                   {cohort.cohort}
                 </td>
-                <td className="text-center p-2">
-                  <span className="text-xs font-medium">{cohort.size}</span>
+                <td className="text-center p-3">
+                  <span className="text-xs font-medium text-default-700">{cohort.size}</span>
                 </td>
                 {[0, 1, 2, 3, 4, 5].map((monthIndex) => {
                   const monthData = cohort.months.find(
@@ -260,7 +243,7 @@ export const CohortAnalysis = memo(function CohortAnalysis({
 
                   if (!monthData) {
                     return (
-                      <td key={monthIndex} className="p-1 text-center">
+                      <td key={monthIndex} className="p-2 text-center">
                         <div className="text-default-300 text-xs">-</div>
                       </td>
                     );
@@ -274,9 +257,9 @@ export const CohortAnalysis = memo(function CohortAnalysis({
                   const displayValue = formatDisplayValue(value, view);
 
                   return (
-                    <td key={monthIndex} className="p-1">
+                    <td key={monthIndex} className="p-2">
                       <div
-                        className={`rounded-md p-2 text-center text-xs font-medium transition-all hover:scale-105 ${getHeatmapColor(
+                        className={`rounded-lg p-1.5 text-center text-xs font-medium ${getHeatmapColor(
                           value,
                           view === "retention" ? 100 : maxRevenue
                         )}`}
@@ -293,46 +276,23 @@ export const CohortAnalysis = memo(function CohortAnalysis({
       </div>
 
       {/* Legend */}
-      <div className="mt-6 pt-4 border-t border-default-200/50">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <p className="text-xs text-default-500">Performance:</p>
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 rounded bg-success/20 border border-success/30" />
-                <span className="text-xs">Excellent</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 rounded bg-warning/20 border border-warning/30" />
-                <span className="text-xs">Average</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 rounded bg-danger/10 border border-danger/20" />
-                <span className="text-xs">Needs Attention</span>
-              </div>
-            </div>
+      <div className="mt-6 flex items-center justify-between text-xs text-default-500">
+        <div className="flex items-center gap-3">
+          <span>Scale:</span>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-3 rounded bg-primary-50 border border-default-100" />
+            <span>High</span>
           </div>
-
-          <Tooltip
-            closeDelay={0}
-            content="This shows the average customer drop-off between month 1 and month 3"
-          >
-            <div className="flex items-center gap-2 cursor-help">
-              <Icon
-                className="text-default-400"
-                icon="solar:chart-square-linear"
-                width={16}
-              />
-              <span className="text-xs text-default-500">
-                Avg drop:{" "}
-                {Math.abs(
-                  (avgRetentionByMonth[1] || 100) -
-                    (avgRetentionByMonth[3] || 0)
-                ).toFixed(0)}
-                % by M3
-              </span>
-            </div>
-          </Tooltip>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-3 rounded bg-default-50 border border-default-100" />
+            <span>Low</span>
+          </div>
+        </div>
+        <div>
+          <span>Avg drop: {Math.abs(
+            (avgRetentionByMonth[1] || 100) -
+              (avgRetentionByMonth[3] || 0)
+          ).toFixed(0)}% by Month 3</span>
         </div>
       </div>
     </Card>

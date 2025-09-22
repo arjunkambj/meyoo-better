@@ -3,9 +3,14 @@
 import { useEffect } from "react";
 
 import { usePathname, useRouter } from "next/navigation";
+import { Button } from "@heroui/button";
+import { Tooltip } from "@heroui/tooltip";
+import { Icon } from "@iconify/react";
+import { useAtom } from "jotai";
 import { PlanUsageAlert } from "../../shared/billing/PlanUsageAlert";
 import UserProfile from "../../shared/UserProfile";
 import { useOnboarding, useCurrentUser } from "@/hooks";
+import { agentSidebarOpenAtom } from "@/store/atoms";
 
 import SidebarToggle from "./SidebarToggle";
 
@@ -14,6 +19,7 @@ export default function DashBoardHeader({ className }: { className?: string }) {
   const router = useRouter();
   const { user } = useCurrentUser();
   const { status: _status } = useOnboarding();
+  const [isAgentOpen, setIsAgentOpen] = useAtom(agentSidebarOpenAtom);
 
   // Fast redirect for non-onboarded users
   const isOnboardingRoute = pathname?.startsWith("/onboarding");
@@ -33,26 +39,27 @@ export default function DashBoardHeader({ className }: { className?: string }) {
 
   // Map pathnames to page titles
   const getPageTitle = () => {
-    switch (pathname) {
-      case "/pnl":
-        return "P&L Insights";
-      case "/customer":
-        return "Customer Insights";
-      case "/inventory":
-        return "Product & Inventory";
-      case "/orders":
-        return "Orders";
-      case "/cost-management":
-        return "Cost & Expenses";
-      case "/integrations":
-        return "Integrations";
-      case "/reports":
-        return "Reports";
-      case "/overview":
-        return "Overview";
-      default:
-        return "Dashboard";
-    }
+    if (!pathname) return "Dashboard";
+
+    const pathnameWithoutQuery = pathname.split("?")[0] ?? "";
+    const [, firstSegment] = pathnameWithoutQuery.split("/");
+    const basePath = firstSegment ? `/${firstSegment}` : "/overview";
+
+    const titles: Record<string, string> = {
+      "/overview": "Overview",
+      "/pnl": "P&L Insights",
+      "/orders": "Orders",
+      "/orders-insights": "Order Insights",
+      "/customer-insights": "Customer Insights",
+      "/customers": "Customers",
+      "/inventory": "Product & Inventory",
+      "/cost-management": "Cost & Expenses",
+      "/integrations": "Integrations",
+      "/settings": "Settings",
+      "/reports": "Reports",
+    };
+
+    return titles[basePath] ?? "Dashboard";
   };
 
   const pageTitle = getPageTitle();
@@ -75,8 +82,21 @@ export default function DashBoardHeader({ className }: { className?: string }) {
           <PlanUsageAlert variant="minimal" />
         </div>
 
+        {/* AI Agent Toggle */}
+        <Tooltip content={isAgentOpen ? "Close AI Assistant" : "Open AI Assistant"} placement="bottom">
+          <Button
+            isIconOnly
+            variant="light"
+            size="sm"
+            onPress={() => setIsAgentOpen(!isAgentOpen)}
+            className="text-default-600 hover:text-primary"
+          >
+            <Icon icon="solar:magic-stick-3-bold" width={20} />
+          </Button>
+        </Tooltip>
+
         {/* Divider */}
-        <div aria-hidden className="h-8 mr-3 w-px bg-divider" />
+        <div aria-hidden className="h-8 mx-3 w-px bg-divider" />
 
         {/* User Profile */}
         <UserProfile />

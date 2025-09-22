@@ -57,7 +57,6 @@ export const tiers: Array<Tier> = [
     features: [
       "Up to 1,200 orders/month",
       "Custom Profit Dashboard",
-      "All Marketing Channels",
       "3 Free Team Members",
       "Email Support",
       "$0.20 Per Extra Order",
@@ -83,9 +82,7 @@ export const tiers: Array<Tier> = [
       [FrequencyEnum.Yearly]: "Per year/store",
     },
     features: [
-      "Up to 3,500 orders/month",
       "Advanced Analytics",
-      "All Marketing Channels",
       "5 Free Team Members",
       "Email Support",
       "$0.10 Per Extra Order",
@@ -113,7 +110,6 @@ export const tiers: Array<Tier> = [
     features: [
       "Up to 7,500 orders/month",
       "AI-powered Insights",
-      "All Marketing Channels",
       "10 Free Team Members",
       "$0.05 Per Extra Order",
       "Max $499 Overage Charge",

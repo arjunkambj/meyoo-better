@@ -3,7 +3,6 @@
 import {
   Avatar,
   Button,
-  Divider,
   Input,
   useDisclosure,
   addToast,
@@ -212,7 +211,7 @@ export default function ProfileSection() {
             type="email"
             value={formData.email}
           />
-          <div>
+          <div className="flex gap-2 flex-wrap">
             <Button
               className="w-full sm:w-auto"
               color="default"
@@ -222,6 +221,16 @@ export default function ProfileSection() {
               onPress={onEmailOpen}
             >
               Change Email
+            </Button>
+            <Button
+              className="w-full sm:w-auto"
+              color="default"
+              size="sm"
+              startContent={<Icon icon="solar:lock-keyhole-bold" width={16} />}
+              variant="flat"
+              onPress={onOpen}
+            >
+              {hasPassword ? "Change Password" : "Set Password"}
             </Button>
           </div>
         </div>
@@ -241,30 +250,8 @@ export default function ProfileSection() {
         </div>
       </div>
 
-      {/* Security Section */}
-      <Divider className="bg-divider mt-6" />
-
-      <div className="space-y-4">
-        <div>
-          <h4 className="text-sm font-medium text-foreground">Security</h4>
-          <p className="text-xs text-default-400 mt-1">
-            Manage your password and authentication settings
-          </p>
-        </div>
-      </div>
-
       {/* Action Buttons */}
-      <div className="flex justify-end flex-wrap gap-3 pt-2">
-        <Button
-          className="w-full sm:w-auto"
-          color="default"
-          isDisabled={isLoading}
-          startContent={<Icon icon="solar:lock-keyhole-bold" width={18} />}
-          variant="flat"
-          onPress={onOpen}
-        >
-          {hasPassword ? "Change Password" : "Set Password"}
-        </Button>
+      <div className="flex justify-end flex-wrap gap-3 pt-4">
         <Button
           color="primary"
           isDisabled={!hasChanges}

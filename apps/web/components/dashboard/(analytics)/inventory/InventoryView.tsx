@@ -17,14 +17,12 @@ export function InventoryView() {
   >();
   const [stockFilter, setStockFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
-  const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
 
   const { overview, products, isLoading, exportData } = useInventoryAnalytics({
     dateRange,
     stockLevel: stockFilter,
     category: categoryFilter,
-    searchTerm: searchTerm ? searchTerm : undefined,
     page: currentPage,
   });
 
@@ -34,12 +32,6 @@ export function InventoryView() {
     } else if (key === "category") {
       setCategoryFilter((value as string) || "all");
     }
-  }, []);
-
-  const handleSearchSubmit = useCallback((term: string) => {
-    const normalized = term.trim();
-    setSearchTerm(normalized);
-    setCurrentPage(1);
   }, []);
 
   const categoryOptions = useMemo(
@@ -80,35 +72,39 @@ export function InventoryView() {
     category: categoryFilter,
   };
 
+  const headerLeft = (
+    <div className="flex flex-col gap-4">
+      <h1 className="text-2xl font-semibold leading-tight">Inventory Products</h1>
+      <div className="flex flex-wrap items-center gap-2">
+        <GlobalDateRangePicker
+          onAnalyticsChange={(range) => {
+            setDateRange({ startDate: range.start, endDate: range.end });
+          }}
+        />
+        <FilterBar
+          filters={filters}
+          values={filterValues}
+          onFilterChange={handleFilterChange}
+        />
+      </div>
+    </div>
+  );
+
+  const headerRight = (
+    <ExportButton
+      color="primary"
+      data={exportData}
+      filename="inventory-report"
+      formats={["csv", "pdf"]}
+    />
+  );
+
   if (isLoading) {
     return (
       <div className="flex flex-col space-y-6 animate-in fade-in duration-500">
         <Spacer y={0.5} />
         {/* Header - Always visible without loading state */}
-        <AnalyticsHeader
-          leftActions={
-            <div className="flex items-center gap-2">
-              <GlobalDateRangePicker
-                onAnalyticsChange={(range) => {
-                  setDateRange({ startDate: range.start, endDate: range.end });
-                }}
-              />
-              <FilterBar
-                filters={filters}
-                values={filterValues}
-                onFilterChange={handleFilterChange}
-              />
-            </div>
-          }
-          rightActions={
-            <ExportButton
-              color="primary"
-              data={exportData}
-              filename="inventory-report"
-              formats={["csv", "excel", "pdf"]}
-            />
-          }
-        />
+        <AnalyticsHeader leftActions={headerLeft} rightActions={headerRight} />
 
         {/* Overview Cards Skeleton */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -118,25 +114,14 @@ export function InventoryView() {
         </div>
 
         {/* Table Skeleton */}
-        <div className="bg-default-50 rounded-2xl border border-divider p-6">
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <Skeleton className="h-8 w-48 rounded-lg" />
-              <div className="flex gap-2">
-                <Skeleton className="h-10 w-28 rounded-lg" />
-                <Skeleton className="h-10 w-32 rounded-lg" />
-              </div>
-            </div>
-            <Skeleton className="h-10 w-80 rounded-lg" />
-            <div className="space-y-3">
-              <Skeleton className="h-12 w-full rounded-lg" />
-              {[...Array(8)].map((_, i) => (
-                <Skeleton
-                  key={`inventory-table-skeleton-${i + 1}`}
-                  className="h-16 w-full rounded-lg"
-                />
-              ))}
-            </div>
+        <div className="rounded-2xl border border-divider bg-content2 p-6">
+          <div className="space-y-3">
+            {[...Array(8)].map((_, i) => (
+              <Skeleton
+                key={`inventory-table-skeleton-${i + 1}`}
+                className="h-16 w-full rounded-lg"
+              />
+            ))}
           </div>
         </div>
 
@@ -155,28 +140,8 @@ export function InventoryView() {
       <Spacer y={0.5} />
 
       <AnalyticsHeader
-        leftActions={
-          <div className="flex items-center gap-2">
-            <GlobalDateRangePicker
-              onAnalyticsChange={(range) => {
-                setDateRange({ startDate: range.start, endDate: range.end });
-              }}
-            />
-            <FilterBar
-              filters={filters}
-              values={filterValues}
-              onFilterChange={handleFilterChange}
-            />
-          </div>
-        }
-        rightActions={
-          <ExportButton
-            color="primary"
-            data={exportData}
-            filename="inventory-report"
-            formats={["csv", "excel", "pdf"]}
-          />
-        }
+        leftActions={headerLeft}
+        rightActions={headerRight}
       />
 
       {/* Overview Cards */}
@@ -195,8 +160,6 @@ export function InventoryView() {
             : undefined
         }
         products={products?.data || []}
-        searchValue={searchTerm}
-        onSearchSubmit={handleSearchSubmit}
       />
     </div>
   );

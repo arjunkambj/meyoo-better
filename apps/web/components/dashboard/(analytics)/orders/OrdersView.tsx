@@ -25,14 +25,12 @@ export const OrdersView = memo(function OrdersView() {
     { startDate: string; endDate: string } | undefined
   >();
   const [selectedStatus, setSelectedStatus] = useState<string | undefined>();
-  const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
 
   const { overview, orders, isInitialLoading, loadingStates, exportData } =
     useOrdersAnalytics({
       dateRange,
       status: selectedStatus,
-      searchTerm: searchTerm ? searchTerm : undefined,
       page: currentPage,
     });
 
@@ -40,12 +38,6 @@ export const OrdersView = memo(function OrdersView() {
     if (key === "status") {
       setSelectedStatus(value === "all" ? undefined : (value as string));
     }
-  }, []);
-
-  const handleSearchSubmit = useCallback((term: string) => {
-    const normalized = term.trim();
-    setSearchTerm(normalized);
-    setCurrentPage(1);
   }, []);
 
   const handleAnalyticsRangeChange = useCallback(
@@ -101,7 +93,7 @@ export const OrdersView = memo(function OrdersView() {
             data={exportData}
             disabled={isInitialLoading}
             filename="orders-report"
-            formats={["csv", "excel", "pdf"]}
+            formats={["csv", "pdf"]}
           />
         }
       />
@@ -130,8 +122,6 @@ export const OrdersView = memo(function OrdersView() {
               }
             : undefined
         }
-        onSearchSubmit={handleSearchSubmit}
-        searchValue={searchTerm}
       />
     </div>
   );

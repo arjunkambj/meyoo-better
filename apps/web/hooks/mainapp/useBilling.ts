@@ -48,7 +48,6 @@ export const AVAILABLE_PLANS: PlanSelection[] = [
     description: "Perfect for growing stores",
     features: [
       "Up to 1,200 orders/month",
-      "All marketing channels",
       "Advanced cost tracking",
       "3 free team members",
       "$0.20 per extra order",
@@ -62,7 +61,6 @@ export const AVAILABLE_PLANS: PlanSelection[] = [
     currency: "USD",
     description: "Most popular - ideal for scaling businesses",
     features: [
-      "Up to 3,500 orders/month",
       "Advanced analytics",
       "Custom reports",
       "5 free team members",

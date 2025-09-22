@@ -1,5 +1,6 @@
 import { authTables } from "@convex-dev/auth/server";
 import { defineSchema } from "convex/server";
+import { chatThreads, messages } from "./schema/agent";
 import {
   customerMetrics,
   metricsDaily,
@@ -25,7 +26,7 @@ import {
 } from "./schema/core";
 import { costCategories, costs, productCostComponents } from "./schema/costs";
 import { metaAdAccounts, metaInsights } from "./schema/meta";
-import { gdprRequests, auditLogs, webhookReceipts } from "./schema/security";
+import { gdprRequests, auditLogs, webhookReceipts, apiKeys } from "./schema/security";
 import { tickets, ticketResponses } from "./schema/tickets";
 import {
   shopifyCustomers,
@@ -102,6 +103,9 @@ export default defineSchema({
   tickets,
   ticketResponses,
 
+  // Security tables
+  apiKeys,
+
   // Cost management tables (simplified)
   costs,
   costCategories,
@@ -112,4 +116,8 @@ export default defineSchema({
 
   // Notifications
   notifications,
+
+  // Agent/AI tables
+  chatThreads,
+  messages,
 });

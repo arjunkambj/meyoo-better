@@ -1,6 +1,7 @@
 "use client";
-import { Button, Chip, Divider, Tab, Tabs } from "@heroui/react";
+import { Button, Chip, Tab, Tabs, Divider } from "@heroui/react";
 import { Icon } from "@iconify/react";
+import { BadgeCheck } from "lucide-react";
 import { useQuery } from "convex-helpers/react/cache/hooks";
 import { useState } from "react";
 import { useSetAtom } from "jotai";
@@ -71,37 +72,51 @@ export default function AvailablePlans() {
   const availablePlans = tiers;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-semibold text-foreground">
-          Available Plans
+    <div className="space-y-4 bg-background">
+      <div className="flex items-center justify-between">
+        <h3 className="text-base font-semibold text-foreground">
+          Upgrade Plan
         </h3>
-        <p className="text-sm text-default-500 mt-1">
-          Upgrade or downgrade your subscription anytime
-        </p>
+        {/* Frequency Toggle - Inline */}
+        <Tabs
+          radius="full"
+          size="sm"
+          onSelectionChange={onFrequencyChange}
+        >
+          <Tab key={FrequencyEnum.Monthly} title="Monthly" />
+          <Tab
+            key={FrequencyEnum.Yearly}
+            title={
+              <div className="flex items-center gap-1.5">
+                <span>Yearly</span>
+                <Chip color="success" size="sm" variant="flat">
+                  -25%
+                </Chip>
+              </div>
+            }
+          />
+        </Tabs>
       </div>
-
-      <Divider className="bg-divider" />
 
       {/* Error Display */}
       {error && (
-        <div className="bg-danger/10 border border-danger/20 rounded-lg p-4">
-          <div className="flex gap-3">
+        <div className="bg-danger/10 border border-danger/20 rounded-lg p-3">
+          <div className="flex gap-2.5">
             <Icon
-              className="text-danger shrink-0"
+              className="text-danger shrink-0 mt-0.5"
               icon="solar:danger-bold"
-              width={20}
+              width={16}
             />
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-foreground">
-                Billing Error
+            <div className="flex-1 space-y-1">
+              <p className="text-xs font-medium text-foreground">
+                Billing Error: {error}
               </p>
-              <p className="text-xs text-default-500">{error}</p>
               <Button
                 color="danger"
                 size="sm"
-                startContent={<Icon icon="solar:refresh-linear" width={16} />}
+                startContent={<Icon icon="solar:refresh-linear" width={14} />}
                 variant="flat"
+                className="h-6 text-xs px-2"
                 onPress={clearError}
               >
                 Try Again
@@ -111,225 +126,183 @@ export default function AvailablePlans() {
         </div>
       )}
 
-      {/* Frequency Toggle */}
-      <div className="flex justify-center">
-        <Tabs
-          classNames={{
-            base: "border border-default-300 rounded-full",
-            tab: "data-[hover-unselected=true]:opacity-90 font-medium ",
-            tabList: "bg-default-100",
-          }}
-          radius="full"
-          size="md"
-          onSelectionChange={onFrequencyChange}
-        >
-          <Tab key={FrequencyEnum.Monthly} title="Monthly" />
-          <Tab
-            key={FrequencyEnum.Yearly}
-            title={
-              <div className="flex items-center gap-2">
-                <span>Yearly</span>
-                <Chip className="bg-success/10 text-success" size="sm">
-                  Save 25%
-                </Chip>
-              </div>
-            }
-          />
-        </Tabs>
-      </div>
-
-      {/* Plans Grid - Updated to handle 4 plans */}
+      {/* Plans Grid with Full Features - Matching Home Pricing Style */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {availablePlans.map((tier) => (
-          <div
-            key={tier.key}
-            className="relative flex flex-col bg-content1 dark:bg-content2 rounded-2xl p-6 border border-default-200/50 hover:border-default-200 hover:shadow-none transition-all duration-300"
-          >
-            {tier.mostPopular && (
-              <Chip
-                className="absolute -top-3 left-1/2 -translate-x-1/2"
-                color="primary"
-                size="sm"
-                variant="flat"
-              >
-                Most Popular
-              </Chip>
-            )}
+        {availablePlans.map((tier) => {
+          const isCurrentPlan = tier.title.toLowerCase() === currentPlan.toLowerCase();
 
-            <div className="mb-4">
-              <h4 className="text-lg font-semibold text-foreground">
-                {tier.title}
-              </h4>
-              <p className="text-sm text-default-500 mt-1">
-                {tier.description}
-              </p>
-            </div>
-
-            <div className="mb-6">
-              <p className="flex items-baseline gap-1">
-                <span className="text-3xl font-bold text-foreground">
-                  {typeof tier.price === "string"
-                    ? tier.price
-                    : tier.price[selectedFrequency.key]}
-                </span>
-                {typeof tier.price !== "string" && (
-                  <span className="text-sm text-default-500">
-                    /{selectedFrequency.priceSuffix}
-                  </span>
-                )}
-              </p>
-            </div>
-
-            <ul className="space-y-2 mb-6 flex-grow">
-              {tier.features?.map((feature) => (
-                <li key={feature} className="flex items-start gap-2">
-                  <Icon
-                    className="text-success shrink-0 mt-0.5"
-                    icon="solar:check-circle-bold"
-                    width={16}
-                  />
-                  <span className="text-xs text-default-600">{feature}</span>
-                </li>
-              ))}
-            </ul>
-
-            <Button
-              fullWidth
-              color={
-                tier.title.toLowerCase() === currentPlan.toLowerCase()
-                  ? "success"
-                  : tier.mostPopular
-                    ? "primary"
-                    : "default"
-              }
-              disabled={(() => {
-                const isCurrentPlan =
-                  tier.title.toLowerCase() === currentPlan.toLowerCase();
-                if (isCurrentPlan || isLoading) return true;
-
-                // Check if downgrade is blocked due to usage
-                const tierLimits: Record<string, number> = {
-                  free: 300,
-                  starter: 1200,
-                  growth: 3500,
-                  business: 7500,
-                };
-
-                const tierLimit = tierLimits[tier.title.toLowerCase()] || 0;
-                const currentOrderUsage = currentUsage?.currentUsage || 0;
-
-                const planOrder = ["free", "starter", "growth", "business"];
-                const currentPlanIndex = planOrder.indexOf(
-                  currentPlan.toLowerCase()
-                );
-                const tierIndex = planOrder.indexOf(tier.title.toLowerCase());
-                const isDowngrade = tierIndex < currentPlanIndex;
-
-                // Disable if downgrading and usage exceeds lower plan limit
-                return isDowngrade && currentOrderUsage > tierLimit;
-              })()}
-              isLoading={loadingTier === (tier.title + " Plan")}
-              endContent={
-                tier.title.toLowerCase() !== currentPlan.toLowerCase() && (
-                  <Icon icon="solar:arrow-right-linear" width={16} />
-                )
-              }
-              size="sm"
-              variant={
-                tier.title.toLowerCase() === currentPlan.toLowerCase()
-                  ? "solid"
-                  : tier.mostPopular
-                    ? "solid"
-                    : "flat"
-              }
-              onPress={() => {
-                if (tier.title.toLowerCase() !== currentPlan.toLowerCase()) {
-                  // Map tier to Shopify plan name using stable identifiers
-                  // Use key mapping aligned with TiersEnum
-                  const planMappingByKey: Record<string, string> = {
-                    free: "Free Plan",
-                    pro: "Starter Plan",
-                    team: "Growth Plan",
-                    custom: "Business Plan",
-                    enterprise: "Enterprise Plan",
-                  };
-
-                  // Fallback: map by title in case keys change
-                  const planMappingByTitle: Record<string, string> = {
-                    free: "Free Plan",
-                    starter: "Starter Plan",
-                    growth: "Growth Plan",
-                    business: "Business Plan",
-                    enterprise: "Enterprise Plan",
-                  };
-
-                  const key = String(tier.key).toLowerCase();
-                  const title = tier.title.toLowerCase();
-                  const shopifyPlanName =
-                    planMappingByKey[key] || planMappingByTitle[title];
-
-                  if (shopifyPlanName) {
-                    handlePlanUpgrade(shopifyPlanName);
-                  }
-                }
-              }}
+          return (
+            <div
+              key={tier.key}
+              className={`relative flex flex-col rounded-3xl pb-2 border bg-background ${
+                tier.mostPopular ? "border-2 border-primary" : isCurrentPlan ? "border-2 border-success" : "border border-default-200/50"
+              }`}
             >
-              {(() => {
-                const isCurrentPlan =
-                  tier.title.toLowerCase() === currentPlan.toLowerCase();
-                if (isCurrentPlan) return "Current Plan";
 
-                // Get tier's order limit
-                const tierLimits: Record<string, number> = {
-                  free: 300,
-                  starter: 1200,
-                  growth: 3500,
-                  business: 7500,
-                };
+              <div className="flex flex-col px-6 py-4">
+                <h3 className="text-lg font-medium text-foreground">
+                  {tier.title}
+                </h3>
+                <div className="mt-4 gap-2 flex flex-col">
+                  <div className="text-4xl font-semibold tracking-tight text-foreground/90">
+                    {typeof tier.price === "string"
+                      ? tier.price
+                      : tier.price[selectedFrequency.key]}
+                  </div>
+                  <div className="text-xs text-default-500">
+                    per {selectedFrequency.priceSuffix}
+                  </div>
+                </div>
 
-                const tierLimit = tierLimits[tier.title.toLowerCase()] || 0;
-                const currentOrderUsage = currentUsage?.currentUsage || 0;
+                <p className="text-sm mt-4 text-muted-foreground">
+                  {tier.description}
+                </p>
 
-                // Check if this is a downgrade
-                const planOrder = ["free", "starter", "growth", "business"];
-                const currentPlanIndex = planOrder.indexOf(
-                  currentPlan.toLowerCase()
-                );
-                const tierIndex = planOrder.indexOf(tier.title.toLowerCase());
-                const isDowngrade = tierIndex < currentPlanIndex;
+                <Button
+                  fullWidth
+                  color={
+                    isCurrentPlan
+                      ? "success"
+                      : tier.mostPopular
+                        ? "primary"
+                        : "default"
+                  }
+                  disabled={(() => {
+                    if (isCurrentPlan || isLoading) return true;
 
-                // Prevent downgrade if current usage exceeds the lower plan's limit
-                if (isDowngrade && currentOrderUsage > tierLimit) {
-                  return `Cannot downgrade (${currentOrderUsage} orders > ${tierLimit} limit)`;
-                }
+                    // Check if downgrade is blocked due to usage
+                    const tierLimits: Record<string, number> = {
+                      free: 300,
+                      starter: 1200,
+                      growth: 3500,
+                      business: 7500,
+                    };
 
-                if (isLoading) return "Processing...";
-                return isDowngrade
-                  ? `Downgrade to ${tier.title}`
-                  : `Upgrade to ${tier.title}`;
-              })()}
-            </Button>
-          </div>
-        ))}
+                    const tierLimit = tierLimits[tier.title.toLowerCase()] || 0;
+                    const currentOrderUsage = currentUsage?.currentUsage || 0;
+
+                    const planOrder = ["free", "starter", "growth", "business"];
+                    const currentPlanIndex = planOrder.indexOf(
+                      currentPlan.toLowerCase()
+                    );
+                    const tierIndex = planOrder.indexOf(tier.title.toLowerCase());
+                    const isDowngrade = tierIndex < currentPlanIndex;
+
+                    // Disable if downgrading and usage exceeds lower plan limit
+                    return isDowngrade && currentOrderUsage > tierLimit;
+                  })()}
+                  isLoading={loadingTier === (tier.title + " Plan")}
+                  endContent={
+                    !isCurrentPlan && (
+                      <Icon icon="solar:arrow-right-linear" width={14} />
+                    )
+                  }
+                  size="sm"
+                  variant={
+                    isCurrentPlan
+                      ? "solid"
+                      : tier.mostPopular
+                        ? "solid"
+                        : "flat"
+                  }
+                  className="mt-2 h-9"
+                  onPress={() => {
+                    if (!isCurrentPlan) {
+                      // Map tier to Shopify plan name using stable identifiers
+                      // Use key mapping aligned with TiersEnum
+                      const planMappingByKey: Record<string, string> = {
+                        free: "Free Plan",
+                        pro: "Starter Plan",
+                        team: "Growth Plan",
+                        custom: "Business Plan",
+                        enterprise: "Enterprise Plan",
+                      };
+
+                      // Fallback: map by title in case keys change
+                      const planMappingByTitle: Record<string, string> = {
+                        free: "Free Plan",
+                        starter: "Starter Plan",
+                        growth: "Growth Plan",
+                        business: "Business Plan",
+                        enterprise: "Enterprise Plan",
+                      };
+
+                      const key = String(tier.key).toLowerCase();
+                      const title = tier.title.toLowerCase();
+                      const shopifyPlanName =
+                        planMappingByKey[key] || planMappingByTitle[title];
+
+                      if (shopifyPlanName) {
+                        handlePlanUpgrade(shopifyPlanName);
+                      }
+                    }
+                  }}
+                >
+                  {(() => {
+                    if (isCurrentPlan) return "Current Plan";
+
+                    // Get tier's order limit
+                    const tierLimits: Record<string, number> = {
+                      free: 300,
+                      starter: 1200,
+                      growth: 3500,
+                      business: 7500,
+                    };
+
+                    const tierLimit = tierLimits[tier.title.toLowerCase()] || 0;
+                    const currentOrderUsage = currentUsage?.currentUsage || 0;
+
+                    // Check if this is a downgrade
+                    const planOrder = ["free", "starter", "growth", "business"];
+                    const currentPlanIndex = planOrder.indexOf(
+                      currentPlan.toLowerCase()
+                    );
+                    const tierIndex = planOrder.indexOf(tier.title.toLowerCase());
+                    const isDowngrade = tierIndex < currentPlanIndex;
+
+                    // Prevent downgrade if current usage exceeds the lower plan's limit
+                    if (isDowngrade && currentOrderUsage > tierLimit) {
+                      return `Over limit for downgrade`;
+                    }
+
+                    if (isLoading) return "Processing...";
+                    return isDowngrade ? `Switch to ${tier.title}` : `Upgrade to ${tier.title}`;
+                  })()}
+                </Button>
+              </div>
+
+              <Divider className="my-2" />
+
+              <div className="flex flex-col justify-between px-6 pt-2 pb-4">
+                <ul className="space-y-3">
+                  {tier.features?.map((feature) => (
+                    <li key={feature} className="flex items-center">
+                      <BadgeCheck className="size-5 text-muted-foreground shrink-0" />
+                      <span className="ml-3 text-sm text-muted-foreground">
+                        {feature}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          );
+        })}
+
       </div>
 
-      {/* Free Tier Notice */}
-      <div className="bg-success/10 border border-success/20 rounded-lg p-4">
-        <div className="flex gap-3">
+      {/* Free Tier Notice - Compact */}
+      <div className="bg-success/10 border border-success/20 rounded-lg p-3">
+        <div className="flex gap-2.5 items-start">
           <Icon
-            className="text-success shrink-0"
+            className="text-success shrink-0 mt-0.5"
             icon="solar:gift-bold"
-            width={20}
+            width={16}
           />
-          <div className="space-y-1">
-            <p className="text-sm font-medium text-foreground">
-              Free for small stores
-            </p>
-            <p className="text-xs text-default-500">
-              Meyoo is completely free for stores with less than 300 orders per
-              month. No credit card required.
-            </p>
-          </div>
+          <p className="text-xs text-default-600">
+            <span className="font-medium text-foreground">Free for small stores:</span>{" "}
+            Meyoo is free for stores with less than 300 orders/month. No credit card required.
+          </p>
         </div>
       </div>
     </div>

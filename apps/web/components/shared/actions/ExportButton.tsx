@@ -22,7 +22,7 @@ import { useCallback, useMemo, useState } from "react";
 
 import { FeatureGatedButton } from "../billing/FeatureGate";
 
-export type ExportFormat = "csv" | "excel" | "pdf" | "json";
+export type ExportFormat = "csv" | "pdf";
 
 export interface ExportColumn {
   key: string;
@@ -70,7 +70,7 @@ export function ExportButton({
   data,
   columns,
   filename = "export",
-  formats = ["csv", "excel", "pdf", "json"],
+  formats = ["csv", "pdf"],
   onExport,
   disabled = false,
   loading = false,
@@ -91,17 +91,13 @@ export function ExportButton({
 
   const formatIcons: Record<ExportFormat, string> = {
     csv: "solar:document-text-linear",
-    excel: "solar:file-linear",
     pdf: "solar:document-linear",
-    json: "solar:code-file-linear",
   };
 
   const formatLabels = useMemo<Record<ExportFormat, string>>(
     () => ({
       csv: "CSV",
-      excel: "Excel",
       pdf: "PDF",
-      json: "JSON",
     }),
     [],
   );
@@ -153,15 +149,6 @@ export function ExportButton({
     downloadFile(blob, `${filename}.csv`);
   }, [downloadFile]);
 
-  const exportToExcel = useCallback(async (
-    data: Record<string, unknown>[],
-    filename: string,
-  ) => {
-    // For Excel export, we'll use CSV format with .xls extension
-    // For production, consider using a library like xlsx
-    await exportToCSV(data, filename);
-  }, [exportToCSV]);
-
   const exportToPDF = useCallback(async (
     data: Record<string, unknown>[],
     filename: string,
@@ -210,14 +197,6 @@ export function ExportButton({
     URL.revokeObjectURL(url);
   }, []);
 
-  const exportToJSON = useCallback(async (
-    data: Record<string, unknown>[],
-    filename: string,
-  ) => {
-    const jsonContent = JSON.stringify(data, null, 2);
-    const blob = new Blob([jsonContent], { type: "application/json" });
-    downloadFile(blob, `${filename}.json`);
-  }, [downloadFile]);
 
   const handleExport = useCallback(
     async (format: ExportFormat) => {
@@ -257,14 +236,8 @@ export function ExportButton({
           case "csv":
             await exportToCSV(filteredData, filename);
             break;
-          case "excel":
-            await exportToExcel(filteredData, filename);
-            break;
           case "pdf":
             await exportToPDF(filteredData, filename, columns);
-            break;
-          case "json":
-            await exportToJSON(filteredData, filename);
             break;
         }
 
@@ -291,9 +264,7 @@ export function ExportButton({
       columns,
       formatLabels,
       exportToCSV,
-      exportToExcel,
       exportToPDF,
-      exportToJSON,
     ],
   );
 const handleQuickExport = (format: ExportFormat) => {
@@ -317,7 +288,7 @@ const handleQuickExport = (format: ExportFormat) => {
           size={size}
           startContent={
             !isExporting && (
-              <Icon className="w-4 h-4" icon="solar:download-linear" />
+              <Icon className="w-4 h-4" icon="solar:export-bold-duotone" />
             )
           }
           onPress={() => handleQuickExport(formats[0] ?? "csv")}
@@ -406,7 +377,7 @@ const handleQuickExport = (format: ExportFormat) => {
             size={size}
             startContent={
               !isExporting && (
-                <Icon className="w-4 h-4" icon="solar:download-linear" />
+                <Icon className="w-4 h-4" icon="solar:export-bold-duotone" />
               )
             }
           >

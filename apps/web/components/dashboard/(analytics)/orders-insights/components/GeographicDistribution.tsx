@@ -1,6 +1,6 @@
 "use client";
 
-import { Card, Chip, Progress, Tooltip } from "@heroui/react";
+import { Card, Tooltip } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { memo, useMemo } from "react";
 
@@ -151,23 +151,24 @@ export const GeographicDistribution = memo(function GeographicDistribution({
   };
 
   return (
-    <Card className="p-5 border bg-default-50 border-default-200  rounded-2xl">
-      <div className="flex items-center justify-between mb-3">
+    <Card className="p-6 bg-white dark:bg-content1 border-none shadow-sm rounded-2xl">
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <h3 className="text-lg font-semibold">Geographic Distribution</h3>
-          <p className="text-sm text-default-500 mt-1">
-            Top performing regions by postal code
+          <h3 className="text-lg font-medium text-default-900">Geographic Distribution</h3>
+          <p className="text-sm text-default-500 mt-0.5">
+            Customer locations by postal code
           </p>
         </div>
-        <Chip color="primary" size="sm" variant="flat">
-          {formatNumber(totals.customers)} customers
-        </Chip>
+        <div className="text-sm text-default-600">
+          <span className="font-medium">{formatNumber(totals.customers)}</span>
+          <span className="text-default-400 ml-1">customers</span>
+        </div>
       </div>
 
       {/* Top 5 Zip Codes */}
       <div className="space-y-3 mb-6">
-        <p className="text-sm font-medium text-default-700">
-          Top 5 Postal Codes
+        <p className="text-sm font-medium text-default-900">
+          Top Postal Codes
         </p>
         {topZipCodes.length > 0 ? (
           topZipCodes.map((zip, index) => {
@@ -177,11 +178,11 @@ export const GeographicDistribution = memo(function GeographicDistribution({
             return (
               <div
                 key={`${zip.zipCode}-${zip.country}`}
-                className="group hover:bg-default-50 p-3 rounded-lg transition-colors"
+                className="p-3 rounded-xl bg-white dark:bg-default-50 border border-default-100"
               >
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-3">
-                    <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-primary/10 text-primary font-semibold text-xs">
+                    <div className="flex items-center justify-center w-6 h-6 rounded-md bg-default-100 text-default-600 font-medium text-xs">
                       {index + 1}
                     </div>
                     <div>
@@ -209,21 +210,21 @@ export const GeographicDistribution = memo(function GeographicDistribution({
                     </p>
                   </div>
                 </div>
-                <Progress
-                  className="h-1"
-                  color={index === 0 ? "primary" : "default"}
-                  maxValue={100}
-                  value={percentage}
-                />
+                <div className="h-1 bg-default-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-primary-400"
+                    style={{ width: `${percentage}%` }}
+                  />
+                </div>
               </div>
             );
           })
         ) : (
           <div className="text-center py-8 text-default-400">
             <Icon
-              className="mx-auto mb-2"
+              className="mx-auto mb-2 text-default-300"
               icon="solar:map-point-wave-linear"
-              width={48}
+              width={32}
             />
             <p className="text-sm">No postal code data available</p>
           </div>
@@ -231,16 +232,16 @@ export const GeographicDistribution = memo(function GeographicDistribution({
       </div>
 
       {/* Country Summary - Compact View */}
-      <div className="space-y-2">
-        <p className="text-sm font-medium text-default-700 mb-2">Countries</p>
+      <div className="space-y-3">
+        <p className="text-sm font-medium text-default-900">Countries</p>
         <div className="grid grid-cols-2 gap-2">
           {geoData.slice(0, 4).map((country) => (
             <div
               key={country.country}
-              className="flex items-center justify-between p-2 rounded-lg bg-default-100 text-xs"
+              className="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-default-50 border border-default-100 text-xs"
             >
               <span className="text-default-600">{country.country}</span>
-              <span className="font-medium">
+              <span className="font-medium text-default-900">
                 {formatRevenue(country.revenue)}
               </span>
             </div>
@@ -249,41 +250,21 @@ export const GeographicDistribution = memo(function GeographicDistribution({
       </div>
 
       {/* Summary Footer */}
-      <div className="mt-6 pt-4 border-t border-divider">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-default-50">
-                <Icon
-                  className="text-default-600"
-                  icon="solar:map-point-bold-duotone"
-                  width={16}
-                />
-              </div>
-              <div>
-                <p className="text-xs text-default-500">Zip Codes Covered</p>
-                <p className="font-semibold text-sm">{totals.zipCodes}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-default-50">
-                <Icon
-                  className="text-default-600"
-                  icon="solar:wallet-money-bold-duotone"
-                  width={16}
-                />
-              </div>
-              <div>
-                <p className="text-xs text-default-500">Total Revenue</p>
-                <p className="font-semibold text-sm">
-                  {formatRevenue(totals.revenue)}
-                </p>
-              </div>
-            </div>
+      <div className="mt-6 pt-4 border-t border-default-100">
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <p className="text-xs text-default-500">Postal Codes</p>
+            <p className="font-medium text-sm text-default-900">{totals.zipCodes}</p>
           </div>
-          <div className="text-right">
-            <p className="text-xs text-default-500">Top Postal Code</p>
-            <p className="font-semibold text-sm">
+          <div>
+            <p className="text-xs text-default-500">Total Revenue</p>
+            <p className="font-medium text-sm text-default-900">
+              {formatRevenue(totals.revenue)}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-default-500">Top Code</p>
+            <p className="font-medium text-sm text-default-900">
               {topZipCodes[0]?.zipCode || "N/A"}
             </p>
           </div>

@@ -10,15 +10,6 @@ export default function InvoicesList() {
   const limit = 5;
   const { invoices, totalCount, loading, hasMore } = useInvoices(limit, offset);
 
-  // Format date for display
-  const formatDate = (timestamp: number) => {
-    return new Date(timestamp).toLocaleDateString("en-US", {
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-    });
-  };
-
   // Format amount for display
   const formatAmount = (amount: number, currency: string = "USD") => {
     return new Intl.NumberFormat("en-US", {
@@ -42,44 +33,46 @@ export default function InvoicesList() {
 
   return (
     <div>
-      {/* Header */}
-      <div className="px-6 py-4 border-b border-divider">
+      {/* Compact Header */}
+      <div className="px-4 py-3 border-b border-divider">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-foreground">
+          <h3 className="text-base font-semibold text-foreground">
             Billing History
           </h3>
+          <span className="text-xs text-default-500">
+            {totalCount > 0 && `${totalCount} transaction${totalCount !== 1 ? "s" : ""}`}
+          </span>
         </div>
       </div>
 
-      {/* Table Header */}
-      <div className="px-6 py-3 border-b border-divider">
-        <div className="grid grid-cols-12 gap-4 text-xs font-medium text-default-500 uppercase">
-          <div className="col-span-3">Transaction ID</div>
+      {/* Compact Table Header */}
+      <div className="px-4 py-2 border-b border-divider bg-content1">
+        <div className="grid grid-cols-12 gap-3 text-xs font-medium text-default-500">
+          <div className="col-span-4">Invoice</div>
           <div className="col-span-3">Date</div>
           <div className="col-span-2">Amount</div>
-          <div className="col-span-2">Status</div>
-          <div className="col-span-2 text-right"></div>
+          <div className="col-span-3">Status</div>
         </div>
       </div>
 
       {/* Table Body */}
       <div className="divide-y divide-divider">
         {loading ? (
-          <div className="px-6 py-12 text-center">
-            <p className="text-sm text-default-500">
+          <div className="px-4 py-8 text-center">
+            <p className="text-xs text-default-500">
               Loading billing history...
             </p>
           </div>
         ) : invoices.length === 0 ? (
-          <div className="px-6 py-12 text-center">
+          <div className="px-4 py-8 text-center">
             <Icon
-              className="mx-auto mb-3 text-default-300"
+              className="mx-auto mb-2 text-default-300"
               icon="solar:document-text-linear"
-              width={48}
+              width={32}
             />
-            <p className="text-sm text-default-500">No billing history yet</p>
-            <p className="text-xs text-default-400 mt-1">
-              Your billing transactions will appear here once generated
+            <p className="text-xs text-default-500">No billing history yet</p>
+            <p className="text-xs text-default-400 mt-0.5">
+              Transactions will appear here
             </p>
           </div>
         ) : (
@@ -95,52 +88,57 @@ export default function InvoicesList() {
             }) => (
               <div
                 key={invoice.id}
-                className="px-6 py-4 hover:bg-content2 transition-colors"
+                className="px-4 py-2.5 hover:bg-content1 transition-colors"
               >
-                <div className="grid grid-cols-12 gap-4 items-center">
+                <div className="grid grid-cols-12 gap-3 items-center">
                   {/* Invoice ID */}
-                  <div className="col-span-3">
-                    <p className="text-sm font-medium text-foreground">
+                  <div className="col-span-4">
+                    <p className="text-xs font-medium text-foreground truncate">
                       {invoice.invoiceNumber}
                     </p>
-                    <p className="text-xs text-default-500 mt-0.5">
+                    <p className="text-xs text-default-400 truncate">
                       {invoice.description}
                     </p>
                   </div>
 
                   {/* Date */}
                   <div className="col-span-3">
-                    <p className="text-sm text-default-600">
-                      {formatDate(invoice.issuedAt)}
+                    <p className="text-xs text-default-600">
+                      {new Date(invoice.issuedAt).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
                     </p>
                   </div>
 
                   {/* Amount */}
                   <div className="col-span-2">
-                    <p className="text-sm font-medium text-foreground">
+                    <p className="text-xs font-medium text-foreground">
                       {formatAmount(invoice.amount, invoice.currency)}
                     </p>
                   </div>
 
                   {/* Status */}
-                  <div className="col-span-2">
+                  <div className="col-span-3">
                     <Chip
                       color={getStatusColor(invoice.status)}
                       size="sm"
                       startContent={
                         invoice.status === "paid" && (
-                          <Icon icon="solar:check-circle-bold" width={14} />
+                          <Icon icon="solar:check-circle-bold" width={12} />
                         )
                       }
                       variant="flat"
+                      classNames={{
+                        base: "h-5 px-1.5",
+                        content: "text-xs px-0.5"
+                      }}
                     >
                       {invoice.status.charAt(0).toUpperCase() +
                         invoice.status.slice(1)}
                     </Chip>
                   </div>
-
-                  {/* Empty Actions column */}
-                  <div className="col-span-2"></div>
                 </div>
               </div>
             ),
@@ -148,27 +146,21 @@ export default function InvoicesList() {
         )}
       </div>
 
-      {/* Footer */}
-      <div className="px-6 py-4 border-t border-divider">
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-default-500">
-            {invoices.length > 0
-              ? `Showing ${Math.min(invoices.length, limit)} of ${totalCount} transaction${totalCount !== 1 ? "s" : ""}`
-              : "No transactions to display"}
-          </p>
-          {hasMore && (
-            <Button
-              color="primary"
-              endContent={<Icon icon="solar:arrow-right-linear" width={16} />}
-              size="sm"
-              variant="flat"
-              onPress={() => setOffset(offset + limit)}
-            >
-              Load More
-            </Button>
-          )}
+      {/* Compact Footer */}
+      {hasMore && (
+        <div className="px-4 py-2 border-t border-divider">
+          <Button
+            color="primary"
+            endContent={<Icon icon="solar:arrow-down-linear" width={14} />}
+            size="sm"
+            variant="flat"
+            className="w-full h-7 text-xs"
+            onPress={() => setOffset(offset + limit)}
+          >
+            Load More ({totalCount - invoices.length} remaining)
+          </Button>
         </div>
-      </div>
+      )}
     </div>
   );
 }

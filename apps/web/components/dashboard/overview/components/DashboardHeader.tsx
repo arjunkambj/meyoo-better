@@ -3,22 +3,33 @@
 import { Button } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { AnalyticsHeader } from "@/components/shared/AnalyticsHeader";
+import { ExportButton } from "@/components/shared/actions/ExportButton";
 import GlobalDateRangePicker from "@/components/shared/GlobalDateRangePicker";
 import React from "react";
 
 interface DashboardHeaderProps {
   onCustomize: () => void;
+  exportData?: Record<string, unknown>[] | (() => Promise<Record<string, unknown>[]>);
 }
 
-export function DashboardHeader({ onCustomize }: DashboardHeaderProps) {
+export function DashboardHeader({ onCustomize, exportData }: DashboardHeaderProps) {
   return (
     <AnalyticsHeader
       leftActions={<GlobalDateRangePicker />}
       rightActions={
         <div className="flex items-center gap-2">
+          {exportData && (
+            <ExportButton
+              data={exportData}
+              filename="dashboard-overview"
+              formats={["csv", "pdf"]}
+              color="primary"
+              variant="flat"
+            />
+          )}
           <Button
             color="primary"
-            startContent={<Icon icon="solar:settings-linear" width={20} />}
+            startContent={<Icon icon="solar:widget-bold-duotone" width={18} />}
             variant="solid"
             onPress={onCustomize}
           >

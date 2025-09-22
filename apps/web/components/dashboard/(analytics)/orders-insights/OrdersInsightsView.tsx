@@ -62,7 +62,7 @@ export const OrdersInsightsView = memo(function OrdersInsightsView() {
             data={exportData}
             disabled={isExportDisabled}
             filename="orders-insights"
-            formats={["csv", "excel", "pdf"]}
+            formats={["csv", "pdf"]}
           />
         }
       />

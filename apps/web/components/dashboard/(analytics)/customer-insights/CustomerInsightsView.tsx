@@ -55,7 +55,7 @@ export const CustomerInsightsView = memo(function CustomerInsightsView() {
             data={exportData}
             disabled={isInitialLoading}
             filename="customers"
-            formats={["csv", "excel", "pdf"]}
+            formats={["csv", "pdf"]}
           />
         }
       />

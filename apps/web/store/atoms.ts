@@ -28,6 +28,8 @@ export const analyticsDateRangeAtom = atom<AnalyticsDateRange>(
 
 // UI State atoms
 export const sidebarOpenAtom = atomWithStorage("sidebar-open", true);
+export const agentSidebarOpenAtom = atomWithStorage("agent-sidebar-open", false);
+export const devToolsVisibleAtom = atomWithStorage("dev-tools-visible", false);
 
 // Global pending overlay for Settings to prevent double actions
 export const settingsPendingAtom = atom<boolean>(false);

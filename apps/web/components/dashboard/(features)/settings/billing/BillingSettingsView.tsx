@@ -13,24 +13,22 @@ export default function BillingSettingsView() {
 
       {/* Current Plan - Moved to top */}
       <Card className="bg-content2 dark:bg-content1 rounded-xl border border-default-200/50 shadow-none">
-        <CardBody className="p-6">
+        <CardBody className="p-4">
           <PlanOverview />
         </CardBody>
       </Card>
 
-      {/* Available Plans (Pricing) */}
-      <Card className="bg-content2 dark:bg-content1 rounded-xl border border-default-200/50 shadow-none">
-        <CardBody className="p-6">
-          <AvailablePlans />
-        </CardBody>
-      </Card>
-
-      {/* Billing History (Below Pricing) */}
+      {/* Billing History */}
       <Card className="bg-content2 dark:bg-content1 rounded-xl border border-default-200/50 shadow-none">
         <CardBody className="p-0">
           <InvoicesList />
         </CardBody>
       </Card>
+
+      {/* Available Plans (Pricing) - Moved below invoices */}
+      <div>
+        <AvailablePlans />
+      </div>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { Card, cn, Tooltip, Divider } from "@heroui/react";
+import { Card, cn, Tooltip, Divider, Skeleton } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import React, { useMemo } from "react";
 
@@ -23,6 +23,130 @@ export interface KPIProps {
   tooltip?: string;
 }
 
+type KPISize = NonNullable<KPIProps["size"]>;
+
+export interface KPISkeletonProps {
+  size?: KPISize;
+  className?: string;
+  showIcon?: boolean;
+  showSparkline?: boolean;
+  showChangeIndicator?: boolean;
+}
+
+const KPI_CARD_BASE_CLASS =
+  "bg-content2/90 dark:bg-content1 rounded-2xl border border-default-100 w-full overflow-hidden shadow-none";
+const KPI_CARD_PADDING = "py-4 px-5";
+const KPI_SIZE_CLASSES: Record<KPISize, string> = {
+  small: "col-span-1",
+  medium: "col-span-1 sm:col-span-2",
+  large: "col-span-1 sm:col-span-2 lg:col-span-3",
+};
+const KPI_VALUE_TEXT_CLASSES: Record<KPISize, string> = {
+  small: "text-2xl",
+  medium: "text-3xl",
+  large: "text-4xl",
+};
+const KPI_VALUE_SKELETON_WIDTHS: Record<KPISize, string> = {
+  small: "w-28",
+  medium: "w-36",
+  large: "w-48",
+};
+const KPI_VALUE_SKELETON_HEIGHTS: Record<KPISize, string> = {
+  small: "h-7",
+  medium: "h-9",
+  large: "h-10",
+};
+const KPI_ICON_SKELETON_SIZES: Record<KPISize, string> = {
+  small: "h-5 w-5",
+  medium: "h-6 w-6",
+  large: "h-7 w-7",
+};
+const KPI_SPARKLINE_SKELETON_HEIGHTS: Record<KPISize, string> = {
+  small: "h-0",
+  medium: "h-12",
+  large: "h-14",
+};
+const KPI_CHANGE_PRIMARY_WIDTH: Record<KPISize, string> = {
+  small: "w-20",
+  medium: "w-24",
+  large: "w-28",
+};
+const KPI_CHANGE_SECONDARY_WIDTH: Record<KPISize, string> = {
+  small: "w-14",
+  medium: "w-16",
+  large: "w-18",
+};
+
+export const KPISkeleton = React.memo(function KPISkeleton({
+  size = "small",
+  className,
+  showIcon = true,
+  showSparkline = false,
+  showChangeIndicator = true,
+}: KPISkeletonProps) {
+  return (
+    <Card
+      className={cn(
+        KPI_CARD_BASE_CLASS,
+        KPI_CARD_PADDING,
+        KPI_SIZE_CLASSES[size],
+        className
+      )}
+      shadow="none"
+    >
+      <div className="flex h-full min-w-0 flex-col justify-between">
+        <div className="mb-2.5 flex items-start justify-between gap-2">
+          <Skeleton className="h-4 w-28 rounded-lg" />
+          {showIcon && (
+            <Skeleton
+              className={cn("shrink-0 rounded-full", KPI_ICON_SKELETON_SIZES[size])}
+            />
+          )}
+        </div>
+
+        <div className="flex-1 space-y-3">
+          <Skeleton
+            className={cn(
+              "rounded-lg",
+              KPI_VALUE_SKELETON_HEIGHTS[size],
+              KPI_VALUE_SKELETON_WIDTHS[size]
+            )}
+          />
+
+          {showSparkline && size !== "small" && (
+            <Skeleton
+              className={cn(
+                "w-full rounded-lg",
+                KPI_SPARKLINE_SKELETON_HEIGHTS[size]
+              )}
+            />
+          )}
+        </div>
+
+        {showChangeIndicator && (
+          <div className="mt-3.5">
+            <Divider className="mb-1.5 bg-default-200" />
+            <div className="mt-1 flex items-center justify-between">
+              <Skeleton
+                className={cn(
+                  "h-3 rounded-lg",
+                  KPI_CHANGE_PRIMARY_WIDTH[size]
+                )}
+              />
+              <Skeleton
+                className={cn(
+                  "h-3 rounded-lg",
+                  KPI_CHANGE_SECONDARY_WIDTH[size]
+                )}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+});
+
 const KPI = React.memo(function KPI({
   title,
   value,
@@ -37,8 +161,7 @@ const KPI = React.memo(function KPI({
   showSparkline = false,
   tooltip,
 }: KPIProps) {
-  // Unified padding for all sizes (matching overview widgets)
-  const paddingClass = "py-4 px-5";
+  const showChangeSkeleton = change !== undefined && change !== null;
 
   const changeData = useMemo(() => {
     if (change === undefined || change === null) return null;
@@ -85,52 +208,22 @@ const KPI = React.memo(function KPI({
 
   if (loading) {
     return (
-      <Card
-        className={cn(
-          "bg-content2 dark:bg-content1 rounded-2xl border border-default-200/50",
-          paddingClass,
-          className
-        )}
-        shadow="none"
-      >
-        <div className="animate-pulse space-y-4">
-          <div className="flex items-start justify-between">
-            <div className="h-4 bg-default-200 rounded w-24" />
-            <div className="w-5 h-5 rounded bg-default-200" />
-          </div>
-          <div className="space-y-3">
-            <div className="h-9 bg-default-200 rounded w-32" />
-            <div className="h-3 bg-default-200 rounded w-20" />
-          </div>
-          <div className="flex justify-end">
-            <div className="h-4 bg-default-200 rounded w-16" />
-          </div>
-        </div>
-      </Card>
+      <KPISkeleton
+        className={className}
+        showChangeIndicator={showChangeSkeleton}
+        showIcon={Boolean(icon)}
+        showSparkline={showSparkline && size !== "small"}
+        size={size}
+      />
     );
   }
-
-  // Size-based grid classes
-  const sizeClasses = {
-    small: "col-span-1",
-    medium: "col-span-1 sm:col-span-2",
-    large: "col-span-1 sm:col-span-2 lg:col-span-3",
-  };
-
-  // Size-based text sizes
-  const valueSizeClasses = {
-    small: "text-2xl",
-    medium: "text-3xl",
-    large: "text-4xl",
-  };
 
   const cardContent = (
     <Card
       className={cn(
-        "bg-content2/90 dark:bg-content1 rounded-2xl border border-default-100  w-full overflow-hidden",
-        paddingClass,
-        "shadow-none",
-        sizeClasses[size],
+        KPI_CARD_BASE_CLASS,
+        KPI_CARD_PADDING,
+        KPI_SIZE_CLASSES[size],
         className
       )}
     >
@@ -148,7 +241,7 @@ const KPI = React.memo(function KPI({
           <div
             className={cn(
               "font-bold tracking-tight tabular-nums text-default-800 truncate",
-              valueSizeClasses[size]
+              KPI_VALUE_TEXT_CLASSES[size]
             )}
           >
             {value}

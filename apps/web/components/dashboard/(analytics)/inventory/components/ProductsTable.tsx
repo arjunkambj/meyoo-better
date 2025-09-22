@@ -5,7 +5,6 @@ import {
   addToast,
   Button,
   Chip,
-  Input,
   Pagination,
   Skeleton,
   Table,
@@ -17,7 +16,7 @@ import {
   Tooltip,
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useUser } from "@/hooks";
 import { getStockStatusConfig } from "@/libs/utils/dashboard-formatters";
 import { getCurrencySymbol, formatNumber } from "@/libs/utils/format";
@@ -62,8 +61,6 @@ interface ProductsTableProps {
     setPage: (page: number) => void;
     total: number;
   };
-  searchValue?: string;
-  onSearchSubmit?: (term: string) => void;
 }
 
 const columns = [
@@ -83,19 +80,11 @@ export const ProductsTable = React.memo(function ProductsTable({
   products,
   loading,
   pagination,
-  searchValue,
-  onSearchSubmit,
 }: ProductsTableProps) {
-  const [search, setSearch] = useState(searchValue ?? "");
   const [page, setPage] = useState(pagination?.page || 1);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const { primaryCurrency } = useUser();
   const currencySymbol = getCurrencySymbol(primaryCurrency);
-  const searchTerm = search.trim().toLowerCase();
-
-  useEffect(() => {
-    setSearch(searchValue ?? "");
-  }, [searchValue]);
 
   useEffect(() => {
     const nextPage = pagination?.page;
@@ -104,41 +93,6 @@ export const ProductsTable = React.memo(function ProductsTable({
       setPage(nextPage);
     }
   }, [pagination?.page]);
-
-  const filteredProducts = useMemo(() => {
-    if (!searchTerm) return products;
-
-    return products.filter((product) => {
-      const name = product.name.toLowerCase();
-      const sku = product.sku.toLowerCase();
-      const vendor = product.vendor.toLowerCase();
-
-      return (
-        name.includes(searchTerm) ||
-        sku.includes(searchTerm) ||
-        vendor.includes(searchTerm)
-      );
-    });
-  }, [products, searchTerm]);
-
-  const handleSearchSubmit = useCallback(() => {
-    if (!onSearchSubmit) return;
-
-    const next = search.trim();
-    const previous = (searchValue ?? "").trim();
-
-    if (next === previous) return;
-
-    onSearchSubmit(next);
-  }, [onSearchSubmit, search, searchValue]);
-
-  const handleSearchClear = useCallback(() => {
-    setSearch("");
-
-    if (onSearchSubmit && (searchValue ?? "").trim() !== "") {
-      onSearchSubmit("");
-    }
-  }, [onSearchSubmit, searchValue]);
 
   const renderCell = useCallback(
     (item: Product, columnKey: React.Key) => {
@@ -290,74 +244,18 @@ export const ProductsTable = React.memo(function ProductsTable({
   );
 
   return (
-    <div className="space-y-4">
-      <div className="px-2 pt-6 space-y-4">
-        <div className="flex justify-between items-center">
-          <h2 className="text-xl font-semibold">Inventory Products</h2>
-          <div className="flex gap-2">
-            <Button
-              startContent={<Icon icon="solar:import-outline" width={16} />}
-              variant="flat"
-              onPress={() => {
-                addToast({
-                  title: "Import feature coming soon",
-                  description: "CSV import will be available soon",
-                  color: "primary",
-                  timeout: 3000,
-                });
-              }}
-            >
-              Import CSV
-            </Button>
-            <Button
-              color="primary"
-              startContent={<Icon icon="solar:add-outline" width={16} />}
-              onPress={() => {
-                addToast({
-                  title: "Add product feature coming soon",
-                  description: "Products will sync from Shopify",
-                  color: "primary",
-                  timeout: 3000,
-                });
-              }}
-            >
-              Add Product
-            </Button>
-          </div>
+    <section className="flex flex-col gap-6 rounded-2xl border border-divider bg-content2 p-6">
+      {loading ? (
+        <div className="space-y-3">
+          {[...Array(5)].map((_, i) => (
+            <Skeleton
+              key={`products-table-skeleton-${i + 1}`}
+              className="h-12 w-full rounded-lg"
+            />
+          ))}
         </div>
-
-        <Input
-          isClearable
-          className="max-w-xs"
-          placeholder="Search products, SKU, or vendor..."
-          startContent={<Icon icon="solar:search-outline" width={18} />}
-          value={search}
-          onBlur={handleSearchSubmit}
-          onClear={handleSearchClear}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.preventDefault();
-              handleSearchSubmit();
-            }
-          }}
-          onValueChange={setSearch}
-        />
-
-        {/* Selection and bulk actions removed */}
-      </div>
-
-      <div className="px-2 relative">
-        {loading ? (
-          <div className="space-y-3">
-            {[...Array(5)].map((_, i) => (
-              <Skeleton
-                key={`products-table-skeleton-${i + 1}`}
-                className="h-12 w-full rounded-lg"
-              />
-            ))}
-          </div>
-        ) : (
-          <>
+      ) : (
+        <>
             <Table
               removeWrapper
               aria-label="Products table"
@@ -373,7 +271,7 @@ export const ProductsTable = React.memo(function ProductsTable({
                 )}
               </TableHeader>
               <TableBody>
-                {(filteredProducts || []).length === 0 ? (
+                {products.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={columns.length}>
                       <div className="text-center py-10">
@@ -389,7 +287,7 @@ export const ProductsTable = React.memo(function ProductsTable({
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredProducts.flatMap((item, idx) => {
+                  products.flatMap((item, idx) => {
                     const isOpen = expanded.has(item.id);
                     const stripe = idx % 2 === 1;
                     const avgPrice = Array.isArray(item.variants) && item.variants.length > 0
@@ -491,8 +389,8 @@ export const ProductsTable = React.memo(function ProductsTable({
               </TableBody>
             </Table>
 
-            {pagination && filteredProducts.length > 0 && (
-              <div className="flex justify-center py-4">
+            {pagination && products.length > 0 && (
+              <div className="flex justify-center pt-2">
                 <Pagination
                   showControls
                   boundaries={1}
@@ -507,9 +405,8 @@ export const ProductsTable = React.memo(function ProductsTable({
                 />
               </div>
             )}
-          </>
-        )}
-      </div>
-    </div>
+        </>
+      )}
+    </section>
   );
 });

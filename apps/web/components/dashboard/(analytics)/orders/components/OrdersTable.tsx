@@ -8,7 +8,6 @@ import {
   DropdownItem,
   DropdownMenu,
   DropdownTrigger,
-  Input,
   Pagination,
   Skeleton,
   Table,
@@ -19,7 +18,7 @@ import {
   TableRow,
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 
 import { OrderStatusBadge } from "@/components/shared/badges/StatusBadge";
 import { useUser } from "@/hooks";
@@ -68,8 +67,6 @@ interface OrdersTableProps {
     total: number;
   };
   loading?: boolean;
-  searchValue?: string;
-  onSearchSubmit?: (term: string) => void;
 }
 
 const columns = [
@@ -88,10 +85,7 @@ export const OrdersTable = React.memo(function OrdersTable({
   orders,
   pagination,
   loading,
-  searchValue,
-  onSearchSubmit,
 }: OrdersTableProps) {
-  const [search, setSearch] = useState(searchValue ?? "");
   const [selectedKeys, setSelectedKeys] = useState<
     "all" | Set<never> | Set<string>
   >(new Set<string>());
@@ -100,49 +94,12 @@ export const OrdersTable = React.memo(function OrdersTable({
   const { primaryCurrency } = useUser();
 
   useEffect(() => {
-    setSearch(searchValue ?? "");
-  }, [searchValue]);
-
-  useEffect(() => {
     const nextPage = pagination?.page;
 
     if (typeof nextPage === "number") {
       setPage(nextPage);
     }
   }, [pagination?.page]);
-
-  const normalizedSearch = search.trim().toLowerCase();
-
-  const filteredOrders = useMemo(() => {
-    if (!normalizedSearch) return orders;
-
-    return orders.filter((order) => {
-      return (
-        order.orderNumber.toLowerCase().includes(normalizedSearch) ||
-        order.customer.name.toLowerCase().includes(normalizedSearch) ||
-        order.customer.email.toLowerCase().includes(normalizedSearch)
-      );
-    });
-  }, [orders, normalizedSearch]);
-
-  const handleSearchSubmit = useCallback(() => {
-    if (!onSearchSubmit) return;
-
-    const next = search.trim();
-    const previous = (searchValue ?? "").trim();
-
-    if (next === previous) return;
-
-    onSearchSubmit(next);
-  }, [onSearchSubmit, search, searchValue]);
-
-  const handleSearchClear = useCallback(() => {
-    setSearch("");
-
-    if (onSearchSubmit && (searchValue ?? "").trim() !== "") {
-      onSearchSubmit("");
-    }
-  }, [onSearchSubmit, searchValue]);
 
   // Helper functions for selection
   const isItemsSelected = useCallback(() => {
@@ -154,11 +111,11 @@ export const OrdersTable = React.memo(function OrdersTable({
 
   const getSelectedCount = useCallback(() => {
     if (selectedKeys === "all") {
-      return filteredOrders.length;
+      return orders.length;
     }
 
     return selectedKeys instanceof Set ? selectedKeys.size : 0;
-  }, [selectedKeys, filteredOrders]);
+  }, [orders.length, selectedKeys]);
 
   const renderCell = useCallback(
     (item: Order, columnKey: React.Key) => {
@@ -280,131 +237,92 @@ export const OrdersTable = React.memo(function OrdersTable({
   );
 
   return (
-    <div className="space-y-4">
-      <div className="px-2 pt-6 space-y-4">
-        <div className="flex justify-between items-center">
-          <h2 className="text-xl font-semibold">Orders</h2>
+    <section className="flex flex-col gap-4">
+      {isItemsSelected() && (
+        <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-divider bg-content2 px-4 py-3">
+          <span className="text-sm">{getSelectedCount()} orders selected</span>
+          <Dropdown>
+            <DropdownTrigger>
+              <Button
+                size="sm"
+                startContent={
+                  <Icon icon="solar:bolt-circle-bold-duotone" width={16} />
+                }
+                variant="flat"
+              >
+                Bulk Actions
+              </Button>
+            </DropdownTrigger>
+            <DropdownMenu
+              aria-label="Bulk actions"
+              onAction={(key) => {
+                switch (key) {
+                  case "fulfill":
+                    addToast({
+                      title: "Fulfilling orders",
+                      description: "Selected orders are being fulfilled",
+                      color: "success",
+                      timeout: 3000,
+                    });
+                    break;
+                  case "cancel":
+                    addToast({
+                      title: "Cancelling orders",
+                      description: "Selected orders are being cancelled",
+                      color: "warning",
+                      timeout: 3000,
+                    });
+                    break;
+                  case "export":
+                    addToast({
+                      title: "Export selected",
+                      description: "Exporting selected orders...",
+                      color: "success",
+                      timeout: 3000,
+                    });
+                    break;
+                }
+                setSelectedKeys(new Set<string>());
+              }}
+            >
+              <DropdownItem
+                key="fulfill"
+                startContent={
+                  <Icon icon="solar:check-circle-outline" width={16} />
+                }
+              >
+                Mark as Fulfilled
+              </DropdownItem>
+              <DropdownItem
+                key="cancel"
+                className="text-danger"
+                color="danger"
+                startContent={
+                  <Icon icon="solar:close-circle-outline" width={16} />
+                }
+              >
+                Cancel Orders
+              </DropdownItem>
+              <DropdownItem
+                key="export"
+                startContent={<Icon icon="solar:export-outline" width={16} />}
+              >
+                Export Selected
+              </DropdownItem>
+            </DropdownMenu>
+          </Dropdown>
           <Button
-            color="primary"
-            startContent={<Icon icon="solar:add-outline" width={16} />}
-            onPress={() => {
-              addToast({
-                title: "Create order",
-                description: "Manual order creation coming soon",
-                color: "primary",
-                timeout: 3000,
-              });
-            }}
+            color="danger"
+            size="sm"
+            variant="flat"
+            onPress={() => setSelectedKeys(new Set())}
           >
-            Create Order
+            Clear Selection
           </Button>
         </div>
+      )}
 
-        <Input
-          isClearable
-          className="max-w-xs"
-          placeholder="Search orders by ID, customer, or email..."
-          startContent={<Icon icon="solar:search-outline" width={18} />}
-          value={search}
-          onBlur={handleSearchSubmit}
-          onClear={handleSearchClear}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.preventDefault();
-              handleSearchSubmit();
-            }
-          }}
-          onValueChange={setSearch}
-        />
-
-        {isItemsSelected() && (
-          <div className="flex items-center gap-4 p-3 bg-default-100 rounded-lg">
-            <span className="text-sm">
-              {getSelectedCount()} orders selected
-            </span>
-            <Dropdown>
-              <DropdownTrigger>
-                <Button
-                  size="sm"
-                  startContent={
-                    <Icon icon="solar:bolt-circle-bold-duotone" width={16} />
-                  }
-                  variant="flat"
-                >
-                  Bulk Actions
-                </Button>
-              </DropdownTrigger>
-              <DropdownMenu
-                aria-label="Bulk actions"
-                onAction={(key) => {
-                  switch (key) {
-                    case "fulfill":
-                      addToast({
-                        title: "Fulfilling orders",
-                        description: "Selected orders are being fulfilled",
-                        color: "success",
-                        timeout: 3000,
-                      });
-                      break;
-                    case "cancel":
-                      addToast({
-                        title: "Cancelling orders",
-                        description: "Selected orders are being cancelled",
-                        color: "warning",
-                        timeout: 3000,
-                      });
-                      break;
-                    case "export":
-                      addToast({
-                        title: "Export selected",
-                        description: "Exporting selected orders...",
-                        color: "success",
-                        timeout: 3000,
-                      });
-                      break;
-                  }
-                  setSelectedKeys(new Set<string>());
-                }}
-              >
-                <DropdownItem
-                  key="fulfill"
-                  startContent={
-                    <Icon icon="solar:check-circle-outline" width={16} />
-                  }
-                >
-                  Mark as Fulfilled
-                </DropdownItem>
-                <DropdownItem
-                  key="cancel"
-                  className="text-danger"
-                  color="danger"
-                  startContent={
-                    <Icon icon="solar:close-circle-outline" width={16} />
-                  }
-                >
-                  Cancel Orders
-                </DropdownItem>
-                <DropdownItem
-                  key="export"
-                  startContent={<Icon icon="solar:export-outline" width={16} />}
-                >
-                  Export Selected
-                </DropdownItem>
-              </DropdownMenu>
-            </Dropdown>
-            <Button
-              color="danger"
-              size="sm"
-              variant="flat"
-              onPress={() => setSelectedKeys(new Set())}
-            >
-              Clear Selection
-            </Button>
-          </div>
-        )}
-      </div>
-
-      <div className="px-2 relative">
+      <div className="rounded-2xl border border-divider bg-content2 p-6">
         {loading ? (
           <div className="space-y-3">
             {[...Array(5)].map((_, i) => (
@@ -441,9 +359,9 @@ export const OrdersTable = React.memo(function OrdersTable({
               </TableHeader>
               <TableBody
                 emptyContent={
-                  <div className="text-center py-10">
+                  <div className="py-10 text-center">
                     <Icon
-                      className="mx-auto text-default-300 mb-4"
+                      className="mx-auto mb-4 text-default-300"
                       icon="solar:cart-large-minimalistic-outline"
                       width={48}
                     />
@@ -452,7 +370,7 @@ export const OrdersTable = React.memo(function OrdersTable({
                     </p>
                   </div>
                 }
-                items={filteredOrders || []}
+                items={orders || []}
               >
                 {(item: Order) => (
                   <TableRow key={item.id}>
@@ -464,8 +382,8 @@ export const OrdersTable = React.memo(function OrdersTable({
               </TableBody>
             </Table>
 
-            {pagination && filteredOrders.length > 0 && (
-              <div className="flex justify-center py-4">
+            {pagination && orders.length > 0 && (
+              <div className="flex justify-center pt-2">
                 <Pagination
                   showControls
                   boundaries={1}
@@ -483,6 +401,6 @@ export const OrdersTable = React.memo(function OrdersTable({
           </>
         )}
       </div>
-    </div>
+    </section>
   );
 });

@@ -126,7 +126,7 @@ export default function ShippingCostTable() {
               variant="light"
               onPress={() => handleEdit(item)}
             >
-              <Icon icon="lucide:edit" width={16} />
+              <Icon icon="solar:pen-linear" width={16} />
             </Button>
           </div>
         );

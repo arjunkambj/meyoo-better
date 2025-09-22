@@ -8,7 +8,6 @@ import GlobalDateRangePicker from "@/components/shared/GlobalDateRangePicker";
 import { usePnLAnalytics } from "@/hooks";
 import { PnLTable } from "./components/PnLTable";
 
-
 export const PnLView = memo(function PnLView() {
   const [dateRange, setDateRange] = useState<
     { startDate: string; endDate: string } | undefined
@@ -34,7 +33,9 @@ export const PnLView = memo(function PnLView() {
       <Spacer y={0.5} />
       <AnalyticsHeader
         leftActions={
-          <GlobalDateRangePicker onAnalyticsChange={handleAnalyticsRangeChange} />
+          <GlobalDateRangePicker
+            onAnalyticsChange={handleAnalyticsRangeChange}
+          />
         }
         rightActions={
           <ExportButton

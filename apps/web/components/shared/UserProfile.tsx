@@ -8,20 +8,32 @@ import {
   DropdownMenu,
   DropdownSection,
   DropdownTrigger,
+  Switch,
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
+import { useTheme } from "next-themes";
 import Link from "next/link";
-import React, { useCallback, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useCurrentUser } from "@/hooks";
 
 const UserProfile = React.memo(() => {
   const { user } = useCurrentUser();
   const { signOut } = useAuthActions();
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleLogout = useCallback(async () => {
     await signOut();
     window.location.href = "/signin";
   }, [signOut]);
+
+  const handleThemeChange = useCallback((isSelected: boolean) => {
+    setTheme(isSelected ? "dark" : "light");
+  }, [setTheme]);
 
   // Memoize user data extraction
   const userData = useMemo(
@@ -79,6 +91,34 @@ const UserProfile = React.memo(() => {
           </DropdownItem>
         </DropdownSection>
         <DropdownSection showDivider>
+          <DropdownItem
+            key="theme"
+            className="flex items-center gap-2"
+            startContent={
+              <Icon
+                icon="solar:pallete-2-linear"
+                width={18}
+              />
+            }
+            endContent={
+              mounted && (
+                <Switch
+                  size="sm"
+                  isSelected={theme === "dark"}
+                  onValueChange={handleThemeChange}
+                  aria-label="Toggle theme"
+                  classNames={{
+                    wrapper: "bg-default-300/60 dark:bg-default-200/60",
+                  }}
+                />
+              )
+            }
+            isReadOnly
+          >
+            Theme
+          </DropdownItem>
+        </DropdownSection>
+        <DropdownSection showDivider>
           {navigationItems.map((item) => (
             <DropdownItem
               key={item.key}
@@ -103,7 +143,7 @@ const UserProfile = React.memo(() => {
         </DropdownSection>
       </DropdownMenu>
     ),
-    [userData, navigationItems, handleLogout]
+    [userData, navigationItems, handleLogout, theme, mounted, handleThemeChange]
   );
 
   return (

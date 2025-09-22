@@ -74,7 +74,7 @@ const SidebarContent = React.memo(({ onClose }: SidebarContentProps) => {
           "no-underline w-full mb-2",
           pathname === "/overview"
             ? "bg-primary/20 text-primary font-medium"
-            : "text-default-800 hover:text-default-900 hover:bg-default-200"
+            : "text-default-900 hover:text-default-900 hover:bg-default-200"
         )}
         href="/overview"
         prefetch={true}

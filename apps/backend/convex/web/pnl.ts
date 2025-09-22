@@ -35,42 +35,62 @@ export const getMetrics = query({
 
     if (filteredMetrics.length === 0) return null;
 
-    // Calculate aggregated metrics
-    const totalRevenue = filteredMetrics.reduce(
-      (sum, m) => sum + (m.revenue || 0),
-      0,
-    );
-    const totalCosts = filteredMetrics.reduce(
-      (sum, m) => sum + (m.totalCosts || 0),
-      0,
-    );
-    const totalGrossProfit = filteredMetrics.reduce(
-      (sum, m) => sum + (m.grossProfit || 0),
-      0,
-    );
-    const totalNetProfit = filteredMetrics.reduce(
-      (sum, m) => sum + (m.netProfit || 0),
-      0,
-    );
+    const sumBy = <K extends keyof (typeof filteredMetrics)[number]>(
+      items: typeof filteredMetrics,
+      key: K,
+    ): number => items.reduce((sum, item) => sum + Number(item[key] ?? 0), 0);
 
-    // Calculate marketing metrics
-    const totalAdSpend = filteredMetrics.reduce(
-      (sum, m) => sum + (m.totalAdSpend || 0),
-      0,
-    );
-    const avgROAS =
-      filteredMetrics.length > 0
-        ? filteredMetrics.reduce((sum, m) => sum + (m.blendedRoas || 0), 0) /
-          filteredMetrics.length
+    const totalRevenue = sumBy(filteredMetrics, "revenue");
+    const totalGrossSales = sumBy(filteredMetrics, "grossSales");
+    const totalDiscounts = sumBy(filteredMetrics, "discounts");
+    const totalRefunds = sumBy(filteredMetrics, "refunds");
+    const totalCosts = sumBy(filteredMetrics, "totalCosts");
+    const totalGrossProfit = sumBy(filteredMetrics, "grossProfit");
+    const totalNetProfit = sumBy(filteredMetrics, "netProfit");
+    const totalCogs = sumBy(filteredMetrics, "cogs");
+    const totalShippingCosts = sumBy(filteredMetrics, "shippingCosts");
+    const totalTransactionFees = sumBy(filteredMetrics, "transactionFees");
+    const totalHandlingFees = sumBy(filteredMetrics, "handlingFees");
+    const totalTaxesCollected = sumBy(filteredMetrics, "taxesCollected");
+    const totalTaxesPaid = sumBy(filteredMetrics, "taxesPaid");
+    const totalCustomCosts = sumBy(filteredMetrics, "customCosts");
+    const totalAdSpend = sumBy(filteredMetrics, "totalAdSpend");
+
+    const operatingExpenses =
+      totalShippingCosts +
+      totalTransactionFees +
+      totalHandlingFees +
+      totalCustomCosts +
+      totalTaxesPaid +
+      totalAdSpend;
+    const operatingExpensesExTaxes = operatingExpenses - totalTaxesPaid;
+    const ebitda = totalGrossProfit - operatingExpensesExTaxes;
+    const marketingROI =
+      totalAdSpend > 0
+        ? ((totalRevenue - totalAdSpend) / totalAdSpend) * 100
         : 0;
 
-    // Calculate average margins
+    const avgROAS =
+      filteredMetrics.length > 0
+        ? filteredMetrics.reduce(
+            (sum, m) => sum + (m.blendedRoas || 0),
+            0,
+          ) / filteredMetrics.length
+        : 0;
+
     const avgGrossMargin =
-      totalRevenue > 0 ? (totalGrossProfit / totalRevenue) * 100 : 0;
+      totalGrossSales > 0 ? (totalGrossProfit / totalGrossSales) * 100 : 0;
     const avgNetMargin =
       totalRevenue > 0 ? (totalNetProfit / totalRevenue) * 100 : 0;
 
-    // Calculate changes (compare with previous period)
+    const calculateChange = (current: number, previous: number) => {
+      if (previous === 0) {
+        return current > 0 ? 100 : 0;
+      }
+
+      return ((current - previous) / Math.abs(previous)) * 100;
+    };
+
     const periodLength = filteredMetrics.length;
     const previousStartDate = new Date(args.dateRange.startDate);
 
@@ -81,64 +101,116 @@ export const getMetrics = query({
 
     const prevStartStr = previousStartDate.toISOString().substring(0, 10);
     const prevEndStr = previousEndDate.toISOString().substring(0, 10);
+
     const previousMetrics = metrics.filter(
       (m) => m.date >= prevStartStr && m.date <= prevEndStr,
     );
 
-    const prevRevenue = previousMetrics.reduce(
-      (sum, m) => sum + (m.revenue || 0),
-      0,
-    );
-    const prevCosts = previousMetrics.reduce(
-      (sum, m) => sum + (m.totalCosts || 0),
-      0,
-    );
-    const prevGrossProfit = previousMetrics.reduce(
-      (sum, m) => sum + (m.grossProfit || 0),
-      0,
-    );
-    const prevNetProfit = previousMetrics.reduce(
-      (sum, m) => sum + (m.netProfit || 0),
-      0,
-    );
-    const prevAdSpend = previousMetrics.reduce(
-      (sum, m) => sum + (m.totalAdSpend || 0),
-      0,
-    );
-    const prevROAS =
+    const prevRevenue = sumBy(previousMetrics, "revenue");
+    const prevGrossSales = sumBy(previousMetrics, "grossSales");
+    const prevDiscounts = sumBy(previousMetrics, "discounts");
+    const prevRefunds = sumBy(previousMetrics, "refunds");
+    const prevCosts = sumBy(previousMetrics, "totalCosts");
+    const prevGrossProfit = sumBy(previousMetrics, "grossProfit");
+    const prevNetProfit = sumBy(previousMetrics, "netProfit");
+    const prevCogs = sumBy(previousMetrics, "cogs");
+    const prevShippingCosts = sumBy(previousMetrics, "shippingCosts");
+    const prevTransactionFees = sumBy(previousMetrics, "transactionFees");
+    const prevHandlingFees = sumBy(previousMetrics, "handlingFees");
+    const prevTaxesPaid = sumBy(previousMetrics, "taxesPaid");
+    const prevTaxesCollected = sumBy(previousMetrics, "taxesCollected");
+    const prevCustomCosts = sumBy(previousMetrics, "customCosts");
+    const prevAdSpend = sumBy(previousMetrics, "totalAdSpend");
+    const prevOperatingExpenses =
+      prevShippingCosts +
+      prevTransactionFees +
+      prevHandlingFees +
+      prevCustomCosts +
+      prevTaxesPaid +
+      prevAdSpend;
+    const prevOperatingExpensesExTaxes = prevOperatingExpenses - prevTaxesPaid;
+    const prevEbitda = prevGrossProfit - prevOperatingExpensesExTaxes;
+
+    const prevAvgROAS =
       previousMetrics.length > 0
-        ? previousMetrics.reduce((sum, m) => sum + (m.blendedRoas || 0), 0) /
-          previousMetrics.length
+        ? previousMetrics.reduce(
+            (sum, m) => sum + (m.blendedRoas || 0),
+            0,
+          ) / previousMetrics.length
         : 0;
 
+    const prevGrossMargin =
+      prevGrossSales > 0 ? (prevGrossProfit / prevGrossSales) * 100 : 0;
+    const prevNetMargin =
+      prevRevenue > 0 ? (prevNetProfit / prevRevenue) * 100 : 0;
+    const prevMarketingROI =
+      prevAdSpend > 0
+        ? ((prevRevenue - prevAdSpend) / prevAdSpend) * 100
+        : 0;
+
+    const discountsReturns = totalDiscounts + totalRefunds;
+    const prevDiscountsReturns = prevDiscounts + prevRefunds;
+
     return {
+      grossSales: totalGrossSales,
+      discounts: totalDiscounts,
+      refunds: totalRefunds,
       revenue: totalRevenue,
-      totalCosts: totalCosts,
+      totalCosts,
       grossProfit: totalGrossProfit,
       netProfit: totalNetProfit,
+      cogs: totalCogs,
+      shippingCosts: totalShippingCosts,
+      transactionFees: totalTransactionFees,
+      handlingFees: totalHandlingFees,
+      taxesCollected: totalTaxesCollected,
+      taxesPaid: totalTaxesPaid,
+      customCosts: totalCustomCosts,
+      totalAdSpend,
+      operatingExpenses,
+      ebitda,
+      marketingROI,
       grossProfitMargin: avgGrossMargin,
       netProfitMargin: avgNetMargin,
-      totalAdSpend: totalAdSpend,
-      avgROAS: avgROAS,
-      revenueChange:
-        prevRevenue > 0
-          ? ((totalRevenue - prevRevenue) / prevRevenue) * 100
-          : 0,
-      costsChange:
-        prevCosts > 0 ? ((totalCosts - prevCosts) / prevCosts) * 100 : 0,
-      grossProfitChange:
-        prevGrossProfit > 0
-          ? ((totalGrossProfit - prevGrossProfit) / prevGrossProfit) * 100
-          : 0,
-      netProfitChange:
-        prevNetProfit > 0
-          ? ((totalNetProfit - prevNetProfit) / prevNetProfit) * 100
-          : 0,
-      adSpendChange:
-        prevAdSpend > 0
-          ? ((totalAdSpend - prevAdSpend) / prevAdSpend) * 100
-          : 0,
-      roasChange: prevROAS > 0 ? ((avgROAS - prevROAS) / prevROAS) * 100 : 0,
+      avgROAS,
+      revenueChange: calculateChange(totalRevenue, prevRevenue),
+      grossSalesChange: calculateChange(totalGrossSales, prevGrossSales),
+      discountsChange: calculateChange(totalDiscounts, prevDiscounts),
+      refundsChange: calculateChange(totalRefunds, prevRefunds),
+      costsChange: calculateChange(totalCosts, prevCosts),
+      grossProfitChange: calculateChange(totalGrossProfit, prevGrossProfit),
+      netProfitChange: calculateChange(totalNetProfit, prevNetProfit),
+      cogsChange: calculateChange(totalCogs, prevCogs),
+      shippingCostsChange: calculateChange(
+        totalShippingCosts,
+        prevShippingCosts,
+      ),
+      transactionFeesChange: calculateChange(
+        totalTransactionFees,
+        prevTransactionFees,
+      ),
+      handlingFeesChange: calculateChange(totalHandlingFees, prevHandlingFees),
+      taxesPaidChange: calculateChange(totalTaxesPaid, prevTaxesPaid),
+      customCostsChange: calculateChange(totalCustomCosts, prevCustomCosts),
+      totalAdSpendChange: calculateChange(totalAdSpend, prevAdSpend),
+      adSpendChange: calculateChange(totalAdSpend, prevAdSpend),
+      operatingExpensesChange: calculateChange(
+        operatingExpenses,
+        prevOperatingExpenses,
+      ),
+      ebitdaChange: calculateChange(ebitda, prevEbitda),
+      grossProfitMarginChange: avgGrossMargin - prevGrossMargin,
+      netProfitMarginChange: avgNetMargin - prevNetMargin,
+      roasChange: calculateChange(avgROAS, prevAvgROAS),
+      discountsReturnsChange: calculateChange(
+        discountsReturns,
+        prevDiscountsReturns,
+      ),
+      marketingROIChange: marketingROI - prevMarketingROI,
+      taxesCollectedChange: calculateChange(
+        totalTaxesCollected,
+        prevTaxesCollected,
+      ),
     };
   },
 });
@@ -877,6 +949,9 @@ export const getTableData = query({
           label: v.string(),
           date: v.string(),
           metrics: v.object({
+            grossSales: v.number(),
+            discounts: v.number(),
+            refunds: v.number(),
             revenue: v.number(),
             grossProfit: v.number(),
             netProfit: v.number(),
@@ -885,6 +960,7 @@ export const getTableData = query({
             shippingCosts: v.number(),
             transactionFees: v.number(),
             handlingFees: v.number(),
+            taxesCollected: v.number(),
             taxesPaid: v.number(),
             customCosts: v.number(),
             totalAdSpend: v.number(),
@@ -931,20 +1007,20 @@ export const getTableData = query({
 
     // Helper function to aggregate metrics
     const aggregateMetrics = (metricsArray: typeof filteredMetrics) => {
-      const _grossSales = metricsArray.reduce(
+      const revenue = metricsArray.reduce(
+        (sum, m) => sum + (m.revenue || 0),
+        0,
+      );
+      const grossSales = metricsArray.reduce(
         (sum, m) => sum + (m.grossSales || 0),
         0,
       );
-      const _discounts = metricsArray.reduce(
+      const discounts = metricsArray.reduce(
         (sum, m) => sum + (m.discounts || 0),
         0,
       );
-      const _refunds = metricsArray.reduce(
+      const refunds = metricsArray.reduce(
         (sum, m) => sum + (m.refunds || 0),
-        0,
-      );
-      const revenue = metricsArray.reduce(
-        (sum, m) => sum + (m.revenue || 0),
         0,
       );
       const cogs = metricsArray.reduce((sum, m) => sum + (m.cogs || 0), 0);
@@ -964,7 +1040,7 @@ export const getTableData = query({
         (sum, m) => sum + (m.grossProfit || 0),
         0,
       );
-      const _taxesCollected = metricsArray.reduce(
+      const taxesCollected = metricsArray.reduce(
         (sum, m) => sum + (m.taxesCollected || 0),
         0,
       );
@@ -988,12 +1064,16 @@ export const getTableData = query({
 
       return {
         // Only return fields defined in the validator
+        grossSales,
+        discounts,
+        refunds,
         revenue,
         cogs,
         shippingCosts,
         transactionFees,
         handlingFees,
         grossProfit,
+        taxesCollected,
         taxesPaid,
         customCosts,
         totalAdSpend,
@@ -1007,6 +1087,9 @@ export const getTableData = query({
       label: string;
       date: string;
       metrics: {
+        grossSales: number;
+        discounts: number;
+        refunds: number;
         revenue: number;
         grossProfit: number;
         netProfit: number;
@@ -1015,6 +1098,7 @@ export const getTableData = query({
         shippingCosts: number;
         transactionFees: number;
         handlingFees: number;
+        taxesCollected: number;
         taxesPaid: number;
         customCosts: number;
         totalAdSpend: number;
@@ -1034,12 +1118,16 @@ export const getTableData = query({
 
         const currentMetrics = {
           // Match validator shape exactly
+          grossSales: current.grossSales || 0,
+          discounts: current.discounts || 0,
+          refunds: current.refunds || 0,
           revenue: current.revenue || 0,
           cogs: current.cogs || 0,
           shippingCosts: current.shippingCosts || 0,
           transactionFees: current.transactionFees || 0,
           handlingFees: current.handlingFees || 0,
           grossProfit: current.grossProfit || 0,
+          taxesCollected: current.taxesCollected || 0,
           taxesPaid: current.taxesPaid || 0,
           customCosts: current.customCosts || 0,
           totalAdSpend: current.totalAdSpend || 0,

@@ -50,8 +50,8 @@ export const CustomerJourney = memo(function CustomerJourney({
       conversionRate: 45,
       icon: "solar:eye-linear",
       color: "primary",
-      bgColor: "bg-primary-50",
-      textColor: "text-primary-500",
+      bgColor: "bg-blue-50 dark:bg-blue-950/20",
+      textColor: "text-blue-600 dark:text-blue-400",
     },
     {
       stage: "Interest",
@@ -61,8 +61,8 @@ export const CustomerJourney = memo(function CustomerJourney({
       conversionRate: 67,
       icon: "solar:heart-linear",
       color: "secondary",
-      bgColor: "bg-secondary-50",
-      textColor: "text-secondary-500",
+      bgColor: "bg-purple-50 dark:bg-purple-950/20",
+      textColor: "text-purple-600 dark:text-purple-400",
     },
     {
       stage: "Consideration",
@@ -71,9 +71,9 @@ export const CustomerJourney = memo(function CustomerJourney({
       avgDays: 5,
       conversionRate: 42,
       icon: "solar:cart-large-minimalistic-linear",
-      color: "warning",
-      bgColor: "bg-warning-50",
-      textColor: "text-warning-500",
+      color: "indigo",
+      bgColor: "bg-indigo-50 dark:bg-indigo-950/20",
+      textColor: "text-indigo-600 dark:text-indigo-400",
     },
     {
       stage: "Purchase",
@@ -83,8 +83,8 @@ export const CustomerJourney = memo(function CustomerJourney({
       conversionRate: 78,
       icon: "solar:bag-4-linear",
       color: "success",
-      bgColor: "bg-success-50",
-      textColor: "text-success-500",
+      bgColor: "bg-green-50 dark:bg-green-950/20",
+      textColor: "text-green-600 dark:text-green-400",
     },
     {
       stage: "Retention",
@@ -93,9 +93,9 @@ export const CustomerJourney = memo(function CustomerJourney({
       avgDays: 30,
       conversionRate: 85,
       icon: "solar:refresh-circle-linear",
-      color: "primary",
-      bgColor: "bg-primary-50",
-      textColor: "text-primary-500",
+      color: "emerald",
+      bgColor: "bg-emerald-50 dark:bg-emerald-950/20",
+      textColor: "text-emerald-600 dark:text-emerald-400",
     },
   ];
 
@@ -128,10 +128,10 @@ export const CustomerJourney = memo(function CustomerJourney({
                     <div className="h-px bg-default-100 w-full" />
                   </div>
                 )}
-                <div className="relative z-10 rounded-xl border border-default-100/70 bg-default-100/60 dark:bg-content1/60 p-4 shadow-sm">
+                <div className="relative z-10 rounded-xl border border-default-100/70 bg-content2/80 dark:bg-content1/80 p-4">
                   <div className="flex flex-col items-center text-center space-y-3">
                     <div
-                      className={`flex h-10 w-10 items-center justify-center rounded-xl ${stage.bgColor} shadow-inner`}
+                      className={`flex h-10 w-10 items-center justify-center rounded-xl ${stage.bgColor}`}
                     >
                       <Icon
                         className={`w-5 h-5 ${stage.textColor}`}
@@ -167,7 +167,7 @@ export const CustomerJourney = memo(function CustomerJourney({
 
         {/* Key Metrics */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="rounded-xl p-4 border border-default-100/70 bg-default-100/70 dark:bg-content1/60">
+          <div className="rounded-xl p-4 border border-default-100/70 bg-content2/60 dark:bg-content1/60">
             <p className="text-xs font-medium text-default-600 mb-2">Overall Conversion</p>
             <p className="text-xl font-semibold text-default-900">
               {(() => {
@@ -179,7 +179,7 @@ export const CustomerJourney = memo(function CustomerJourney({
             </p>
             <p className="text-xs text-default-400 mt-1">Visitor to customer</p>
           </div>
-          <div className="rounded-xl p-4 border border-default-100/70 bg-default-100/70 dark:bg-content1/60">
+          <div className="rounded-xl p-4 border border-default-100/70 bg-content2/60 dark:bg-content1/60">
             <p className="text-xs font-medium text-default-600 mb-2">Repeat Rate</p>
             <p className="text-xl font-semibold text-default-900">
               {(() => {
@@ -192,12 +192,12 @@ export const CustomerJourney = memo(function CustomerJourney({
             <p className="text-xs text-default-400 mt-1">Buy again</p>
           </div>
 
-          <div className="rounded-xl p-4 border border-default-100/70 bg-default-100/70 dark:bg-content1/60">
+          <div className="rounded-xl p-4 border border-default-100/70 bg-content2/60 dark:bg-content1/60">
             <p className="text-xs font-medium text-default-600 mb-2">Cancel Rate</p>
             <p className="text-xl font-semibold text-default-900">{cancelRate.toFixed(1)}%</p>
             <p className="text-xs text-default-400 mt-1">Orders cancelled</p>
           </div>
-          <div className="rounded-xl p-4 border border-default-100/70 bg-default-100/70 dark:bg-content1/60">
+          <div className="rounded-xl p-4 border border-default-100/70 bg-content2/60 dark:bg-content1/60">
             <p className="text-xs font-medium text-default-600 mb-2">Return Rate</p>
             <p className="text-xl font-semibold text-default-900">{returnRate.toFixed(1)}%</p>
             <p className="text-xs text-default-400 mt-1">Products returned</p>
@@ -205,7 +205,7 @@ export const CustomerJourney = memo(function CustomerJourney({
         </div>
 
         {/* Conversion Breakdown */}
-        <div className="rounded-xl p-5 border border-default-100/70 bg-default-100/70 dark:bg-content1/60">
+        <div className="rounded-xl p-5 border border-default-100/70 bg-content2/60 dark:bg-content1/60">
           <p className="text-sm font-medium text-default-900 mb-4">Stage Progression</p>
           <div className="space-y-3">
             {journeyData.slice(0, -1).map((stage, index) => {
@@ -215,6 +215,14 @@ export const CustomerJourney = memo(function CustomerJourney({
               };
               const conversionRate =
                 ((nextStage.customers || 0) / (stage.customers || 1)) * 100;
+
+              // Simple color based on conversion rate
+              const getProgressBarClass = () => {
+                if (conversionRate >= 70) return "bg-success";
+                if (conversionRate >= 50) return "bg-primary";
+                if (conversionRate >= 30) return "bg-warning";
+                return "bg-danger";
+              };
 
               return (
                 <div key={`${stage.stage}-conversion`}>
@@ -228,7 +236,7 @@ export const CustomerJourney = memo(function CustomerJourney({
                   </div>
                   <div className="h-1.5 bg-default-200/70 rounded-full overflow-hidden">
                     <div
-                      className="h-full rounded-full bg-gradient-to-r from-primary-400 via-primary-500 to-primary-400"
+                      className={`h-full rounded-full ${getProgressBarClass()}`}
                       style={{ width: `${conversionRate}%` }}
                     />
                   </div>

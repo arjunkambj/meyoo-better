@@ -97,23 +97,31 @@ export function usePnLAnalytics(dateRange?: {
   const kpiMetrics: PnLKPIMetrics | undefined = useMemo(() => {
     if (!metricsData) return undefined;
 
-    // Calculate additional metrics from base data
-    const grossSales = metricsData.revenue || 0;
-    const discountsReturns = grossSales * 0.1; // Estimate 10% for discounts/returns
-    const netRevenue = grossSales - discountsReturns;
-    const cogs = metricsData.totalCosts * 0.4 || 0; // Estimate COGS as 40% of total costs
-    const grossProfit = metricsData.grossProfit || 0;
-    const operatingExpenses = metricsData.totalCosts - cogs || 0;
-    const ebitda = grossProfit - operatingExpenses * 0.3 || 0; // Estimate EBITDA
-    const netProfit = metricsData.netProfit || 0;
-    const netMargin = metricsData.netProfitMargin || 0;
-    const marketingCost = metricsData.totalAdSpend || 0;
-    const marketingROAS = metricsData.avgROAS || 0;
-    // Calculate Marketing ROI: (Revenue from marketing - Marketing Cost) / Marketing Cost
+    const grossSales = metricsData.grossSales ?? metricsData.revenue ?? 0;
+    const netRevenue = metricsData.revenue ?? 0;
+    const discountsReturns =
+      (metricsData.discounts ?? 0) + (metricsData.refunds ?? 0);
+    const grossProfit = metricsData.grossProfit ?? 0;
+    const marketingCost = metricsData.totalAdSpend ?? 0;
+    const marketingROAS = metricsData.avgROAS ?? 0;
+    const taxes = metricsData.taxesPaid ?? 0;
+    const inferredOperatingExpenses =
+      (metricsData.shippingCosts ?? 0) +
+      (metricsData.transactionFees ?? 0) +
+      (metricsData.handlingFees ?? 0) +
+      (metricsData.customCosts ?? 0) +
+      taxes +
+      marketingCost;
+    const operatingExpenses =
+      metricsData.operatingExpenses ?? inferredOperatingExpenses;
+    const netProfit = metricsData.netProfit ?? 0;
+    const netMargin = metricsData.netProfitMargin ?? 0;
+    const ebitda = metricsData.ebitda ?? netProfit + taxes;
     const marketingROI =
-      marketingCost > 0 ? (netRevenue - marketingCost) / marketingCost : 0;
-    // Estimate taxes as 15% of operating expenses
-    const taxes = operatingExpenses * 0.15 || 0;
+      metricsData.marketingROI ??
+      (marketingCost > 0
+        ? ((netRevenue - marketingCost) / marketingCost) * 100
+        : 0);
 
     return {
       grossSales,
@@ -129,22 +137,22 @@ export function usePnLAnalytics(dateRange?: {
       marketingROI,
       taxes,
       changes: {
-        grossSales: metricsData.revenueChange || 0,
-        discountsReturns: -5, // Estimate discount change
-        netRevenue: metricsData.revenueChange || 0,
-        grossProfit: metricsData.grossProfitChange || 0,
-        operatingExpenses: metricsData.costsChange || 0,
-        ebitda: metricsData.grossProfitChange || 0,
-        netProfit: metricsData.netProfitChange || 0,
-        netMargin:
-          (metricsData.netProfitMargin || 0) -
-            ((metricsData.netProfit - metricsData.netProfit * 0.1) /
-              metricsData.revenue) *
-              100 || 0,
-        marketingCost: metricsData.adSpendChange || 0,
-        marketingROAS: metricsData.roasChange || 0,
-        marketingROI: metricsData.roasChange || 0, // Use ROAS change as proxy for ROI change
-        taxes: metricsData.costsChange * 0.15 || 0, // Estimate taxes change
+        grossSales: metricsData.grossSalesChange ?? metricsData.revenueChange ?? 0,
+        discountsReturns:
+          metricsData.discountsReturnsChange ?? metricsData.discountsChange ?? 0,
+        netRevenue: metricsData.revenueChange ?? 0,
+        grossProfit: metricsData.grossProfitChange ?? 0,
+        operatingExpenses:
+          metricsData.operatingExpensesChange ?? metricsData.costsChange ?? 0,
+        ebitda: metricsData.ebitdaChange ?? metricsData.netProfitChange ?? 0,
+        netProfit: metricsData.netProfitChange ?? 0,
+        netMargin: metricsData.netProfitMarginChange ?? 0,
+        marketingCost:
+          metricsData.totalAdSpendChange ?? metricsData.adSpendChange ?? 0,
+        marketingROAS: metricsData.roasChange ?? 0,
+        marketingROI:
+          metricsData.marketingROIChange ?? metricsData.roasChange ?? 0,
+        taxes: metricsData.taxesPaidChange ?? 0,
       },
     };
   }, [metricsData]);
@@ -153,19 +161,19 @@ export function usePnLAnalytics(dateRange?: {
   const tablePeriods: PnLTablePeriod[] | undefined = useMemo(() => {
     if (!tableData?.periods) return undefined;
 
-    return tableData.periods.map((period) => ({
+    return tableData.periods.map((period): PnLTablePeriod => ({
       ...period,
       metrics: {
-        grossSales: period.metrics.revenue || 0, // Use revenue as proxy for gross sales
-        discounts: 0, // Not provided by API
-        refunds: 0, // Not provided by API
+        grossSales: period.metrics.grossSales,
+        discounts: period.metrics.discounts,
+        refunds: period.metrics.refunds,
         revenue: period.metrics.revenue,
         cogs: period.metrics.cogs,
         shippingCosts: period.metrics.shippingCosts,
         transactionFees: period.metrics.transactionFees,
         handlingFees: period.metrics.handlingFees,
         grossProfit: period.metrics.grossProfit,
-        taxesCollected: 0, // Not provided by API
+        taxesCollected: period.metrics.taxesCollected,
         taxesPaid: period.metrics.taxesPaid,
         customCosts: period.metrics.customCosts,
         totalAdSpend: period.metrics.totalAdSpend,

@@ -15,7 +15,7 @@ import {
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { useEffect, useMemo, useState } from "react";
-import type React from "react";
+import type { RowElement } from "@react-types/table";
 import { useRouter } from "next/navigation";
 
 import {
@@ -402,7 +402,7 @@ export default function VariantCostsClient({
                   );
                 }
 
-                const rows: Array<React.ReactElement> = [];
+                const rows: RowElement<VariantRow>[] = [];
                 grouped.forEach((grp, grpIndex) => {
                   const count = grp.items.length;
                   const isOpen = expandedGroups.has(grp.key);

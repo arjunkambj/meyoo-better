@@ -40,9 +40,12 @@ const Pricing = () => {
   return (
     <section className="bg-background py-16 sm:py-24 md:py-32">
       <div className="container mx-auto flex flex-col gap-8 sm:gap-10 md:gap-13 px-4 sm:px-6 lg:px-8">
-        <h1 className="text-center text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tighter text-foreground">
-          Simple Pricing Plans
-        </h1>
+        <div className="flex flex-col items-center justify-center">
+          <p className="text-center mb-3 text-primary">Pricing</p>
+          <h1 className="text-center text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tighter text-foreground">
+            Simple Pricing Plans
+          </h1>
+        </div>
 
         <div className="flex items-center justify-center gap-4">
           <span className="text-sm text-muted-foreground">Monthly</span>
@@ -73,7 +76,7 @@ const Pricing = () => {
             return (
               <Card
                 key={tier.key}
-                className={`h-full w-full sm:w-80 rounded-3xl pb-2 border ${
+                className={`h-full w-full bg-muted/70 sm:w-80 rounded-3xl pb-4  ${
                   tier.mostPopular ? "border-2 border-primary" : "border-border"
                 }`}
               >

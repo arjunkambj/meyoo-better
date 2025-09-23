@@ -1,10 +1,8 @@
 "use client";
 
-import { Card, CardBody, Divider } from "@heroui/react";
+import { Card, CardBody } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import Link from "next/link";
-
-import ContactForm from "@/components/home/components/ContactForm";
 
 const contactInfo = [
   {
@@ -12,6 +10,11 @@ const contactInfo = [
     title: "Email",
     description: "hey@meyoo.io",
     link: "mailto:hey@meyoo.io",
+  },
+  {
+    icon: "solar:phone-calling-bold-duotone",
+    title: "Mobile",
+    description: "Coming soon",
   },
 ];
 
@@ -42,7 +45,7 @@ export default function ContactPage() {
       {/* Contact Options */}
       <section className="py-12 px-4">
         <div className="max-w-6xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-16">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {contactInfo.map((item) => (
               <Card
                 key={item.title}
@@ -83,80 +86,6 @@ export default function ContactPage() {
             ))}
           </div>
 
-          {/* Contact Form */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-            {/* Form */}
-            <Card className="bg-content1/70 dark:bg-content1/40 backdrop-blur-md border border-divider rounded-2xl shadow-none">
-              <CardBody className="p-8">
-                <h2 className="text-2xl font-bold mb-6">Send Message</h2>
-                <ContactForm />
-              </CardBody>
-            </Card>
-
-            {/* FAQ Section */}
-            <div className="space-y-6">
-              <h2 className="text-2xl font-bold">Frequently Asked Questions</h2>
-
-              <div className="space-y-4">
-                <Card className="bg-content1/70 dark:bg-content1/40 backdrop-blur-md border border-divider rounded-2xl shadow-none">
-                  <CardBody className="p-6">
-                    <h3 className="font-semibold mb-2">
-                      What&apos;s the response time?
-                    </h3>
-                    <p className="text-default-600 text-sm">
-                      We typically respond to all inquiries within 24 hours
-                      during business days. Priority support customers receive
-                      responses within 4 hours.
-                    </p>
-                  </CardBody>
-                </Card>
-
-                <Card className="bg-content1/70 dark:bg-content1/40 backdrop-blur-md border border-divider rounded-2xl shadow-none">
-                  <CardBody className="p-6">
-                    <h3 className="font-semibold mb-2">Do you offer demos?</h3>
-                    <p className="text-default-600 text-sm">
-                      Yes! We offer personalized demos for qualified businesses.
-                      Select &quot;Sales Inquiry&quot; as your reason for
-                      contact to schedule one.
-                    </p>
-                  </CardBody>
-                </Card>
-
-                <Card className="bg-content1/70 dark:bg-content1/40 backdrop-blur-md border border-divider rounded-2xl shadow-none">
-                  <CardBody className="p-6">
-                    <h3 className="font-semibold mb-2">
-                      Is there phone support?
-                    </h3>
-                    <p className="text-default-600 text-sm">
-                      Phone support is available for Enterprise customers. All
-                      other plans include email and live chat support.
-                    </p>
-                  </CardBody>
-                </Card>
-              </div>
-
-              <Divider className="my-8" />
-
-              <div className="bg-content1/70 dark:bg-content1/40 backdrop-blur-md border border-divider rounded-2xl p-6">
-                <h3 className="font-semibold mb-3 flex items-center gap-2">
-                  <Icon
-                    className="w-5 h-5 text-primary"
-                    icon="solar:buildings-2-bold-duotone"
-                  />
-                  Office Location
-                </h3>
-                <p className="text-default-600 text-sm">
-                  Pyro Labs Private Limited
-                  <br />
-                  (Operating as Meyoo)
-                  <br />
-                  Noida, Uttar Pradesh
-                  <br />
-                  India
-                </p>
-              </div>
-            </div>
-          </div>
         </div>
       </section>
     </div>

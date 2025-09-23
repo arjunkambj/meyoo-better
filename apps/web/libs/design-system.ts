@@ -28,16 +28,12 @@ export const designSystem = {
 
   // Card styling
   card: {
-    base: "rounded-2xl border border-default-200/50 ",
-    hover: "transition-all duration-300",
-    padding: "p-6 sm:p-8",
-    subtle: "bg-muted/30 backdrop-blur-sm",
-    prominent: "bg-muted/60 backdrop-blur-sm",
+    base: "bg-gradient-to-br from-default-100 to-default-100/50 border border-default-200/20",
   },
 
   // Background patterns
   background: {
-    gradient: "bg-gradient-to-b from-background via-primary/5 to-background",
+    gradient: "bg-gradient-to-b from-background via-primary/4 to-background ",
     mesh: "absolute inset-0 -z-10 opacity-30",
     pattern: `
       background-image: linear-gradient(to right, rgba(99,102,241,0.08) 1px, transparent 1px),

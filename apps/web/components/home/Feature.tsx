@@ -132,7 +132,7 @@ const Card = ({
   return (
     <div
       className={cn(
-        "relative z-20 flex h-full ring-1 bg-primary/5 ring-primary/10 backdrop-blur-sm flex-col items-center justify-center gap-4 rounded-2xl p-6 sm:p-8 text-center backdrop-blur-sm transition-all duration-300",
+        `relative z-20 flex h-full ${designSystem.card.base} flex-col items-center justify-center gap-4 rounded-2xl p-6 sm:p-8 text-center backdrop-blur-sm transition-all duration-300`,
         className
       )}
     >

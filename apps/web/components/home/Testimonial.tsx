@@ -79,14 +79,12 @@ const Testimonial = () => {
                 <Icon icon="ri:double-quotes-l" width={40} />
               </div>
 
-              <h3 className="text-2xl font-semibold text-default-900 leading-tight mb-6">
+              <h3 className="text-2xl font-semibold text-foreground leading-tight mb-6">
                 {testimonial.title}
               </h3>
 
               <div className="flex-1 mb-8">
-                <p
-                  className={`${designSystem.typography.cardDescription} text-base text-default-800`}
-                >
+                <p className={`$ text-muted-foreground leading-relaxed`}>
                   {testimonial.description}
                 </p>
               </div>

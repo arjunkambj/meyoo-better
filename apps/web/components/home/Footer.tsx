@@ -7,6 +7,7 @@ import { footerNavigation } from "@/constants/navigation/footerNavigation";
 
 import { Logo } from "@/components/shared/Logo";
 import { designSystem } from "@/libs/design-system";
+import Link from "next/link";
 
 const navigationSections = [
   {
@@ -46,7 +47,9 @@ const Footer = () => {
       <div className={designSystem.spacing.container}>
         <footer>
           {/* CTA Section */}
-          <div className="mb-16 sm:mb-24 rounded-2xl max-w-7xl mx-auto  p-8 sm:p-10 md:p-12 lg:p-16 transition-all duration-300 ring-1 bg-primary/5 ring-primary/10">
+          <div
+            className={`mb-16 sm:mb-24 rounded-2xl max-w-7xl mx-auto  p-8 sm:p-10 md:p-12 lg:p-16 transition-all duration-300 ${designSystem.card.base}`}
+          >
             <div className="flex flex-col items-center text-center gap-5">
               <h2 className="max-w-[700px] text-2xl leading-tight font-semibold tracking-tight text-balance sm:text-3xl lg:text-4xl text-foreground">
                 Revolutionize Decision Making for your D2C{" "}
@@ -59,13 +62,12 @@ const Footer = () => {
               </p>
               <div className="mt-6 flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center sm:justify-center sm:gap-4">
                 <Button
-                  as="a"
+                  as={Link}
                   href="/get-started"
                   size="lg"
                   className="group w-full sm:w-auto font-medium"
                   variant="solid"
                   color="primary"
-                  radius="full"
                 >
                   <span className="flex items-center gap-2">
                     Start 14-day free trial

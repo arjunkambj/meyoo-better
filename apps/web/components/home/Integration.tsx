@@ -139,7 +139,7 @@ const Integration = () => {
         {howItWorks.map((feature, index) => (
           <PinContainer
             key={index}
-            className="ring-1 bg-primary/5 ring-primary/10 backdrop-blur-sm w-full rounded-2xl p-4 transition-all duration-300 ring-1 ring-white/5"
+            className={`${designSystem.card.base} w-full rounded-2xl p-4 transition-all duration-300`}
           >
             <div className="flex flex-col">
               <div className={feature.imageOrder}>

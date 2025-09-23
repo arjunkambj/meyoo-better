@@ -16,6 +16,7 @@ import { frequencies, tiers } from "./pricing/constants";
 import { type Frequency, FrequencyEnum, TiersEnum } from "./pricing/types";
 import { designSystem } from "@/libs/design-system";
 import { Icon } from "@iconify/react";
+import Link from "next/link";
 
 const showcasedTiers = tiers.filter(
   (tier) => tier.key !== TiersEnum.Enterprise
@@ -97,10 +98,8 @@ const Pricing = () => {
             return (
               <Card
                 key={tier.key}
-                className={`h-full w-full bg-primary/5 ring-primary/10 backdrop-blur-sm sm:w-80 rounded-2xl pb-4 transition-all duration-300 ${
-                  tier.mostPopular
-                    ? "ring-2  bg-primary/5 ring-primary backdrop-blur-sm "
-                    : "ring-1 ring-white/5"
+                className={`h-full w-full ${designSystem.card.base} sm:w-80 rounded-2xl pb-4 transition-all duration-300 
+                 
                 }`}
               >
                 <CardHeader className="flex flex-col px-6 py-6 items-start">
@@ -119,9 +118,9 @@ const Pricing = () => {
                   </p>
 
                   <Button
+                    as={Link}
                     className="mt-2 w-full"
                     color={tier.buttonColor}
-                    as="a"
                     href={tier.href}
                     variant={tier.buttonVariant}
                   >

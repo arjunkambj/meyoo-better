@@ -38,9 +38,12 @@ const faqs = [
 
 const Faq = () => {
   return (
-    <section className="py-16 sm:py-20 md:py-24 px-4 sm:px-6 lg:px-8">
-      <div className="container">
-        <div className="mx-auto grid max-w-7xl gap-10 md:grid-cols-2">
+    <section
+      id="faq"
+      className="py-16 sm:py-24 lg:py-32 px-4 sm:px-6 lg:px-8 scroll-mt-24"
+    >
+      <div className="container mx-auto max-w-7xl">
+        <div className="grid gap-10 md:grid-cols-2">
           <div className="flex flex-col gap-6">
             <h2 className="text-3xl font-semibold text-balance sm:text-4xl">
               Need Help?

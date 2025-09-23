@@ -9,8 +9,8 @@ import Link from "next/link";
 
 const Hero = () => {
   return (
-    <section className="relative w-full min-h-[calc(90vh)] flex items-center justify-center overflow-hidden bg-gradient-to-b from-background via-primary/5 to-background pt-[calc(env(safe-area-inset-top)+56px)] sm:pt-[calc(env(safe-area-inset-top)+72px)] md:pt-6">
-      <div className="container relative z-10 mx-auto py-16 sm:py-20 md:py-28 lg:py-36">
+    <section className="relative w-full min-h-[calc(90vh)] flex items-center justify-center overflow-hidden bg-gradient-to-b from-background via-primary/5 to-background pt-[calc(env(safe-area-inset-top)+56px)] sm:pt-[calc(env(safe-area-inset-top)+72px)] md:pt-24 pb-16 sm:pb-24 lg:pb-32">
+      <div className="container relative z-10 mx-auto py-16 sm:py-24 lg:py-32">
         <div className="text-center flex flex-col items-center">
           {/* Chip Badge */}
           <div className="inline-flex items-center gap-2.5 bg-default-50 border border-default-100 rounded-full px-5 py-2 mb-3">

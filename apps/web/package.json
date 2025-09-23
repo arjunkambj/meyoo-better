@@ -54,6 +54,7 @@
     "convex": "^1.27.1",
     "convex-helpers": "^0.1.104",
     "date-fns": "^4.1.0",
+    "embla-carousel-auto-scroll": "^8.6.0",
     "embla-carousel-react": "^8.6.0",
     "framer-motion": "^12.23.18",
     "graphql-request": "^7.2.0",

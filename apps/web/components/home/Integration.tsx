@@ -87,8 +87,8 @@ const Integration = () => {
   ];
 
   return (
-    <section className="flex flex-col py-12 items-center justify-center">
-      <div className="container pt-32">
+    <section className="flex w-full flex-col items-center justify-center py-16 sm:py-24 lg:py-32">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <p className="text-center mb-3 text-primary">How it Works</p>
         <h1 className="text-center text-5xl font-medium tracking-tight md:text-7xl">
           Stop Guessing, Start Knowing
@@ -118,7 +118,7 @@ const Integration = () => {
           <div className="pointer-events-none absolute inset-y-0 right-0 w-36 bg-gradient-to-l from-background"></div>
         </div>
       </div>
-      <div className="relative grid min-h-[32rem] max-w-7xl mx-auto mt-24 items-stretch gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="relative mx-auto mt-16 grid min-h-[32rem] w-full max-w-7xl items-stretch gap-6 px-4 sm:px-6 lg:px-8 md:grid-cols-2 lg:grid-cols-3">
         {howItWorks.map((feature, index) => (
           <PinContainer
             key={index}

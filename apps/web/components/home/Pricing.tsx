@@ -38,7 +38,10 @@ const Pricing = () => {
   );
 
   return (
-    <section className="bg-background py-16 sm:py-24 md:py-32">
+    <section
+      id="pricing"
+      className="bg-background py-16 sm:py-24 lg:py-32 scroll-mt-24"
+    >
       <div className="container mx-auto flex flex-col gap-8 sm:gap-10 md:gap-13 px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col items-center justify-center">
           <p className="text-center mb-3 text-primary">Pricing</p>

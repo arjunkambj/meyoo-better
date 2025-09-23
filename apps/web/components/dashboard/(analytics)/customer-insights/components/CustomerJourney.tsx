@@ -26,8 +26,8 @@ interface CustomerJourneyProps {
 
 export const CustomerJourney = memo(function CustomerJourney({
   data,
-  cancelRate = 3.2,
-  returnRate = 5.8,
+  cancelRate = 0,
+  returnRate = 0,
 }: CustomerJourneyProps) {
   // D2C-friendly stage descriptions
   const stageDescriptions: Record<string, string> = {
@@ -41,65 +41,19 @@ export const CustomerJourney = memo(function CustomerJourney({
     Retention: "Happy customers who came back and bought again",
   };
 
-  const defaultData: JourneyStage[] = [
-    {
-      stage: "Awareness",
-      customers: 5234,
-      percentage: 100,
-      avgDays: 0,
-      conversionRate: 45,
-      icon: "solar:eye-linear",
-      color: "primary",
-      bgColor: "bg-blue-50 dark:bg-blue-950/20",
-      textColor: "text-blue-600 dark:text-blue-400",
-    },
-    {
-      stage: "Interest",
-      customers: 2355,
-      percentage: 45,
-      avgDays: 2,
-      conversionRate: 67,
-      icon: "solar:heart-linear",
-      color: "secondary",
-      bgColor: "bg-purple-50 dark:bg-purple-950/20",
-      textColor: "text-purple-600 dark:text-purple-400",
-    },
-    {
-      stage: "Consideration",
-      customers: 1578,
-      percentage: 30,
-      avgDays: 5,
-      conversionRate: 42,
-      icon: "solar:cart-large-minimalistic-linear",
-      color: "indigo",
-      bgColor: "bg-indigo-50 dark:bg-indigo-950/20",
-      textColor: "text-indigo-600 dark:text-indigo-400",
-    },
-    {
-      stage: "Purchase",
-      customers: 663,
-      percentage: 13,
-      avgDays: 8,
-      conversionRate: 78,
-      icon: "solar:bag-4-linear",
-      color: "success",
-      bgColor: "bg-green-50 dark:bg-green-950/20",
-      textColor: "text-green-600 dark:text-green-400",
-    },
-    {
-      stage: "Retention",
-      customers: 517,
-      percentage: 10,
-      avgDays: 30,
-      conversionRate: 85,
-      icon: "solar:refresh-circle-linear",
-      color: "emerald",
-      bgColor: "bg-emerald-50 dark:bg-emerald-950/20",
-      textColor: "text-emerald-600 dark:text-emerald-400",
-    },
-  ];
+  const journeyData = data ?? [];
+  const hasJourneyData = journeyData.length > 0;
 
-  const journeyData = data || defaultData;
+  const firstStage = hasJourneyData ? journeyData[0] : undefined;
+  const purchaseStage = journeyData.find(
+    (stage) => stage.stage.toLowerCase() === "purchase",
+  );
+  const retentionStage = journeyData.find(
+    (stage) => stage.stage.toLowerCase() === "retention",
+  );
+
+  const safeCancelRate = Number.isFinite(cancelRate) ? cancelRate : 0;
+  const safeReturnRate = Number.isFinite(returnRate) ? returnRate : 0;
 
   return (
     <Card className="p-6 rounded-2xl border border-default-100/60 bg-content2/90 dark:bg-content1 shadow-none backdrop-blur-sm">
@@ -114,7 +68,7 @@ export const CustomerJourney = memo(function CustomerJourney({
         </div>
         <div className="text-sm bg-background border border-default-50 rounded-full px-4 py-2 text-default-600">
           <span className="font-medium">
-            {formatNumber(journeyData[0]?.customers ?? 0)}
+            {formatNumber(firstStage?.customers ?? 0)}
           </span>
           <span className="text-default-400 ml-1">visitors</span>
         </div>
@@ -123,52 +77,58 @@ export const CustomerJourney = memo(function CustomerJourney({
       <div className="space-y-8">
         {/* Journey Stages */}
         <div className="relative">
-          <div className="grid grid-cols-1 md:grid-cols-2  lg:grid-cols-5 gap-3">
-            {journeyData.map((stage, index) => (
-              <div key={stage.stage} className="relative">
-                {/* Simple connecting line */}
-                {index < journeyData.length - 1 && (
-                  <div className="hidden lg:block absolute top-8 left-[calc(100%-1rem)] w-8 pointer-events-none z-0">
-                    <div className="h-px bg-default-100 w-full" />
-                  </div>
-                )}
-                <div className="relative z-10 rounded-xl border border-default-100/70 bg-background border-default-50 p-4">
-                  <div className="flex flex-col items-center text-center space-y-3">
-                    <div
-                      className={`flex h-10 w-10 items-center justify-center rounded-xl ${stage.bgColor}`}
-                    >
-                      <Icon
-                        className={`w-5 h-5 ${stage.textColor}`}
-                        icon={stage.icon}
-                      />
+          {hasJourneyData ? (
+            <div className="grid grid-cols-1 md:grid-cols-2  lg:grid-cols-5 gap-3">
+              {journeyData.map((stage, index) => (
+                <div key={stage.stage} className="relative">
+                  {/* Simple connecting line */}
+                  {index < journeyData.length - 1 && (
+                    <div className="hidden lg:block absolute top-8 left-[calc(100%-1rem)] w-8 pointer-events-none z-0">
+                      <div className="h-px bg-default-100 w-full" />
                     </div>
-                    <div>
-                      <Tooltip
-                        closeDelay={0}
-                        content={stageDescriptions[stage.stage] || stage.stage}
-                        placement="top"
+                  )}
+                  <div className="relative z-10 rounded-xl border border-default-100/70 bg-background border-default-50 p-4">
+                    <div className="flex flex-col items-center text-center space-y-3">
+                      <div
+                        className={`flex h-10 w-10 items-center justify-center rounded-xl ${stage.bgColor}`}
                       >
-                        <p className="font-medium text-sm text-default-900 mb-1">
-                          {stage.stage}
+                        <Icon
+                          className={`w-5 h-5 ${stage.textColor}`}
+                          icon={stage.icon}
+                        />
+                      </div>
+                      <div>
+                        <Tooltip
+                          closeDelay={0}
+                          content={stageDescriptions[stage.stage] || stage.stage}
+                          placement="top"
+                        >
+                          <p className="font-medium text-sm text-default-900 mb-1">
+                            {stage.stage}
+                          </p>
+                        </Tooltip>
+                        <p className="text-xs text-default-500">
+                          {formatNumber(stage.customers)}
                         </p>
-                      </Tooltip>
-                      <p className="text-xs text-default-500">
-                        {formatNumber(stage.customers)}
-                      </p>
-                    </div>
-                    <div className="w-full pt-2 border-t border-default-100/70">
-                      <p className="text-xs text-default-400 mb-1">
-                        Conversion
-                      </p>
-                      <p className="text-sm font-medium text-default-700">
-                        {stage.conversionRate}%
-                      </p>
+                      </div>
+                      <div className="w-full pt-2 border-t border-default-100/70">
+                        <p className="text-xs text-default-400 mb-1">
+                          Conversion
+                        </p>
+                        <p className="text-sm font-medium text-default-700">
+                          {stage.conversionRate}%
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-default-100/70 bg-background p-6 text-center text-sm text-default-500">
+              No customer journey data is available for the selected period yet.
+            </div>
+          )}
         </div>
 
         {/* Key Metrics */}
@@ -179,9 +139,9 @@ export const CustomerJourney = memo(function CustomerJourney({
             </p>
             <p className="text-xl font-semibold text-default-900">
               {(() => {
-                const visitors = journeyData[0]?.customers || 0;
-                const purchasers = journeyData[3]?.customers || 0;
-                if (visitors <= 0) return "0.0%";
+                const visitors = firstStage?.customers || 0;
+                const purchasers = purchaseStage?.customers || 0;
+                if (visitors <= 0 || purchasers <= 0) return "0.0%";
                 return `${((purchasers / visitors) * 100).toFixed(1)}%`;
               })()}
             </p>
@@ -193,8 +153,8 @@ export const CustomerJourney = memo(function CustomerJourney({
             </p>
             <p className="text-xl font-semibold text-default-900">
               {(() => {
-                const purchasers = journeyData[3]?.customers || 0;
-                const repeat = journeyData[4]?.customers || 0;
+                const purchasers = purchaseStage?.customers || 0;
+                const repeat = retentionStage?.customers || 0;
                 if (purchasers <= 0) return "0%";
                 return `${((repeat / purchasers) * 100).toFixed(0)}%`;
               })()}
@@ -207,7 +167,7 @@ export const CustomerJourney = memo(function CustomerJourney({
               Cancel Rate
             </p>
             <p className="text-xl font-semibold text-default-900">
-              {cancelRate.toFixed(1)}%
+              {safeCancelRate.toFixed(1)}%
             </p>
             <p className="text-xs text-default-400 mt-1">Orders cancelled</p>
           </div>
@@ -216,7 +176,7 @@ export const CustomerJourney = memo(function CustomerJourney({
               Return Rate
             </p>
             <p className="text-xl font-semibold text-default-900">
-              {returnRate.toFixed(1)}%
+              {safeReturnRate.toFixed(1)}%
             </p>
             <p className="text-xs text-default-400 mt-1">Products returned</p>
           </div>
@@ -227,43 +187,54 @@ export const CustomerJourney = memo(function CustomerJourney({
           <p className="text-sm font-medium text-default-900 mb-4">
             Stage Progression
           </p>
-          <div className="space-y-3">
-            {journeyData.slice(0, -1).map((stage, index) => {
-              const nextStage = journeyData[index + 1] ?? {
-                stage: "",
-                customers: 0,
-              };
-              const conversionRate =
-                ((nextStage.customers || 0) / (stage.customers || 1)) * 100;
+          {hasJourneyData ? (
+            <div className="space-y-3">
+              {journeyData.slice(0, -1).map((stage, index) => {
+                const nextStage = journeyData[index + 1] ?? {
+                  stage: "",
+                  customers: 0,
+                };
+                const conversionRate =
+                  ((nextStage.customers || 0) / (stage.customers || 1)) * 100;
 
-              // Simple color based on conversion rate
-              const getProgressBarClass = () => {
-                if (conversionRate >= 70) return "bg-success";
-                if (conversionRate >= 50) return "bg-primary";
-                if (conversionRate >= 30) return "bg-warning";
-                return "bg-danger";
-              };
+                // Simple color based on conversion rate
+                const getProgressBarClass = () => {
+                  if (conversionRate >= 70) return "bg-success";
+                  if (conversionRate >= 50) return "bg-primary";
+                  if (conversionRate >= 30) return "bg-warning";
+                  return "bg-danger";
+                };
 
-              return (
-                <div key={`${stage.stage}-conversion`}>
-                  <div className="flex items-center justify-between text-sm mb-1.5">
-                    <span className="text-default-600">
-                      {stage.stage} → {nextStage.stage}
-                    </span>
-                    <span className="font-medium text-default-900">
-                      {conversionRate.toFixed(1)}%
-                    </span>
+                return (
+                  <div key={`${stage.stage}-conversion`}>
+                    <div className="flex items-center justify-between text-sm mb-1.5">
+                      <span className="text-default-600">
+                        {stage.stage} → {nextStage.stage}
+                      </span>
+                      <span className="font-medium text-default-900">
+                        {conversionRate.toFixed(1)}%
+                      </span>
+                    </div>
+                    <div className="h-1.5 bg-default-200/70 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${getProgressBarClass()}`}
+                        style={{
+                          width: `${Math.max(
+                            0,
+                            Math.min(conversionRate, 100),
+                          )}%`,
+                        }}
+                      />
+                    </div>
                   </div>
-                  <div className="h-1.5 bg-default-200/70 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full ${getProgressBarClass()}`}
-                      style={{ width: `${conversionRate}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-sm text-default-500">
+              We need more customer activity to show stage-by-stage conversions.
+            </p>
+          )}
         </div>
       </div>
     </Card>

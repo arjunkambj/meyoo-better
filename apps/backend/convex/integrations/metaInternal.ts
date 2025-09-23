@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 
 import { createSimpleLogger } from "../../libs/logging/simple";
+import { internal } from "../_generated/api";
 import { internalAction, internalMutation, internalQuery } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { debugToken } from "./metaTokens";
@@ -119,9 +120,7 @@ export const debugMetaTokenInternal = internalAction({
     try {
       // Always use token manager to obtain a valid token
       const token = await ctx.runAction(
-        // Cast to avoid FunctionReference generic inference noise
-        (require("../_generated/api").internal.integrations.tokenManager
-          .getValidAccessToken as any),
+        internal.integrations.tokenManager.getValidAccessToken,
         {
           organizationId: args.organizationId,
           platform: "meta",
@@ -130,8 +129,7 @@ export const debugMetaTokenInternal = internalAction({
 
       // Fetch session metadata via tokenManager's internal query
       const session = await ctx.runQuery(
-        (require("../_generated/api").internal.integrations.tokenManager
-          .getActiveSessionInternal as any),
+        internal.integrations.tokenManager.getActiveSessionInternal,
         {
           organizationId: args.organizationId,
           platform: "meta",

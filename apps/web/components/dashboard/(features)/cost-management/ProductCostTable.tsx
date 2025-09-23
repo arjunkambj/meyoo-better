@@ -14,7 +14,7 @@ import {
   TableRow,
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ComponentProps, type ReactElement } from "react";
 import { sanitizeDecimal } from "@/components/shared/table/sanitize";
 
 import {
@@ -34,6 +34,8 @@ import {
   DATA_TABLE_TABLE_CLASS,
 } from "@/components/shared/table/DataTableCard";
 import { cn } from "@/libs/utils";
+
+type TableCellElement = ReactElement<ComponentProps<typeof TableCell>>;
 
 type RowEdit = {
   cogs?: string;
@@ -380,7 +382,7 @@ export default function ProductCostTable() {
                 );
 
                 // Header cells aligned to table columns
-                const headerCells: any[] = [];
+                const headerCells: TableCellElement[] = [];
                 headerCells.push(
                   <TableCell key="variant">
                     <div className="min-w-0 flex items-center gap-3 py-1">

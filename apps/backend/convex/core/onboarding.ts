@@ -723,7 +723,7 @@ export const completeBillingStep = mutation({
     success: v.boolean(),
     nextStep: v.number(),
   }),
-  handler: async (ctx, args) => {
+  handler: async (ctx, _args) => {
     const { user } = await requireUserAndOrg(ctx);
 
     // Do not mark subscription or set plan here.

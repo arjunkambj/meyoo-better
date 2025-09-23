@@ -98,7 +98,13 @@ export const OnboardingLayoutClient = memo(function OnboardingLayoutClient({
     }
     // Clear any pending overlay on route change
     setNavigationPending(false);
-  }, [currentStep, pathname, onboardingState.currentStep, navigateToStep]);
+  }, [
+    currentStep,
+    pathname,
+    onboardingState.currentStep,
+    navigateToStep,
+    setNavigationPending,
+  ]);
 
   // Safety: auto-clear pending overlay if it lingers without a route change
   useEffect(() => {

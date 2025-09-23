@@ -2,7 +2,6 @@ import { v } from "convex/values";
 import { internalAction, internalMutation, internalQuery } from "../_generated/server";
 import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
-import { OAuthUtils } from "./_base";
 import { createSimpleLogger } from "../../libs/logging/simple";
 
 const logger = createSimpleLogger("TokenManager");

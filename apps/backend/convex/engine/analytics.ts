@@ -296,7 +296,6 @@ type DailyMetric = {
   orders: number;
   unitsSold: number;
   shippingCosts: number;
-  taxesPaid: number;
   discounts: number;
   refunds: number;
   cogs: number;
@@ -681,7 +680,10 @@ function calculateDailyMetrics(data: AnalyticsData): DailyMetric[] {
             }
             break;
           case "tax":
-            metrics.taxesPaid += percentageOfMoney(metrics.revenue, cost.value);
+            metrics.customCosts += percentageOfMoney(
+              metrics.revenue,
+              cost.value,
+            );
             break;
         }
       } else if (cost.calculation === "fixed") {
@@ -696,10 +698,10 @@ function calculateDailyMetrics(data: AnalyticsData): DailyMetric[] {
               );
             } else if (cost.type === "handling") {
               metrics.handlingFees += roundMoney(metrics.orders * cost.value);
-            } else if (cost.type === "tax") {
-              metrics.taxesPaid += roundMoney(metrics.orders * cost.value);
             } else if (cost.type === "operational") {
               // Rare case: operational per order, include in customCosts
+              metrics.customCosts += roundMoney(metrics.orders * cost.value);
+            } else if (cost.type === "tax") {
               metrics.customCosts += roundMoney(metrics.orders * cost.value);
             }
             break;
@@ -717,7 +719,9 @@ function calculateDailyMetrics(data: AnalyticsData): DailyMetric[] {
               metrics.transactionFees += roundMoney(
                 metrics.unitsSold * cost.value,
               );
-            } else if (cost.type === "operational") {
+            } else if (
+              cost.type === "operational" || cost.type === "tax"
+            ) {
               metrics.customCosts += roundMoney(
                 metrics.unitsSold * cost.value,
               );
@@ -725,36 +729,58 @@ function calculateDailyMetrics(data: AnalyticsData): DailyMetric[] {
             break;
           case "monthly":
             // Spread monthly costs across days in the month
-            if (cost.type === "operational" || cost.type === "marketing") {
+            if (
+              cost.type === "operational" ||
+              cost.type === "marketing" ||
+              cost.type === "tax"
+            ) {
               const dim = daysInMonth(date);
               metrics.customCosts += roundMoney(cost.value / dim);
             }
             break;
           case "weekly":
-            if (cost.type === "operational" || cost.type === "marketing") {
+            if (
+              cost.type === "operational" ||
+              cost.type === "marketing" ||
+              cost.type === "tax"
+            ) {
               metrics.customCosts += roundMoney(cost.value / 7);
             }
             break;
           case "daily":
-            if (cost.type === "operational" || cost.type === "marketing") {
+            if (
+              cost.type === "operational" ||
+              cost.type === "marketing" ||
+              cost.type === "tax"
+            ) {
               metrics.customCosts += roundMoney(cost.value);
             }
             break;
           case "quarterly":
-            if (cost.type === "operational" || cost.type === "marketing") {
+            if (
+              cost.type === "operational" ||
+              cost.type === "marketing" ||
+              cost.type === "tax"
+            ) {
               const diq = daysInQuarter(date);
               metrics.customCosts += roundMoney(cost.value / diq);
             }
             break;
           case "yearly":
-            if (cost.type === "operational" || cost.type === "marketing") {
+            if (
+              cost.type === "operational" ||
+              cost.type === "marketing" ||
+              cost.type === "tax"
+            ) {
               const diy = daysInYear(date);
               metrics.customCosts += roundMoney(cost.value / diy);
             }
             break;
           case "one_time":
             if (
-              (cost.type === "operational" || cost.type === "marketing") &&
+              (cost.type === "operational" ||
+                cost.type === "marketing" ||
+                cost.type === "tax") &&
               date === earliestActiveDate
             ) {
               metrics.customCosts += roundMoney(cost.value);
@@ -771,7 +797,7 @@ function calculateDailyMetrics(data: AnalyticsData): DailyMetric[] {
           metrics.handlingFees += roundMoney(metrics.unitsSold * cost.value);
         } else if (cost.type === "payment") {
           metrics.transactionFees += roundMoney(metrics.unitsSold * cost.value);
-        } else if (cost.type === "operational") {
+        } else if (cost.type === "operational" || cost.type === "tax") {
           metrics.customCosts += roundMoney(metrics.unitsSold * cost.value);
         }
       }
@@ -787,8 +813,7 @@ function calculateDailyMetrics(data: AnalyticsData): DailyMetric[] {
       metrics.totalAdSpend +
       metrics.shippingCosts +
       metrics.customCosts +
-      metrics.transactionFees +
-      metrics.taxesPaid;
+      metrics.transactionFees;
 
     // Profit metrics
     metrics.grossProfit = metrics.grossSales - metrics.cogs;
@@ -923,7 +948,6 @@ function initializeMetrics(date: string, organizationId: string): DailyMetric {
     shippingCosts: 0,
     customCosts: 0,
     transactionFees: 0,
-    taxesPaid: 0,
 
     // Order metrics
     orders: 0,
@@ -1031,7 +1055,6 @@ export const storeMetric = internalMutation({
       shippingCosts: args.metrics.shippingCosts || 0,
       customCosts: args.metrics.customCosts || 0,
       transactionFees: args.metrics.transactionFees || 0,
-      taxesPaid: args.metrics.taxesPaid || 0,
 
       // Order Summary
       avgOrderValue: args.metrics.avgOrderValue || 0,
@@ -1051,7 +1074,6 @@ export const storeMetric = internalMutation({
       taxesCollected: args.metrics.taxesCollected || 0,
       
       returns: args.metrics.returns || 0,
-
       // Total Ad Spend (blendedAdSpend should be same as totalAdSpend)
       blendedAdSpend: args.metrics.totalAdSpend || 0,
       blendedRoas: args.metrics.blendedRoas || 0,
@@ -1093,12 +1115,51 @@ export const storeMetric = internalMutation({
       metaROAS: args.metrics.metaROAS,
       googleROAS: args.metrics.googleROAS,
 
+      // Session & conversion tracking
+      uniqueVisitors: args.metrics.uniqueVisitors,
+      shopifySessions: args.metrics.shopifySessions,
+      shopifyConversionRate: args.metrics.shopifyConversionRate,
+      googleClicks: args.metrics.googleClicks,
+      googleConversions: args.metrics.googleConversions,
+      googleConversionRate: args.metrics.googleConversionRate,
+      blendedSessionConversionRate: args.metrics.blendedSessionConversionRate,
+
+      // Cost structure percentages
+      cogsPercentageOfGross: args.metrics.cogsPercentageOfGross,
+      cogsPercentageOfNet: args.metrics.cogsPercentageOfNet,
+      shippingPercentageOfNet: args.metrics.shippingPercentageOfNet,
+      taxesPercentageOfRevenue: args.metrics.taxesPercentageOfRevenue,
+      handlingFeesPercentage: args.metrics.handlingFeesPercentage,
+      customCostsPercentage: args.metrics.customCostsPercentage,
+
+      // Profitability & customer economics
+      operatingMargin: args.metrics.operatingMargin,
+      cacPercentageOfAOV: args.metrics.cacPercentageOfAOV,
+      cacPaybackPeriod: args.metrics.cacPaybackPeriod,
+      profitPerOrder: args.metrics.profitPerOrder,
+      profitPerUnit: args.metrics.profitPerUnit,
+      fulfillmentCostPerOrder: args.metrics.fulfillmentCostPerOrder,
+      inventoryTurnover: args.metrics.inventoryTurnover,
+      returnProcessingCost: args.metrics.returnProcessingCost,
+      cancelledOrderRate: args.metrics.cancelledOrderRate,
+      returnRate: args.metrics.returnRate,
+      refundRate: args.metrics.refundRate,
+      moMRevenueGrowth: args.metrics.moMRevenueGrowth,
+
       // Metadata
       updatedAt: Date.now(),
+      lastSyncedAt: args.metrics.lastSyncedAt,
     };
 
+    const patchPayload: Record<string, any> = { ...metricsToStore };
+
+    // Clean up deprecated fields that may linger in older documents
+    if (existing && "taxesPaid" in (existing as Record<string, unknown>)) {
+      patchPayload.taxesPaid = undefined;
+    }
+
     if (existing) {
-      await ctx.db.patch(existing._id, metricsToStore as any);
+      await ctx.db.patch(existing._id, patchPayload as any);
     } else {
       await ctx.db.insert("metricsDaily", metricsToStore as any);
     }
@@ -1399,7 +1460,6 @@ type AggregateMetric = {
   shippingCosts: number;
   customCosts: number;
   transactionFees: number;
-  taxesPaid: number;
   shippingCharged: number;
   taxesCollected: number;
   returns: number;
@@ -1460,7 +1520,6 @@ function initializeAggregateMetric(
     shippingCosts: 0,
     customCosts: 0,
     transactionFees: 0,
-    taxesPaid: 0,
 
     // Others
     shippingCharged: 0,
@@ -1541,7 +1600,6 @@ function aggregateMetric(aggregate: AggregateMetric, daily: DailyMetric): void {
   aggregate.shippingCosts += daily.shippingCosts || 0;
   aggregate.customCosts += daily.customCosts || 0;
   aggregate.transactionFees += daily.transactionFees || 0;
-  aggregate.taxesPaid += daily.taxesPaid || 0;
 
   // Others
   aggregate.shippingCharged += daily.shippingCharged || 0;
@@ -1617,7 +1675,6 @@ export const storeWeeklyMetric = internalMutation({
       shippingCosts: metric.shippingCosts || 0,
       customCosts: metric.customCosts || 0,
       transactionFees: metric.transactionFees || 0,
-      taxesPaid: metric.taxesPaid || 0,
 
       // Averages
       avgOrderValue: metric.orders > 0 ? metric.revenue / metric.orders : 0,
@@ -1742,7 +1799,6 @@ export const storeMonthlyMetric = internalMutation({
       shippingCosts: metric.shippingCosts || 0,
       customCosts: metric.customCosts || 0,
       transactionFees: metric.transactionFees || 0,
-      taxesPaid: metric.taxesPaid || 0,
 
       // Averages
       avgOrderValue: metric.orders > 0 ? metric.revenue / metric.orders : 0,

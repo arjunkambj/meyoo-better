@@ -26,6 +26,23 @@ const resolveApiToken = (
   return token;
 };
 
+const formatError = (error: unknown): string => {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (typeof error === "string") {
+    return error;
+  }
+
+  try {
+    return JSON.stringify(error);
+  } catch (stringifyError) {
+    void stringifyError;
+    return String(error);
+  }
+};
+
 const handler = createMcpHandler(
   (server) => {
     // Orders Summary Tool
@@ -75,9 +92,12 @@ const handler = createMcpHandler(
           return {
             content: [{ type: "text", text: lines.join("\n") }],
           };
-        } catch (error: any) {
+        } catch (error: unknown) {
           return {
-            content: [{ type: "text", text: `Error summarizing orders: ${error.message}` }],
+            content: [{
+              type: "text",
+              text: `Error summarizing orders: ${formatError(error)}`,
+            }],
             isError: true,
           };
         }
@@ -132,9 +152,12 @@ const handler = createMcpHandler(
           return {
             content: [{ type: "text", text: lines.join("\n\n") }],
           };
-        } catch (error: any) {
+        } catch (error: unknown) {
           return {
-            content: [{ type: "text", text: `Error retrieving inventory alerts: ${error.message}` }],
+            content: [{
+              type: "text",
+              text: `Error retrieving inventory alerts: ${formatError(error)}`,
+            }],
             isError: true,
           };
         }
@@ -185,9 +208,12 @@ const handler = createMcpHandler(
           return {
             content: [{ type: "text", text: lines.join("\n") }],
           };
-        } catch (error: any) {
+        } catch (error: unknown) {
           return {
-            content: [{ type: "text", text: `Error generating P&L snapshot: ${error.message}` }],
+            content: [{
+              type: "text",
+              text: `Error generating P&L snapshot: ${formatError(error)}`,
+            }],
             isError: true,
           };
         }
@@ -231,9 +257,12 @@ const handler = createMcpHandler(
           return {
             content: [{ type: "text", text: response }],
           };
-        } catch (error: any) {
+        } catch (error: unknown) {
           return {
-            content: [{ type: "text", text: `Error fetching analytics: ${error.message}` }],
+            content: [{
+              type: "text",
+              text: `Error fetching analytics: ${formatError(error)}`,
+            }],
             isError: true,
           };
         }
@@ -295,9 +324,12 @@ Video Performance:
           return {
             content: [{ type: "text", text: metricsText }],
           };
-        } catch (error: any) {
+        } catch (error: unknown) {
           return {
-            content: [{ type: "text", text: `Error fetching Meta ads data: ${error.message}` }],
+            content: [{
+              type: "text",
+              text: `Error fetching Meta ads data: ${formatError(error)}`,
+            }],
             isError: true,
           };
         }
@@ -330,9 +362,12 @@ Video Performance:
           return {
             content: [{ type: "text", text: response }],
           };
-        } catch (error: any) {
+        } catch (error: unknown) {
           return {
-            content: [{ type: "text", text: `Error getting current date: ${error.message}` }],
+            content: [{
+              type: "text",
+              text: `Error getting current date: ${formatError(error)}`,
+            }],
             isError: true,
           };
         }
@@ -369,9 +404,12 @@ Video Performance:
           return {
             content: [{ type: "text", text: response }],
           };
-        } catch (error: any) {
+        } catch (error: unknown) {
           return {
-            content: [{ type: "text", text: `Error fetching brand summary: ${error.message}` }],
+            content: [{
+              type: "text",
+              text: `Error fetching brand summary: ${formatError(error)}`,
+            }],
             isError: true,
           };
         }
@@ -419,7 +457,7 @@ const verifyToken = async (
         organization: validation.organization,
       },
     };
-  } catch (error) {
+  } catch (error: unknown) {
     if (process.env.NODE_ENV === "development") {
       console.error("Failed to validate API key", error);
     }

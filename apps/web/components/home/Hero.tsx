@@ -5,6 +5,7 @@ import { Icon } from "@iconify/react";
 import React from "react";
 
 import { Button, Card, CardBody } from "@heroui/react";
+import Image from "next/image";
 import Link from "next/link";
 
 const Hero = () => {
@@ -39,7 +40,7 @@ const Hero = () => {
               className="text-primary"
             />
             <span className="text-sm font-semibold text-primary">
-              Finally see today's profit
+              Finally see today&apos;s profit
             </span>
           </div>
 
@@ -101,10 +102,13 @@ const Hero = () => {
           <Card className="group relative mx-auto mt-12 h-[320px] w-full max-w-7xl rounded-4xl border border-default-200/70 bg-background/70 p-3 shadow-sm shadow-primary/10 backdrop-blur md:h-190">
             <div className="pointer-events-none absolute inset-0 rounded-4xl bg-gradient-to-br from-primary/10 via-transparent to-primary/5 opacity-80" />
             <CardBody className="relative size-full rounded-3xl border border-default-200/60 bg-gradient-to-br from-background via-content1 to-content2">
-              <img
+              <Image
+                alt="Dashboard preview"
+                className="size-full rounded-3xl object-cover"
+                fill
+                priority
                 src="https://deifkwefumgah.cloudfront.net/shadcnblocks/block/placeholder-1.svg"
-                className="size-full"
-                alt=""
+                unoptimized
               />
             </CardBody>
           </Card>

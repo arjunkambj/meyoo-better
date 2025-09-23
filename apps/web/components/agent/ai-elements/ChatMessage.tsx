@@ -12,7 +12,6 @@ interface ChatMessageProps {
   onCopy?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
-  onRegenerate?: () => void;
   className?: string;
 }
 
@@ -23,7 +22,6 @@ export default function ChatMessage({
   onCopy,
   onEdit,
   onDelete,
-  onRegenerate,
   className,
 }: ChatMessageProps) {
   const [showActions, setShowActions] = useState(false);

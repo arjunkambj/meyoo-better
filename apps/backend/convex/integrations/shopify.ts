@@ -3134,7 +3134,7 @@ export const storeCollectionInternal = internalMutation({
     collection: v.any(),
   },
   returns: v.null(),
-  handler: async (_ctx, args) => {
+  handler: async (_ctx, _args) => {
     // production: avoid noisy collection logs
 
     return null;
@@ -3147,7 +3147,7 @@ export const updateCollectionInternal = internalMutation({
     collection: v.any(),
   },
   returns: v.null(),
-  handler: async (_ctx, args) => {
+  handler: async (_ctx, _args) => {
     // production: avoid noisy collection logs
 
     return null;
@@ -3160,7 +3160,7 @@ export const deleteCollectionInternal = internalMutation({
     collectionId: v.string(),
   },
   returns: v.null(),
-  handler: async (_ctx, args) => {
+  handler: async (_ctx, _args) => {
     // production: avoid noisy collection logs
 
     return null;
@@ -4554,15 +4554,6 @@ export const handleAppUninstalled = internalMutation({
       });
 
       // Try to get a user for audit log
-      const users = await ctx.db
-        .query("users")
-        .withIndex("by_organization", (q) =>
-          q.eq("organizationId", args.organizationId as Id<"organizations">)
-        )
-        .collect();
-
-      // Audit logs trimmed in schema
-
       throw error;
     }
   },

@@ -148,8 +148,7 @@ export const dedupeMetaAdAccounts = internalAction({
       if (docs.length <= 1) continue;
       // Keep the one with latest updatedAt (fallback to createdAt via _id timestamp ordering isn't available, so use updatedAt)
       const sorted = docs.sort((a: any, b: any) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
-      const keep = sorted[0];
-      const toDelete = sorted.slice(1);
+      const [, ...toDelete] = sorted;
       for (const d of toDelete) {
         try {
           await ctx.runMutation(

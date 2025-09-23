@@ -1126,12 +1126,7 @@ export const getGeographicDistribution = query({
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 10); // Top 10 cities
 
-    // Mock heatmap data (in production, would use geocoding)
-    const heatmapData = [
-      { lat: 40.7128, lng: -74.006, value: 100 }, // New York
-      { lat: 34.0522, lng: -118.2437, value: 85 }, // Los Angeles
-      { lat: 41.8781, lng: -87.6298, value: 70 }, // Chicago
-    ];
+    const heatmapData: Array<{ lat: number; lng: number; value: number }> = [];
 
     return {
       countries: countries.sort((a, b) => b.revenue - a.revenue),

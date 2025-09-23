@@ -426,16 +426,11 @@ export const initial = internalAction({
 
         // Also fetch campaigns for reference
         // production: omit campaign fetch chatter
-        const campaignStartTime = Date.now();
         const campaigns = await client.getCampaigns(
           accountId,
           ["id", "name", "status", "objective", "created_time", "updated_time"],
           { limit: 500 }
         );
-
-        const campaignDuration = Date.now() - campaignStartTime;
-
-        // production: omit timings; summary is logged below
 
         if (campaigns.data && campaigns.data.length > 0) {
           await ctx.runMutation(

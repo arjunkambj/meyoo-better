@@ -19,7 +19,6 @@ export interface PnLMetrics {
   handlingFees: number;
   grossProfit: number;
   taxesCollected: number;
-  taxesPaid: number;
   customCosts: number;
   totalAdSpend: number;
   netProfit: number;
@@ -104,19 +103,17 @@ export function usePnLAnalytics(dateRange?: {
     const grossProfit = metricsData.grossProfit ?? 0;
     const marketingCost = metricsData.totalAdSpend ?? 0;
     const marketingROAS = metricsData.avgROAS ?? 0;
-    const taxes = metricsData.taxesPaid ?? 0;
     const inferredOperatingExpenses =
       (metricsData.shippingCosts ?? 0) +
       (metricsData.transactionFees ?? 0) +
       (metricsData.handlingFees ?? 0) +
       (metricsData.customCosts ?? 0) +
-      taxes +
       marketingCost;
     const operatingExpenses =
       metricsData.operatingExpenses ?? inferredOperatingExpenses;
     const netProfit = metricsData.netProfit ?? 0;
     const netMargin = metricsData.netProfitMargin ?? 0;
-    const ebitda = metricsData.ebitda ?? netProfit + taxes;
+    const ebitda = metricsData.ebitda ?? netProfit;
     const marketingROI =
       metricsData.marketingROI ??
       (marketingCost > 0
@@ -135,7 +132,6 @@ export function usePnLAnalytics(dateRange?: {
       marketingCost,
       marketingROAS,
       marketingROI,
-      taxes,
       changes: {
         grossSales: metricsData.grossSalesChange ?? metricsData.revenueChange ?? 0,
         discountsReturns:
@@ -152,7 +148,6 @@ export function usePnLAnalytics(dateRange?: {
         marketingROAS: metricsData.roasChange ?? 0,
         marketingROI:
           metricsData.marketingROIChange ?? metricsData.roasChange ?? 0,
-        taxes: metricsData.taxesPaidChange ?? 0,
       },
     };
   }, [metricsData]);
@@ -174,7 +169,6 @@ export function usePnLAnalytics(dateRange?: {
         handlingFees: period.metrics.handlingFees,
         grossProfit: period.metrics.grossProfit,
         taxesCollected: period.metrics.taxesCollected,
-        taxesPaid: period.metrics.taxesPaid,
         customCosts: period.metrics.customCosts,
         totalAdSpend: period.metrics.totalAdSpend,
         netProfit: period.metrics.netProfit,
@@ -248,7 +242,6 @@ export function usePnLAnalytics(dateRange?: {
           handlingFees: period.metrics.handlingFees,
           grossProfit: period.metrics.grossProfit,
           taxesCollected: period.metrics.taxesCollected,
-          taxesPaid: period.metrics.taxesPaid,
           customCosts: period.metrics.customCosts,
           totalAdSpend: period.metrics.totalAdSpend,
           netProfit: period.metrics.netProfit,

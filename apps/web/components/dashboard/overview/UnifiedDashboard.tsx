@@ -88,13 +88,9 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
       cogsPercentageOfGross: overviewMetrics?.cogsPercentageOfGross?.value || 0,
       cogsPercentageOfNet: overviewMetrics?.cogsPercentageOfNet?.value || 0,
       shippingCosts: overviewMetrics?.shippingCosts?.value || 0,
-      shippingPercentageOfGross:
-        overviewMetrics?.shippingPercentageOfGross?.value || 0,
       shippingPercentageOfNet:
         overviewMetrics?.shippingPercentageOfNet?.value || 0,
       transactionFees: overviewMetrics?.transactionFees?.value || 0,
-      transactionFeesPercentage:
-        overviewMetrics?.transactionFeesPercentage?.value || 0,
       taxesCollected: overviewMetrics?.taxesCollected?.value || 0,
       taxesPercentageOfRevenue:
         overviewMetrics?.taxesPercentageOfRevenue?.value || 0,
@@ -117,7 +113,6 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
       // Additional costs for widgets
       handlingFees: overviewMetrics?.handlingFees?.value || 0,
       customCosts: overviewMetrics?.customCosts?.value || 0,
-      taxesPaid: overviewMetrics?.taxesPaid?.value || 0,
       operatingCosts: overviewMetrics?.operatingCosts?.value || 0,
 
       // Widget-specific metrics

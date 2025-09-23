@@ -52,7 +52,6 @@ export const getMetrics = query({
     const totalTransactionFees = sumBy(filteredMetrics, "transactionFees");
     const totalHandlingFees = sumBy(filteredMetrics, "handlingFees");
     const totalTaxesCollected = sumBy(filteredMetrics, "taxesCollected");
-    const totalTaxesPaid = sumBy(filteredMetrics, "taxesPaid");
     const totalCustomCosts = sumBy(filteredMetrics, "customCosts");
     const totalAdSpend = sumBy(filteredMetrics, "totalAdSpend");
 
@@ -61,10 +60,8 @@ export const getMetrics = query({
       totalTransactionFees +
       totalHandlingFees +
       totalCustomCosts +
-      totalTaxesPaid +
       totalAdSpend;
-    const operatingExpensesExTaxes = operatingExpenses - totalTaxesPaid;
-    const ebitda = totalGrossProfit - operatingExpensesExTaxes;
+    const ebitda = totalGrossProfit - operatingExpenses;
     const marketingROI =
       totalAdSpend > 0
         ? ((totalRevenue - totalAdSpend) / totalAdSpend) * 100
@@ -117,7 +114,6 @@ export const getMetrics = query({
     const prevShippingCosts = sumBy(previousMetrics, "shippingCosts");
     const prevTransactionFees = sumBy(previousMetrics, "transactionFees");
     const prevHandlingFees = sumBy(previousMetrics, "handlingFees");
-    const prevTaxesPaid = sumBy(previousMetrics, "taxesPaid");
     const prevTaxesCollected = sumBy(previousMetrics, "taxesCollected");
     const prevCustomCosts = sumBy(previousMetrics, "customCosts");
     const prevAdSpend = sumBy(previousMetrics, "totalAdSpend");
@@ -126,10 +122,8 @@ export const getMetrics = query({
       prevTransactionFees +
       prevHandlingFees +
       prevCustomCosts +
-      prevTaxesPaid +
       prevAdSpend;
-    const prevOperatingExpensesExTaxes = prevOperatingExpenses - prevTaxesPaid;
-    const prevEbitda = prevGrossProfit - prevOperatingExpensesExTaxes;
+    const prevEbitda = prevGrossProfit - prevOperatingExpenses;
 
     const prevAvgROAS =
       previousMetrics.length > 0
@@ -164,7 +158,6 @@ export const getMetrics = query({
       transactionFees: totalTransactionFees,
       handlingFees: totalHandlingFees,
       taxesCollected: totalTaxesCollected,
-      taxesPaid: totalTaxesPaid,
       customCosts: totalCustomCosts,
       totalAdSpend,
       operatingExpenses,
@@ -190,7 +183,6 @@ export const getMetrics = query({
         prevTransactionFees,
       ),
       handlingFeesChange: calculateChange(totalHandlingFees, prevHandlingFees),
-      taxesPaidChange: calculateChange(totalTaxesPaid, prevTaxesPaid),
       customCostsChange: calculateChange(totalCustomCosts, prevCustomCosts),
       totalAdSpendChange: calculateChange(totalAdSpend, prevAdSpend),
       adSpendChange: calculateChange(totalAdSpend, prevAdSpend),
@@ -270,11 +262,6 @@ export const getWaterfallData = query({
       (sum, m) => sum + (m.customCosts || 0),
       0,
     );
-    const taxesPaid = filteredMetrics.reduce(
-      (sum, m) => sum + (m.taxesPaid || 0),
-      0,
-    );
-
     return {
       grossRevenue,
       discounts,
@@ -284,7 +271,6 @@ export const getWaterfallData = query({
       transactionFees,
       totalAdSpend,
       customCosts,
-      taxesPaid,
     };
   },
 });
@@ -332,17 +318,13 @@ export const getCostBreakdown = query({
       (sum, m) => sum + (m.handlingFees || 0),
       0,
     );
-    const taxes = filteredMetrics.reduce(
-      (sum, m) => sum + (m.taxesPaid || 0),
-      0,
-    );
     const custom = filteredMetrics.reduce(
       (sum, m) => sum + (m.customCosts || 0),
       0,
     );
 
     const totalCosts =
-      cogs + shipping + marketing + transactionFees + handling + taxes + custom;
+      cogs + shipping + marketing + transactionFees + handling + custom;
 
     // Calculate changes (compare with previous period)
     const periodLength = filteredMetrics.length;
@@ -416,14 +398,6 @@ export const getCostBreakdown = query({
           change: 0,
           icon: "solar:box-minimalistic-bold-duotone",
           color: "info",
-        },
-        {
-          category: "Taxes",
-          amount: taxes,
-          percentage: totalCosts > 0 ? (taxes / totalCosts) * 100 : 0,
-          change: 0,
-          icon: "solar:document-text-bold-duotone",
-          color: "default",
         },
       ],
     };
@@ -961,7 +935,6 @@ export const getTableData = query({
             transactionFees: v.number(),
             handlingFees: v.number(),
             taxesCollected: v.number(),
-            taxesPaid: v.number(),
             customCosts: v.number(),
             totalAdSpend: v.number(),
           }),
@@ -1044,10 +1017,6 @@ export const getTableData = query({
         (sum, m) => sum + (m.taxesCollected || 0),
         0,
       );
-      const taxesPaid = metricsArray.reduce(
-        (sum, m) => sum + (m.taxesPaid || 0),
-        0,
-      );
       const customCosts = metricsArray.reduce(
         (sum, m) => sum + (m.customCosts || 0),
         0,
@@ -1074,7 +1043,6 @@ export const getTableData = query({
         handlingFees,
         grossProfit,
         taxesCollected,
-        taxesPaid,
         customCosts,
         totalAdSpend,
         netProfit,
@@ -1099,7 +1067,6 @@ export const getTableData = query({
         transactionFees: number;
         handlingFees: number;
         taxesCollected: number;
-        taxesPaid: number;
         customCosts: number;
         totalAdSpend: number;
       };
@@ -1125,11 +1092,10 @@ export const getTableData = query({
           cogs: current.cogs || 0,
           shippingCosts: current.shippingCosts || 0,
           transactionFees: current.transactionFees || 0,
-          handlingFees: current.handlingFees || 0,
-          grossProfit: current.grossProfit || 0,
-          taxesCollected: current.taxesCollected || 0,
-          taxesPaid: current.taxesPaid || 0,
-          customCosts: current.customCosts || 0,
+        handlingFees: current.handlingFees || 0,
+        grossProfit: current.grossProfit || 0,
+        taxesCollected: current.taxesCollected || 0,
+        customCosts: current.customCosts || 0,
           totalAdSpend: current.totalAdSpend || 0,
           netProfit: current.netProfit || 0,
           netProfitMargin:

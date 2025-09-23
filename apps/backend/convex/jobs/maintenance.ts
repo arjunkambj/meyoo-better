@@ -248,7 +248,7 @@ export const resetSyncCredits = internalAction({
     success: v.boolean(),
     reset: v.number(),
   }),
-  handler: async (ctx) => {
+  handler: async (_ctx) => {
     return {
       success: true,
       reset: 0,
@@ -495,9 +495,7 @@ export const getOrganizationCache = internalQuery({
 export const getProfilesNeedingCreditReset = internalQuery({
   args: {},
   returns: v.array(v.any()),
-  handler: async (ctx) => {
-    const now = Date.now();
-
+  handler: async (_ctx) => {
     // TODO: Need index "by_credits_reset" on syncProfiles table
     // Once index is added, replace with:
     // const profiles = await ctx.db

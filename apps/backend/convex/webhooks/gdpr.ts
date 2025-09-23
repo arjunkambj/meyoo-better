@@ -1,4 +1,3 @@
-import { api } from "../_generated/api";
 import { httpAction } from "../_generated/server";
 import { WebhookUtils } from "../integrations/_base";
 
@@ -19,7 +18,6 @@ export const customerRedact = httpAction(async (ctx, request) => {
     const topic = request.headers.get("x-shopify-topic");
     const domain = request.headers.get("x-shopify-shop-domain");
     const signature = request.headers.get("x-shopify-hmac-sha256");
-    const webhookId = request.headers.get("x-shopify-webhook-id");
 
     // Validate required headers
     if (!topic || !domain) {
@@ -139,7 +137,6 @@ export const customerDataRequest = httpAction(async (ctx, request) => {
     const topic = request.headers.get("x-shopify-topic");
     const domain = request.headers.get("x-shopify-shop-domain");
     const signature = request.headers.get("x-shopify-hmac-sha256");
-    const webhookId = request.headers.get("x-shopify-webhook-id");
 
     // Validate required headers
     if (!topic || !domain) {
@@ -260,7 +257,6 @@ export const shopRedact = httpAction(async (ctx, request) => {
     const topic = request.headers.get("x-shopify-topic");
     const domain = request.headers.get("x-shopify-shop-domain");
     const signature = request.headers.get("x-shopify-hmac-sha256");
-    const webhookId = request.headers.get("x-shopify-webhook-id");
 
     // Validate required headers
     if (!topic || !domain) {

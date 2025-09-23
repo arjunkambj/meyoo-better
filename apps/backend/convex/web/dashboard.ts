@@ -1,6 +1,6 @@
 import type { GenericQueryCtx } from "convex/server";
 import { v } from "convex/values";
-import type { DataModel, Id } from "../_generated/dataModel";
+import type { DataModel, Doc, Id } from "../_generated/dataModel";
 import { query } from "../_generated/server";
 import { getUserAndOrg } from "../utils/auth";
 
@@ -21,67 +21,71 @@ export const getDashboardSummary = query({
   returns: v.union(
     v.null(),
     v.object({
-      revenue: v.number(),
-      revenueChange: v.number(),
-      profit: v.number(),
-      profitChange: v.number(),
-      orders: v.number(),
-      ordersChange: v.number(),
-      customers: v.number(),
-      customersChange: v.number(),
-      products: v.number(),
-      productsChange: v.number(),
-      adSpend: v.number(),
-      adSpendChange: v.number(),
-      profitMargin: v.number(),
-      profitMarginChange: v.number(),
-      avgOrderValue: v.number(),
-      avgOrderValueChange: v.number(),
-      roas: v.number(),
-      roasChange: v.number(),
+      revenue: v.float64(),
+      revenueChange: v.float64(),
+      profit: v.float64(),
+      profitChange: v.float64(),
+      orders: v.float64(),
+      ordersChange: v.float64(),
+      customers: v.float64(),
+      customersChange: v.float64(),
+      products: v.float64(),
+      productsChange: v.float64(),
+      adSpend: v.float64(),
+      adSpendChange: v.float64(),
+      profitMargin: v.float64(),
+      profitMarginChange: v.float64(),
+      avgOrderValue: v.float64(),
+      avgOrderValueChange: v.float64(),
+      roas: v.float64(),
+      roasChange: v.float64(),
       // Additional metrics
-      grossSales: v.number(),
-      grossSalesChange: v.number(),
-      grossProfit: v.number(),
-      grossProfitChange: v.number(),
-      grossProfitMargin: v.number(),
-      grossProfitMarginChange: v.number(),
-      discounts: v.number(),
-      discountsChange: v.number(),
-      discountRate: v.number(),
-      discountRateChange: v.number(),
-      cogs: v.number(),
-      cogsChange: v.number(),
-      shippingCosts: v.number(),
-      shippingCostsChange: v.number(),
-      transactionFees: v.number(),
-      transactionFeesChange: v.number(),
-      taxesCollected: v.number(),
-      taxesCollectedChange: v.number(),
-      metaAdSpend: v.number(),
-      metaAdSpendChange: v.number(),
-      googleAdSpend: v.number(),
-      googleAdSpendChange: v.number(),
-      contributionMargin: v.number(),
-      contributionMarginChange: v.number(),
-      contributionMarginPercentage: v.number(),
-      contributionMarginPercentageChange: v.number(),
-      metaROAS: v.number(),
-      metaROASChange: v.number(),
-      googleROAS: v.number(),
-      googleROASChange: v.number(),
-      metaSpendPercentage: v.number(),
-      metaSpendPercentageChange: v.number(),
-      googleSpendPercentage: v.number(),
-      googleSpendPercentageChange: v.number(),
-      unitsSold: v.number(),
-      unitsSoldChange: v.number(),
-      newCustomers: v.number(),
-      newCustomersChange: v.number(),
-      returningCustomers: v.number(),
-      returningCustomersChange: v.number(),
+      grossSales: v.float64(),
+      grossSalesChange: v.float64(),
+      grossProfit: v.float64(),
+      grossProfitChange: v.float64(),
+      grossProfitMargin: v.float64(),
+      grossProfitMarginChange: v.float64(),
+      discounts: v.float64(),
+      discountsChange: v.float64(),
+      discountRate: v.float64(),
+      discountRateChange: v.float64(),
+      cogs: v.float64(),
+      cogsChange: v.float64(),
+      shippingCosts: v.float64(),
+      shippingCostsChange: v.float64(),
+      handlingFees: v.float64(),
+      handlingFeesChange: v.float64(),
+      customCosts: v.float64(),
+      customCostsChange: v.float64(),
+      transactionFees: v.float64(),
+      transactionFeesChange: v.float64(),
+      taxesCollected: v.float64(),
+      taxesCollectedChange: v.float64(),
+      metaAdSpend: v.float64(),
+      metaAdSpendChange: v.float64(),
+      googleAdSpend: v.float64(),
+      googleAdSpendChange: v.float64(),
+      contributionMargin: v.float64(),
+      contributionMarginChange: v.float64(),
+      contributionMarginPercentage: v.float64(),
+      contributionMarginPercentageChange: v.float64(),
+      metaROAS: v.float64(),
+      metaROASChange: v.float64(),
+      googleROAS: v.float64(),
+      googleROASChange: v.float64(),
+      metaSpendPercentage: v.float64(),
+      metaSpendPercentageChange: v.float64(),
+      googleSpendPercentage: v.float64(),
+      googleSpendPercentageChange: v.float64(),
+      unitsSold: v.float64(),
+      unitsSoldChange: v.float64(),
+      newCustomers: v.float64(),
+      newCustomersChange: v.float64(),
+      returningCustomers: v.float64(),
+      returningCustomersChange: v.float64(),
       // Strict calendar month-over-month growth (revenue)
-      calendarMoMRevenueGrowth: v.number(),
+      calendarMoMRevenueGrowth: v.float64(),
       period: v.object({
         start: v.string(),
         end: v.string(),
@@ -315,6 +319,10 @@ export const getDashboardSummary = query({
         cogsChange: 0,
         shippingCosts,
         shippingCostsChange: 0,
+        handlingFees: 0,
+        handlingFeesChange: 0,
+        customCosts: 0,
+        customCostsChange: 0,
         transactionFees,
         transactionFeesChange: 0,
         taxesCollected: filteredOrders.reduce(
@@ -358,24 +366,68 @@ export const getDashboardSummary = query({
 
     // Aggregate previous period metrics
     type SummaryAcc = {
-      revenue: number; profit: number; orders: number; customers: number; adSpend: number;
-      grossSales: number; grossProfit: number; discounts: number; cogs: number; shippingCosts: number;
-      transactionFees: number; taxesCollected: number; metaAdSpend: number; googleAdSpend: number;
-      contributionMargin: number; metaROAS: number; googleROAS: number; unitsSold: number; newCustomers: number; returningCustomers: number;
+      revenue: number;
+      profit: number;
+      orders: number;
+      customers: number;
+      products: number;
+      adSpend: number;
+      grossSales: number;
+      grossProfit: number;
+      discounts: number;
+      cogs: number;
+      shippingCosts: number;
+      handlingFees: number;
+      customCosts: number;
+      transactionFees: number;
+      taxesCollected: number;
+      metaAdSpend: number;
+      googleAdSpend: number;
+      contributionMargin: number;
+      unitsSold: number;
+      newCustomers: number;
+      returningCustomers: number;
     };
-    const previousSummary = previousMetrics.reduce(
-      (acc: SummaryAcc, m: any) => {
+    const createSummaryAcc = (): SummaryAcc => ({
+      revenue: 0,
+      profit: 0,
+      orders: 0,
+      customers: 0,
+      products: 0,
+      adSpend: 0,
+      grossSales: 0,
+      grossProfit: 0,
+      discounts: 0,
+      cogs: 0,
+      shippingCosts: 0,
+      handlingFees: 0,
+      customCosts: 0,
+      transactionFees: 0,
+      taxesCollected: 0,
+      metaAdSpend: 0,
+      googleAdSpend: 0,
+      contributionMargin: 0,
+      unitsSold: 0,
+      newCustomers: 0,
+      returningCustomers: 0,
+    });
+
+    const previousSummary = previousMetrics.reduce<SummaryAcc>(
+      (acc, m: Doc<"metricsDaily">) => {
         acc.revenue += m.revenue || 0;
         acc.profit += m.netProfit || 0;
         acc.orders += m.orders || 0;
         acc.customers += m.totalCustomers || 0;
-        acc.adSpend += m.totalAdSpend || m.marketingSpend || 0;
+        acc.products += 0;
+        acc.adSpend += m.totalAdSpend;
         acc.grossSales += m.grossSales || 0;
         acc.grossProfit += m.grossProfit || 0;
         acc.discounts += m.discounts || 0;
         acc.cogs += m.cogs || 0;
         acc.shippingCosts += m.shippingCosts || 0;
         acc.transactionFees += m.transactionFees || 0;
+        acc.handlingFees += m.handlingFees || 0;
+        acc.customCosts += m.customCosts || 0;
         acc.taxesCollected += m.taxesCollected || 0;
         acc.metaAdSpend += m.metaAdSpend || 0;
         acc.googleAdSpend += m.googleAdSpend || 0;
@@ -384,33 +436,9 @@ export const getDashboardSummary = query({
         acc.newCustomers += m.newCustomers || 0;
         acc.returningCustomers += m.returningCustomers || 0;
 
-        if (m.metaROAS) acc.metaROAS = m.metaROAS;
-        if (m.googleROAS) acc.googleROAS = m.googleROAS;
-
         return acc;
       },
-      {
-        revenue: 0,
-        profit: 0,
-        orders: 0,
-        customers: 0,
-        adSpend: 0,
-        grossSales: 0,
-        grossProfit: 0,
-        discounts: 0,
-        cogs: 0,
-        shippingCosts: 0,
-        transactionFees: 0,
-        taxesCollected: 0,
-        metaAdSpend: 0,
-        googleAdSpend: 0,
-        contributionMargin: 0,
-        metaROAS: 0,
-        googleROAS: 0,
-        unitsSold: 0,
-        newCustomers: 0,
-        returningCustomers: 0,
-      } as SummaryAcc,
+      createSummaryAcc(),
     );
 
     // Helper function to calculate percentage change
@@ -421,14 +449,14 @@ export const getDashboardSummary = query({
     };
 
     // Aggregate current metrics - include all metrics from metricsDaily
-    const summary = metrics.reduce(
-      (acc, m) => {
+    const summary = metrics.reduce<SummaryAcc>(
+      (acc, m: Doc<"metricsDaily">) => {
         acc.revenue += m.revenue || 0;
         acc.profit += m.netProfit || 0;
         acc.orders += m.orders || 0;
         acc.customers += m.totalCustomers || 0;
         acc.products += 0; // products field doesn't exist
-        acc.adSpend += m.totalAdSpend || 0;
+        acc.adSpend += m.totalAdSpend;
 
         // Additional metrics for comprehensive dashboard
         acc.grossSales += m.grossSales || 0;
@@ -437,6 +465,8 @@ export const getDashboardSummary = query({
         acc.cogs += m.cogs || 0;
         acc.shippingCosts += m.shippingCosts || 0;
         acc.transactionFees += m.transactionFees || 0;
+        acc.handlingFees += m.handlingFees || 0;
+        acc.customCosts += m.customCosts || 0;
         acc.taxesCollected += m.taxesCollected || 0;
         acc.metaAdSpend += m.metaAdSpend || 0;
         acc.googleAdSpend += m.googleAdSpend || 0;
@@ -447,27 +477,7 @@ export const getDashboardSummary = query({
 
         return acc;
       },
-      {
-        revenue: 0,
-        profit: 0,
-        orders: 0,
-        customers: 0,
-        products: 0,
-        adSpend: 0,
-        grossSales: 0,
-        grossProfit: 0,
-        discounts: 0,
-        cogs: 0,
-        shippingCosts: 0,
-        transactionFees: 0,
-        taxesCollected: 0,
-        metaAdSpend: 0,
-        googleAdSpend: 0,
-        contributionMargin: 0,
-        unitsSold: 0,
-        newCustomers: 0,
-        returningCustomers: 0,
-      },
+      createSummaryAcc(),
     );
 
     // production: avoid noisy dashboard logs
@@ -613,6 +623,14 @@ export const getDashboardSummary = query({
       shippingCostsChange: calculateChange(
         summary.shippingCosts,
         previousSummary.shippingCosts,
+      ),
+      handlingFeesChange: calculateChange(
+        summary.handlingFees,
+        previousSummary.handlingFees,
+      ),
+      customCostsChange: calculateChange(
+        summary.customCosts,
+        previousSummary.customCosts,
       ),
       transactionFeesChange: calculateChange(
         summary.transactionFees,

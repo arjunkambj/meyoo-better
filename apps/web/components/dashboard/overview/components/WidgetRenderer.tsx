@@ -54,7 +54,6 @@ export function WidgetRenderer({
           operatingCosts={metricsData.operatingCosts ?? 0}
           shippingCosts={metricsData.shippingCosts ?? 0}
           showCostSetupWarning={showCostSetupWarning}
-          taxesPaid={metricsData.taxesPaid ?? 0}
           totalAdSpend={metricsData.totalAdSpend ?? 0}
           totalRevenue={metricsData.revenue ?? 0}
           transactionFees={metricsData.transactionFees ?? 0}

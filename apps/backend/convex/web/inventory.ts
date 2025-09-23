@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import { query } from "../_generated/server";
+import type { QueryCtx } from "../_generated/server";
 import { getUserAndOrg } from "../utils/auth";
 
 /**
@@ -39,6 +40,263 @@ const aggregateInventoryLevels = (
   }
 
   return totals;
+};
+
+const MS_IN_DAY = 24 * 60 * 60 * 1000;
+const DEFAULT_ANALYSIS_DAYS = 30;
+const EXTENDED_ANALYSIS_DAYS = 90;
+const DEFAULT_LEAD_TIME_DAYS = 7;
+const SAFETY_STOCK_DAYS = 3;
+
+const normalizeDateRange = (
+  range: { startDate: string; endDate: string } | undefined,
+  fallbackWindowDays: number,
+): { start: Date; end: Date } => {
+  const now = new Date();
+  const end = range?.endDate ? new Date(range.endDate) : now;
+  const fallbackStart = new Date(end.getTime() - fallbackWindowDays * MS_IN_DAY);
+  const start = range?.startDate
+    ? new Date(range.startDate)
+    : fallbackStart;
+
+  const safeEnd = Number.isNaN(end.getTime()) ? now : end;
+  const safeStart = Number.isNaN(start.getTime()) ? fallbackStart : start;
+
+  if (safeStart.getTime() > safeEnd.getTime()) {
+    return { start: safeEnd, end: safeStart };
+  }
+
+  return { start: safeStart, end: safeEnd };
+};
+
+const fetchOrdersWithItems = async (
+  ctx: QueryCtx,
+  orgId: Id<"organizations">,
+  start?: Date,
+  end?: Date,
+): Promise<{
+  orders: Array<Doc<"shopifyOrders">>;
+  orderItems: Array<Doc<"shopifyOrderItems">>;
+}> => {
+  const orders = await ctx.db
+    .query("shopifyOrders")
+    .withIndex("by_organization_and_created", (q) => {
+      if (start && end) {
+        return q
+          .eq("organizationId", orgId)
+          .gte("shopifyCreatedAt", start.getTime())
+          .lte("shopifyCreatedAt", end.getTime());
+      }
+
+      if (start) {
+        return q
+          .eq("organizationId", orgId)
+          .gte("shopifyCreatedAt", start.getTime());
+      }
+
+      if (end) {
+        return q
+          .eq("organizationId", orgId)
+          .lte("shopifyCreatedAt", end.getTime());
+      }
+
+      return q.eq("organizationId", orgId);
+    })
+    .collect();
+  if (orders.length === 0) {
+    return { orders, orderItems: [] };
+  }
+
+  const orderIdSet = new Set(orders.map((order) => order._id));
+
+  const orderItems = await ctx.db
+    .query("shopifyOrderItems")
+    .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
+    .collect();
+
+  const filteredItems = orderItems.filter((item) => orderIdSet.has(item.orderId));
+
+  return { orders, orderItems: filteredItems };
+};
+
+const getVariantCost = (variant: Doc<"shopifyProductVariants">): number => {
+  if (typeof variant.costPerItem === "number") {
+    return variant.costPerItem;
+  }
+
+  const price = typeof variant.price === "number" ? variant.price : 0;
+
+  if (variant.compareAtPrice && variant.compareAtPrice < price) {
+    return variant.compareAtPrice;
+  }
+
+  // Fall back to a conservative estimate when cost is unknown.
+  return price * 0.6;
+};
+
+type VariantSalesStats = {
+  units: number;
+  revenue: number;
+  cogs: number;
+  lastSoldAt?: number;
+};
+
+const buildVariantSalesMap = (
+  orderItems: Array<Doc<"shopifyOrderItems">>,
+  orders: Array<Doc<"shopifyOrders">>,
+  variantMap: Map<Id<"shopifyProductVariants">, Doc<"shopifyProductVariants">>,
+): Map<Id<"shopifyProductVariants">, VariantSalesStats> => {
+  const orderById = new Map<string, Doc<"shopifyOrders">>();
+  orders.forEach((order) => {
+    orderById.set(order._id.toString(), order);
+  });
+
+  const sales = new Map<Id<"shopifyProductVariants">, VariantSalesStats>();
+
+  orderItems.forEach((item) => {
+    if (!item.variantId) return;
+    const variant = variantMap.get(item.variantId);
+    if (!variant) return;
+
+    const order = orderById.get(item.orderId.toString());
+    const price = variant.price || 0;
+    const cost = getVariantCost(variant);
+
+    const current = sales.get(item.variantId) || {
+      units: 0,
+      revenue: 0,
+      cogs: 0,
+    };
+
+    current.units += item.quantity;
+    current.revenue += item.quantity * price;
+    current.cogs += item.quantity * cost;
+
+    if (order) {
+      const soldAt = order.shopifyCreatedAt;
+      if (!current.lastSoldAt || soldAt > current.lastSoldAt) {
+        current.lastSoldAt = soldAt;
+      }
+    }
+
+    sales.set(item.variantId, current);
+  });
+
+  return sales;
+};
+
+type ProductSalesStats = {
+  units: number;
+  revenue: number;
+  cogs: number;
+  lastSoldAt?: number;
+};
+
+const buildProductSalesMap = (
+  variantSales: Map<Id<"shopifyProductVariants">, VariantSalesStats>,
+  variants: Array<Doc<"shopifyProductVariants">>,
+): Map<Id<"shopifyProducts">, ProductSalesStats> => {
+  const productSales = new Map<Id<"shopifyProducts">, ProductSalesStats>();
+
+  variants.forEach((variant) => {
+    const stats = variantSales.get(variant._id);
+    if (!stats) return;
+
+    const current = productSales.get(variant.productId) || {
+      units: 0,
+      revenue: 0,
+      cogs: 0,
+    };
+
+    current.units += stats.units;
+    current.revenue += stats.revenue;
+    current.cogs += stats.cogs;
+
+    if (stats.lastSoldAt) {
+      if (!current.lastSoldAt || stats.lastSoldAt > current.lastSoldAt) {
+        current.lastSoldAt = stats.lastSoldAt;
+      }
+    }
+
+    productSales.set(variant.productId, current);
+  });
+
+  return productSales;
+};
+
+const assignABCCategories = (
+  products: Array<Doc<"shopifyProducts">>,
+  productSales: Map<Id<"shopifyProducts">, ProductSalesStats>,
+): Map<Id<"shopifyProducts">, "A" | "B" | "C"> => {
+  const distribution = products.map((product) => {
+    const stats = productSales.get(product._id);
+    return {
+      id: product._id,
+      revenue: stats?.revenue ?? 0,
+      units: stats?.units ?? 0,
+    };
+  });
+
+  const totalRevenue = distribution.reduce((sum, item) => sum + item.revenue, 0);
+  const totalUnits = distribution.reduce((sum, item) => sum + item.units, 0);
+
+  if (totalRevenue > 0) {
+    distribution.sort((a, b) => b.revenue - a.revenue);
+    let cumulativeRevenue = 0;
+    return distribution.reduce((map, item) => {
+      cumulativeRevenue += item.revenue;
+      const share = cumulativeRevenue / totalRevenue;
+      let category: "A" | "B" | "C";
+      if (share <= 0.8) {
+        category = "A";
+      } else if (share <= 0.95) {
+        category = "B";
+      } else {
+        category = "C";
+      }
+      map.set(item.id, category);
+      return map;
+    }, new Map<Id<"shopifyProducts">, "A" | "B" | "C">());
+  }
+
+  if (totalUnits > 0) {
+    distribution.sort((a, b) => b.units - a.units);
+    let cumulativeUnits = 0;
+    return distribution.reduce((map, item) => {
+      cumulativeUnits += item.units;
+      const share = cumulativeUnits / totalUnits;
+      let category: "A" | "B" | "C";
+      if (share <= 0.8) {
+        category = "A";
+      } else if (share <= 0.95) {
+        category = "B";
+      } else {
+        category = "C";
+      }
+      map.set(item.id, category);
+      return map;
+    }, new Map<Id<"shopifyProducts">, "A" | "B" | "C">());
+  }
+
+  // If there is no sales data yet, fall back to an even distribution by count.
+  const fallback = new Map<Id<"shopifyProducts">, "A" | "B" | "C">();
+  const totalCount = Math.max(distribution.length, 1);
+  distribution
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .forEach((item, index) => {
+      const positionRatio = (index + 1) / totalCount;
+      let category: "A" | "B" | "C";
+      if (positionRatio <= 0.2) {
+        category = "A";
+      } else if (positionRatio <= 0.5) {
+        category = "B";
+      } else {
+        category = "C";
+      }
+      fallback.set(item.id, category);
+    });
+
+  return fallback;
 };
 
 /**
@@ -120,14 +378,10 @@ export const getInventoryOverview = query({
       const totals = inventoryTotals.get(variant._id);
       const available = totals?.available ?? 0;
       const price = variant.price || 0;
-      // Use actual cost if available, otherwise estimate at 60% of price
-      const cost =
-        variant.compareAtPrice && variant.compareAtPrice < price
-          ? variant.compareAtPrice * 0.4 // If we have compare price, use 40% of it as cost
-          : price * 0.6; // Otherwise estimate cost at 60% of price
+      const cost = getVariantCost(variant);
 
-      totalValue += available * price; // Retail value
-      totalCOGS += available * cost; // Cost value
+      totalValue += available * price;
+      totalCOGS += available * cost;
     });
 
     // Count stock levels
@@ -168,7 +422,7 @@ export const getInventoryOverview = query({
 
     const orderItems = await ctx.db
       .query("shopifyOrderItems")
-      .withIndex("by_order")
+      .withIndex("by_organization", (q) => q.eq("organizationId", _orgId))
       .collect();
 
     const soldVariantIds = new Set<string>();
@@ -219,10 +473,7 @@ export const getInventoryOverview = query({
         const variant = variants.find((v) => v._id === item.variantId);
 
         if (variant) {
-          const cost =
-            variant.compareAtPrice && variant.compareAtPrice < variant.price
-              ? variant.compareAtPrice * 0.4
-              : (variant.price || 0) * 0.6;
+          const cost = getVariantCost(variant);
 
           totalCOGSSold += cost * item.quantity;
         }
@@ -294,10 +545,7 @@ export const getInventoryOverview = query({
 
         if (variant) {
           const price = variant.price || 0;
-          const cost =
-            variant.compareAtPrice && variant.compareAtPrice < price
-              ? variant.compareAtPrice * 0.4
-              : price * 0.6;
+          const cost = getVariantCost(variant);
 
           totalSales += price * item.quantity;
           unitsSold += item.quantity;
@@ -307,7 +555,7 @@ export const getInventoryOverview = query({
     });
 
     const averageSalePrice = unitsSold > 0 ? totalSales / unitsSold : 0;
-    const averageProfit = unitsSold > 0 ? (totalProfit / totalSales) * 100 : 0;
+    const averageProfit = totalSales > 0 ? (totalProfit / totalSales) * 100 : 0;
 
     // Calculate changes by comparing with previous period
     // Calculate previous period dates
@@ -339,10 +587,7 @@ export const getInventoryOverview = query({
 
         if (variant) {
           const price = variant.price || 0;
-          const cost =
-            variant.compareAtPrice && variant.compareAtPrice < price
-              ? variant.compareAtPrice * 0.4
-              : price * 0.6;
+          const cost = getVariantCost(variant);
 
           prevTotalSales += price * item.quantity;
           prevUnitsSold += item.quantity;
@@ -375,11 +620,11 @@ export const getInventoryOverview = query({
     };
 
     const changes = {
-      totalValue: calculateChange(totalValue, totalValue * 0.95), // Approximate as inventory value changes slowly
-      totalCOGS: calculateChange(totalCOGS, totalCOGS * 0.95), // Approximate as COGS changes slowly
-      totalSKUs: calculateChange(totalSKUs, totalSKUs), // SKUs typically stable
+      totalValue: 0,
+      totalCOGS: 0,
+      totalSKUs: 0,
       turnoverRate: calculateChange(avgTurnoverRate, prevTurnoverRate),
-      healthScore: calculateChange(healthScore, healthScore * 0.98), // Health score changes slowly
+      healthScore: 0,
       stockCoverage: calculateChange(stockCoverageDays, prevStockCoverageDays),
       totalSales: calculateChange(totalSales, prevTotalSales),
       unitsSold: calculateChange(unitsSold, prevUnitsSold),
@@ -479,69 +724,59 @@ export const getProductsList = query({
         data: [],
         pagination: { page: 1, pageSize: 50, total: 0, totalPages: 0 },
       };
-    const orgId = auth.orgId as Id<'organizations'>;
+    const orgId = auth.orgId as Id<"organizations">;
 
     const page = args.page || 1;
     const pageSize = args.pageSize || 50;
 
-    // Get products
-    const products = await ctx.db
-      .query("shopifyProducts")
-      .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
-      .collect();
-
-    // Get variants
-    const variants = await ctx.db
-      .query("shopifyProductVariants")
-      .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
-      .collect();
-
-    // Get inventory
-    const inventory = await ctx.db
-      .query("shopifyInventory")
-      .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
-      .collect();
+    const [products, variants, inventory] = await Promise.all([
+      ctx.db
+        .query("shopifyProducts")
+        .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
+        .collect(),
+      ctx.db
+        .query("shopifyProductVariants")
+        .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
+        .collect(),
+      ctx.db
+        .query("shopifyInventory")
+        .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
+        .collect(),
+    ]);
 
     const inventoryTotals = aggregateInventoryLevels(inventory);
 
-    // Get order data for turnover calculation
-    const thirtyDaysAgo = new Date();
+    const { start, end } = normalizeDateRange(
+      args.dateRange,
+      DEFAULT_ANALYSIS_DAYS,
+    );
+    const analysisWindowMs = Math.max(1, end.getTime() - start.getTime());
+    const analysisDays = Math.max(1, Math.ceil(analysisWindowMs / MS_IN_DAY));
 
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const { orders, orderItems } = await fetchOrdersWithItems(
+      ctx,
+      orgId,
+      start,
+      end,
+    );
 
-    const recentOrders = await ctx.db
-      .query("shopifyOrders")
-      .withIndex("by_organization_and_created", (q) =>
-        q.eq("organizationId", orgId).gte("shopifyCreatedAt", thirtyDaysAgo.getTime()),
-      )
-      .collect();
-
-    const orderItems = await ctx.db
-      .query("shopifyOrderItems")
-      .withIndex("by_order")
-      .collect();
-
-    // Calculate sales by variant for turnover
-    const variantSales = new Map<string, number>();
-
-    recentOrders.forEach((order) => {
-      const items = orderItems.filter((item) => item.orderId === order._id);
-
-      items.forEach((item) => {
-        if (item.variantId) {
-          variantSales.set(
-            item.variantId,
-            (variantSales.get(item.variantId) || 0) + item.quantity,
-          );
-        }
-      });
+    const variantMap = new Map<
+      Id<"shopifyProductVariants">,
+      Doc<"shopifyProductVariants">
+    >();
+    variants.forEach((variant) => {
+      variantMap.set(variant._id, variant);
     });
 
-    // Map products with inventory data
+    const variantSales = buildVariantSalesMap(orderItems, orders, variantMap);
+    const productSales = buildProductSalesMap(variantSales, variants);
+    const abcCategories = assignABCCategories(products, productSales);
+
     const productsWithInventory = products.map((product) => {
       const productVariants = variants.filter(
-        (v) => v.productId === product._id,
+        (variant) => variant.productId === product._id,
       );
+
       const variantInventory = productVariants.map((variant) => {
         const totals = inventoryTotals.get(variant._id);
         const available = totals?.available ?? 0;
@@ -552,84 +787,88 @@ export const getProductsList = query({
           sku: variant.sku || "N/A",
           title: variant.title || "Default",
           price: variant.price || 0,
-          stock: available,
+          stock: available + committed,
           reserved: committed,
           available,
         };
       });
 
-      // Calculate totals
-      const totalStock = variantInventory.reduce((sum, v) => sum + v.stock, 0);
-      const totalReserved = variantInventory.reduce(
-        (sum, v) => sum + v.reserved,
-        0,
-      );
       const totalAvailable = variantInventory.reduce(
-        (sum, v) => sum + v.available,
+        (sum, entry) => sum + entry.available,
+        0,
+      );
+      const totalReserved = variantInventory.reduce(
+        (sum, entry) => sum + entry.reserved,
+        0,
+      );
+      const totalStock = variantInventory.reduce(
+        (sum, entry) => sum + entry.stock,
         0,
       );
 
-      // Determine stock status
-      let stockStatus: "healthy" | "low" | "critical" | "out" = "healthy";
+      const salesStats = productSales.get(product._id);
+      const unitsSold = salesStats?.units ?? 0;
+      const avgDailySales = unitsSold / analysisDays;
 
-      if (totalAvailable === 0) {
-        stockStatus = "out";
-      } else if (totalAvailable < 5) {
-        stockStatus = "critical";
-      } else if (totalAvailable < 20) {
-        stockStatus = "low";
-      }
-
-      // Calculate price and cost (using first variant as default)
-      const defaultVariant = productVariants[0];
-      const price = defaultVariant?.price || 0;
-      const cost =
-        defaultVariant?.compareAtPrice && defaultVariant.compareAtPrice < price
-          ? defaultVariant.compareAtPrice * 0.4
-          : price * 0.6;
-      const margin = price > 0 ? ((price - cost) / price) * 100 : 0;
-
-      // Calculate actual turnover rate based on sales
-      // Turnover = (Units sold in 30 days * 12) / Current stock
-      let productUnitsSold = 0;
-
-      productVariants.forEach((variant) => {
-        const sales = variantSales.get(variant._id) || 0;
-
-        productUnitsSold += sales;
-      });
-
-      const annualizedSales = productUnitsSold * 12; // Annualize 30-day sales
-      const turnoverRate =
-        totalAvailable > 0
-          ? Math.round((annualizedSales / totalAvailable) * 10) / 10
+      const reorderPoint =
+        avgDailySales > 0
+          ? Math.max(
+              1,
+              Math.round(
+                avgDailySales * (DEFAULT_LEAD_TIME_DAYS + SAFETY_STOCK_DAYS),
+              ),
+            )
           : 0;
 
-      // Assign ABC category based on turnover rate
-      const abcCategory: "A" | "B" | "C" =
-        turnoverRate > 6 ? "A" : turnoverRate > 4 ? "B" : "C";
+      const stockStatus = (() => {
+        if (totalAvailable <= 0) return "out" as const;
+        if (avgDailySales > 0) {
+          const coverageDays = totalAvailable / avgDailySales;
+          if (coverageDays <= SAFETY_STOCK_DAYS) return "critical" as const;
+          if (coverageDays <= DEFAULT_LEAD_TIME_DAYS + SAFETY_STOCK_DAYS)
+            return "low" as const;
+        } else {
+          if (totalAvailable < 5) return "critical" as const;
+          if (totalAvailable < 20) return "low" as const;
+        }
+        return "healthy" as const;
+      })();
 
-      // Find last sold date
-      let lastSold: string | undefined;
-      const productOrderItems = orderItems.filter((item) =>
-        productVariants.some((v) => v._id === item.variantId),
+      const defaultVariant = productVariants[0];
+      const price = defaultVariant?.price ?? 0;
+
+      const weightedCostTotals = productVariants.reduce(
+        (acc, variant) => {
+          const totals = inventoryTotals.get(variant._id);
+          const available = totals?.available ?? 0;
+          const weight = available > 0 ? available : 1;
+
+          acc.sum += getVariantCost(variant) * weight;
+          acc.weight += weight;
+          return acc;
+        },
+        { sum: 0, weight: 0 },
       );
 
-      if (productOrderItems.length > 0) {
-        const lastOrder = recentOrders
-          .filter((o) =>
-            productOrderItems.some((item) => item.orderId === o._id),
-          )
-          .sort(
-            (a, b) =>
-              new Date(b.shopifyCreatedAt).getTime() -
-              new Date(a.shopifyCreatedAt).getTime(),
-          )[0];
+      const cost =
+        weightedCostTotals.weight > 0
+          ? weightedCostTotals.sum / weightedCostTotals.weight
+          : 0;
+      const margin = price > 0 ? ((price - cost) / price) * 100 : 0;
 
-        if (lastOrder) {
-          lastSold = new Date(lastOrder.shopifyCreatedAt).toISOString();
-        }
-      }
+      const annualizationFactor = 365 / analysisDays;
+      const turnoverRate =
+        totalAvailable > 0
+          ? Math.round(
+              ((unitsSold * annualizationFactor) / totalAvailable) * 10,
+            ) /
+            10
+          : 0;
+
+      const lastSold =
+        salesStats?.lastSoldAt != null
+          ? new Date(salesStats.lastSoldAt).toISOString()
+          : undefined;
 
       return {
         id: product._id,
@@ -641,74 +880,71 @@ export const getProductsList = query({
         stock: totalStock,
         reserved: totalReserved,
         available: totalAvailable,
-        reorderPoint: 10, // Mock reorder point
+        reorderPoint,
         stockStatus,
         price,
         cost,
         margin,
         turnoverRate,
-        unitsSold: productUnitsSold,
+        unitsSold,
         lastSold,
         variants: variantInventory.length > 1 ? variantInventory : undefined,
-        abcCategory,
+        abcCategory: abcCategories.get(product._id) ?? "C",
       };
     });
 
-    // Apply filters
-    let filteredProducts = productsWithInventory;
+    let filteredProducts = [...productsWithInventory];
 
-    // Filter by stock level
     if (args.stockLevel) {
       filteredProducts = filteredProducts.filter(
-        (p) => p.stockStatus === args.stockLevel,
+        (product) => product.stockStatus === args.stockLevel,
       );
     }
 
-    // Filter by ABC category
     if (args.category && args.category !== "all") {
       filteredProducts = filteredProducts.filter(
-        (p) => p.abcCategory === args.category,
+        (product) => product.abcCategory === args.category,
       );
     }
 
-    // Search filter
     if (args.searchTerm) {
       const term = args.searchTerm.toLowerCase();
-
-      filteredProducts = filteredProducts.filter(
-        (p) =>
-          p.name.toLowerCase().includes(term) ||
-          p.sku.toLowerCase().includes(term) ||
-          p.vendor.toLowerCase().includes(term) ||
-          p.category.toLowerCase().includes(term),
-      );
+      filteredProducts = filteredProducts.filter((product) => {
+        return (
+          product.name.toLowerCase().includes(term) ||
+          product.sku.toLowerCase().includes(term) ||
+          product.vendor.toLowerCase().includes(term) ||
+          product.category.toLowerCase().includes(term)
+        );
+      });
     }
 
-    // Sort
     if (args.sortBy) {
       filteredProducts.sort((a, b) => {
         const sortKey = args.sortBy as keyof typeof a;
         const aVal = a[sortKey];
         const bVal = b[sortKey];
-        const order = args.sortOrder === "desc" ? -1 : 1;
-
         if (aVal === undefined || bVal === undefined) {
           return 0;
         }
-        return aVal > bVal ? order : -order;
+        const order = args.sortOrder === "desc" ? -1 : 1;
+        return aVal > bVal ? order : aVal < bVal ? -order : 0;
       });
     }
 
-    // Paginate
     const total = filteredProducts.length;
-    const totalPages = Math.ceil(total / pageSize);
-    const start = (page - 1) * pageSize;
-    const paginatedData = filteredProducts.slice(start, start + pageSize);
+    const totalPages = total > 0 ? Math.ceil(total / pageSize) : 0;
+    const safePage = totalPages > 0 ? Math.min(page, totalPages) : 1;
+    const startIndex = (safePage - 1) * pageSize;
+    const paginatedData = filteredProducts.slice(
+      startIndex,
+      startIndex + pageSize,
+    );
 
     return {
       data: paginatedData,
       pagination: {
-        page,
+        page: safePage,
         pageSize,
         total,
         totalPages,
@@ -854,27 +1090,84 @@ export const getABCAnalysis = query({
     if (!auth) return [];
     const orgId = auth.orgId as Id<'organizations'>;
 
-    // Get products
-    const products = await ctx.db
-      .query("shopifyProducts")
-      .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
-      .collect();
+    const [products, variants] = await Promise.all([
+      ctx.db
+        .query("shopifyProducts")
+        .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
+        .collect(),
+      ctx.db
+        .query("shopifyProductVariants")
+        .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
+        .collect(),
+    ]);
 
-    // Mock ABC distribution
-    const total = products.length;
-    const aCount = Math.floor(total * 0.2);
-    const bCount = Math.floor(total * 0.3);
-    const cCount = total - aCount - bCount;
+    const { start, end } = normalizeDateRange(
+      _args.dateRange,
+      EXTENDED_ANALYSIS_DAYS,
+    );
+
+    const { orders, orderItems } = await fetchOrdersWithItems(
+      ctx,
+      orgId,
+      start,
+      end,
+    );
+
+    const variantMap = new Map<
+      Id<'shopifyProductVariants'>,
+      Doc<'shopifyProductVariants'>
+    >();
+    variants.forEach((variant) => {
+      variantMap.set(variant._id, variant);
+    });
+
+    const variantSales = buildVariantSalesMap(orderItems, orders, variantMap);
+    const productSales = buildProductSalesMap(variantSales, variants);
+    const abcCategories = assignABCCategories(products, productSales);
+
+    const categoryTotals: Record<"A" | "B" | "C", {
+      productCount: number;
+      revenue: number;
+      units: number;
+    }> = {
+      A: { productCount: 0, revenue: 0, units: 0 },
+      B: { productCount: 0, revenue: 0, units: 0 },
+      C: { productCount: 0, revenue: 0, units: 0 },
+    };
+
+    products.forEach((product) => {
+      const category = abcCategories.get(product._id) ?? "C";
+      const stats = productSales.get(product._id);
+      categoryTotals[category].productCount += 1;
+      if (stats) {
+        categoryTotals[category].revenue += stats.revenue;
+        categoryTotals[category].units += stats.units;
+      }
+    });
+
+    const totalRevenue =
+      categoryTotals.A.revenue +
+      categoryTotals.B.revenue +
+      categoryTotals.C.revenue;
+    const totalUnits =
+      categoryTotals.A.units +
+      categoryTotals.B.units +
+      categoryTotals.C.units;
+
+    const toPercentage = (value: number, total: number): number => {
+      if (total === 0) return 0;
+      return Math.round((value / total) * 1000) / 10;
+    };
 
     return [
       {
         category: "A" as const,
         label: "High Value",
-        description: "Top 20% of products generating 80% of revenue",
-        productCount: aCount,
-        valuePercentage: 80,
-        volumePercentage: 20,
-        revenue: 480000,
+        description: "Top performers contributing the largest share of revenue",
+        productCount: categoryTotals.A.productCount,
+        valuePercentage: toPercentage(categoryTotals.A.revenue, totalRevenue),
+        volumePercentage: toPercentage(categoryTotals.A.units, totalUnits),
+        revenue: Math.round(categoryTotals.A.revenue),
         color: "success",
         icon: "solar:star-bold-duotone",
         recommendations: [
@@ -886,33 +1179,33 @@ export const getABCAnalysis = query({
       {
         category: "B" as const,
         label: "Medium Value",
-        description: "Middle 30% of products generating 15% of revenue",
-        productCount: bCount,
-        valuePercentage: 15,
-        volumePercentage: 30,
-        revenue: 90000,
+        description: "Steady movers with moderate revenue impact",
+        productCount: categoryTotals.B.productCount,
+        valuePercentage: toPercentage(categoryTotals.B.revenue, totalRevenue),
+        volumePercentage: toPercentage(categoryTotals.B.units, totalUnits),
+        revenue: Math.round(categoryTotals.B.revenue),
         color: "warning",
         icon: "solar:square-bold-duotone",
         recommendations: [
-          "Regular stock review",
-          "Consider bundling opportunities",
+          "Review pricing and bundling opportunities",
           "Optimize reorder points",
+          "Balance stock with forecasted demand",
         ],
       },
       {
         category: "C" as const,
         label: "Low Value",
-        description: "Bottom 50% of products generating 5% of revenue",
-        productCount: cCount,
-        valuePercentage: 5,
-        volumePercentage: 50,
-        revenue: 30000,
+        description: "Long-tail items with limited contribution",
+        productCount: categoryTotals.C.productCount,
+        valuePercentage: toPercentage(categoryTotals.C.revenue, totalRevenue),
+        volumePercentage: toPercentage(categoryTotals.C.units, totalUnits),
+        revenue: Math.round(categoryTotals.C.revenue),
         color: "default",
         icon: "solar:circle-bold-duotone",
         recommendations: [
           "Evaluate for discontinuation",
-          "Reduce stock levels",
-          "Consider clearance sales",
+          "Reduce stock levels or run promotions",
+          "Focus on targeted marketing",
         ],
       },
     ];
@@ -951,25 +1244,49 @@ export const getStockAlerts = query({
     if (!auth) return null;
     const orgId = auth.orgId as Id<'organizations'>;
 
-    // Get products with low stock
-    const products = await ctx.db
-      .query("shopifyProducts")
-      .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
-      .take(args.limit || 10);
-
-    const variants = await ctx.db
-      .query("shopifyProductVariants")
-      .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
-      .collect();
-
-    const inventory = await ctx.db
-      .query("shopifyInventory")
-      .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
-      .collect();
+    const [products, variants, inventory] = await Promise.all([
+      ctx.db
+        .query("shopifyProducts")
+        .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
+        .collect(),
+      ctx.db
+        .query("shopifyProductVariants")
+        .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
+        .collect(),
+      ctx.db
+        .query("shopifyInventory")
+        .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
+        .collect(),
+    ]);
 
     const inventoryTotals = aggregateInventoryLevels(inventory);
 
-    const alerts: {
+    const { start, end } = normalizeDateRange(undefined, DEFAULT_ANALYSIS_DAYS);
+    const analysisWindowMs = Math.max(1, end.getTime() - start.getTime());
+    const analysisDays = Math.max(1, Math.ceil(analysisWindowMs / MS_IN_DAY));
+
+    const { orders, orderItems } = await fetchOrdersWithItems(
+      ctx,
+      orgId,
+      start,
+      end,
+    );
+
+    const variantMap = new Map<
+      Id<'shopifyProductVariants'>,
+      Doc<'shopifyProductVariants'>
+    >();
+    variants.forEach((variant) => {
+      variantMap.set(variant._id, variant);
+    });
+
+    const variantSales = buildVariantSalesMap(orderItems, orders, variantMap);
+    const productMap = new Map<Id<'shopifyProducts'>, Doc<'shopifyProducts'>>();
+    products.forEach((product) => {
+      productMap.set(product._id, product);
+    });
+
+    const alerts: Array<{
       id: string;
       type: "critical" | "low" | "reorder" | "overstock";
       productName: string;
@@ -978,54 +1295,142 @@ export const getStockAlerts = query({
       reorderPoint?: number;
       daysUntilStockout?: number;
       message: string;
-    }[] = [];
+    }> = [];
 
-    products.forEach((product) => {
-      const productVariants = variants.filter(
-        (v) => v.productId === product._id,
-      );
+    variants.forEach((variant) => {
+      const totals = inventoryTotals.get(variant._id);
+      const available = totals?.available ?? 0;
+      const product = productMap.get(variant.productId);
+      const productName = product?.title || variant.title || "Unnamed Product";
+      const sku = variant.sku || product?.handle || "N/A";
+      const salesStats = variantSales.get(variant._id);
+      const unitsSold = salesStats?.units ?? 0;
+      const avgDailySales = unitsSold / analysisDays;
+      const reorderPoint =
+        avgDailySales > 0
+          ? Math.max(
+              1,
+              Math.round(
+                avgDailySales * (DEFAULT_LEAD_TIME_DAYS + SAFETY_STOCK_DAYS),
+              ),
+            )
+          : 0;
+      const coverageDays = avgDailySales > 0 ? available / avgDailySales : Infinity;
+      const daysUntilStockout =
+        avgDailySales > 0
+          ? Number(Math.max(0, coverageDays).toFixed(1))
+          : undefined;
 
-      productVariants.forEach((variant) => {
-        const totals = inventoryTotals.get(variant._id);
-        const available = totals?.available ?? 0;
+      if (available <= 0) {
+        alerts.push({
+          id: `${variant._id}-out`,
+          type: "critical",
+          productName,
+          sku,
+          currentStock: 0,
+          reorderPoint,
+          daysUntilStockout: 0,
+          message: "Product is out of stock. Immediate reorder required.",
+        });
+        return;
+      }
 
-        if (available === 0) {
-          alerts.push({
-            id: `${variant._id}-out`,
-            type: "critical" as const,
-            productName: product.title,
-            sku: variant.sku || "N/A",
-            currentStock: 0,
-            reorderPoint: 10,
-            message: "Product is out of stock. Immediate reorder required.",
-          });
-        } else if (available < 5) {
+      if (avgDailySales > 0) {
+        if (coverageDays <= SAFETY_STOCK_DAYS) {
           alerts.push({
             id: `${variant._id}-critical`,
-            type: "critical" as const,
-            productName: product.title,
-            sku: variant.sku || "N/A",
+            type: "critical",
+            productName,
+            sku,
             currentStock: available,
-            reorderPoint: 10,
-            daysUntilStockout: Math.floor(available / 2), // Mock calculation
-            message: `Critical stock level. Only ${available} units remaining.`,
+            reorderPoint,
+            daysUntilStockout,
+            message: `Projected stockout in ${daysUntilStockout} days at current velocity.`,
           });
-        } else if (available < 20) {
+          return;
+        }
+
+        if (coverageDays <= DEFAULT_LEAD_TIME_DAYS + SAFETY_STOCK_DAYS) {
           alerts.push({
             id: `${variant._id}-low`,
-            type: "low" as const,
-            productName: product.title,
-            sku: variant.sku || "N/A",
+            type: "low",
+            productName,
+            sku,
             currentStock: available,
-            reorderPoint: 20,
-            daysUntilStockout: Math.floor(available / 2), // Mock calculation
-            message: `Low stock warning. Consider reordering soon.`,
+            reorderPoint,
+            daysUntilStockout,
+            message: `Inventory covers approximately ${daysUntilStockout} days. Plan a restock.`,
+          });
+          return;
+        }
+
+        if (available <= reorderPoint) {
+          alerts.push({
+            id: `${variant._id}-reorder`,
+            type: "reorder",
+            productName,
+            sku,
+            currentStock: available,
+            reorderPoint,
+            daysUntilStockout,
+            message: `Available units (${available}) are below the reorder point (${reorderPoint}).`,
+          });
+          return;
+        }
+
+        const generousCover =
+          (DEFAULT_LEAD_TIME_DAYS + SAFETY_STOCK_DAYS) * 3;
+        if (coverageDays >= generousCover) {
+          alerts.push({
+            id: `${variant._id}-overstock`,
+            type: "overstock",
+            productName,
+            sku,
+            currentStock: available,
+            reorderPoint,
+            daysUntilStockout,
+            message: `Stock covers roughly ${daysUntilStockout} days of demand. Consider slowing replenishment.`,
           });
         }
-      });
+
+        return;
+      }
+
+      // No sales in the analysis window
+      if (available >= 50) {
+        alerts.push({
+          id: `${variant._id}-idle`,
+          type: "overstock",
+          productName,
+          sku,
+          currentStock: available,
+          reorderPoint,
+          message: "No recent sales detected but inventory remains high. Evaluate for markdown or promotions.",
+        });
+      }
     });
 
-    return alerts.slice(0, args.limit || 10);
+    const severityRank: Record<
+      "critical" | "low" | "reorder" | "overstock",
+      number
+    > = {
+      critical: 0,
+      low: 1,
+      reorder: 2,
+      overstock: 3,
+    };
+
+    alerts.sort((a, b) => {
+      const severityDiff = severityRank[a.type] - severityRank[b.type];
+      if (severityDiff !== 0) return severityDiff;
+
+      const aDays = a.daysUntilStockout ?? Number.POSITIVE_INFINITY;
+      const bDays = b.daysUntilStockout ?? Number.POSITIVE_INFINITY;
+      return aDays - bDays;
+    });
+
+    const limit = args.limit || 10;
+    return alerts.slice(0, limit);
   },
 });
 
@@ -1089,104 +1494,112 @@ export const getTopPerformers = query({
 
     const limit = args.limit || 3;
 
-    // Get products
-    const products = await ctx.db
-      .query("shopifyProducts")
-      .withIndex("by_organization", (q) => q.eq("organizationId", auth.orgId as Id<"organizations">))
-      .collect();
+    const orgId = auth.orgId as Id<'organizations'>;
 
-    const variants = await ctx.db
-      .query("shopifyProductVariants")
-      .withIndex("by_organization", (q) => q.eq("organizationId", auth.orgId as Id<"organizations">))
-      .collect();
+    const [products, variants] = await Promise.all([
+      ctx.db
+        .query("shopifyProducts")
+        .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
+        .collect(),
+      ctx.db
+        .query("shopifyProductVariants")
+        .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
+        .collect(),
+    ]);
 
-    // Get actual sales data
-    const endDate = args.dateRange?.endDate
-      ? new Date(args.dateRange.endDate)
-      : new Date();
-    const startDate = args.dateRange?.startDate
-      ? new Date(args.dateRange.startDate)
-      : new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const { start, end } = normalizeDateRange(
+      args.dateRange,
+      DEFAULT_ANALYSIS_DAYS,
+    );
+    const periodDurationMs = Math.max(MS_IN_DAY, end.getTime() - start.getTime());
 
-    // Get orders in date range using index
-    const ordersInRange = await ctx.db
-      .query("shopifyOrders")
-      .withIndex("by_organization_and_created", (q) =>
-        q
-          .eq("organizationId", auth.orgId as Id<"organizations">)
-          .gte("shopifyCreatedAt", startDate.getTime())
-          .lte("shopifyCreatedAt", endDate.getTime()),
-      )
-      .collect();
+    const { orders, orderItems } = await fetchOrdersWithItems(
+      ctx,
+      orgId,
+      start,
+      end,
+    );
 
-    // Get order items
-    const orderItems = await ctx.db
-      .query("shopifyOrderItems")
-      .withIndex("by_order")
-      .collect();
+    const prevEnd = new Date(start.getTime() - 1);
+    const prevStart = new Date(prevEnd.getTime() - periodDurationMs);
+    const { orders: prevOrders, orderItems: prevOrderItems } =
+      await fetchOrdersWithItems(ctx, orgId, prevStart, prevEnd);
 
-    // Calculate sales by product
-    const productSales = new Map<string, { units: number; revenue: number }>();
-
-    ordersInRange.forEach((order) => {
-      const items = orderItems.filter((item) => item.orderId === order._id);
-
-      items.forEach((item) => {
-        const variant = variants.find((v) => v._id === item.variantId);
-
-        if (variant) {
-          const product = products.find((p) => p._id === variant.productId);
-
-          if (product) {
-            const current = productSales.get(product._id) || {
-              units: 0,
-              revenue: 0,
-            };
-
-            productSales.set(product._id, {
-              units: current.units + item.quantity,
-              revenue: current.revenue + item.quantity * (variant.price || 0),
-            });
-          }
-        }
-      });
+    const variantMap = new Map<
+      Id<'shopifyProductVariants'>,
+      Doc<'shopifyProductVariants'>
+    >();
+    variants.forEach((variant) => {
+      variantMap.set(variant._id, variant);
     });
 
-    // Convert to array and calculate metrics
-    const performanceData = Array.from(productSales.entries())
-      .map(([productId, sales]) => {
-        const product = products.find((p) => p._id === productId);
-        const variant = variants.find((v) => v.productId === productId);
+    const currentVariantSales = buildVariantSalesMap(
+      orderItems,
+      orders,
+      variantMap,
+    );
+    const previousVariantSales = buildVariantSalesMap(
+      prevOrderItems,
+      prevOrders,
+      variantMap,
+    );
 
-        if (!product) return null;
+    const currentProductSales = buildProductSalesMap(
+      currentVariantSales,
+      variants,
+    );
+    const previousProductSales = buildProductSalesMap(
+      previousVariantSales,
+      variants,
+    );
 
-        // Calculate change (mock for now, would compare with previous period)
-        const change =
-          sales.units > 100 ? 25.5 : sales.units > 50 ? 12.3 : -5.2;
+    const performanceData = products.map((product) => {
+      const current = currentProductSales.get(product._id) || {
+        units: 0,
+        revenue: 0,
+        cogs: 0,
+      };
+      const previous = previousProductSales.get(product._id) || {
+        units: 0,
+        revenue: 0,
+        cogs: 0,
+      };
 
-        return {
-          id: product._id,
-          name: product.title,
-          sku: variant?.sku || product.handle || "N/A",
-          image: product.featuredImage,
-          metric: sales.units,
-          change,
-          units: sales.units,
-          revenue: sales.revenue,
-          trend:
-            change > 0
-              ? ("up" as const)
-              : change < 0
-                ? ("down" as const)
-                : ("stable" as const),
-        };
-      })
-      .filter((item): item is NonNullable<typeof item> => item !== null);
+      const variant = variants.find((v) => v.productId === product._id);
 
-    // Sort and categorize
-    const sorted = [...performanceData].sort((a, b) => b.units - a.units);
-    const best = sorted.slice(0, limit);
-    const worst = sorted.slice(-limit).reverse();
+      const change =
+        previous.units > 0
+          ? Number(
+              (((current.units - previous.units) / previous.units) * 100).toFixed(1),
+            )
+          : current.units > 0
+            ? 100
+            : 0;
+
+      type Trend = "up" | "down" | "stable";
+      const trend: Trend = change > 0 ? "up" : change < 0 ? "down" : "stable";
+
+      return {
+        id: String(product._id),
+        name: product.title,
+        sku: variant?.sku || product.handle || "N/A",
+        image: product.featuredImage,
+        metric: current.units,
+        change,
+        units: current.units,
+        revenue: current.revenue,
+        trend,
+      };
+    });
+
+    const best = [...performanceData]
+      .sort((a, b) => b.units - a.units)
+      .slice(0, limit);
+
+    const worst = [...performanceData]
+      .sort((a, b) => a.units - b.units)
+      .slice(0, limit);
+
     const trending = [...performanceData]
       .sort((a, b) => b.change - a.change)
       .slice(0, limit);
@@ -1227,10 +1640,10 @@ export const getStockMovement = query({
       : new Date();
     const startDate = args.dateRange?.startDate
       ? new Date(args.dateRange.startDate)
-      : new Date(endDate.getTime() - (periods - 1) * 24 * 60 * 60 * 1000);
+      : new Date(endDate.getTime() - (periods - 1) * MS_IN_DAY);
+    startDate.setHours(0, 0, 0, 0);
 
-    // Get all orders in the date range using index
-    const filteredOrders = await ctx.db
+    const orders = await ctx.db
       .query("shopifyOrders")
       .withIndex("by_organization_and_created", (q) =>
         q
@@ -1240,18 +1653,13 @@ export const getStockMovement = query({
       )
       .collect();
 
-    // Get all order items for these orders
-    const orderIds = filteredOrders.map((o) => o._id);
     const orderItems = await ctx.db
       .query("shopifyOrderItems")
-      .withIndex("by_order")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", auth.orgId as Id<'organizations'>),
+      )
       .collect();
 
-    const relevantOrderItems = orderItems.filter((item) =>
-      orderIds.includes(item.orderId),
-    );
-
-    // Get inventory changes (we'll track inventory snapshots)
     const inventory = await ctx.db
       .query("shopifyInventory")
       .withIndex("by_organization", (q) =>
@@ -1259,68 +1667,79 @@ export const getStockMovement = query({
       )
       .collect();
 
-    // Group data by period
-    const movementData: Record<
+    const itemsByOrder = new Map<string, Array<Doc<'shopifyOrderItems'>>>();
+    orderItems.forEach((item) => {
+      const key = item.orderId.toString();
+      const existing = itemsByOrder.get(key);
+      if (existing) {
+        existing.push(item);
+      } else {
+        itemsByOrder.set(key, [item]);
+      }
+    });
+
+    const periodEntries: Array<{
+      key: string;
+      label: string;
+      start: Date;
+      end: Date;
+    }> = [];
+    const movementData = new Map<
       string,
-      { inbound: number; outbound: number; orders: number }
-    > = {};
+      { label: string; inbound: number; outbound: number; orders: number }
+    >();
 
-    // Initialize periods
     for (let i = 0; i < periods; i++) {
-      const date = new Date(startDate.getTime() + i * 24 * 60 * 60 * 1000);
-      const periodKey = date.toLocaleDateString("en-US", { weekday: "short" });
+      const currentDate = new Date(startDate.getTime() + i * MS_IN_DAY);
+      const label = currentDate.toLocaleDateString('en-US', {
+        weekday: 'short',
+      });
+      const keyDate = new Date(currentDate);
+      keyDate.setHours(0, 0, 0, 0);
+      const key = keyDate.toISOString().split('T')[0] as string;
 
-      movementData[periodKey] = { inbound: 0, outbound: 0, orders: 0 };
+      const endOfDay = new Date(keyDate);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      periodEntries.push({ key, label, start: keyDate, end: endOfDay });
+      movementData.set(key, { label, inbound: 0, outbound: 0, orders: 0 });
     }
 
-    // Calculate outbound from orders
-    filteredOrders.forEach((order) => {
+    orders.forEach((order) => {
       const orderDate = new Date(order.shopifyCreatedAt);
-      const periodKey = orderDate.toLocaleDateString("en-US", {
-        weekday: "short",
-      });
+      orderDate.setHours(0, 0, 0, 0);
+      const key = orderDate.toISOString().split('T')[0] as string;
+      const entry = movementData.get(key);
+      if (!entry) return;
 
-      if (movementData[periodKey]) {
-        // Count items sold (outbound)
-        const orderItemsForOrder = relevantOrderItems.filter(
-          (item) => item.orderId === order._id,
-        );
-        const totalQuantity = orderItemsForOrder.reduce(
-          (sum, item) => sum + item.quantity,
-          0,
-        );
+      const items = itemsByOrder.get(order._id.toString()) || [];
+      const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
 
-        movementData[periodKey].outbound += totalQuantity;
-        movementData[periodKey].orders += 1;
-      }
+      entry.outbound += totalQuantity;
+      entry.orders += 1;
     });
 
-    // Calculate inbound from inventory incoming field
-    // For now, we'll estimate inbound based on restocking patterns
-    Object.keys(movementData).forEach((period) => {
-      // Get total incoming inventory
-      const totalIncoming = inventory.reduce(
-        (sum, inv) => sum + (inv.incoming || 0),
-        0,
-      );
-
-      // Distribute incoming across periods (simplified)
-      if (!movementData[period]) {
-        (movementData as any)[period] = { inbound: 0, outbound: 0, orders: 0 };
-      }
-      movementData[period]!.inbound = Math.round(totalIncoming / periods);
+    inventory.forEach((inv) => {
+      if (!inv.incoming || inv.incoming <= 0) return;
+      const updatedAt = inv.updatedAt ?? inv.syncedAt;
+      const updateDate = new Date(updatedAt);
+      updateDate.setHours(0, 0, 0, 0);
+      const key = updateDate.toISOString().split('T')[0] as string;
+      const entry = movementData.get(key);
+      if (!entry) return;
+      entry.inbound += inv.incoming;
     });
 
-    // Convert to array format
-    const result = Object.keys(movementData).map((period) => {
-      const data = movementData[period] || { inbound: 0, outbound: 0, orders: 0 };
+    const results = periodEntries.map(({ key, label }) => {
+      const fallback = { inbound: 0, outbound: 0, orders: 0, label };
+      const data = movementData.get(key) ?? fallback;
       const velocity =
         data.orders > 0
-          ? Math.round(data.outbound / Math.max(1, data.orders))
+          ? Math.round((data.outbound / Math.max(1, data.orders)) * 10) / 10
           : 0;
 
       return {
-        period,
+        period: label,
         inbound: data.inbound,
         outbound: data.outbound,
         netMovement: data.inbound - data.outbound,
@@ -1328,7 +1747,7 @@ export const getStockMovement = query({
       };
     });
 
-    return result;
+    return results;
   },
 });
 
@@ -1356,41 +1775,154 @@ export const getInventoryTurnover = query({
   handler: async (ctx, args) => {
     const auth = await getUserAndOrg(ctx);
     if (!auth) return [];
+    const orgId = auth.orgId as Id<'organizations'>;
+    const periods = args.periods || 6;
 
-    const periods = args.periods || 7;
-    const months = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
-    ];
-    const currentMonth = new Date().getMonth();
+    const fallbackWindowDays = Math.max(30, periods * 30);
+    const { start, end } = normalizeDateRange(args.dateRange, fallbackWindowDays);
 
-    // Generate mock turnover data
-    const data = [];
+    const [variants, inventory] = await Promise.all([
+      ctx.db
+        .query("shopifyProductVariants")
+        .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
+        .collect(),
+      ctx.db
+        .query("shopifyInventory")
+        .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
+        .collect(),
+    ]);
 
-    for (let i = periods - 1; i >= 0; i--) {
-      const monthIndex = (currentMonth - i + 12) % 12;
-      const turnoverRate = 4 + Math.random() * 2; // Between 4 and 6
-      const daysInInventory = Math.round(365 / turnoverRate);
-      const stockValue = 150000 - i * 5000 + Math.random() * 10000;
+    const inventoryTotals = aggregateInventoryLevels(inventory);
 
-      data.push({
-        period: months[monthIndex] || "",
-        turnoverRate: parseFloat(turnoverRate.toFixed(1)),
-        daysInInventory,
-        stockValue: Math.round(stockValue),
+    const inventoryCost = variants.reduce((sum, variant) => {
+      const totals = inventoryTotals.get(variant._id);
+      const available = totals?.available ?? 0;
+      return sum + getVariantCost(variant) * available;
+    }, 0);
+
+    const inventoryRetailValue = variants.reduce((sum, variant) => {
+      const totals = inventoryTotals.get(variant._id);
+      const available = totals?.available ?? 0;
+      return sum + (variant.price || 0) * available;
+    }, 0);
+
+    const { orders, orderItems } = await fetchOrdersWithItems(
+      ctx,
+      orgId,
+      start,
+      end,
+    );
+
+    const itemsByOrder = new Map<string, Array<Doc<'shopifyOrderItems'>>>();
+    orderItems.forEach((item) => {
+      const key = item.orderId.toString();
+      const existing = itemsByOrder.get(key);
+      if (existing) {
+        existing.push(item);
+      } else {
+        itemsByOrder.set(key, [item]);
+      }
+    });
+
+    const variantMap = new Map<
+      Id<'shopifyProductVariants'>,
+      Doc<'shopifyProductVariants'>
+    >();
+    variants.forEach((variant) => {
+      variantMap.set(variant._id, variant);
+    });
+
+    const periodsData = [] as Array<{
+      period: string;
+      start: Date;
+      end: Date;
+      unitsSold: number;
+      cogsSold: number;
+    }>;
+
+    const baseStart = new Date(start);
+    baseStart.setHours(0, 0, 0, 0);
+    const baseEnd = new Date(end);
+    baseEnd.setHours(23, 59, 59, 999);
+    const totalDurationMs = Math.max(
+      MS_IN_DAY,
+      baseEnd.getTime() - baseStart.getTime(),
+    );
+    const segmentMs = Math.ceil(totalDurationMs / periods);
+
+    for (let i = 0; i < periods; i++) {
+      const segmentStart = new Date(baseStart.getTime() + i * segmentMs);
+      const segmentEnd =
+        i === periods - 1
+          ? baseEnd
+          : new Date(baseStart.getTime() + (i + 1) * segmentMs - 1);
+
+      if (segmentStart.getTime() > baseEnd.getTime()) {
+        break;
+      }
+
+      const clampedEnd = segmentEnd.getTime() > baseEnd.getTime()
+        ? baseEnd
+        : segmentEnd;
+
+      const label = clampedEnd.toLocaleString('en-US', {
+        month: 'short',
+      });
+
+      periodsData.push({
+        period: label,
+        start: segmentStart,
+        end: clampedEnd,
+        unitsSold: 0,
+        cogsSold: 0,
       });
     }
 
-    return data;
+    orders.forEach((order) => {
+      const createdAt = new Date(order.shopifyCreatedAt);
+      const period = periodsData.find(
+        (window) =>
+          createdAt.getTime() >= window.start.getTime() &&
+          createdAt.getTime() <= window.end.getTime(),
+      );
+      if (!period) return;
+
+      const items = itemsByOrder.get(order._id.toString()) || [];
+      items.forEach((item) => {
+        if (!item.variantId) return;
+        const variant = variantMap.get(item.variantId);
+        if (!variant) return;
+
+        const cost = getVariantCost(variant);
+        period.unitsSold += item.quantity;
+        period.cogsSold += item.quantity * cost;
+      });
+    });
+
+    const results = periodsData.map((period) => {
+      const periodDays = Math.max(
+        1,
+        Math.ceil((period.end.getTime() - period.start.getTime()) / MS_IN_DAY),
+      );
+      const annualizationFactor = 365 / periodDays;
+      const turnoverRate =
+        inventoryCost > 0
+          ? Math.round(
+              ((period.cogsSold * annualizationFactor) / inventoryCost) * 10,
+            ) /
+            10
+          : 0;
+      const daysInInventory =
+        turnoverRate > 0 ? Math.round(365 / turnoverRate) : 0;
+
+      return {
+        period: period.period,
+        turnoverRate,
+        daysInInventory,
+        stockValue: Math.round(inventoryRetailValue),
+      };
+    });
+
+    return results;
   },
 });

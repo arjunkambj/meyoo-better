@@ -8,5 +8,9 @@ export default [
       "dist/**",
     ],
   },
+  {
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+    },
+  },
 ];
-

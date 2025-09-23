@@ -1,7 +1,364 @@
 import { v } from "convex/values";
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import { query } from "../_generated/server";
 import { getUserAndOrg } from "../utils/auth";
+import { percentageOfMoney, roundMoney } from "../../libs/utils/money";
+
+const MS_IN_DAY = 24 * 60 * 60 * 1000;
+
+const toDateTimestamp = (dateKey: string, endOfDay = false): number => {
+  const base = new Date(`${dateKey}T00:00:00.000Z`).getTime();
+
+  return endOfDay ? base + MS_IN_DAY - 1 : base;
+};
+
+const formatDateKey = (date: Date): string =>
+  date.toISOString().substring(0, 10);
+
+const roundPercentage = (value: number): number =>
+  Number.isFinite(value) ? Math.round(value * 100) / 100 : 0;
+
+interface AggregatedOverviewMetrics {
+  revenue: number;
+  totalCosts: number;
+  netProfit: number;
+  taxesCollected: number;
+  orders: number;
+  grossProfit: number;
+  grossSales: number;
+  totalAdSpend: number;
+  newCustomers: number;
+  cacWeightedSum: number;
+  cacWeight: number;
+}
+
+const aggregateDailyMetrics = (
+  metrics: Array<Doc<"metricsDaily">>,
+): AggregatedOverviewMetrics => {
+  return metrics.reduce<AggregatedOverviewMetrics>(
+    (acc, metric) => {
+      acc.revenue += metric.revenue || 0;
+      acc.totalCosts += metric.totalCosts || 0;
+      acc.netProfit += metric.netProfit || 0;
+      acc.taxesCollected += metric.taxesCollected || 0;
+      acc.orders += metric.orders || 0;
+      acc.grossProfit += metric.grossProfit || 0;
+      acc.grossSales += metric.grossSales || 0;
+      acc.totalAdSpend += metric.totalAdSpend || 0;
+      acc.newCustomers += metric.newCustomers || 0;
+
+      if (metric.newCustomers > 0) {
+        acc.cacWeightedSum +=
+          (metric.customerAcquisitionCost || 0) * metric.newCustomers;
+        acc.cacWeight += metric.newCustomers;
+      }
+
+      return acc;
+    },
+    {
+      revenue: 0,
+      totalCosts: 0,
+      netProfit: 0,
+      taxesCollected: 0,
+      orders: 0,
+      grossProfit: 0,
+      grossSales: 0,
+      totalAdSpend: 0,
+      newCustomers: 0,
+      cacWeightedSum: 0,
+      cacWeight: 0,
+    },
+  );
+};
+
+const calculateChange = (current: number, previous: number): number => {
+  if (previous === 0) return current > 0 ? 100 : 0;
+
+  return ((current - previous) / previous) * 100;
+};
+
+interface OrderCostSummary {
+  totalCost: number;
+  profit: number;
+  profitMargin: number;
+}
+
+const selectVariantComponentForOrder = (
+  components: Doc<"productCostComponents">[] | undefined,
+  orderTimestamp: number,
+): Doc<"productCostComponents"> | undefined => {
+  if (!components || components.length === 0) return undefined;
+
+  let selected: Doc<"productCostComponents"> | undefined;
+
+  for (const component of components) {
+    if (component.isActive === false) continue;
+    if (
+      typeof component.effectiveFrom === "number" &&
+      component.effectiveFrom > orderTimestamp
+    ) {
+      continue;
+    }
+    if (
+      typeof component.effectiveTo === "number" &&
+      component.effectiveTo < orderTimestamp
+    ) {
+      continue;
+    }
+
+    if (
+      !selected ||
+      (typeof component.effectiveFrom === "number" &&
+        (component.effectiveFrom || 0) > (selected.effectiveFrom || 0))
+    ) {
+      selected = component;
+    }
+  }
+
+  if (selected) return selected;
+
+  return components.find((component) => component.isActive !== false);
+};
+
+const isCostActiveForOrder = (
+  cost: Doc<"costs">,
+  orderTimestamp: number,
+): boolean => {
+  if (cost.isActive === false) return false;
+  if (
+    typeof cost.effectiveFrom === "number" &&
+    cost.effectiveFrom > orderTimestamp
+  ) {
+    return false;
+  }
+  if (
+    typeof cost.effectiveTo === "number" &&
+    cost.effectiveTo < orderTimestamp
+  ) {
+    return false;
+  }
+
+  return true;
+};
+
+const computeOrderCost = (
+  order: Doc<"shopifyOrders">,
+  items: Array<Doc<"shopifyOrderItems">>,
+  variantComponents: Map<string, Doc<"productCostComponents">[]>,
+  costConfigs: Array<Doc<"costs">>,
+): OrderCostSummary => {
+  const orderTimestamp = order.shopifyCreatedAt || Date.now();
+  const orderRevenue = order.totalPrice || 0;
+  const grossSales = order.subtotalPrice || 0;
+  const totalUnits = items.reduce((acc, item) => acc + (item.quantity || 0), 0);
+
+  let cogs = 0;
+  let shippingCost = 0;
+  let handlingFees = 0;
+  let transactionFees = 0;
+  let marketingCosts = 0;
+  let operationalCosts = 0;
+  let taxCosts = 0;
+  let otherCosts = 0;
+  let revenueCoveredForCogs = 0;
+  let revenueCoveredForPayment = 0;
+
+  for (const item of items) {
+    const qty = item.quantity || 0;
+    const unitPrice = item.price || 0;
+    const discount = item.totalDiscount || 0;
+    const lineRevenue = Math.max(0, unitPrice * qty - discount);
+    const variantId = item.variantId ? String(item.variantId) : undefined;
+    const component = variantId
+      ? selectVariantComponentForOrder(
+          variantComponents.get(variantId),
+          orderTimestamp,
+        )
+      : undefined;
+
+    if (component) {
+      if (typeof component.cogsPerUnit === "number" && component.cogsPerUnit > 0) {
+        cogs += component.cogsPerUnit * qty;
+        revenueCoveredForCogs += lineRevenue;
+      }
+      if (
+        typeof component.shippingPerUnit === "number" &&
+        component.shippingPerUnit > 0
+      ) {
+        shippingCost += component.shippingPerUnit * qty;
+      }
+      if (
+        typeof component.handlingPerUnit === "number" &&
+        component.handlingPerUnit > 0
+      ) {
+        handlingFees += component.handlingPerUnit * qty;
+      }
+      if (
+        typeof component.paymentFeePercent === "number" &&
+        component.paymentFeePercent > 0
+      ) {
+        transactionFees += percentageOfMoney(
+          lineRevenue,
+          component.paymentFeePercent,
+        );
+        revenueCoveredForPayment += lineRevenue;
+      }
+      if (
+        typeof component.paymentFixedPerItem === "number" &&
+        component.paymentFixedPerItem > 0
+      ) {
+        transactionFees += roundMoney(component.paymentFixedPerItem * qty);
+      }
+    }
+  }
+
+  for (const cost of costConfigs) {
+    if (!isCostActiveForOrder(cost, orderTimestamp)) continue;
+
+    const value = cost.value || 0;
+    if (value === 0) continue;
+
+    const config = (cost as { config?: any }).config ?? {};
+    const frequency = cost.frequency || config.frequency;
+
+    if (cost.calculation === "percentage") {
+      if (cost.type === "product") {
+        const base = Math.max(0, grossSales - revenueCoveredForCogs);
+        if (base > 0) {
+          cogs += percentageOfMoney(base, value);
+        }
+      } else if (cost.type === "payment") {
+        const base = Math.max(0, orderRevenue - revenueCoveredForPayment);
+        if (base > 0) {
+          transactionFees += percentageOfMoney(base, value);
+        }
+        if (typeof config.fixedFee === "number" && config.fixedFee > 0) {
+          transactionFees += roundMoney(config.fixedFee);
+        }
+      } else {
+        const amount = percentageOfMoney(orderRevenue, value);
+
+        switch (cost.type) {
+          case "shipping":
+            shippingCost += amount;
+            break;
+          case "handling":
+            handlingFees += amount;
+            break;
+          case "marketing":
+            marketingCosts += amount;
+            break;
+          case "operational":
+            operationalCosts += amount;
+            break;
+          case "tax":
+            taxCosts += amount;
+            break;
+          default:
+            otherCosts += amount;
+        }
+      }
+    } else if (cost.calculation === "fixed") {
+      let amount = 0;
+
+      switch (frequency) {
+        case "per_item":
+        case "per_unit":
+          amount = roundMoney(value * totalUnits);
+          break;
+        case "per_order":
+        case undefined:
+          amount = roundMoney(value);
+          break;
+        default:
+          amount = 0;
+      }
+
+      if (amount === 0) continue;
+
+      switch (cost.type) {
+        case "product":
+          cogs += amount;
+          break;
+        case "shipping":
+          shippingCost += amount;
+          break;
+        case "handling":
+          handlingFees += amount;
+          break;
+        case "payment":
+          transactionFees += amount;
+          break;
+        case "marketing":
+          marketingCosts += amount;
+          break;
+        case "operational":
+          operationalCosts += amount;
+          break;
+        case "tax":
+          taxCosts += amount;
+          break;
+        default:
+          otherCosts += amount;
+      }
+    } else if (cost.calculation === "per_unit") {
+      const amount = roundMoney(value * totalUnits);
+      if (amount === 0) continue;
+
+      switch (cost.type) {
+        case "product":
+          cogs += amount;
+          break;
+        case "shipping":
+          shippingCost += amount;
+          break;
+        case "handling":
+          handlingFees += amount;
+          break;
+        case "payment":
+          transactionFees += amount;
+          break;
+        case "marketing":
+          marketingCosts += amount;
+          break;
+        case "operational":
+          operationalCosts += amount;
+          break;
+        case "tax":
+          taxCosts += amount;
+          break;
+        default:
+          otherCosts += amount;
+      }
+    }
+  }
+
+  cogs = roundMoney(cogs);
+  shippingCost = roundMoney(shippingCost);
+  handlingFees = roundMoney(handlingFees);
+  transactionFees = roundMoney(transactionFees);
+  marketingCosts = roundMoney(marketingCosts);
+  operationalCosts = roundMoney(operationalCosts);
+  taxCosts = roundMoney(taxCosts);
+  otherCosts = roundMoney(otherCosts);
+
+  const totalCost = roundMoney(
+    cogs +
+      shippingCost +
+      handlingFees +
+      transactionFees +
+      marketingCosts +
+      operationalCosts +
+      taxCosts +
+      otherCosts,
+  );
+
+  const profit = roundMoney(orderRevenue - totalCost);
+  const profitMargin =
+    orderRevenue > 0 ? roundPercentage((profit / orderRevenue) * 100) : 0;
+
+  return { totalCost, profit, profitMargin };
+};
 
 /**
  * Orders Management API
@@ -53,178 +410,203 @@ export const getOrdersOverview = query({
     const auth = await getUserAndOrg(ctx);
     if (!auth) return null;
 
-    // Get ALL orders from shopifyOrders table for comparison purposes
-    const allOrders = await ctx.db
-      .query("shopifyOrders")
-      .withIndex("by_organization", (q) => q.eq("organizationId", auth.orgId as Id<"organizations">))
-      .collect();
+    const defaultEnd = new Date();
+    const defaultStart = new Date(defaultEnd);
 
-    // Use effective date range
-    const effectiveDateRange = args.dateRange || {
-      startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-        .toISOString()
-        .substring(0, 10),
-      endDate: new Date().toISOString().substring(0, 10),
+    defaultStart.setDate(defaultStart.getDate() - 30);
+
+    const effectiveDateRange = args.dateRange ?? {
+      startDate: formatDateKey(defaultStart),
+      endDate: formatDateKey(defaultEnd),
     };
 
-    // Filter orders for current period
-    const orders = allOrders.filter((order) => {
-      const orderDate = new Date(order.shopifyCreatedAt)
-        .toISOString()
-        .substring(0, 10);
+    const startDateKey = effectiveDateRange.startDate;
+    const endDateKey = effectiveDateRange.endDate;
 
-      return (
-        orderDate >= effectiveDateRange.startDate &&
-        orderDate <= effectiveDateRange.endDate
-      );
-    });
+    const rangeStartTs = toDateTimestamp(startDateKey);
+    const rangeEndTs = toDateTimestamp(endDateKey, true);
 
-    // Calculate metrics
-    const totalOrders = orders.length;
-    const pendingOrders = orders.filter(
+    const periodDays = Math.max(
+      1,
+      Math.round((rangeEndTs - rangeStartTs) / MS_IN_DAY) + 1,
+    );
+
+    const previousEndTs = rangeStartTs - 1;
+    const previousStartTs = previousEndTs - (periodDays - 1) * MS_IN_DAY;
+
+    const previousStartKey = formatDateKey(new Date(previousStartTs));
+    const previousEndKey = formatDateKey(new Date(previousEndTs));
+
+    const [currentMetrics, previousMetrics, orders] = await Promise.all([
+      ctx.db
+        .query("metricsDaily")
+        .withIndex("by_org_date", (q) =>
+          q
+            .eq("organizationId", auth.orgId as Id<"organizations">)
+            .gte("date", startDateKey)
+            .lte("date", endDateKey),
+        )
+        .collect(),
+      ctx.db
+        .query("metricsDaily")
+        .withIndex("by_org_date", (q) =>
+          q
+            .eq("organizationId", auth.orgId as Id<"organizations">)
+            .gte("date", previousStartKey)
+            .lte("date", previousEndKey),
+        )
+        .collect(),
+      ctx.db
+        .query("shopifyOrders")
+        .withIndex("by_organization_and_created", (q) =>
+          q
+            .eq("organizationId", auth.orgId as Id<"organizations">)
+            .gte("shopifyCreatedAt", previousStartTs)
+            .lte("shopifyCreatedAt", rangeEndTs),
+        )
+        .collect(),
+    ]);
+
+    const currentOrders = orders.filter(
+      (order) =>
+        order.shopifyCreatedAt >= rangeStartTs &&
+        order.shopifyCreatedAt <= rangeEndTs,
+    );
+    const previousOrders = orders.filter(
+      (order) =>
+        order.shopifyCreatedAt >= previousStartTs &&
+        order.shopifyCreatedAt <= previousEndTs,
+    );
+
+    const totalOrders = currentOrders.length;
+    const pendingOrders = currentOrders.filter(
       (o) =>
         o.fulfillmentStatus === "unfulfilled" &&
         o.financialStatus === "pending",
     ).length;
-    const processingOrders = orders.filter(
+    const processingOrders = currentOrders.filter(
       (o) => o.fulfillmentStatus === "partial",
     ).length;
-    const completedOrders = orders.filter(
+    const completedOrders = currentOrders.filter(
       (o) => o.fulfillmentStatus === "fulfilled",
     ).length;
-    const cancelledOrders = orders.filter(
+    const cancelledOrders = currentOrders.filter(
       (o) => o.cancelledAt !== undefined && o.cancelledAt !== null,
     ).length;
 
-    const totalRevenue = orders.reduce(
-      (sum, o) => sum + (o.totalPrice || 0),
-      0,
-    );
-    const totalCosts = orders.reduce(
-      (sum, o) => sum + (o.subtotalPrice || 0) * 0.6, // Assume 60% cost of subtotal
-      0,
-    );
-    const totalTax = orders.reduce((sum, o) => sum + (o.totalTax || 0), 0);
-    const totalShipping = orders.reduce(
-      (sum, o) => sum + (o.totalShippingPrice || 0),
-      0,
-    );
-    const netProfit = totalRevenue - totalCosts - totalTax - totalShipping;
-    const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
-    const customerAcquisitionCost =
-      totalOrders > 0 ? (totalRevenue * 0.15) / totalOrders : 0; // Assume 15% of revenue for CAC
-    const grossMargin =
-      totalRevenue > 0 ? ((totalRevenue - totalCosts) / totalRevenue) * 100 : 0;
+    const aggregatedCurrent = aggregateDailyMetrics(currentMetrics);
+    const aggregatedPrevious = aggregateDailyMetrics(previousMetrics);
 
-    // Calculate fulfillment metrics
-    const fulfilledOrders = orders.filter(
+    const totalRevenue = roundMoney(aggregatedCurrent.revenue);
+    const totalCosts = roundMoney(aggregatedCurrent.totalCosts);
+    const netProfit = roundMoney(aggregatedCurrent.netProfit);
+    const totalTax = roundMoney(aggregatedCurrent.taxesCollected);
+
+    const avgOrderValue =
+      totalOrders > 0 ? roundMoney(totalRevenue / totalOrders) : 0;
+
+    const fulfilledOrders = currentOrders.filter(
       (o) => o.fulfillmentStatus === "fulfilled",
     );
     const fulfillmentRate =
-      totalOrders > 0 ? (fulfilledOrders.length / totalOrders) * 100 : 0;
+      totalOrders > 0
+        ? roundPercentage((fulfilledOrders.length / totalOrders) * 100)
+        : 0;
 
-    // Calculate average fulfillment time in days
     const fulfillmentTimes = fulfilledOrders
-      .filter((o) => o.closedAt)
       .map((o) => {
-        if (!o.closedAt) return 0;
-        const created = new Date(o.shopifyCreatedAt).getTime();
-        const fulfilled = new Date(o.closedAt).getTime();
+        if (typeof o.closedAt !== "number") return 0;
 
-        return (fulfilled - created) / (1000 * 60 * 60 * 24); // Convert to days
+        return (o.closedAt - o.shopifyCreatedAt) / MS_IN_DAY;
       })
       .filter((t) => t > 0);
     const avgFulfillmentTime =
       fulfillmentTimes.length > 0
-        ? fulfillmentTimes.reduce((sum, t) => sum + t, 0) /
-          fulfillmentTimes.length
+        ? roundPercentage(
+            fulfillmentTimes.reduce((sum, t) => sum + t, 0) /
+              fulfillmentTimes.length,
+          )
         : 0;
 
-    // Calculate return rate (using financial status)
-    const returnedOrders = orders.filter(
+    const returnedOrders = currentOrders.filter(
       (o) =>
         o.financialStatus === "refunded" ||
         o.financialStatus === "partially_refunded",
     ).length;
     const returnRate =
-      totalOrders > 0 ? (returnedOrders / totalOrders) * 100 : 0;
-
-    // Calculate changes from previous period
-    const startStr = effectiveDateRange.startDate || new Date().toISOString().substring(0,10);
-    const endStr = effectiveDateRange.endDate || new Date().toISOString().substring(0,10);
-    const currentStart = new Date(startStr);
-    const currentEnd = new Date(endStr);
-    const periodLength = Math.ceil(
-      (currentEnd.getTime() - currentStart.getTime()) / (1000 * 60 * 60 * 24),
-    );
-
-    const previousEndDate = new Date(startStr);
-
-    previousEndDate.setDate(previousEndDate.getDate() - 1);
-    const previousStartDate = new Date(previousEndDate);
-
-    previousStartDate.setDate(previousStartDate.getDate() - periodLength + 1);
-
-    const previousOrders = allOrders.filter((order) => {
-      const orderDate = new Date(order.shopifyCreatedAt)
-        .toISOString()
-        .substring(0, 10);
-
-      return (
-        orderDate >= previousStartDate.toISOString().substring(0, 10) &&
-        orderDate <= previousEndDate.toISOString().substring(0, 10)
-      );
-    });
-
-    const prevTotalOrders = previousOrders.length;
-    const prevTotalRevenue = previousOrders.reduce(
-      (sum, o) => sum + (o.totalPrice || 0),
-      0,
-    );
-    const prevTotalCosts = previousOrders.reduce(
-      (sum, o) => sum + (o.subtotalPrice || 0) * 0.6,
-      0,
-    );
-    const prevTotalTax = previousOrders.reduce(
-      (sum, o) => sum + (o.totalTax || 0),
-      0,
-    );
-    const prevTotalShipping = previousOrders.reduce(
-      (sum, o) => sum + (o.totalShippingPrice || 0),
-      0,
-    );
-    const prevNetProfit =
-      prevTotalRevenue - prevTotalCosts - prevTotalTax - prevTotalShipping;
-    const prevAvgOrderValue =
-      prevTotalOrders > 0 ? prevTotalRevenue / prevTotalOrders : 0;
-    const prevCAC =
-      prevTotalOrders > 0 ? (prevTotalRevenue * 0.15) / prevTotalOrders : 0;
-    const prevGrossMargin =
-      prevTotalRevenue > 0
-        ? ((prevTotalRevenue - prevTotalCosts) / prevTotalRevenue) * 100
+      totalOrders > 0
+        ? roundPercentage((returnedOrders / totalOrders) * 100)
         : 0;
-    const prevFulfilledOrders = previousOrders.filter(
+
+    const customerAcquisitionCost =
+      aggregatedCurrent.cacWeight > 0
+        ? roundMoney(
+            aggregatedCurrent.cacWeightedSum / aggregatedCurrent.cacWeight,
+          )
+        : 0;
+
+    const grossMargin =
+      totalRevenue > 0
+        ? roundPercentage((aggregatedCurrent.grossProfit / totalRevenue) * 100)
+        : 0;
+
+    const previousTotalOrders = previousOrders.length;
+    const previousAvgOrderValue =
+      previousTotalOrders > 0
+        ? roundMoney(
+            (aggregatedPrevious.revenue || 0) / previousTotalOrders,
+          )
+        : 0;
+
+    const previousCustomerAcquisitionCost =
+      aggregatedPrevious.cacWeight > 0
+        ? roundMoney(
+            aggregatedPrevious.cacWeightedSum / aggregatedPrevious.cacWeight,
+          )
+        : 0;
+
+    const previousGrossMargin =
+      aggregatedPrevious.revenue > 0
+        ? roundPercentage(
+            (aggregatedPrevious.grossProfit / aggregatedPrevious.revenue) * 100,
+          )
+        : 0;
+
+    const previousFulfilledOrders = previousOrders.filter(
       (o) => o.fulfillmentStatus === "fulfilled",
-    );
-    const prevFulfillmentRate =
-      prevTotalOrders > 0
-        ? (prevFulfilledOrders.length / prevTotalOrders) * 100
+    ).length;
+    const previousFulfillmentRate =
+      previousTotalOrders > 0
+        ? roundPercentage(
+            (previousFulfilledOrders / previousTotalOrders) * 100,
+          )
         : 0;
-
-    const calculateChange = (current: number, previous: number) => {
-      if (previous === 0) return current > 0 ? 100 : 0;
-
-      return ((current - previous) / previous) * 100;
-    };
 
     const changes = {
-      totalOrders: calculateChange(totalOrders, prevTotalOrders),
-      revenue: calculateChange(totalRevenue, prevTotalRevenue),
-      netProfit: calculateChange(netProfit, prevNetProfit),
-      avgOrderValue: calculateChange(avgOrderValue, prevAvgOrderValue),
-      cac: calculateChange(customerAcquisitionCost, prevCAC),
-      margin: calculateChange(grossMargin, prevGrossMargin),
-      fulfillmentRate: calculateChange(fulfillmentRate, prevFulfillmentRate),
+      totalOrders: roundPercentage(
+        calculateChange(totalOrders, previousTotalOrders),
+      ),
+      revenue: roundPercentage(
+        calculateChange(totalRevenue, roundMoney(aggregatedPrevious.revenue)),
+      ),
+      netProfit: roundPercentage(
+        calculateChange(netProfit, roundMoney(aggregatedPrevious.netProfit)),
+      ),
+      avgOrderValue: roundPercentage(
+        calculateChange(avgOrderValue, previousAvgOrderValue),
+      ),
+      cac: roundPercentage(
+        calculateChange(
+          customerAcquisitionCost,
+          previousCustomerAcquisitionCost,
+        ),
+      ),
+      margin: roundPercentage(
+        calculateChange(grossMargin, previousGrossMargin),
+      ),
+      fulfillmentRate: roundPercentage(
+        calculateChange(fulfillmentRate, previousFulfillmentRate),
+      ),
     };
 
     return {
@@ -325,29 +707,94 @@ export const getOrdersList = query({
     const page = args.page || 1;
     const pageSize = args.pageSize || 50;
 
-    // Get orders
-    const orders = await ctx.db
-      .query("shopifyOrders")
-      .withIndex("by_organization", (q) => q.eq("organizationId", auth.orgId as Id<"organizations">))
-      .collect();
+    const [orders, customers, orderItems, productCostComponents, costConfigs] =
+      await Promise.all([
+        ctx.db
+          .query("shopifyOrders")
+          .withIndex("by_organization", (q) =>
+            q.eq("organizationId", auth.orgId as Id<"organizations">),
+          )
+          .collect(),
+        ctx.db
+          .query("shopifyCustomers")
+          .withIndex("by_organization", (q) =>
+            q.eq("organizationId", auth.orgId as Id<"organizations">),
+          )
+          .collect(),
+        ctx.db
+          .query("shopifyOrderItems")
+          .withIndex("by_organization", (q) =>
+            q.eq("organizationId", auth.orgId as Id<"organizations">),
+          )
+          .collect(),
+        ctx.db
+          .query("productCostComponents")
+          .withIndex("by_organization", (q) =>
+            q.eq("organizationId", auth.orgId as Id<"organizations">),
+          )
+          .collect(),
+        ctx.db
+          .query("costs")
+          .withIndex("by_organization", (q) =>
+            q.eq("organizationId", auth.orgId as Id<"organizations">),
+          )
+          .collect(),
+      ]);
 
-    // Get customers for order data
-    const customers = await ctx.db
-      .query("shopifyCustomers")
-      .withIndex("by_organization", (q) => q.eq("organizationId", auth.orgId as Id<"organizations">))
-      .collect();
+    const orderItemsByOrder = new Map<string, Array<Doc<"shopifyOrderItems">>>();
+    for (const item of orderItems) {
+      const key = String(item.orderId);
+      const list = orderItemsByOrder.get(key);
+      if (list) {
+        list.push(item);
+      } else {
+        orderItemsByOrder.set(key, [item]);
+      }
+    }
+
+    const variantComponents = new Map<
+      string,
+      Array<Doc<"productCostComponents">>
+    >();
+    for (const component of productCostComponents) {
+      const key = String(component.variantId);
+      const list = variantComponents.get(key);
+      if (list) {
+        list.push(component);
+      } else {
+        variantComponents.set(key, [component]);
+      }
+    }
+
+    const activeCosts = costConfigs.filter((cost) => cost.isActive !== false);
+    const costSummaryByOrderId = new Map<string, OrderCostSummary>();
+
+    for (const order of orders) {
+      const items = orderItemsByOrder.get(String(order._id)) || [];
+      const summary = computeOrderCost(
+        order,
+        items,
+        variantComponents,
+        activeCosts,
+      );
+      costSummaryByOrderId.set(String(order._id), summary);
+    }
 
     // Map orders with customer data
     const ordersWithCustomers = orders.map((order) => {
       const customer = customers.find((c) => c._id === order.customerId);
+      const summary =
+        costSummaryByOrderId.get(String(order._id)) ?? (
+          () => {
+            const totalPrice = order.totalPrice || 0;
 
-      // Calculate financial metrics
-      const totalPrice = order.totalPrice || 0;
-      const totalCost = (order.subtotalPrice || 0) * 0.6; // Assume 60% cost of subtotal
-      const taxAmount = order.totalTax || 0;
-      const shippingCost = order.totalShippingPrice || 0;
-      const profit = totalPrice - totalCost - taxAmount - shippingCost;
-      const profitMargin = totalPrice > 0 ? (profit / totalPrice) * 100 : 0;
+            return {
+              totalCost: 0,
+              profit: roundMoney(totalPrice),
+              profitMargin: totalPrice > 0 ? 100 : 0,
+            };
+          }
+        )();
 
       // Determine payment method based on financial status
       let paymentMethod = "Credit Card";
@@ -379,12 +826,12 @@ export const getOrdersList = query({
         fulfillmentStatus: order.fulfillmentStatus || "unfulfilled",
         financialStatus: order.financialStatus || "pending",
         items: order.totalQuantity || 0,
-        totalPrice,
-        totalCost,
-        profit,
-        profitMargin,
-        taxAmount,
-        shippingCost,
+        totalPrice: order.totalPrice || 0,
+        totalCost: summary.totalCost,
+        profit: summary.profit,
+        profitMargin: summary.profitMargin,
+        taxAmount: order.totalTax || 0,
+        shippingCost: order.totalShippingPrice || 0,
         paymentMethod,
         tags: order.tags || undefined,
         shippingAddress: {
@@ -720,20 +1167,20 @@ export const getFulfillmentMetrics = query({
 
     // Calculate averages with proper defaults only if we have some data
     const avgProcessingTime =
-      processingTimes.length > 0 ? avg(processingTimes) : 1.0;
-    const avgShippingTime = shippingTimes.length > 0 ? avg(shippingTimes) : 3.0;
-    const avgDeliveryTime = deliveryTimes.length > 0 ? avg(deliveryTimes) : 5.0;
+      processingTimes.length > 0 ? avg(processingTimes) : 0;
+    const avgShippingTime = shippingTimes.length > 0 ? avg(shippingTimes) : 0;
+    const avgDeliveryTime = deliveryTimes.length > 0 ? avg(deliveryTimes) : 0;
 
     // Ensure logical consistency: processing <= shipping <= delivery
     const finalProcessingTime = avgProcessingTime;
-    const finalShippingTime = Math.max(
-      avgShippingTime,
-      avgProcessingTime + 1.0,
-    );
-    const finalDeliveryTime = Math.max(
-      avgDeliveryTime,
-      finalShippingTime + 1.0,
-    );
+    const finalShippingTime =
+      avgShippingTime > 0
+        ? Math.max(avgShippingTime, finalProcessingTime)
+        : finalProcessingTime;
+    const finalDeliveryTime =
+      avgDeliveryTime > 0
+        ? Math.max(avgDeliveryTime, finalShippingTime)
+        : finalShippingTime;
 
     // Calculate average fulfillment cost (shipping cost per order)
     const totalShippingCost = orders.reduce(

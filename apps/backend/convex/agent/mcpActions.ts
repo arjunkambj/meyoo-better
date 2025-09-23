@@ -158,7 +158,7 @@ export const analyticsSummary = action({
     records: v.array(v.any()),
   }),
   handler: async (ctx, args): Promise<{ summary: string; totals: Record<string, number>; records: any[] }> => {
-    const { organizationId } = await validateAndGetOrgContext(ctx, args.apiKey);
+    const { organizationId: _organizationId } = await validateAndGetOrgContext(ctx, args.apiKey);
 
     const rows: any[] = await ctx.runQuery(api.web.analytics.getMetrics, {
       dateRange: { startDate: args.startDate, endDate: args.endDate },
@@ -226,7 +226,7 @@ export const metaAdsOverview = action({
     }),
   }),
   handler: async (ctx, args): Promise<{ summary: string; dateRange: { startDate: string; endDate: string; }; meta: { sessions: number; conversionRate: number; impressions: number; ctr: number; reach: number; frequency: number; uniqueClicks: number; cpc: number; costPerConversion: number; addToCart: number; initiateCheckout: number; pageViews: number; viewContent: number; linkClicks: number; outboundClicks: number; landingPageViews: number; videoViews: number; video3SecViews: number; costPerThruPlay: number; } }> => {
-    const { organizationId } = await validateAndGetOrgContext(ctx, args.apiKey);
+    const { organizationId: _organizationId } = await validateAndGetOrgContext(ctx, args.apiKey);
 
     const dateRange = args.startDate && args.endDate
       ? { startDate: args.startDate, endDate: args.endDate }

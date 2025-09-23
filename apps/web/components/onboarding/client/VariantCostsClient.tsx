@@ -14,7 +14,13 @@ import {
   TableRow,
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type ComponentProps,
+  type ReactElement,
+} from "react";
 import type { RowElement } from "@react-types/table";
 import { useRouter } from "next/navigation";
 
@@ -41,6 +47,8 @@ import {
   DATA_TABLE_TABLE_CLASS,
 } from "@/components/shared/table/DataTableCard";
 import { cn } from "@/libs/utils";
+
+type TableCellElement = ReactElement<ComponentProps<typeof TableCell>>;
 
 type RowEdit = {
   cogs?: string;
@@ -488,7 +496,7 @@ export default function VariantCostsClient({
                   );
 
                   // Product header row renders the same columns
-                  const headerCells: any[] = [];
+                  const headerCells: TableCellElement[] = [];
                   headerCells.push(
                     <TableCell key="variant">
                       <div className="min-w-0 flex items-center gap-3 py-1">
@@ -767,7 +775,7 @@ export default function VariantCostsClient({
                         )}
                       >
                         {(() => {
-                          const cells: any[] = [];
+                          const cells: TableCellElement[] = [];
                           // Variant (only variant-specific text since product info is in header)
                           cells.push(
                             <TableCell key="variant">

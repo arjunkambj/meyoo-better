@@ -4,8 +4,7 @@ import { Card } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { useMemo } from "react";
 
-import { useUser } from "@/hooks";
-import { getCurrencySymbol, formatNumber } from "@/libs/utils/format";
+import { formatNumber } from "@/libs/utils/format";
 
 export interface FulfillmentData {
   avgProcessingTime: number;
@@ -23,9 +22,6 @@ interface FulfillmentAnalysisProps {
 }
 
 export function FulfillmentAnalysis({ metrics }: FulfillmentAnalysisProps) {
-  const { primaryCurrency } = useUser();
-  const currencySymbol = getCurrencySymbol(primaryCurrency);
-
   const performanceMetrics = useMemo(() => {
     if (!metrics) return [];
 

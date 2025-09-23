@@ -18,7 +18,6 @@ export interface PnLKPIMetrics {
   marketingCost: number;
   marketingROAS: number;
   marketingROI: number;
-  taxes: number;
   changes: {
     grossSales: number;
     discountsReturns: number;
@@ -31,7 +30,6 @@ export interface PnLKPIMetrics {
     marketingCost: number;
     marketingROAS: number;
     marketingROI: number;
-    taxes: number;
   };
 }
 
@@ -154,4 +152,3 @@ export const PnLKPICards = memo(function PnLKPICards({
     </div>
   );
 });
-

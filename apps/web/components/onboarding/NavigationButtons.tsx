@@ -150,6 +150,7 @@ const NavigationButtons = memo(function NavigationButtons({
     currentStepInfo.stepId,
     optimisticNavigation,
     router,
+    setNavigationPending,
     updateOnboardingState,
   ]);
 
@@ -173,7 +174,13 @@ const NavigationButtons = memo(function NavigationButtons({
     // Navigate
     setNavigationPending(true);
     router.push(previousRoute);
-  }, [previousRoute, onPrevious, optimisticNavigation, router]);
+  }, [
+    previousRoute,
+    onPrevious,
+    optimisticNavigation,
+    router,
+    setNavigationPending,
+  ]);
 
   const containerBase = "flex items-center justify-between gap-4";
   const isFloating = variant !== "inline";

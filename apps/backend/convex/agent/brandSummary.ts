@@ -63,7 +63,7 @@ export const upsertBrandSummary = action({
     lookbackDays: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const { user, orgId } = await requireUserAndOrg(ctx);
+    const { user: _user, orgId } = await requireUserAndOrg(ctx);
     const lookback = args.lookbackDays ?? DEFAULT_LOOKBACK_DAYS;
     const since = Date.now() - lookback * DAY_MS;
 

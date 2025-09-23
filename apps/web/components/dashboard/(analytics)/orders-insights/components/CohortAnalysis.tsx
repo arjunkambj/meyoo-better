@@ -28,72 +28,15 @@ export const CohortAnalysis = memo(function CohortAnalysis({
   const { primaryCurrency } = useUser();
   const currencySymbol = getCurrencySymbol(primaryCurrency);
 
-  const defaultCohorts: CohortData[] = [
-    {
-      cohort: "Jan 2024",
-      size: 245,
-      months: [
-        { month: 0, retention: 100, revenue: 45000 },
-        { month: 1, retention: 68, revenue: 38000 },
-        { month: 2, retention: 52, revenue: 32000 },
-        { month: 3, retention: 45, revenue: 28000 },
-        { month: 4, retention: 42, revenue: 26000 },
-        { month: 5, retention: 40, revenue: 25000 },
-      ],
-    },
-    {
-      cohort: "Feb 2024",
-      size: 198,
-      months: [
-        { month: 0, retention: 100, revenue: 38000 },
-        { month: 1, retention: 72, revenue: 32000 },
-        { month: 2, retention: 58, revenue: 28000 },
-        { month: 3, retention: 48, revenue: 24000 },
-        { month: 4, retention: 44, revenue: 22000 },
-      ],
-    },
-    {
-      cohort: "Mar 2024",
-      size: 312,
-      months: [
-        { month: 0, retention: 100, revenue: 52000 },
-        { month: 1, retention: 75, revenue: 45000 },
-        { month: 2, retention: 62, revenue: 38000 },
-        { month: 3, retention: 55, revenue: 34000 },
-      ],
-    },
-    {
-      cohort: "Apr 2024",
-      size: 267,
-      months: [
-        { month: 0, retention: 100, revenue: 48000 },
-        { month: 1, retention: 78, revenue: 42000 },
-        { month: 2, retention: 65, revenue: 36000 },
-      ],
-    },
-    {
-      cohort: "May 2024",
-      size: 289,
-      months: [
-        { month: 0, retention: 100, revenue: 51000 },
-        { month: 1, retention: 80, revenue: 46000 },
-      ],
-    },
-    {
-      cohort: "Jun 2024",
-      size: 334,
-      months: [{ month: 0, retention: 100, revenue: 58000 }],
-    },
-  ];
-
-  const data = cohorts || defaultCohorts;
+  const data = useMemo(() => cohorts ?? [], [cohorts]);
 
   // Minimal color function for heatmap
   const getHeatmapColor = (value: number | undefined, max: number = 100) => {
     if (value === undefined || Number.isNaN(value))
       return "bg-default-50 text-default-400";
 
-    const intensity = value / max;
+    const denominator = max > 0 ? max : 1;
+    const intensity = value / denominator;
 
     if (intensity >= 0.8) return "bg-primary-50 text-primary-600";
     if (intensity >= 0.6) return "bg-primary-50/70 text-primary-500";
@@ -103,10 +46,15 @@ export const CohortAnalysis = memo(function CohortAnalysis({
     return "bg-default-50 text-default-400";
   };
 
-  const maxRevenue = useMemo(
-    () => Math.max(...data.flatMap((c) => c.months.map((m) => m.revenue || 0))),
-    [data]
-  );
+  const maxRevenue = useMemo(() => {
+    if (!data.length) return 0;
+
+    const values = data.flatMap((c) => c.months.map((m) => m.revenue || 0));
+
+    if (values.length === 0) return 0;
+
+    return Math.max(...values);
+  }, [data]);
 
   // Calculate average retention by month
   const avgRetentionByMonth = useMemo(() => {
@@ -226,12 +174,22 @@ export const CohortAnalysis = memo(function CohortAnalysis({
             </tr>
           </thead>
           <tbody>
-            {data.map((cohort) => (
-              <tr key={cohort.cohort} className="border-b border-default-50">
-                <td className="p-3 font-medium text-xs sticky left-0 bg-background text-default-800">
-                  {cohort.cohort}
+            {data.length === 0 ? (
+              <tr>
+                <td
+                  className="p-6 text-center text-xs text-default-500"
+                  colSpan={8}
+                >
+                  No cohort activity yet. Once repeat purchases start, retention will appear here.
                 </td>
-                <td className="text-center p-3">
+              </tr>
+            ) : (
+              data.map((cohort) => (
+                <tr key={cohort.cohort} className="border-b border-default-50">
+                  <td className="p-3 font-medium text-xs sticky left-0 bg-background text-default-800">
+                    {cohort.cohort}
+                  </td>
+                  <td className="text-center p-3">
                   <span className="text-xs font-medium  text-default-800">
                     {cohort.size}
                   </span>
@@ -270,7 +228,8 @@ export const CohortAnalysis = memo(function CohortAnalysis({
                   );
                 })}
               </tr>
-            ))}
+              ))
+            )}
           </tbody>
         </table>
       </div>

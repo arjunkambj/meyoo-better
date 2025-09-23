@@ -3,8 +3,6 @@
 import {
   Avatar,
   Button,
-  Card,
-  CardBody,
   Input,
   addToast,
   useDisclosure,

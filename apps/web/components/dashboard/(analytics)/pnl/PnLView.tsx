@@ -6,6 +6,7 @@ import { AnalyticsHeader } from "@/components/shared/AnalyticsHeader";
 import { ExportButton } from "@/components/shared/actions/ExportButton";
 import GlobalDateRangePicker from "@/components/shared/GlobalDateRangePicker";
 import { usePnLAnalytics } from "@/hooks";
+import { PnLKPICards } from "./components/PnLKPICards";
 import { PnLTable } from "./components/PnLTable";
 
 export const PnLView = memo(function PnLView() {
@@ -14,6 +15,7 @@ export const PnLView = memo(function PnLView() {
   >();
 
   const {
+    kpiMetrics,
     tablePeriods,
     granularity,
     setGranularity,
@@ -45,6 +47,11 @@ export const PnLView = memo(function PnLView() {
             color="primary"
           />
         }
+      />
+
+      <PnLKPICards
+        metrics={kpiMetrics}
+        isLoading={loadingStates.metrics}
       />
 
       {/* P&L Table with integrated granularity controls */}

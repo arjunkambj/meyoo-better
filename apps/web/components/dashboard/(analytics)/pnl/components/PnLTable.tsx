@@ -10,13 +10,6 @@ import {
   useUser,
 } from "@/hooks";
 import { formatCurrency } from "@/libs/utils/format";
-import { cn } from "@/libs/utils";
-import {
-  DATA_TABLE_HEADER_CLASS,
-  DATA_TABLE_ROW_BASE_BG,
-  DATA_TABLE_ROW_STRIPE_CHILD_BG,
-  DATA_TABLE_TABLE_CLASS,
-} from "@/components/shared/table/DataTableCard";
 
 interface PnLTableProps {
   periods: PnLTablePeriod[] | undefined;
@@ -108,13 +101,6 @@ const metricConfig: Record<
     category: "operations",
     isSubItem: true,
   },
-  taxesPaid: {
-    label: "Taxes Paid",
-    icon: "solar:bill-check-bold-duotone",
-    iconColor: "text-warning-400",
-    category: "operations",
-    isSubItem: true,
-  },
   customCosts: {
     label: "Custom Costs",
     icon: "solar:settings-bold-duotone",
@@ -190,7 +176,6 @@ export const PnLTable = React.memo(function PnLTable({
       "shippingCosts",
       "transactionFees",
       "handlingFees",
-      "taxesPaid",
       "customCosts",
       "totalAdSpend",
     ].includes(metricKey);

@@ -107,10 +107,13 @@ const Integration = () => {
                 key={index}
                 className="flex items-center justify-center gap-4 rounded-full bg-muted px-5 py-2"
               >
-                <img
-                  src={logo.image}
+                <Image
                   alt={logo.name}
                   className={cn("size-5", logo?.className)}
+                  height={20}
+                  src={logo.image}
+                  unoptimized
+                  width={20}
                 />
                 <p className="text-lg">{logo.name}</p>
               </div>
@@ -158,13 +161,11 @@ export { Integration };
 export const PinContainer = ({
   children,
   title,
-  href,
   className,
   containerClassName,
 }: {
   children: React.ReactNode;
   title?: string;
-  href?: string;
   className?: string;
   containerClassName?: string;
 }) => {

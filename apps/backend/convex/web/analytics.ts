@@ -1060,7 +1060,6 @@ export const getCustomerAnalytics = query({
       totalCustomers: v.number(),
       newCustomers: v.number(),
       returningCustomers: v.number(),
-      customerLifetimeValue: v.number(),
       averageOrderValue: v.number(),
       churnRate: v.number(),
     }),
@@ -1083,9 +1082,6 @@ export const getCustomerAnalytics = query({
     const returningCustomers = customers.filter(
       (c) => c.lifetimeOrders > 1,
     ).length;
-    const avgLifetimeValue =
-      customers.reduce((sum, c) => sum + (c.lifetimeValue || 0), 0) /
-      (totalCustomers || 1);
     const avgOrderValue =
       customers.reduce((sum, c) => sum + (c.avgOrderValue || 0), 0) /
       (totalCustomers || 1);
@@ -1107,7 +1103,6 @@ export const getCustomerAnalytics = query({
       totalCustomers,
       newCustomers,
       returningCustomers,
-      customerLifetimeValue: avgLifetimeValue,
       averageOrderValue: avgOrderValue,
       churnRate,
     };
@@ -1216,7 +1211,7 @@ export const getProfitLossOverview = query({
         acc.expenses +=
           (m.shippingCosts || 0) + // Use shippingCosts (plural)
           (m.transactionFees || 0) +
-          (m.taxesPaid || 0) + // Use totalTaxes field
+          (m.customCosts || 0) +
           (m.totalAdSpend || 0);
         acc.grossProfit += m.grossProfit || 0;
         acc.netProfit += m.netProfit || 0;

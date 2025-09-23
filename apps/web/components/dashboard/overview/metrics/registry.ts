@@ -117,9 +117,7 @@ export const METRIC_CATEGORIES: Record<string, MetricCategory> = {
       "returningCustomers",
       "repeatCustomerRate",
       "cacPaybackPeriod",
-      "customerLifetimeValue",
       "ltvToCACRatio",
-      "profitPerCustomer",
     ],
   },
   unitEconomics: {
@@ -703,16 +701,6 @@ export const METRICS: Record<string, MetricDefinition> = {
     prefix: "$",
     description: "Total shipping costs",
   },
-  shippingPercentageOfGross: {
-    id: "shippingPercentageOfGross",
-    label: "Shipping % of Gross",
-    icon: "solar:percent-bold-duotone",
-    category: "costStructure",
-    format: "percentage",
-    suffix: "%",
-    decimal: 1,
-    description: "Shipping as percentage of gross sales",
-  },
   shippingPercentageOfNet: {
     id: "shippingPercentageOfNet",
     label: "Shipping % of Revenue",
@@ -732,16 +720,6 @@ export const METRICS: Record<string, MetricDefinition> = {
     prefix: "$",
     description: "Payment processing fees",
   },
-  transactionFeesPercentage: {
-    id: "transactionFeesPercentage",
-    label: "Fees % of Revenue",
-    icon: "solar:percent-bold-duotone",
-    category: "costStructure",
-    format: "percentage",
-    suffix: "%",
-    decimal: 1,
-    description: "Transaction fees as percentage of revenue",
-  },
   taxesCollected: {
     id: "taxesCollected",
     label: "Taxes Collected",
@@ -750,15 +728,6 @@ export const METRICS: Record<string, MetricDefinition> = {
     format: "currency",
     prefix: "$",
     description: "Total taxes collected",
-  },
-  taxesPaid: {
-    id: "taxesPaid",
-    label: "Taxes Paid",
-    icon: "solar:document-medicine-bold-duotone",
-    category: "costStructure",
-    format: "currency",
-    prefix: "$",
-    description: "Total taxes paid",
   },
   taxesPercentageOfRevenue: {
     id: "taxesPercentageOfRevenue",
@@ -874,15 +843,6 @@ export const METRICS: Record<string, MetricDefinition> = {
     decimal: 0,
     description: "Days to recover CAC",
   },
-  customerLifetimeValue: {
-    id: "customerLifetimeValue",
-    label: "CLV",
-    icon: "solar:user-heart-bold-duotone",
-    category: "customerEconomics",
-    format: "currency",
-    prefix: "$",
-    description: "Customer lifetime value",
-  },
   ltvToCACRatio: {
     id: "ltvToCACRatio",
     label: "LTV:CAC Ratio",
@@ -892,15 +852,6 @@ export const METRICS: Record<string, MetricDefinition> = {
     decimal: 1,
     suffix: ":1",
     description: "Lifetime value to CAC ratio",
-  },
-  profitPerCustomer: {
-    id: "profitPerCustomer",
-    label: "Profit/Customer",
-    icon: "solar:profit-bold-duotone",
-    category: "customerEconomics",
-    format: "currency",
-    prefix: "$",
-    description: "Average profit per customer",
   },
   // Unit Economics
   unitsSold: {

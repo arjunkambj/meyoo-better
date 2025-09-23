@@ -104,7 +104,6 @@ export const shopifyWebhook = httpAction(async (ctx, request) => {
     }
 
     // Fast-path processing with idempotent receipt
-    const debugMode = process.env.SHOPIFY_WEBHOOK_DEBUG === "1";
     // For idempotency, prefer Event-Id (stable across retries). Fallback to Webhook-Id.
     const providerId = eventId || webhookId || "";
 

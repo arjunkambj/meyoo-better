@@ -2,7 +2,6 @@
 
 import {
   Button,
-  Chip,
   Divider,
   Input,
   Modal,

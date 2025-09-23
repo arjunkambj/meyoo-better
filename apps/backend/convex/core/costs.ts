@@ -223,9 +223,8 @@ export const getCostSummary = query({
       const cogs = sum("cogs");
       const shippingCosts = sum("shippingCosts");
       const transactionFees = sum("transactionFees");
-      const taxesPaid = sum("taxesPaid");
       const customCosts = sum("customCosts");
-      const total = cogs + shippingCosts + transactionFees + taxesPaid + customCosts;
+      const total = cogs + shippingCosts + transactionFees + customCosts;
 
       return {
         total,
@@ -233,7 +232,6 @@ export const getCostSummary = query({
           product: cogs,
           shipping: shippingCosts,
           payment: transactionFees,
-          tax: taxesPaid,
           operational: customCosts,
         },
         period: dateRange,
@@ -544,7 +542,10 @@ export const upsertProductCostComponents = mutation({
           costPerItem: roundMoney(args.cogsPerUnit),
           updatedAt: Date.now(),
         } as any);
-      } catch {}
+      } catch (error) {
+        // Ignore variant patch failures; variant might have been deleted concurrently.
+        void error;
+      }
     }
 
     return { success: true };

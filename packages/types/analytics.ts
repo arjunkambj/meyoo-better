@@ -28,7 +28,6 @@ export interface Metrics {
   shippingCosts: number;
   customCosts: number;
   transactionFees: number;
-  taxesPaid: number;
 
   // Order Summary
   avgOrderValue: number;
@@ -43,7 +42,6 @@ export interface Metrics {
   repeatCustomerRate?: number;
   repurchaseRate?: number;
   customerAcquisitionCost: number;
-  customerLifetimeValue?: number;
   ltvToCACRatio?: number;
 
   // Others
@@ -85,9 +83,7 @@ export interface Metrics {
   // Cost Structure Percentages
   cogsPercentageOfGross?: number;
   cogsPercentageOfNet?: number;
-  shippingPercentageOfGross?: number;
   shippingPercentageOfNet?: number;
-  transactionFeesPercentage?: number;
   taxesPercentageOfRevenue?: number;
   handlingFeesPercentage?: number;
   customCostsPercentage?: number;
@@ -101,7 +97,6 @@ export interface Metrics {
   // Customer Economics
   cacPercentageOfAOV?: number;
   cacPaybackPeriod?: number;
-  profitPerCustomer?: number;
 
   // Unit Economics
   profitPerOrder?: number;

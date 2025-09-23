@@ -33,70 +33,7 @@ export const GeographicDistribution = memo(function GeographicDistribution({
   const { primaryCurrency } = useUser();
   const currencySymbol = getCurrencySymbol(primaryCurrency);
 
-  const defaultData: GeoData[] = [
-    {
-      country: "United States",
-      customers: 1245,
-      revenue: 450000,
-      avgOrderValue: 362,
-      percentage: 45,
-      zipCodes: [
-        { zipCode: "10001", city: "New York", customers: 342, revenue: 125000 },
-        {
-          zipCode: "90001",
-          city: "Los Angeles",
-          customers: 289,
-          revenue: 105000,
-        },
-        { zipCode: "60601", city: "Chicago", customers: 198, revenue: 72000 },
-        { zipCode: "77001", city: "Houston", customers: 156, revenue: 56000 },
-        { zipCode: "85001", city: "Phoenix", customers: 134, revenue: 48000 },
-      ],
-    },
-    {
-      country: "United Kingdom",
-      customers: 534,
-      revenue: 180000,
-      avgOrderValue: 337,
-      percentage: 19,
-      zipCodes: [
-        { zipCode: "SW1A 1AA", city: "London", customers: 245, revenue: 82000 },
-        {
-          zipCode: "M1 1AE",
-          city: "Manchester",
-          customers: 98,
-          revenue: 33000,
-        },
-        {
-          zipCode: "B1 1AA",
-          city: "Birmingham",
-          customers: 78,
-          revenue: 26000,
-        },
-        { zipCode: "G1 1AA", city: "Glasgow", customers: 67, revenue: 22000 },
-      ],
-    },
-    {
-      country: "Canada",
-      customers: 389,
-      revenue: 125000,
-      avgOrderValue: 321,
-      percentage: 14,
-      zipCodes: [
-        { zipCode: "M5H 2N2", city: "Toronto", customers: 156, revenue: 50000 },
-        {
-          zipCode: "V6B 4Y8",
-          city: "Vancouver",
-          customers: 98,
-          revenue: 31000,
-        },
-        { zipCode: "H2X 1Y7", city: "Montreal", customers: 78, revenue: 25000 },
-        { zipCode: "T2P 1J9", city: "Calgary", customers: 57, revenue: 19000 },
-      ],
-    },
-  ];
-
-  const geoData = data || defaultData;
+  const geoData = useMemo(() => data ?? [], [data]);
 
   // Extract and sort all zip codes by revenue
   const topZipCodes = useMemo(() => {
@@ -235,19 +172,25 @@ export const GeographicDistribution = memo(function GeographicDistribution({
       {/* Country Summary - Compact View */}
       <div className="space-y-3">
         <p className="text-sm font-medium text-default-900">Countries</p>
-        <div className="grid grid-cols-2 gap-2">
-          {geoData.slice(0, 4).map((country) => (
-            <div
-              key={country.country}
-              className="flex items-center justify-between p-3 rounded-xl bg-background border border-default-50 text-xs"
-            >
-              <span className="text-default-600">{country.country}</span>
-              <span className="font-medium text-default-900">
-                {formatRevenue(country.revenue)}
-              </span>
-            </div>
-          ))}
-        </div>
+        {geoData.length === 0 ? (
+          <div className="p-4 text-sm text-default-500 border border-dashed border-default-200 rounded-xl">
+            No geographic insights yet.
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            {geoData.slice(0, 4).map((country) => (
+              <div
+                key={country.country}
+                className="flex items-center justify-between p-3 rounded-xl bg-background border border-default-50 text-xs"
+              >
+                <span className="text-default-600">{country.country}</span>
+                <span className="font-medium text-default-900">
+                  {formatRevenue(country.revenue)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Summary Footer */}

@@ -27,7 +27,6 @@ export const metricsDaily = defineTable({
   shippingCosts: v.number(),
   customCosts: v.number(),
   transactionFees: v.number(),
-  taxesPaid: v.number(),
 
   // 3. Order Summary
   avgOrderValue: v.number(),
@@ -41,7 +40,6 @@ export const metricsDaily = defineTable({
   returningCustomers: v.number(),
   repeatCustomerRate: v.optional(v.number()),
   customerAcquisitionCost: v.number(),
-  customerLifetimeValue: v.optional(v.number()),
   ltvToCACRatio: v.optional(v.number()),
 
   // 5. Others
@@ -104,9 +102,7 @@ export const metricsDaily = defineTable({
   // 8. Cost Structure Percentages
   cogsPercentageOfGross: v.optional(v.number()),
   cogsPercentageOfNet: v.optional(v.number()),
-  shippingPercentageOfGross: v.optional(v.number()),
   shippingPercentageOfNet: v.optional(v.number()),
-  transactionFeesPercentage: v.optional(v.number()),
   taxesPercentageOfRevenue: v.optional(v.number()),
   handlingFeesPercentage: v.optional(v.number()),
   customCostsPercentage: v.optional(v.number()),
@@ -120,7 +116,6 @@ export const metricsDaily = defineTable({
   // 10. Customer Economics
   cacPercentageOfAOV: v.optional(v.number()),
   cacPaybackPeriod: v.optional(v.number()),
-  profitPerCustomer: v.optional(v.number()),
 
   // 11. Unit Economics
   profitPerOrder: v.optional(v.number()),
@@ -174,7 +169,6 @@ export const metricsWeekly = defineTable({
   shippingCosts: v.number(),
   customCosts: v.number(),
   transactionFees: v.number(),
-  taxesPaid: v.number(),
 
   avgOrderValue: v.number(),
   avgOrderCost: v.number(),
@@ -187,7 +181,6 @@ export const metricsWeekly = defineTable({
   repeatCustomerRate: v.optional(v.number()),
   repurchaseRate: v.optional(v.number()),
   customerAcquisitionCost: v.number(),
-  customerLifetimeValue: v.optional(v.number()),
   ltvToCACRatio: v.optional(v.number()),
 
   shippingCharged: v.number(),
@@ -239,9 +232,7 @@ export const metricsWeekly = defineTable({
   // Cost Structure Percentages
   cogsPercentageOfGross: v.optional(v.number()),
   cogsPercentageOfNet: v.optional(v.number()),
-  shippingPercentageOfGross: v.optional(v.number()),
   shippingPercentageOfNet: v.optional(v.number()),
-  transactionFeesPercentage: v.optional(v.number()),
   taxesPercentageOfRevenue: v.optional(v.number()),
   handlingFeesPercentage: v.optional(v.number()),
   customCostsPercentage: v.optional(v.number()),
@@ -255,7 +246,6 @@ export const metricsWeekly = defineTable({
   // Customer Economics
   cacPercentageOfAOV: v.optional(v.number()),
   cacPaybackPeriod: v.optional(v.number()),
-  profitPerCustomer: v.optional(v.number()),
 
   // Unit Economics
   profitPerOrder: v.optional(v.number()),
@@ -306,7 +296,6 @@ export const metricsMonthly = defineTable({
   shippingCosts: v.number(),
   customCosts: v.number(),
   transactionFees: v.number(),
-  taxesPaid: v.number(),
 
   avgOrderValue: v.number(),
   avgOrderCost: v.number(),
@@ -319,7 +308,6 @@ export const metricsMonthly = defineTable({
   repeatCustomerRate: v.optional(v.number()),
   repurchaseRate: v.optional(v.number()),
   customerAcquisitionCost: v.number(),
-  customerLifetimeValue: v.optional(v.number()),
   ltvToCACRatio: v.optional(v.number()),
 
   shippingCharged: v.number(),
@@ -371,9 +359,7 @@ export const metricsMonthly = defineTable({
   // Cost Structure Percentages
   cogsPercentageOfGross: v.optional(v.number()),
   cogsPercentageOfNet: v.optional(v.number()),
-  shippingPercentageOfGross: v.optional(v.number()),
   shippingPercentageOfNet: v.optional(v.number()),
-  transactionFeesPercentage: v.optional(v.number()),
   taxesPercentageOfRevenue: v.optional(v.number()),
   handlingFeesPercentage: v.optional(v.number()),
   customCostsPercentage: v.optional(v.number()),
@@ -387,7 +373,6 @@ export const metricsMonthly = defineTable({
   // Customer Economics
   cacPercentageOfAOV: v.optional(v.number()),
   cacPaybackPeriod: v.optional(v.number()),
-  profitPerCustomer: v.optional(v.number()),
 
   // Unit Economics
   profitPerOrder: v.optional(v.number()),

@@ -21,7 +21,6 @@ interface CostBreakdownWidgetProps {
   transactionFees: number;
   customCosts: number;
   handlingFees: number;
-  taxesPaid: number;
   operatingCosts?: number;
   totalRevenue?: number;
   currency?: string;
@@ -36,7 +35,6 @@ export function CostBreakdownWidget({
   transactionFees,
   customCosts,
   handlingFees,
-  taxesPaid,
   operatingCosts = 0,
   totalRevenue = 0,
   currency = "USD",
@@ -54,7 +52,6 @@ export function CostBreakdownWidget({
       transactionFees,
       customCosts,
       handlingFees,
-      taxesPaid,
       operatingCosts,
     };
 
@@ -69,7 +66,6 @@ export function CostBreakdownWidget({
       { name: "Transaction Fees", value: transactionFees, fill: "#8B5CF6" },
       { name: "Custom Costs", value: customCosts, fill: "#EC4899" },
       { name: "Handling", value: handlingFees, fill: "#14B8A6" },
-      { name: "Taxes", value: taxesPaid, fill: "#F97316" },
       { name: "Operating", value: operatingCosts, fill: "#6366F1" },
     ].filter((item) => item.value > 0);
 
@@ -127,14 +123,6 @@ export function CostBreakdownWidget({
         icon: "solar:hand-money-bold-duotone",
       },
       {
-        key: "taxes",
-        label: "Taxes",
-        value: taxesPaid,
-        percentage: total > 0 ? (taxesPaid / total) * 100 : 0,
-        color: "#F97316",
-        icon: "solar:document-text-bold-duotone",
-      },
-      {
         key: "operating",
         label: "Operating",
         value: operatingCosts,
@@ -159,7 +147,6 @@ export function CostBreakdownWidget({
     transactionFees,
     customCosts,
     handlingFees,
-    taxesPaid,
     operatingCosts,
     totalRevenue,
   ]);

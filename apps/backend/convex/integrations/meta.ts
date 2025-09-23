@@ -881,7 +881,7 @@ export const connectMeta = mutation({
       throw new Error("User or organization not found");
     }
 
-    const sessionId = await ctx.db.insert("integrationSessions", {
+    await ctx.db.insert("integrationSessions", {
       organizationId: user.organizationId,
       userId: user._id,
       platform: "meta",

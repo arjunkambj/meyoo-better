@@ -259,15 +259,6 @@ export function useOverviewAnalytics(dateRange?: {
           change: summary.shippingCostsChange || 0,
           prefix: currencySymbol,
         },
-        shippingPercentageOfGross: {
-          label: "Shipping % of Gross",
-          value:
-            summary.grossSales > 0
-              ? (summary.shippingCosts / summary.grossSales) * 100
-              : 0,
-          suffix: "%",
-          decimal: 1,
-        },
         shippingPercentageOfNet: {
           label: "Shipping % of Revenue",
           value:
@@ -282,15 +273,6 @@ export function useOverviewAnalytics(dateRange?: {
           value: summary.transactionFees || 0,
           change: summary.transactionFeesChange || 0,
           prefix: currencySymbol,
-        },
-        transactionFeesPercentage: {
-          label: "Fees % of Revenue",
-          value:
-            summary.revenue > 0
-              ? (summary.transactionFees / summary.revenue) * 100
-              : 0,
-          suffix: "%",
-          decimal: 1,
         },
         taxesCollected: {
           label: "Taxes Collected",
@@ -309,21 +291,33 @@ export function useOverviewAnalytics(dateRange?: {
         },
         handlingFees: {
           label: "Handling Fees",
-          value: 0, // TODO: Get from costs data
-          change: 0,
+          value: summary.handlingFees || 0,
+          change: summary.handlingFeesChange || 0,
           prefix: currencySymbol,
+        },
+        handlingFeesPercentage: {
+          label: "Handling % of Revenue",
+          value:
+            summary.revenue > 0
+              ? (summary.handlingFees / summary.revenue) * 100
+              : 0,
+          suffix: "%",
+          decimal: 1,
         },
         customCosts: {
           label: "Custom Costs",
-          value: 0, // TODO: Get from costs data
-          change: 0,
+          value: summary.customCosts || 0,
+          change: summary.customCostsChange || 0,
           prefix: currencySymbol,
         },
-        taxesPaid: {
-          label: "Taxes Paid",
-          value: 0, // TODO: Get from costs data
-          change: 0,
-          prefix: currencySymbol,
+        customCostsPercentage: {
+          label: "Custom % of Revenue",
+          value:
+            summary.revenue > 0
+              ? (summary.customCosts / summary.revenue) * 100
+              : 0,
+          suffix: "%",
+          decimal: 1,
         },
         operatingCosts: {
           label: "Operating Costs",

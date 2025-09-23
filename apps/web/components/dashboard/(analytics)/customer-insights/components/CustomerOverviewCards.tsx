@@ -13,12 +13,10 @@ export interface CustomerMetrics {
   avgLTV: number;
   avgCAC: number;
   ltvCacRatio: number;
-  churnRate: number;
   changes: {
     totalCustomers: number;
     newCustomers: number;
     avgLTV: number;
-    churnRate: number;
   };
 }
 
@@ -98,12 +96,6 @@ export const CustomerOverviewCards = memo(function CustomerOverviewCards({
               icon: "solar:graph-up-bold-duotone",
               subtitle: `CAC: ${formatCurrency(metrics.avgCAC)}`,
             },
-            {
-              title: "Churn",
-              value: `${!Number.isNaN(metrics.churnRate) ? metrics.churnRate.toFixed(1) : "0.0"}%`,
-              change: formatChange(metrics.changes.churnRate, true),
-              icon: "solar:restart-bold-duotone",
-            },
           ]
         : [],
     [metrics, formatNumber, formatCurrency, formatChange],
@@ -111,8 +103,8 @@ export const CustomerOverviewCards = memo(function CustomerOverviewCards({
 
   if (!metrics) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        {[1, 2, 3, 4, 5].map((i) => (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {[1, 2, 3, 4].map((i) => (
           <KPI key={i} loading title="" value="" />
         ))}
       </div>
@@ -120,7 +112,7 @@ export const CustomerOverviewCards = memo(function CustomerOverviewCards({
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       {cards.map((card) => (
         <KPI
           key={card.title}
@@ -135,4 +127,3 @@ export const CustomerOverviewCards = memo(function CustomerOverviewCards({
     </div>
   );
 });
-

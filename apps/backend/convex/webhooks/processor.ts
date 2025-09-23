@@ -1,6 +1,5 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery } from "../_generated/server";
-import type { Id } from "../_generated/dataModel";
 
 // Minimal helpers kept for fast-path Shopify handling
 
@@ -97,4 +96,3 @@ export const getCurrentBilling = internalQuery({
       .first();
   },
 });
-

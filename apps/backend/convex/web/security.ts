@@ -195,6 +195,14 @@ export const validateApiKey = query({
       valid: v.literal(true),
       userId: v.id("users"),
       organizationId: v.id("organizations"),
+      organization: v.object({
+        _id: v.id("organizations"),
+        name: v.string(),
+        timezone: v.optional(v.string()),
+        locale: v.optional(v.string()),
+        isPremium: v.optional(v.boolean()),
+        trialEndDate: v.optional(v.number()),
+      }),
     }),
     v.object({
       valid: v.literal(false),
@@ -223,11 +231,28 @@ export const validateApiKey = query({
       };
     }
 
+    const organization = await ctx.db.get(apiKey.organizationId);
+
+    if (!organization) {
+      return {
+        valid: false as const,
+        reason: "Organization not found for API key",
+      };
+    }
+
     // Note: Usage statistics would be updated in a separate mutation
     return {
       valid: true as const,
       userId: apiKey.userId,
       organizationId: apiKey.organizationId,
+      organization: {
+        _id: organization._id,
+        name: organization.name,
+        timezone: organization.timezone,
+        locale: organization.locale,
+        isPremium: organization.isPremium,
+        trialEndDate: organization.trialEndDate,
+      },
     };
   },
 });

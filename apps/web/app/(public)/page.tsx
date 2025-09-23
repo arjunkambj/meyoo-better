@@ -8,9 +8,7 @@ export default function Home() {
       {/* Enhanced background gradient for all public pages */}
 
       {/* Hero Section - Gradient background */}
-      <section className="w-full">
-        <Hero />
-      </section>
+      <section className="w-full"></section>
 
       <section className="w-full scroll-mt-24" id="pricing">
         <Pricing />

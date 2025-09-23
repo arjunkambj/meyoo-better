@@ -7,18 +7,27 @@ export type AgentToolMetadata = {
 };
 
 type AgentToolName =
-  | "searchCustomers"
+  | "ordersSummary"
+  | "inventoryLowStock"
   | "analyticsSummary"
   | "metaAdsOverview"
   | "currentDate"
-  | "brandSummary";
+  | "brandSummary"
+  | "pnlSnapshot";
 
 export const agentToolsMetadata: AgentToolMetadata[] = [
   {
-    name: "searchCustomers",
+    name: "ordersSummary",
     description:
-      "Search for customers by name or email and return lifetime value and activity details.",
-    inputs: "query: string, limit?: number (default 5)",
+      "Summarize order volumes, revenue, and fulfillment performance over a date range.",
+    inputs:
+      "startDate?: string (YYYY-MM-DD), endDate?: string (YYYY-MM-DD)",
+  },
+  {
+    name: "inventoryLowStock",
+    description:
+      "Surface low or critical stock alerts so replenishment can be prioritised.",
+    inputs: "limit?: number (default 10, max 50)",
   },
   {
     name: "analyticsSummary",
@@ -42,6 +51,13 @@ export const agentToolsMetadata: AgentToolMetadata[] = [
     name: "brandSummary",
     description:
       "Retrieve the latest stored overview of the merchant brand, including storefront highlights and recent sales stats.",
+  },
+  {
+    name: "pnlSnapshot",
+    description:
+      "Generate a profit & loss snapshot covering revenue, profit margins, operating spend, and marketing ROI.",
+    inputs:
+      "startDate?: string (YYYY-MM-DD), endDate?: string (YYYY-MM-DD)",
   },
 ];
 

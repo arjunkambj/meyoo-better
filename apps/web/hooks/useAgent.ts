@@ -42,11 +42,9 @@ export function useAgent({
   const messagePagination = usePaginatedQuery(
     api.agent.chat.listMessages,
     threadId ? { threadId } : "skip",
-    threadId
-      ? {
-          initialNumItems: messagePageSize,
-        }
-      : undefined,
+    {
+      initialNumItems: messagePageSize,
+    },
   );
 
   const renameThreadMutation = useMutation(api.agent.chat.renameThread);

@@ -9,6 +9,10 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+
+  /* Custom width utilities for hero component */
+  --width-75: 19rem; /* 304px - for button/link elements */
+  --width-240: 60rem; /* 960px - for large decorative elements */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -42,14 +46,14 @@
   --color-sidebar-ring: var(--sidebar-ring);
   --animate-shine: shine var(--duration) infinite linear;
   @keyframes shine {
-  0% {
-    background-position: 0% 0%;
+    0% {
+      background-position: 0% 0%;
     }
-  50% {
-    background-position: 100% 100%;
+    50% {
+      background-position: 100% 100%;
     }
-  to {
-    background-position: 0% 0%;
+    to {
+      background-position: 0% 0%;
     }
   }
 }

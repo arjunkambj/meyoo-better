@@ -15,33 +15,67 @@ function defaultDateRange(days: number = 30) {
   return { startDate: normalize(start), endDate: normalize(end) };
 }
 
-type CustomerListItem = {
-  id: string;
-  name: string;
-  email: string;
-  avatar?: string;
-  status: string;
-  lifetimeValue: number;
-  orders: number;
-  avgOrderValue: number;
-  lastOrderDate: string;
-  firstOrderDate: string;
-  segment: string;
-  city?: string;
-  country?: string;
-};
+type AnalyticsRow = Record<string, unknown>;
 
-type CustomerListResponse = {
-  data: CustomerListItem[];
-  pagination: {
-    page: number;
-    pageSize: number;
-    total: number;
-    totalPages: number;
+type OrdersOverview = {
+  totalOrders: number;
+  pendingOrders: number;
+  processingOrders: number;
+  completedOrders: number;
+  cancelledOrders: number;
+  totalRevenue: number;
+  totalCosts: number;
+  netProfit: number;
+  avgOrderValue: number;
+  grossMargin: number;
+  customerAcquisitionCost: number;
+  fulfillmentRate: number;
+  avgFulfillmentTime: number;
+  returnRate: number;
+  changes?: {
+    totalOrders?: number;
+    revenue?: number;
+    netProfit?: number;
+    avgOrderValue?: number;
+    cac?: number;
+    margin?: number;
+    fulfillmentRate?: number;
   };
 };
 
-type AnalyticsRow = Record<string, unknown>;
+type OrdersOverviewChanges = NonNullable<OrdersOverview["changes"]>;
+
+type InventoryAlert = {
+  id: string;
+  type: "critical" | "low" | "reorder" | "overstock";
+  productName: string;
+  sku: string;
+  currentStock: number;
+  reorderPoint?: number;
+  daysUntilStockout?: number;
+  message: string;
+};
+
+type NormalizedInventoryAlert = Omit<InventoryAlert, "type"> & {
+  type: "critical" | "low" | "reorder";
+};
+
+type PnlMetrics = {
+  revenue?: number;
+  grossProfit?: number;
+  netProfit?: number;
+  grossProfitMargin?: number;
+  netProfitMargin?: number;
+  operatingExpenses?: number;
+  totalAdSpend?: number;
+  marketingROI?: number;
+  ebitda?: number;
+  revenueChange?: number;
+  netProfitChange?: number;
+  grossProfitMarginChange?: number;
+  netProfitMarginChange?: number;
+  marketingROIChange?: number;
+};
 
 type RawPlatformMetrics = {
   metaSessions: number;
@@ -87,80 +121,241 @@ type PlatformMetrics = {
   costPerThruPlay: number;
 };
 
-export const searchCustomersTool = createTool<
-  { query: string; limit: number },
+export const ordersSummaryTool = createTool<
+  { startDate?: string; endDate?: string },
   {
-    totalMatches: number;
-    topCustomers: Array<{
-      id: string;
-      name: string;
-      email: string;
-      status: string;
-      segment: string;
-      lifetimeValue: number;
-      orders: number;
+    dateRange: { startDate: string; endDate: string };
+    totals: {
+      totalOrders: number;
+      pendingOrders: number;
+      processingOrders: number;
+      completedOrders: number;
+      cancelledOrders: number;
+    };
+    financials: {
+      totalRevenue: number;
+      totalCosts: number;
+      netProfit: number;
       avgOrderValue: number;
-      lastOrderDate: string;
-      country?: string;
+      grossMargin: number;
+      customerAcquisitionCost: number;
+    };
+    fulfillment: {
+      fulfillmentRate: number;
+      avgFulfillmentTime: number;
+      returnRate: number;
+    };
+    changes: {
+      totalOrders: number;
+      revenue: number;
+      netProfit: number;
+      avgOrderValue: number;
+      cac: number;
+      margin: number;
+      fulfillmentRate: number;
+    };
+    summary: string;
+  }
+>({
+  description:
+    "Summarize order volume, revenue, and fulfillment performance over a date range.",
+  args: z.object({
+    startDate: isoDate.optional(),
+    endDate: isoDate.optional(),
+  }),
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{
+    dateRange: { startDate: string; endDate: string };
+    totals: {
+      totalOrders: number;
+      pendingOrders: number;
+      processingOrders: number;
+      completedOrders: number;
+      cancelledOrders: number;
+    };
+    financials: {
+      totalRevenue: number;
+      totalCosts: number;
+      netProfit: number;
+      avgOrderValue: number;
+      grossMargin: number;
+      customerAcquisitionCost: number;
+    };
+    fulfillment: {
+      fulfillmentRate: number;
+      avgFulfillmentTime: number;
+      returnRate: number;
+    };
+    changes: {
+      totalOrders: number;
+      revenue: number;
+      netProfit: number;
+      avgOrderValue: number;
+      cac: number;
+      margin: number;
+      fulfillmentRate: number;
+    };
+    summary: string;
+  }> => {
+    await requireUserAndOrg(ctx);
+    const dateRange = args.startDate && args.endDate
+      ? { startDate: args.startDate, endDate: args.endDate }
+      : defaultDateRange();
+
+    const overview = (await ctx.runQuery(api.web.orders.getOrdersOverview, {
+      dateRange,
+    })) as OrdersOverview | null;
+
+    const zeroState = {
+      dateRange,
+      totals: {
+        totalOrders: 0,
+        pendingOrders: 0,
+        processingOrders: 0,
+        completedOrders: 0,
+        cancelledOrders: 0,
+      },
+      financials: {
+        totalRevenue: 0,
+        totalCosts: 0,
+        netProfit: 0,
+        avgOrderValue: 0,
+        grossMargin: 0,
+        customerAcquisitionCost: 0,
+      },
+      fulfillment: {
+        fulfillmentRate: 0,
+        avgFulfillmentTime: 0,
+        returnRate: 0,
+      },
+      changes: {
+        totalOrders: 0,
+        revenue: 0,
+        netProfit: 0,
+        avgOrderValue: 0,
+        cac: 0,
+        margin: 0,
+        fulfillmentRate: 0,
+      },
+      summary: `No orders found between ${dateRange.startDate} and ${dateRange.endDate}.`,
+    } as const;
+
+    if (!overview) {
+      return zeroState;
+    }
+
+    const totals = {
+      totalOrders: Number(overview.totalOrders ?? 0),
+      pendingOrders: Number(overview.pendingOrders ?? 0),
+      processingOrders: Number(overview.processingOrders ?? 0),
+      completedOrders: Number(overview.completedOrders ?? 0),
+      cancelledOrders: Number(overview.cancelledOrders ?? 0),
+    };
+
+    const financials = {
+      totalRevenue: Number(overview.totalRevenue ?? 0),
+      totalCosts: Number(overview.totalCosts ?? 0),
+      netProfit: Number(overview.netProfit ?? 0),
+      avgOrderValue: Number(overview.avgOrderValue ?? 0),
+      grossMargin: Number(overview.grossMargin ?? 0),
+      customerAcquisitionCost: Number(overview.customerAcquisitionCost ?? 0),
+    };
+
+    const fulfillment = {
+      fulfillmentRate: Number(overview.fulfillmentRate ?? 0),
+      avgFulfillmentTime: Number(overview.avgFulfillmentTime ?? 0),
+      returnRate: Number(overview.returnRate ?? 0),
+    };
+
+    const changesSource = (overview.changes ?? {}) as Partial<OrdersOverviewChanges>;
+    const changes = {
+      totalOrders: Number(changesSource.totalOrders ?? 0),
+      revenue: Number(changesSource.revenue ?? 0),
+      netProfit: Number(changesSource.netProfit ?? 0),
+      avgOrderValue: Number(changesSource.avgOrderValue ?? 0),
+      cac: Number(changesSource.cac ?? 0),
+      margin: Number(changesSource.margin ?? 0),
+      fulfillmentRate: Number(changesSource.fulfillmentRate ?? 0),
+    };
+
+    const summary = `Processed ${totals.totalOrders} orders (${totals.completedOrders} completed, ${totals.pendingOrders} pending) generating $${financials.totalRevenue.toFixed(2)} revenue and $${financials.netProfit.toFixed(2)} net profit.`;
+
+    return {
+      dateRange,
+      totals,
+      financials,
+      fulfillment,
+      changes,
+      summary,
+    };
+  },
+});
+
+export const inventoryLowStockTool = createTool<
+  { limit?: number },
+  {
+    summary: string;
+    totalAlerts: number;
+    alerts: Array<{
+      id: string;
+      type: "critical" | "low" | "reorder";
+      productName: string;
+      sku: string;
+      currentStock: number;
+      reorderPoint?: number;
+      daysUntilStockout?: number;
+      message: string;
     }>;
   }
 >({
   description:
-    "Search for customers by name or email and return lifetime value and activity details.",
+    "List products that are low or critical on stock so replenishment can be prioritised.",
   args: z.object({
-    query: z
-      .string()
-      .trim()
-      .min(1, "Provide a name or email to search for"),
-    limit: z
-      .number()
-      .int()
-      .positive()
-      .max(50)
-      .default(5)
-      .describe("Maximum number of customers to return"),
+    limit: z.number().int().positive().max(50).optional(),
   }),
   handler: async (
     ctx,
-    { query, limit },
+    args,
   ): Promise<{
-    totalMatches: number;
-    topCustomers: Array<{
+    summary: string;
+    totalAlerts: number;
+    alerts: Array<{
       id: string;
-      name: string;
-      email: string;
-      status: string;
-      segment: string;
-      lifetimeValue: number;
-      orders: number;
-      avgOrderValue: number;
-      lastOrderDate: string;
-      country?: string;
+      type: "critical" | "low" | "reorder";
+      productName: string;
+      sku: string;
+      currentStock: number;
+      reorderPoint?: number;
+      daysUntilStockout?: number;
+      message: string;
     }>;
   }> => {
-    const result = (await ctx.runQuery(
-      api.web.customers.getCustomerList,
-      {
-        page: 1,
-        pageSize: limit,
-        searchTerm: query,
-      },
-    )) as CustomerListResponse;
+    await requireUserAndOrg(ctx);
+    const limit = args.limit && args.limit > 0 ? Math.min(args.limit, 50) : 10;
+
+    const alertsResponse = (await ctx.runQuery(api.web.inventory.getStockAlerts, {
+      limit,
+    })) as InventoryAlert[] | null;
+
+    const alerts = alertsResponse ?? [];
+
+    const filtered = alerts.filter((alert) => alert.type !== "overstock");
+
+    const summary = filtered.length === 0
+      ? "No low-stock alerts detected. Inventory levels look healthy."
+      : `Identified ${filtered.length} low-stock items requiring replenishment.`;
+
+    const normalized: NormalizedInventoryAlert[] = filtered.map((alert) => ({
+      ...alert,
+      type: alert.type === "critical" ? "critical" : alert.type === "reorder" ? "reorder" : "low",
+    }));
 
     return {
-      totalMatches: result.pagination.total,
-      topCustomers: result.data.map((customer) => ({
-        id: customer.id,
-        name: customer.name,
-        email: customer.email,
-        status: customer.status,
-        segment: customer.segment,
-        lifetimeValue: customer.lifetimeValue,
-        orders: customer.orders,
-        avgOrderValue: Number(customer.avgOrderValue.toFixed(2)),
-        lastOrderDate: customer.lastOrderDate,
-        country: customer.country,
-      })),
+      summary,
+      totalAlerts: normalized.length,
+      alerts: normalized,
     };
   },
 });
@@ -341,6 +536,127 @@ export const currentDateTool = createTool<
   },
 });
 
+export const pnlSnapshotTool = createTool<
+  { startDate?: string; endDate?: string },
+  {
+    summary: string;
+    dateRange: { startDate: string; endDate: string };
+    revenue: number;
+    grossProfit: number;
+    netProfit: number;
+    grossMargin: number;
+    netMargin: number;
+    operatingExpenses: number;
+    adSpend: number;
+    marketingROI: number;
+    ebitda: number;
+    changes: {
+      revenue: number;
+      netProfit: number;
+      grossMargin: number;
+      netMargin: number;
+      marketingROI: number;
+    };
+  }
+>({
+  description:
+    "Generate a profit & loss snapshot covering revenue, profit margins, and spend for a period.",
+  args: z.object({
+    startDate: isoDate.optional(),
+    endDate: isoDate.optional(),
+  }),
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{
+    summary: string;
+    dateRange: { startDate: string; endDate: string };
+    revenue: number;
+    grossProfit: number;
+    netProfit: number;
+    grossMargin: number;
+    netMargin: number;
+    operatingExpenses: number;
+    adSpend: number;
+    marketingROI: number;
+    ebitda: number;
+    changes: {
+      revenue: number;
+      netProfit: number;
+      grossMargin: number;
+      netMargin: number;
+      marketingROI: number;
+    };
+  }> => {
+    await requireUserAndOrg(ctx);
+    const dateRange = args.startDate && args.endDate
+      ? { startDate: args.startDate, endDate: args.endDate }
+      : defaultDateRange();
+
+    const metrics = (await ctx.runQuery(api.web.pnl.getMetrics, {
+      dateRange,
+    })) as PnlMetrics | null;
+
+    if (!metrics) {
+      return {
+        summary: `No financial data available between ${dateRange.startDate} and ${dateRange.endDate}.`,
+        dateRange,
+        revenue: 0,
+        grossProfit: 0,
+        netProfit: 0,
+        grossMargin: 0,
+        netMargin: 0,
+        operatingExpenses: 0,
+        adSpend: 0,
+        marketingROI: 0,
+        ebitda: 0,
+        changes: {
+          revenue: 0,
+          netProfit: 0,
+          grossMargin: 0,
+          netMargin: 0,
+          marketingROI: 0,
+        },
+      };
+    }
+
+    const revenue = Number(metrics.revenue ?? 0);
+    const grossProfit = Number(metrics.grossProfit ?? 0);
+    const netProfit = Number(metrics.netProfit ?? 0);
+    const grossMargin = Number(metrics.grossProfitMargin ?? 0);
+    const netMargin = Number(metrics.netProfitMargin ?? 0);
+    const operatingExpenses = Number(metrics.operatingExpenses ?? 0);
+    const adSpend = Number(metrics.totalAdSpend ?? 0);
+    const marketingROI = Number(metrics.marketingROI ?? 0);
+    const ebitda = Number(metrics.ebitda ?? 0);
+
+    const changes = {
+      revenue: Number(metrics.revenueChange ?? 0),
+      netProfit: Number(metrics.netProfitChange ?? 0),
+      grossMargin: Number(metrics.grossProfitMarginChange ?? 0),
+      netMargin: Number(metrics.netProfitMarginChange ?? 0),
+      marketingROI: Number(metrics.marketingROIChange ?? 0),
+    };
+
+    const summary = `Revenue of $${revenue.toFixed(2)} generated $${netProfit.toFixed(2)} net profit (${netMargin.toFixed(1)}% net margin) with $${operatingExpenses.toFixed(2)} in operating expenses.`;
+
+    return {
+      summary,
+      dateRange,
+      revenue,
+      grossProfit,
+      netProfit,
+      grossMargin,
+      netMargin,
+      operatingExpenses,
+      adSpend,
+      marketingROI,
+      ebitda,
+      changes,
+    };
+  },
+});
+
 export const brandSummaryTool = createTool<
   Record<string, never>,
   {
@@ -376,7 +692,7 @@ export const brandSummaryTool = createTool<
       return "";
     };
 
-    let summary = extractSummary();
+    const summary = extractSummary();
 
     if (!entry || summary.length === 0) {
       return {
@@ -396,10 +712,12 @@ export const brandSummaryTool = createTool<
 });
 
 export const agentTools = {
-  searchCustomers: searchCustomersTool,
+  ordersSummary: ordersSummaryTool,
+  inventoryLowStock: inventoryLowStockTool,
   analyticsSummary: analyticsSummaryTool,
   metaAdsOverview: metaAdsOverviewTool,
   currentDate: currentDateTool,
+  pnlSnapshot: pnlSnapshotTool,
   brandSummary: brandSummaryTool,
 };
 

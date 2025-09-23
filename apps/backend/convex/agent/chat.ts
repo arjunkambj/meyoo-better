@@ -8,7 +8,7 @@ import { ensureThreadBelongsToUser } from "./agent";
 
 export const listThreads = query({
   args: {
-    paginationOpts: v.optional(paginationOptsValidator),
+    paginationOpts: paginationOptsValidator,
   },
   returns: v.object({
     page: v.array(
@@ -33,10 +33,10 @@ export const listThreads = query({
       userId,
       order: "desc",
       paginationOpts: {
-        cursor: args.paginationOpts?.cursor ?? null,
-        numItems: args.paginationOpts?.numItems ?? 50,
+        cursor: args.paginationOpts.cursor ?? null,
+        numItems: args.paginationOpts.numItems ?? 50,
       },
-    });
+  });
 
     return {
       page: result.page.map((thread) => ({
@@ -84,7 +84,7 @@ export const renameThread = mutation({
 export const listMessages = query({
   args: {
     threadId: v.string(),
-    paginationOpts: v.optional(paginationOptsValidator),
+    paginationOpts: paginationOptsValidator,
   },
   returns: v.object({
     page: v.array(v.any()),
@@ -108,10 +108,10 @@ export const listMessages = query({
     const result = await listUIMessages(ctx, components.agent, {
       threadId: args.threadId,
       paginationOpts: {
-        cursor: args.paginationOpts?.cursor ?? null,
-        numItems: args.paginationOpts?.numItems ?? 40,
+        cursor: args.paginationOpts.cursor ?? null,
+        numItems: args.paginationOpts.numItems ?? 40,
       },
-    });
+  });
 
     return {
       page: result.page,

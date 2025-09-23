@@ -3,6 +3,7 @@
 import React from "react";
 import { Avatar } from "@heroui/react";
 import { Icon } from "@iconify/react";
+import { designSystem } from "@/libs/design-system";
 
 const testimonials = [
   {
@@ -45,32 +46,47 @@ const testimonials = [
 
 const Testimonial = () => {
   return (
-    <section className="flex w-full flex-col items-center justify-center py-12 sm:py-16 lg:py-20">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <p className="text-center mb-3 text-primary/80 text-sm uppercase tracking-[0.2em]">
-          Customer stories
-        </p>
-        <h2 className="text-center text-4xl font-semibold tracking-tight sm:text-5xl">
-          Operators who rely on Meyoo
+    <section
+      className={`relative flex w-full flex-col items-center justify-center ${designSystem.spacing.section} ${designSystem.background.gradient}`}
+    >
+      <div className={designSystem.spacing.container}>
+        <div className="text-center">
+          <div className={designSystem.typography.sectionChip}>
+            <Icon
+              icon="solar:chat-square-like-bold"
+              width={16}
+              className="text-primary/70"
+            />
+            <span className="text-xs uppercase tracking-[0.15em] font-medium text-primary/70">
+              Customer stories
+            </span>
+          </div>
+        </div>
+        <h2 className={designSystem.typography.sectionTitle}>
+          Trusted by smart operators
         </h2>
       </div>
-      <div className="relative mx-auto mt-12 grid min-h-[28rem] w-full max-w-7xl items-stretch gap-6 px-4 sm:px-6 lg:px-8 md:grid-cols-2 lg:grid-cols-3">
+      <div
+        className={`relative mx-auto mt-12 grid min-h-[28rem] w-full max-w-7xl items-stretch ${designSystem.spacing.gap.md} px-4 sm:px-6 lg:px-8 md:grid-cols-2 lg:grid-cols-3`}
+      >
         {testimonials.map((testimonial) => (
           <div
             key={testimonial.id}
-            className="bg-muted/70 w-full rounded-3xl p-8"
+            className=" ring-1 bg-primary/5 ring-primary/10 backdrop-blur-sm w-full rounded-2xl p-6 sm:p-8 transition-all duration-300"
           >
             <div className="flex flex-col h-full relative">
-              <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full text-primary/30">
+              <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full text-primary/40">
                 <Icon icon="ri:double-quotes-l" width={40} />
               </div>
 
-              <h3 className="text-2xl font-semibold leading-tight mb-6">
+              <h3 className="text-2xl font-semibold text-default-900 leading-tight mb-6">
                 {testimonial.title}
               </h3>
 
               <div className="flex-1 mb-8">
-                <p className="text-muted-foreground leading-relaxed text-base">
+                <p
+                  className={`${designSystem.typography.cardDescription} text-base text-default-800`}
+                >
                   {testimonial.description}
                 </p>
               </div>
@@ -82,10 +98,10 @@ const Testimonial = () => {
                   name={testimonial.user.name}
                 />
                 <div>
-                  <p className="font-medium text-base">
+                  <p className="font-medium text-base text-default-900">
                     {testimonial.user.name}
                   </p>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm text-default-600">
                     {testimonial.user.location}
                   </p>
                 </div>

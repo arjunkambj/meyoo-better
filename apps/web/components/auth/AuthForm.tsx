@@ -12,7 +12,7 @@ import { GoogleAuthButton } from "./GoogleAuthButton";
 
 // Lazy load OTP component only when needed
 const OTPAuthForm = lazy(() =>
-  import("./OTPAuthForm").then((mod) => ({ default: mod.OTPAuthForm })),
+  import("./OTPAuthForm").then((mod) => ({ default: mod.OTPAuthForm }))
 );
 
 type AuthMode = "signin" | "signup";
@@ -29,7 +29,7 @@ export const AuthForm = React.memo(function AuthForm({
 }: AuthFormProps) {
   // Default method: password for signin, OTP for signup
   const [authMethod, setAuthMethod] = useState<AuthMethod>(
-    mode === "signin" ? "password" : "otp",
+    mode === "signin" ? "password" : "otp"
   );
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -142,7 +142,7 @@ export const AuthForm = React.memo(function AuthForm({
         setIsLoading(false);
       }
     },
-    [email, password, mode, name, confirmPassword, returnUrl, router, signIn],
+    [email, password, mode, name, confirmPassword, returnUrl, router, signIn]
   );
 
   // Memoized toggle password visibility
@@ -151,7 +151,7 @@ export const AuthForm = React.memo(function AuthForm({
   }, []);
 
   return (
-    <div className="w-full max-w-lg  mx-auto">
+    <div className="w-full bg-transparent  max-w-lg  mx-auto">
       <div className="p-8">
         {/* Header */}
         <div className="mb-8 text-center">
@@ -336,4 +336,3 @@ export const AuthForm = React.memo(function AuthForm({
     </div>
   );
 });
-

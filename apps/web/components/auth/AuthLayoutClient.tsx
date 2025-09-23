@@ -13,12 +13,8 @@ const AuthLayoutClient = React.memo(function AuthLayoutClient({
   children: React.ReactNode;
 }) {
   return (
-    <div className="relative flex h-full min-h-dvh w-full bg-background overflow-hidden">
-      {/* Minimal background gradient */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-0 left-1/3 w-64 h-64 bg-gradient-to-br from-primary/3 to-transparent rounded-full blur-[100px] opacity-30" />
-        <div className="absolute bottom-0 right-1/3 w-64 h-64 bg-gradient-to-tr from-secondary/3 to-transparent rounded-full blur-[100px] opacity-30" />
-      </div>
+    <div className={`relative flex h-full min-h-dvh w-full overflow-hidden`}>
+      {/* Enhanced background decoration */}
 
       {/* Logo */}
       <div className="absolute left-6 top-6 z-50">
@@ -39,10 +35,10 @@ const AuthLayoutClient = React.memo(function AuthLayoutClient({
 
       {/* Right side - Welcome Preview */}
       <div className="hidden w-1/2 p-6 lg:flex">
-        <div className="relative flex flex-col justify-end rounded-2xl p-10 w-full bg-content2 dark:bg-content1 overflow-hidden">
+        <div className="relative flex flex-col justify-end rounded-2xl p-10 w-full border border-default-100 bg-muted/80 backdrop-blur-sm overflow-hidden">
           {/* Customer Feedback Card - Bottom Right */}
           <div className="absolute 0 bottom-8 right-8 max-w-sm">
-            <div className="bg-background backdrop-blur-lg rounded-xl px-6 py-4 shadow-lg">
+            <div className="bg-background/90 backdrop-blur-lg rounded-2xl px-6 py-5 shadow-md transition-all duration-300">
               {/* Quote icon */}
               <Icon
                 className="text-primary/30 mb-4"

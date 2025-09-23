@@ -3,9 +3,10 @@
 import React from "react";
 
 import { cn } from "@/libs/utils";
-
+import { designSystem } from "@/libs/design-system";
 import Image from "next/image";
 import { Marquee } from "@/components/ui/marquee";
+import { Icon } from "@iconify/react";
 
 const howItWorks = [
   {
@@ -87,15 +88,26 @@ const Integration = () => {
   ];
 
   return (
-    <section className="flex w-full flex-col items-center justify-center py-12 sm:py-16 lg:py-20">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <p className="text-center mb-3 text-primary/80 text-sm uppercase tracking-[0.2em]">
-          How Meyoo works
-        </p>
-        <h2 className="text-center text-4xl font-semibold tracking-tight sm:text-5xl">
-          A trusted profit view in under 10 minutes
+    <section
+      className={`relative flex w-full flex-col items-center justify-center ${designSystem.spacing.section} ${designSystem.background.gradient}`}
+    >
+      <div className={designSystem.spacing.container}>
+        <div className="text-center">
+          <div className={designSystem.typography.sectionChip}>
+            <Icon
+              icon="solar:diagram-up-bold"
+              width={16}
+              className="text-primary/70"
+            />
+            <span className="text-xs uppercase tracking-[0.15em] font-medium text-primary/70">
+              How it works
+            </span>
+          </div>
+        </div>
+        <h2 className={designSystem.typography.sectionTitle}>
+          Get profit clarity in under 10 minutes
         </h2>
-        <p className="mx-auto mt-4 max-w-2xl text-center tracking-tight text-muted-foreground/80 md:text-lg">
+        <p className={designSystem.typography.sectionSubtitle}>
           Connect the tools you already use and let Meyoo keep revenue, spend,
           and costs tidy in the background.
         </p>
@@ -105,7 +117,7 @@ const Integration = () => {
             {logos.map((logo, index) => (
               <div
                 key={index}
-                className="flex items-center justify-center gap-4 rounded-full bg-muted px-5 py-2"
+                className="flex items-center justify-center gap-4 rounded-full bg-muted/40 px-5 py-2 backdrop-blur-sm"
               >
                 <Image
                   alt={logo.name}
@@ -123,11 +135,11 @@ const Integration = () => {
           <div className="pointer-events-none absolute inset-y-0 right-0 w-36 bg-gradient-to-l from-background"></div>
         </div>
       </div>
-      <div className="relative mx-auto mt-12 grid min-h-[28rem] w-full max-w-7xl items-stretch gap-6 px-4 sm:px-6 lg:px-8 md:grid-cols-2 lg:grid-cols-3">
+      <div className="relative mx-auto mt-12 grid min-h-[28rem] w-full max-w-7xl items-stretch ${designSystem.spacing.gap.md} gap-10 px-4 sm:px-6 lg:px-8 md:grid-cols-2 lg:grid-cols-3">
         {howItWorks.map((feature, index) => (
           <PinContainer
             key={index}
-            className="!bg-muted/70 w-full rounded-3xl p-4"
+            className="ring-1 bg-primary/5 ring-primary/10 backdrop-blur-sm w-full rounded-2xl p-4 transition-all duration-300 ring-1 ring-white/5"
           >
             <div className="flex flex-col">
               <div className={feature.imageOrder}>
@@ -135,18 +147,20 @@ const Integration = () => {
                   src={feature.image}
                   height={1000}
                   width={1000}
-                  className="h-64 w-full sm:h-70 rounded-3xl object-cover"
+                  className="h-64 w-full sm:h-70 rounded-xl object-cover"
                   alt="thumbnail"
                 />
               </div>
               <div className={`mt-4 w-full p-3 ${feature.contentOrder}`}>
-                <p className="leading-none tracking-tighter opacity-50">
-                  {feature.number}
+                <p className="text-xs uppercase tracking-[0.15em] text-muted-foreground font-medium">
+                  Step {feature.number}
                 </p>
-                <h2 className="my-3 text-3xl font-semibold leading-none tracking-tighter">
+                <h2 className="my-3 text-xl font-semibold tracking-tight">
                   {feature.title}
                 </h2>
-                <p className="leading-5 opacity-50">{feature.description}</p>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {feature.description}
+                </p>
               </div>
             </div>
           </PinContainer>
@@ -170,7 +184,7 @@ export const PinContainer = ({
   containerClassName?: string;
 }) => {
   return (
-    <div className={cn("relative h-full", containerClassName)}>
+    <div className={cn("relative h-full ", containerClassName)}>
       <div className={cn("relative h-full flex flex-col", className)}>
         {children}
       </div>

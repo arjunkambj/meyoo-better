@@ -7,10 +7,13 @@ import React from "react";
 import { Button, Card, CardBody } from "@heroui/react";
 import Image from "next/image";
 import Link from "next/link";
+import { designSystem } from "@/libs/design-system";
 
 const Hero = () => {
   return (
-    <section className="relative w-full min-h-[calc(90vh)] flex items-center justify-center overflow-hidden bg-gradient-to-b from-background via-primary/5 to-background pt-[calc(env(safe-area-inset-top)+56px)] sm:pt-[calc(env(safe-area-inset-top)+72px)] md:pt-20 pb-12 sm:pb-16 lg:pb-20 dark:via-primary/15">
+    <section
+      className={`relative w-full min-h-[calc(90vh)] flex items-center justify-center overflow-hidden ${designSystem.background.gradient} ${designSystem.spacing.section}`}
+    >
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
         <div
           className="absolute inset-0 opacity-55 dark:opacity-80"
@@ -20,7 +23,7 @@ const Hero = () => {
           }}
         />
         <div
-          className="absolute inset-0 opacity-50 dark:opacity-40"
+          className="absolute inset-0 opacity-50 dark:opacity-30"
           style={{
             backgroundImage:
               "linear-gradient(to right, rgba(148,163,184,0.15) 1px, transparent 1px), linear-gradient(to bottom, rgba(148,163,184,0.12) 1px, transparent 1px)",
@@ -30,26 +33,23 @@ const Hero = () => {
         <div className="absolute left-1/2 top-[10%] h-[420px] w-[420px] -translate-x-1/2 rounded-full bg-primary/15 blur-3xl opacity-70 dark:bg-primary/25" />
         <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-background via-background/90 to-transparent" />
       </div>
-      <div className="container relative z-10 mx-auto py-12 sm:py-16 lg:py-20">
+      <div className={`${designSystem.spacing.container} relative z-10`}>
         <div className="text-center flex flex-col items-center">
           {/* Chip Badge */}
-          <div className="inline-flex items-center gap-2 bg-white/70 dark:bg-white/10 border border-white/40 dark:border-white/10 rounded-full px-4 py-1.5 mb-4 backdrop-blur">
+          <div className={designSystem.typography.sectionChip}>
             <Icon
               icon="solar:target-bold-duotone"
-              width={18}
-              className="text-primary"
+              width={16}
+              className="text-primary/70"
             />
-            <span className="text-sm font-semibold text-primary">
-              Finally see today&apos;s profit
+            <span className="text-xs uppercase tracking-[0.15em] font-medium text-primary/70">
+              Real-time profit tracking
             </span>
           </div>
 
           {/* Header  */}
-          <h1 className="text-3xl leading-tight tracking-tighter text-balance sm:text-5xl md:text-6xl lg:text-7xl">
-            <span className="font-semibold">
-              See,<span> </span>Measure And{" "}
-              <span className="text-primary">Grow Profit</span>
-            </span>
+          <h1 className="text-4xl leading-tight tracking-tight text-balance sm:text-5xl lg:text-6xl font-semibold">
+            See, Measure And <span className="text-primary">Grow Profit</span>
             <br />
             <span className="font-playfair italic">
               Built for <span className="text-primary">D2C</span> brands.
@@ -57,7 +57,9 @@ const Hero = () => {
           </h1>
 
           {/* Professional info */}
-          <p className="mt-2 text-base sm:text-lg md:text-xl text-default-600 max-w-2xl mx-auto text-balance">
+          <p
+            className={`${designSystem.typography.sectionSubtitle} text-balance`}
+          >
             Meyoo gathers orders, ad spend, and every cost in one place so D2C
             operators can see margin without digging through spreadsheets.
           </p>
@@ -99,12 +101,12 @@ const Hero = () => {
           animate={{ opacity: 100, y: 0 }}
           transition={{ ease: [0, 0.71, 0.2, 1.01], duration: 0.8 }}
         >
-          <Card className="group relative mx-auto mt-12 h-[320px] w-full max-w-7xl rounded-4xl border border-default-200/70 bg-background/70 p-3 shadow-sm shadow-primary/10 backdrop-blur md:h-190">
-            <div className="pointer-events-none absolute inset-0 rounded-4xl bg-gradient-to-br from-primary/10 via-transparent to-primary/5 opacity-80" />
-            <CardBody className="relative size-full rounded-3xl border border-default-200/60 bg-gradient-to-br from-background via-content1 to-content2">
+          <Card className="group relative mx-auto mt-12 h-[320px] w-full max-w-7xl rounded-2xl bg-muted/30 p-3 backdrop-blur-sm md:h-[480px] transition-all duration-300 ring-1 ring-white/10">
+            <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/10 via-transparent to-primary/5 opacity-60" />
+            <CardBody className="relative size-full rounded-xl bg-gradient-to-br from-background/90 via-background/80 to-muted/20">
               <Image
                 alt="Dashboard preview"
-                className="size-full rounded-3xl object-cover"
+                className="size-full rounded-xl object-cover"
                 fill
                 priority
                 src="https://deifkwefumgah.cloudfront.net/shadcnblocks/block/placeholder-1.svg"

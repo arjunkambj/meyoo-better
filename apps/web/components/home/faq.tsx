@@ -2,6 +2,7 @@
 
 import { Accordion, AccordionItem, Button } from "@heroui/react";
 import { Icon } from "@iconify/react";
+import { designSystem } from "@/libs/design-system";
 
 const faqs = [
   {
@@ -40,26 +41,43 @@ const Faq = () => {
   return (
     <section
       id="faq"
-      className="py-12 sm:py-16 lg:py-20 px-4 sm:px-6 lg:px-8 scroll-mt-24"
+      className={`relative ${designSystem.spacing.section} ${designSystem.background.gradient} w-full scroll-mt-24`}
     >
-      <div className="container mx-auto max-w-7xl">
+      <div className={`${designSystem.spacing.container} max-w-7xl`}>
+        <div className="text-center mb-12">
+          <div className={designSystem.typography.sectionChip}>
+            <Icon
+              icon="solar:question-circle-bold"
+              width={16}
+              className="text-primary/70"
+            />
+            <span className="text-xs uppercase tracking-[0.15em] font-medium text-primary/70">
+              Support & FAQ
+            </span>
+          </div>
+          <h2 className={designSystem.typography.sectionTitle}>
+            Got questions? We&apos;ve got answers
+          </h2>
+          <p className={designSystem.typography.sectionSubtitle}>
+            Our team typically responds within one business day
+          </p>
+        </div>
         <div className="grid gap-8 md:grid-cols-2">
           <div className="flex flex-col gap-6">
-            <h2 className="text-3xl font-semibold text-balance sm:text-4xl">
-              Need a hand?
-              <br />
-              <span className="text-muted-foreground/70">
-                Our team replies within a business day.
-              </span>
-            </h2>
-            <p className="text-base text-muted-foreground sm:text-lg md:text-xl">
-              Still stuck? Drop a note to our
-              <a href="mailto:support@meyoo.app" className="mx-1 whitespace-nowrap underline">
+            <h3 className="text-2xl font-semibold tracking-tight">
+              Need personalized help?
+            </h3>
+            <p className="text-base text-muted-foreground">
+              Drop a note to our
+              <a
+                href="mailto:support@meyoo.app"
+                className="mx-1 whitespace-nowrap underline text-primary hover:text-primary/80 transition-colors"
+              >
                 support team
               </a>
               and we&apos;ll point you in the right direction.
             </p>
-            <Button size="lg" variant="bordered" className="w-full sm:w-fit">
+            <Button size="lg" color="primary" className="w-full sm:w-fit ">
               View all FAQs
             </Button>
           </div>
@@ -67,10 +85,10 @@ const Faq = () => {
             className="w-full"
             fullWidth={true}
             itemClasses={{
-              base: "w-full min-w-full max-w-full block transition-none data-[open=true]:w-full data-[open=false]:w-full",
+              base: "w-full min-w-full max-w-full block bg-transparent backdrop-blur-sm rounded-xl mb-2 transition-all duration-300",
               title: "font-medium text-foreground w-full min-w-full",
               trigger:
-                "px-4 sm:px-6 py-5 sm:py-6 w-full min-w-full flex items-center justify-between transition-colors",
+                "px-4 sm:px-6 py-5 sm:py-6 w-full min-w-full flex items-center justify-between",
               indicator: "text-primary shrink-0",
               content: "text-default-600 px-4 sm:px-6 pb-5 sm:pb-6 pt-2 w-full",
             }}
@@ -80,10 +98,10 @@ const Faq = () => {
               <AccordionItem
                 key={faq.question}
                 aria-label={faq.question}
-                className="border-b border-default-200/50 dark:border-default-100/40 last:border-0 mb-0"
+                className="mb-0"
                 indicator={({ isOpen }) => (
                   <Icon
-                    className={`text-primary transition-transform duration-200 ${
+                    className={`text-primary/60 transition-transform duration-200 ${
                       isOpen ? "rotate-180" : ""
                     }`}
                     icon="solar:alt-arrow-down-outline"
@@ -94,7 +112,9 @@ const Faq = () => {
                   <span className="block w-full pr-8">{faq.question}</span>
                 }
               >
-                <p className="leading-relaxed break-words">{faq.answer}</p>
+                <p className="leading-relaxed break-words text-muted-foreground">
+                  {faq.answer}
+                </p>
               </AccordionItem>
             ))}
           </Accordion>

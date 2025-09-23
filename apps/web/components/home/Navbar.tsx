@@ -90,15 +90,15 @@ export default function CenteredNavbar() {
   };
 
   return (
-    <div className="fixed w-full top-1 z-50 px-4 md:px-6 py-2 md:py-3">
-      <div className="max-w-6xl mx-auto">
+    <div className="fixed w-full top-2 z-50 px-4 md:px-6 py-1">
+      <div className="max-w-7xl mx-auto">
         <Navbar
           className={`
-            ${hasScrolled ? " border-1 border-default-300/60" : " border-1 border-default-300/60"}
-            rounded-xl transition-all duration-300
+            ${hasScrolled ? "bg-background/90 backdrop-blur-md" : "bg-background/70 backdrop-blur-sm"}
+            rounded-2xl border border-default-200/50 transition-all duration-300
           `}
           classNames={{
-            base: "px-3 md:px-5 py-2.5 md:py-3 rounded-lg",
+            base: "px-4 md:px-6 py-3 md:py-3.5 rounded-2xl",
             wrapper: "px-0 max-w-none",
           }}
           height="auto"
@@ -121,11 +121,11 @@ export default function CenteredNavbar() {
               {navItems.map((item) => (
                 <NavbarItem key={item.name}>
                   <Button
-                    className={`relative px-2 py-2 transition-all bg-transparent hover:bg-transparent duration-200 font-medium text-sm  group h-auto min-w-0 ${
+                    className={`relative px-3 py-2 transition-all bg-transparent hover:bg-transparent duration-300 font-medium text-sm group h-auto min-w-0 ${
                       activeSection === item.href.substring(1) ||
                       (item.href === "/contact" && currentPath === "/contact")
                         ? "text-primary"
-                        : "text-default-800 hover:text-primary"
+                        : "text-muted-foreground hover:text-primary"
                     }`}
                     onPress={() => {
                       if (item.href.startsWith("/")) {
@@ -137,7 +137,7 @@ export default function CenteredNavbar() {
                   >
                     {item.name}
                     <span
-                      className={`absolute bottom-0 left-0 w-full h-0.5 bg-primary transition-transform duration-200 origin-left ${
+                      className={`absolute bottom-0 left-0 w-full h-0.5 bg-primary/60 rounded-full transition-transform duration-300 origin-left ${
                         activeSection === item.href.substring(1) ||
                         (item.href === "/contact" && currentPath === "/contact")
                           ? "scale-x-100"
@@ -155,14 +155,13 @@ export default function CenteredNavbar() {
             <NavbarItem>
               <Button
                 as={Link}
-                className="font-semibold"
+                className="font-semibold px-6"
                 color="primary"
-                endContent={<Icon icon="solar:arrow-right-linear" width={16} />}
+                endContent={<Icon icon="solar:arrow-right-linear" width={18} />}
                 href="/signin"
-                radius="lg"
                 size="md"
               >
-                Get started
+                Start free trial
               </Button>
             </NavbarItem>
           </NavbarContent>
@@ -172,8 +171,8 @@ export default function CenteredNavbar() {
             <NavbarItem>
               <Button
                 isIconOnly
-                className="text-default-700 hover:bg-content1/50 dark:hover:bg-default-100/50 backdrop-blur-sm"
-                radius="lg"
+                className="text-muted-foreground hover:bg-muted/50 backdrop-blur-sm transition-all duration-300"
+                radius="full"
                 variant="light"
                 onPress={() => setIsMenuOpen(true)}
               >
@@ -185,7 +184,7 @@ export default function CenteredNavbar() {
           {/* Mobile Modal */}
           <Modal
             classNames={{
-              base: "bg-content1/95 dark:bg-content1/95 backdrop-blur-sm",
+              base: "bg-background/95 backdrop-blur-md rounded-2xl",
               body: "py-6",
             }}
             isOpen={isMenuOpen}
@@ -197,11 +196,11 @@ export default function CenteredNavbar() {
               <ModalBody>
                 <div className="flex flex-col h-full">
                   {/* Mobile Header */}
-                  <div className="flex items-center justify-between pb-6 border-b border-divider">
+                  <div className="flex items-center justify-between pb-6 border-b border-default-200/50">
                     <Logo />
                     <Button
                       isIconOnly
-                      className="text-default-700 hover:bg-default-100"
+                      className="text-muted-foreground hover:bg-muted/50 transition-all duration-300"
                       variant="light"
                       onPress={() => setIsMenuOpen(false)}
                     >
@@ -215,7 +214,7 @@ export default function CenteredNavbar() {
                       <Button
                         key={item.name}
                         variant="light"
-                        className="text-xl font-semibold text-foreground hover:text-primary transition-colors duration-200 text-left justify-start p-0 h-auto min-w-0"
+                        className="text-xl font-medium text-muted-foreground hover:text-primary transition-colors duration-300 text-left justify-start p-0 h-auto min-w-0"
                         onClick={() => {
                           if (item.href.startsWith("/")) {
                             router.push(item.href);

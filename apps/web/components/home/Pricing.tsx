@@ -14,6 +14,8 @@ import {
 
 import { frequencies, tiers } from "./pricing/constants";
 import { type Frequency, FrequencyEnum, TiersEnum } from "./pricing/types";
+import { designSystem } from "@/libs/design-system";
+import { Icon } from "@iconify/react";
 
 const showcasedTiers = tiers.filter(
   (tier) => tier.key !== TiersEnum.Enterprise
@@ -40,18 +42,29 @@ const Pricing = () => {
   return (
     <section
       id="pricing"
-      className="bg-background py-12 sm:py-16 lg:py-20 scroll-mt-24"
+      className={`relative ${designSystem.spacing.section} ${designSystem.background.gradient} w-full scroll-mt-24`}
     >
-      <div className="container mx-auto flex flex-col gap-6 sm:gap-8 md:gap-10 px-4 sm:px-6 lg:px-8">
+      <div
+        className={`${designSystem.spacing.container} flex flex-col gap-6 sm:gap-8 md:gap-10`}
+      >
         <div className="flex flex-col items-center justify-center">
-          <p className="text-center mb-3 text-primary/80 text-sm uppercase tracking-[0.2em]">
-            Plans & pricing
-          </p>
-          <h2 className="text-center text-4xl sm:text-5xl font-semibold tracking-tight text-foreground">
-            Choose the plan that matches your volume
+          <div className={designSystem.typography.sectionChip}>
+            <Icon
+              icon="solar:tag-price-bold"
+              width={16}
+              className="text-primary/70"
+            />
+            <span className="text-xs uppercase tracking-[0.15em] font-medium text-primary/70">
+              Pricing plans
+            </span>
+          </div>
+          <h2 className={designSystem.typography.sectionTitle}>
+            Choose your growth plan
           </h2>
-          <p className="mt-4 max-w-2xl text-center text-base sm:text-lg md:text-xl text-muted-foreground">
-            Start with a 14-day free trial. All plans include the live profit dashboard, ad integrations, AI assistant, and automated cost tracking.
+          <p className={designSystem.typography.sectionSubtitle}>
+            Start with a 14-day free trial. All plans include the live profit
+            dashboard, ad integrations, AI assistant, and automated cost
+            tracking.
           </p>
         </div>
 
@@ -84,22 +97,24 @@ const Pricing = () => {
             return (
               <Card
                 key={tier.key}
-                className={`h-full w-full bg-muted/70 sm:w-80 rounded-3xl pb-4  ${
-                  tier.mostPopular ? "border-2 border-primary" : "border-border"
+                className={`h-full w-full bg-primary/5 ring-primary/10 backdrop-blur-sm sm:w-80 rounded-2xl pb-4 transition-all duration-300 ${
+                  tier.mostPopular
+                    ? "ring-2  bg-primary/5 ring-primary backdrop-blur-sm "
+                    : "ring-1 ring-white/5"
                 }`}
               >
-                <CardHeader className="flex flex-col  px-6 py-4  items-start">
-                  <h3 className="text-lg font-medium text-foreground">
+                <CardHeader className="flex flex-col px-6 py-6 items-start">
+                  <h3 className="text-lg font-semibold text-foreground text-default-900">
                     {tier.title}
                   </h3>
                   <div className="mt-4 gap-2 flex flex-col">
-                    <div className="text-5xl font-semibold tracking-tight text-foreground/90">
+                    <div className="text-4xl font-semibold tracking-tight text-foreground text-default-900">
                       {price}
                     </div>
                     <div className="text-xs">{periodCopy}</div>
                   </div>
 
-                  <p className="text-sm mt-4 text-muted-foreground">
+                  <p className="text-sm mt-4 text-muted-foreground text-default-800">
                     {tier.description}
                   </p>
 
@@ -114,15 +129,15 @@ const Pricing = () => {
                   </Button>
                 </CardHeader>
 
-                <Divider className="my-2" />
+                <Divider className="my-2 bg-default-200" />
 
                 <CardBody className="flex flex-col justify-between px-6 pt-2">
                   <div className="flex-1">
                     <ul className="space-y-4">
                       {tier.features?.map((feature) => (
                         <li key={feature} className="flex items-center">
-                          <BadgeCheck className="size-5 text-muted-foreground" />
-                          <span className="ml-3 text-sm text-muted-foreground">
+                          <BadgeCheck className="size-5 text-primary/60" />
+                          <span className="ml-3 text-sm text-muted-foreground leading-relaxed text-default-800  ">
                             {feature}
                           </span>
                         </li>

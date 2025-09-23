@@ -12,6 +12,8 @@ import {
 import React, { useState } from "react";
 
 import { cn } from "@/libs/utils";
+import { designSystem } from "@/libs/design-system";
+import { Icon } from "@iconify/react";
 
 const Feature = () => {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
@@ -56,20 +58,29 @@ const Feature = () => {
   ];
 
   return (
-    <section className="flex w-full items-center justify-center overflow-hidden py-12 sm:py-16 lg:py-20">
-      <div className="container mx-auto flex w-full flex-col items-center justify-center px-4 sm:px-6 lg:px-8">
-        <p className="px-4 text-xs uppercase tracking-[0.2em] text-primary/80">
-          Why teams choose Meyoo
-        </p>
-        <h2 className="relative z-20 py-5 text-center font-sans text-4xl font-semibold tracking-tight sm:text-5xl">
-          Less guessing, more confident decisions
+    <section
+      className={`relative flex w-full items-center justify-center overflow-hidden ${designSystem.spacing.section} ${designSystem.background.gradient}`}
+    >
+      <div
+        className={`${designSystem.spacing.container} flex w-full flex-col items-center justify-center`}
+      >
+        <div className={designSystem.typography.sectionChip}>
+          <Icon icon="solar:star-bold" width={16} className="text-primary/70" />
+          <span className="text-xs uppercase tracking-[0.15em] font-medium text-primary/70">
+            Why Meyoo
+          </span>
+        </div>
+        <h2 className={`relative z-20 ${designSystem.typography.sectionTitle}`}>
+          Make confident decisions daily
         </h2>
-        <p className="text-md text-muted-foreground mx-auto max-w-2xl text-center lg:text-lg">
+        <p className={designSystem.typography.sectionSubtitle}>
           We designed Meyoo for operators who want the real story on profits
           without chasing screenshots from different tools.
         </p>
 
-        <div className="relative mx-auto mt-10 grid w-full max-w-7xl grid-cols-1 gap-4 px-4 sm:px-6 lg:px-8 md:grid-cols-2 lg:grid-cols-3">
+        <div
+          className={`relative mx-auto mt-10 grid w-full max-w-7xl grid-cols-1 ${designSystem.spacing.gap.md} md:grid-cols-2 lg:grid-cols-3`}
+        >
           {items.map((item, idx) => (
             <div
               key={idx}
@@ -80,7 +91,7 @@ const Feature = () => {
               <AnimatePresence mode="wait" initial={false}>
                 {hoveredIndex === idx && (
                   <motion.span
-                    className="bg-muted-foreground/20 absolute inset-0 block h-full w-full rounded-2xl"
+                    className="absolute inset-0 block h-full w-full rounded-2xl"
                     layoutId="hoverBackground"
                     key={idx}
                     initial={{ opacity: 0 }}
@@ -121,13 +132,13 @@ const Card = ({
   return (
     <div
       className={cn(
-        "bg-muted relative z-20 flex h-full flex-col items-center justify-center gap-4 rounded-2xl p-5 text-center",
+        "relative z-20 flex h-full ring-1 bg-primary/5 ring-primary/10 backdrop-blur-sm flex-col items-center justify-center gap-4 rounded-2xl p-6 sm:p-8 text-center backdrop-blur-sm transition-all duration-300",
         className
       )}
     >
-      <Icon className="text-muted-foreground mt-3 size-8 stroke-1" />
-      <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-      <p className="text-muted-foreground text-sm">{description}</p>
+      <Icon className="text-primary/60 mt-3 size-8 stroke-1" />
+      <h1 className={designSystem.typography.cardTitle}>{title}</h1>
+      <p className={designSystem.typography.cardDescription}>{description}</p>
     </div>
   );
 };

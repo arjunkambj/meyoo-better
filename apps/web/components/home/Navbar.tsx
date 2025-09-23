@@ -11,8 +11,6 @@ import { useEffect, useState } from "react";
 import { Logo } from "@/components/shared/Logo";
 
 const navItems = [
-  { name: "Integrations", href: "#integrations" },
-  { name: "Testimonials", href: "#testimonials" },
   { name: "Pricing", href: "#pricing" },
   { name: "FAQ", href: "#faq" },
   { name: "Contact", href: "/contact" },
@@ -119,7 +117,7 @@ export default function CenteredNavbar() {
 
           {/* Center - Navigation Items */}
           <NavbarContent className="hidden md:flex flex-1" justify="center">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-12">
               {navItems.map((item) => (
                 <NavbarItem key={item.name}>
                   <Button
@@ -127,7 +125,7 @@ export default function CenteredNavbar() {
                       activeSection === item.href.substring(1) ||
                       (item.href === "/contact" && currentPath === "/contact")
                         ? "text-primary"
-                        : "text-default-700 hover:text-primary"
+                        : "text-default-800 hover:text-primary"
                     }`}
                     onPress={() => {
                       if (item.href.startsWith("/")) {

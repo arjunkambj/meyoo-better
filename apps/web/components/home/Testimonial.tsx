@@ -7,78 +7,79 @@ import { Icon } from "@iconify/react";
 const testimonials = [
   {
     id: "1",
-    title: "Very easy to connect ad accounts",
+    title: "We spotted bleeding campaigns fast",
     description:
-      "Very fantastic app, it is very easy to connect your ad account and install new pixels. And the support is very fast and helpful.",
+      "Meyoo showed our hero SKU was underwater once returns hit. We tweaked bundles the same day and recovered 18% margin that week.",
     user: {
-      name: "Premiumpatikeus",
-      location: "Serbia",
-      initials: "DDS",
+      name: "Lena Cho",
+      location: "Glow Lab Skincare · Austin, TX",
+      avatar:
+        "https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=160&q=80",
     },
   },
   {
     id: "2",
-    title: "Amazing profit tracking",
+    title: "Everyone agrees on yesterday's profit",
     description:
-      "Meyoo has completely transformed how I track my profits. The integration with my store was seamless and the insights are invaluable.",
+      "Our agency and finance team finally look at the same number. Stand-ups went from 45 minutes of debates to a 10-minute review.",
     user: {
-      name: "Sarah Johnson",
-      location: "United States",
-      initials: "SJ",
+      name: "Marcus Reed",
+      location: "Trailside Outfitters · Denver, CO",
+      avatar:
+        "https://images.unsplash.com/photo-1527980965255-d3b416303d12?auto=format&fit=crop&w=160&q=80",
     },
   },
   {
     id: "3",
-    title: "Best analytics tool for e-commerce",
+    title: "No more spreadsheet friday nights",
     description:
-      "The most comprehensive analytics I've found for managing my online store. Everything I need in one place with beautiful visualizations.",
+      "I used to export Shopify, Meta, and Spendesk just to see profit. Now Meyoo gives that answer when I open my laptop in the morning.",
     user: {
-      name: "Mike Chen",
-      location: "Canada",
-      initials: "MC",
+      name: "Priya Natarajan",
+      location: "Hearth & Home · Toronto, ON",
+      avatar:
+        "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=160&q=80",
     },
   },
 ];
 
 const Testimonial = () => {
   return (
-    <section className="flex w-full flex-col items-center justify-center py-16 sm:py-24 lg:py-32">
+    <section className="flex w-full flex-col items-center justify-center py-12 sm:py-16 lg:py-20">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <p className="text-center mb-3 text-primary">Testimonials</p>
-        <h1 className="text-center text-5xl font-medium tracking-tight md:text-7xl">
-          Happy Customer Stories
-        </h1>
+        <p className="text-center mb-3 text-primary/80 text-sm uppercase tracking-[0.2em]">
+          Customer stories
+        </p>
+        <h2 className="text-center text-4xl font-semibold tracking-tight sm:text-5xl">
+          Operators who rely on Meyoo
+        </h2>
       </div>
-      <div className="relative mx-auto mt-16 grid min-h-[32rem] w-full max-w-7xl items-stretch gap-6 px-4 sm:px-6 lg:px-8 md:grid-cols-2 lg:grid-cols-3">
+      <div className="relative mx-auto mt-12 grid min-h-[28rem] w-full max-w-7xl items-stretch gap-6 px-4 sm:px-6 lg:px-8 md:grid-cols-2 lg:grid-cols-3">
         {testimonials.map((testimonial) => (
           <div
             key={testimonial.id}
             className="bg-muted/70 w-full rounded-3xl p-8"
           >
-            <div className="flex flex-col h-full">
-              {/* Quote Icon */}
-              <div className="mb-4">
-                <Icon icon="mdi:quote" className="text-3xl text-primary/60" />
+            <div className="flex flex-col h-full relative">
+              <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full text-primary/30">
+                <Icon icon="ri:double-quotes-l" width={40} />
               </div>
 
-              {/* Title */}
               <h3 className="text-2xl font-semibold leading-tight mb-6">
                 {testimonial.title}
               </h3>
 
-              {/* Description */}
               <div className="flex-1 mb-8">
                 <p className="text-muted-foreground leading-relaxed text-base">
                   {testimonial.description}
                 </p>
               </div>
 
-              {/* User Info */}
               <div className="flex items-center gap-3">
                 <Avatar
                   size="md"
-                  name={testimonial.user.initials}
-                  className="bg-primary text-primary-foreground"
+                  src={testimonial.user.avatar}
+                  name={testimonial.user.name}
                 />
                 <div>
                   <p className="font-medium text-base">

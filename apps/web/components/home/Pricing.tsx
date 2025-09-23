@@ -40,14 +40,19 @@ const Pricing = () => {
   return (
     <section
       id="pricing"
-      className="bg-background py-16 sm:py-24 lg:py-32 scroll-mt-24"
+      className="bg-background py-12 sm:py-16 lg:py-20 scroll-mt-24"
     >
-      <div className="container mx-auto flex flex-col gap-8 sm:gap-10 md:gap-13 px-4 sm:px-6 lg:px-8">
+      <div className="container mx-auto flex flex-col gap-6 sm:gap-8 md:gap-10 px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col items-center justify-center">
-          <p className="text-center mb-3 text-primary">Pricing</p>
-          <h1 className="text-center text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tighter text-foreground">
-            Simple Pricing Plans
-          </h1>
+          <p className="text-center mb-3 text-primary/80 text-sm uppercase tracking-[0.2em]">
+            Plans & pricing
+          </p>
+          <h2 className="text-center text-4xl sm:text-5xl font-semibold tracking-tight text-foreground">
+            Choose the plan that matches your volume
+          </h2>
+          <p className="mt-4 max-w-2xl text-center text-base sm:text-lg md:text-xl text-muted-foreground">
+            Start with a 14-day free trial. All plans include the live profit dashboard, ad integrations, AI assistant, and automated cost tracking.
+          </p>
         </div>
 
         <div className="flex items-center justify-center gap-4">

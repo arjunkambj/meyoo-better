@@ -5,34 +5,34 @@ import { Icon } from "@iconify/react";
 
 const faqs = [
   {
-    question: "How do you calculate real profit?",
+    question: "How does Meyoo figure out my profit?",
     answer:
-      "Meyoo pulls orders from Shopify and spend from ad platforms, then subtracts COGS, shipping, fees, returns, and taxes to show true profit.",
+      "We sync Shopify orders and ad spend, then subtract the costs you track—COGS, shipping, payment fees, returns, and taxes—so you see a true profit line.",
   },
   {
-    question: "How fast does data update?",
+    question: "How fresh is the data?",
     answer:
-      "Orders sync instantly. Ad spend updates about every 15 minutes. Changes to costs update your profit view immediately.",
+      "Orders show up instantly. Ad channels refresh about every 15 minutes, and any cost changes you make update your numbers right away.",
   },
   {
-    question: "Can I slice by product or channel?",
+    question: "Can I break results down by product or channel?",
     answer:
-      "Yes. Segment by product, campaign, traffic source, region, and more so you can see exactly what drives margins.",
+      "Yes. Filter by product, campaign, traffic source, region, day, and more to see what is helping or hurting margin.",
   },
   {
-    question: "What integrations are supported?",
+    question: "Which integrations are live today?",
     answer:
-      "Shopify, Meta Ads, and Google Ads today. Coming soon: TikTok Ads, Amazon FBA, and popular email platforms.",
+      "Shopify, Meta Ads, and Google Ads are available now. TikTok Ads, Amazon, and leading email platforms are on the roadmap.",
   },
   {
-    question: "Will this scale with my store?",
+    question: "Will Meyoo keep up as we scale?",
     answer:
-      "Yes. Meyoo handles high volume and sales events, keeping hourly profit and campaign performance responsive.",
+      "Yes. We handle high order volume and sales spikes while keeping profit and campaign performance responsive.",
   },
   {
-    question: "How is my data secured?",
+    question: "How is our data protected?",
     answer:
-      "Encryption in transit and at rest, role-based access, and GDPR-friendly data handling. Your data is isolated per organization.",
+      "Your data stays encrypted in transit and at rest. Each organization gets isolated access with roles so only the right people can view sensitive numbers.",
   },
 ];
 
@@ -40,24 +40,24 @@ const Faq = () => {
   return (
     <section
       id="faq"
-      className="py-16 sm:py-24 lg:py-32 px-4 sm:px-6 lg:px-8 scroll-mt-24"
+      className="py-12 sm:py-16 lg:py-20 px-4 sm:px-6 lg:px-8 scroll-mt-24"
     >
       <div className="container mx-auto max-w-7xl">
-        <div className="grid gap-10 md:grid-cols-2">
+        <div className="grid gap-8 md:grid-cols-2">
           <div className="flex flex-col gap-6">
             <h2 className="text-3xl font-semibold text-balance sm:text-4xl">
-              Need Help?
+              Need a hand?
               <br />
               <span className="text-muted-foreground/70">
-                We&apos;re here to assist.
+                Our team replies within a business day.
               </span>
             </h2>
             <p className="text-base text-muted-foreground sm:text-lg md:text-xl">
-              Still have questions? Feel free to contact our friendly
-              <a href="#" className="mx-1 whitespace-nowrap underline">
+              Still stuck? Drop a note to our
+              <a href="mailto:support@meyoo.app" className="mx-1 whitespace-nowrap underline">
                 support team
               </a>
-              specialists.
+              and we&apos;ll point you in the right direction.
             </p>
             <Button size="lg" variant="bordered" className="w-full sm:w-fit">
               View all FAQs

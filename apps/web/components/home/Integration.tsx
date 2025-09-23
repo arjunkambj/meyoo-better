@@ -10,9 +10,9 @@ import { Marquee } from "@/components/ui/marquee";
 const howItWorks = [
   {
     number: "01",
-    title: "Connect your store",
+    title: "Connect Shopify",
     description:
-      "Link Shopify in seconds. We’ll pull in orders, products, and customers—no setup stress.",
+      "Install Meyoo and sync Shopify. We import orders, products, and customers automatically—no CSV shuffling.",
     image:
       "https://images.unsplash.com/photo-1460925895917-afdab827c52f?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80",
     imageOrder: "order-1",
@@ -20,9 +20,9 @@ const howItWorks = [
   },
   {
     number: "02",
-    title: "Add your ads",
+    title: "Link your ad spend",
     description:
-      "Bring in Meta and Google Ads. Spend, ROAS, and conversions flow into one clear view.",
+      "Plug in Meta and Google Ads. We keep spend, ROAS, and conversions in sync so marketing and finance see the same truth.",
     image:
       "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80",
     imageOrder: "order-2",
@@ -30,9 +30,9 @@ const howItWorks = [
   },
   {
     number: "03",
-    title: "See the real profit",
+    title: "Track profit automatically",
     description:
-      "Add costs like COGS, shipping, and fees. Meyoo shows your true profit daily.",
+      "Set up costs like COGS, shipping, and fees once. Meyoo updates profit and margin every day without extra work.",
     image:
       "https://images.unsplash.com/photo-1522071820081-009f0129c71c?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80",
     imageOrder: "order-1",
@@ -87,15 +87,17 @@ const Integration = () => {
   ];
 
   return (
-    <section className="flex w-full flex-col items-center justify-center py-16 sm:py-24 lg:py-32">
+    <section className="flex w-full flex-col items-center justify-center py-12 sm:py-16 lg:py-20">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <p className="text-center mb-3 text-primary">How it Works</p>
-        <h1 className="text-center text-5xl font-medium tracking-tight md:text-7xl">
-          Stop Guessing, Start Knowing
-        </h1>
-        <p className="mx-auto mt-4 max-w-xl text-center tracking-tight text-muted-foreground/80 md:text-lg">
-          Meyoo brings your sales, ads, and costs together—so you always see the
-          full picture.
+        <p className="text-center mb-3 text-primary/80 text-sm uppercase tracking-[0.2em]">
+          How Meyoo works
+        </p>
+        <h2 className="text-center text-4xl font-semibold tracking-tight sm:text-5xl">
+          A trusted profit view in under 10 minutes
+        </h2>
+        <p className="mx-auto mt-4 max-w-2xl text-center tracking-tight text-muted-foreground/80 md:text-lg">
+          Connect the tools you already use and let Meyoo keep revenue, spend,
+          and costs tidy in the background.
         </p>
 
         <div className="relative mt-12">
@@ -118,7 +120,7 @@ const Integration = () => {
           <div className="pointer-events-none absolute inset-y-0 right-0 w-36 bg-gradient-to-l from-background"></div>
         </div>
       </div>
-      <div className="relative mx-auto mt-16 grid min-h-[32rem] w-full max-w-7xl items-stretch gap-6 px-4 sm:px-6 lg:px-8 md:grid-cols-2 lg:grid-cols-3">
+      <div className="relative mx-auto mt-12 grid min-h-[28rem] w-full max-w-7xl items-stretch gap-6 px-4 sm:px-6 lg:px-8 md:grid-cols-2 lg:grid-cols-3">
         {howItWorks.map((feature, index) => (
           <PinContainer
             key={index}

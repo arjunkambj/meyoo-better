@@ -2,12 +2,12 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  BrushCleaning,
-  Clock,
-  CodeXml,
-  Plug2,
-  Snowflake,
-  Zap,
+  BellRing,
+  LayoutDashboard,
+  Receipt,
+  Sparkles,
+  TrendingUp,
+  Users,
 } from "lucide-react";
 import React, { useState } from "react";
 
@@ -18,69 +18,58 @@ const Feature = () => {
 
   const items = [
     {
-      title: "Plug & Play",
+      title: "Profit you can trust",
       description:
-        "Ready to use components that work out of the box with no configuration ",
-      icon: Plug2,
+        "Revenue, ad spend, fees, and returns roll into one daily profit view—no spreadsheets needed.",
+      icon: TrendingUp,
     },
     {
-      title: "Customizable",
+      title: "Every channel, one dashboard",
       description:
-        "Fully customizable components with clean, maintainable code structure",
-      icon: CodeXml,
+        "Shopify, Meta, Google, and more live side by side so the whole team works from the same numbers.",
+      icon: LayoutDashboard,
     },
     {
-      title: "Design Control",
+      title: "Costs stay accurate",
       description:
-        "Complete control over styling and animations with modern  patterns",
-      icon: Snowflake,
+        "Set COGS, shipping, and payment fees once. Meyoo applies them automatically to every order.",
+      icon: Receipt,
     },
     {
-      title: "Regular Updates",
+      title: "Alerts before margins slip",
       description:
-        "Continuously updated with new features, improvements and fixes",
-      icon: Clock,
+        "Get nudges when ROAS drops or profit falls so you can fix issues the same day.",
+      icon: BellRing,
     },
     {
-      title: "Clean Code",
+      title: "Ask the AI copilot",
       description:
-        "Well-structured, readable code following industry best practices",
-      icon: BrushCleaning,
+        "Type questions like 'Which campaign lost us money yesterday?' and get plain-language answers.",
+      icon: Sparkles,
     },
     {
-      title: "Performance",
+      title: "Built for your whole team",
       description:
-        "Optimized for speed and efficiency without compromising functionality",
-      icon: Zap,
-    },
-    {
-      title: "Performance",
-      description:
-        "Optimized for speed and efficiency without compromising functionality",
-      icon: Zap,
-    },
-    {
-      title: "Performance",
-      description:
-        "Optimized for speed and efficiency without compromising functionality",
-      icon: Zap,
+        "Invite founders, finance, and agencies with the right permissions and shared dashboards.",
+      icon: Users,
     },
   ];
 
   return (
-    <section className="flex w-full items-center justify-center overflow-hidden py-16 sm:py-24 lg:py-32">
+    <section className="flex w-full items-center justify-center overflow-hidden py-12 sm:py-16 lg:py-20">
       <div className="container mx-auto flex w-full flex-col items-center justify-center px-4 sm:px-6 lg:px-8">
-        <p className="px-4 text-xs uppercase text-primary">
-          Meyoo's Benefits
+        <p className="px-4 text-xs uppercase tracking-[0.2em] text-primary/80">
+          Why teams choose Meyoo
         </p>
-        <h2 className="relative z-20 py-5 text-center font-sans text-5xl font-semibold tracking-tighter  lg:text-6xl">
-          The Ultimate Block Toolkit
+        <h2 className="relative z-20 py-5 text-center font-sans text-4xl font-semibold tracking-tight sm:text-5xl">
+          Less guessing, more confident decisions
         </h2>
-        <p className="text-md text-muted-foreground mx-auto max-w-xl text-center lg:text-lg">
-          Perfectly balanced between performance and customization.
+        <p className="text-md text-muted-foreground mx-auto max-w-2xl text-center lg:text-lg">
+          We designed Meyoo for operators who want the real story on profits
+          without chasing screenshots from different tools.
         </p>
 
-        <div className="relative mx-auto mt-12 grid w-full max-w-7xl grid-cols-1 gap-4 px-4 sm:px-6 lg:px-8 md:grid-cols-2 lg:grid-cols-4">
+        <div className="relative mx-auto mt-10 grid w-full max-w-7xl grid-cols-1 gap-4 px-4 sm:px-6 lg:px-8 md:grid-cols-2 lg:grid-cols-3">
           {items.map((item, idx) => (
             <div
               key={idx}

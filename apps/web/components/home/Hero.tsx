@@ -14,25 +14,6 @@ const Hero = () => {
     <section
       className={`relative w-full min-h-[calc(90vh)] flex items-center justify-center overflow-hidden md:mt-8 ${designSystem.background.gradient} ${designSystem.spacing.section}`}
     >
-      <div className="pointer-events-none absolute  inset-0 -z-10  overflow-hidden">
-        <div
-          className="absolute inset-0 opacity-100 left"
-          style={{
-            background:
-              "radial-gradient(ellipse at top, rgba(99,102,241,0.18), rgba(15,23,42,0) 60%)",
-          }}
-        />
-        <div
-          className="absolute inset-0 opacity-10"
-          style={{
-            backgroundImage:
-              "linear-gradient(to right, rgba(148,163,184,0.15) 1px, transparent 1px), linear-gradient(to bottom, rgba(148,163,184,0.12) 1px, transparent 1px)",
-            backgroundSize: "140px 140px",
-          }}
-        />
-        <div className="absolute left-[60%] top-[10%] h-[420px] w-[420px] -translate-x-1/2  rounded-full bg-primary/15 blur-3xl opacity-80 dark:bg-primary/25" />
-        <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-background via-background/90 to-transparent" />
-      </div>
       <div className={`${designSystem.spacing.container} relative z-10`}>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
           {/* Left Column - Text Content */}

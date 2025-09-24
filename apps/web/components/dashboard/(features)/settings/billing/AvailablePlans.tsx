@@ -131,7 +131,7 @@ export default function AvailablePlans() {
           return (
             <div
               key={tier.key}
-              className={`relative flex flex-col rounded-3xl pb-2 shadow-none bg-content2/90 dark:bg-content1 transition-colors ${
+              className={`relative flex flex-col rounded-3xl pb-2 shadow-none bg-content2 dark:bg-content1 transition-colors ${
                 tier.mostPopular
                   ? "border-2 border-primary"
                   : isCurrentPlan

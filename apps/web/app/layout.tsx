@@ -4,12 +4,12 @@ import { ToastProvider } from "@heroui/toast";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata, Viewport } from "next";
-import { DM_Sans } from "next/font/google";
+import { Inter } from "next/font/google";
 
 import { Providers } from "@/components/Providers";
 import { siteConfig } from "@/constants/config/site";
 
-const dmSans = DM_Sans({
+const inter = Inter({
   subsets: ["latin"],
   display: "swap",
 });
@@ -43,7 +43,7 @@ export default function RootLayout({
         <head />
         <body>
           <Providers themeProps={{ attribute: "class", defaultTheme: "light" }}>
-            <main className={`h-dvh w-full antialiased ${dmSans.className}`}>
+            <main className={`h-dvh w-full antialiased ${inter.className}`}>
               <ToastProvider />
               <SpeedInsights />
               <Analytics />

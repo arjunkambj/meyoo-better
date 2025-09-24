@@ -46,17 +46,17 @@ export const CustomerJourney = memo(function CustomerJourney({
 
   const firstStage = hasJourneyData ? journeyData[0] : undefined;
   const purchaseStage = journeyData.find(
-    (stage) => stage.stage.toLowerCase() === "purchase",
+    (stage) => stage.stage.toLowerCase() === "purchase"
   );
   const retentionStage = journeyData.find(
-    (stage) => stage.stage.toLowerCase() === "retention",
+    (stage) => stage.stage.toLowerCase() === "retention"
   );
 
   const safeCancelRate = Number.isFinite(cancelRate) ? cancelRate : 0;
   const safeReturnRate = Number.isFinite(returnRate) ? returnRate : 0;
 
   return (
-    <Card className="p-6 rounded-2xl border border-default-100/60 bg-content2/90 dark:bg-content1 shadow-none backdrop-blur-sm">
+    <Card className="p-6 rounded-2xl border border-default-100/60 bg-content2 dark:bg-content1 shadow-none backdrop-blur-sm">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h3 className="text-lg font-medium text-default-900">
@@ -100,7 +100,9 @@ export const CustomerJourney = memo(function CustomerJourney({
                       <div>
                         <Tooltip
                           closeDelay={0}
-                          content={stageDescriptions[stage.stage] || stage.stage}
+                          content={
+                            stageDescriptions[stage.stage] || stage.stage
+                          }
                           placement="top"
                         >
                           <p className="font-medium text-sm text-default-900 mb-1">
@@ -221,7 +223,7 @@ export const CustomerJourney = memo(function CustomerJourney({
                         style={{
                           width: `${Math.max(
                             0,
-                            Math.min(conversionRate, 100),
+                            Math.min(conversionRate, 100)
                           )}%`,
                         }}
                       />

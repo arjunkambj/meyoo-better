@@ -34,7 +34,7 @@ export interface KPISkeletonProps {
 }
 
 const KPI_CARD_BASE_CLASS =
-  "bg-content2/90 dark:bg-content1 rounded-2xl border border-default-100 w-full overflow-hidden shadow-none";
+  "bg-content2 dark:bg-content1 rounded-2xl border border-default-100 w-full overflow-hidden shadow-none";
 const KPI_CARD_PADDING = "py-4 px-5";
 const KPI_SIZE_CLASSES: Record<KPISize, string> = {
   small: "col-span-1",
@@ -99,7 +99,10 @@ export const KPISkeleton = React.memo(function KPISkeleton({
           <Skeleton className="h-4 w-28 rounded-lg" />
           {showIcon && (
             <Skeleton
-              className={cn("shrink-0 rounded-full", KPI_ICON_SKELETON_SIZES[size])}
+              className={cn(
+                "shrink-0 rounded-full",
+                KPI_ICON_SKELETON_SIZES[size]
+              )}
             />
           )}
         </div>
@@ -128,10 +131,7 @@ export const KPISkeleton = React.memo(function KPISkeleton({
             <Divider className="mb-1.5 bg-default-200" />
             <div className="mt-1 flex items-center justify-between">
               <Skeleton
-                className={cn(
-                  "h-3 rounded-lg",
-                  KPI_CHANGE_PRIMARY_WIDTH[size]
-                )}
+                className={cn("h-3 rounded-lg", KPI_CHANGE_PRIMARY_WIDTH[size])}
               />
               <Skeleton
                 className={cn(

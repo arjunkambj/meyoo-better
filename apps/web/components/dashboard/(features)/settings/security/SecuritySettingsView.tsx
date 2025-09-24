@@ -11,7 +11,7 @@ export default function SecuritySettingsView() {
 
   return (
     <div className="space-y-6">
-      <Card className="rounded-2xl border border-default-100 shadow-none bg-content2/90 dark:bg-content1">
+      <Card className="rounded-2xl border border-default-100 shadow-none bg-content2 dark:bg-content1">
         <CardHeader className="flex items-center gap-2">
           <Icon icon="solar:code-bold" width={20} />
           <h3 className="text-lg font-semibold text-default-800">
@@ -25,7 +25,8 @@ export default function SecuritySettingsView() {
                 Show Developer Tools
               </span>
               <span className="text-xs text-default-500">
-                Display developer tools and debugging information on the overview page
+                Display developer tools and debugging information on the
+                overview page
               </span>
             </div>
             <Switch

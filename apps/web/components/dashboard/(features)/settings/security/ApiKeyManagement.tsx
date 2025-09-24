@@ -69,7 +69,7 @@ export default function ApiKeyManagement() {
 
   return (
     <>
-      <Card className="rounded-2xl border border-default-100 shadow-none bg-content2/90 dark:bg-content1">
+      <Card className="rounded-2xl border border-default-100 shadow-none bg-content2 dark:bg-content1">
         <CardHeader className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Icon icon="solar:key-bold" width={20} />

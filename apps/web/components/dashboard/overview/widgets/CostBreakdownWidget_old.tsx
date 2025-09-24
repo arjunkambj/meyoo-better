@@ -153,7 +153,7 @@ export function CostBreakdownWidget({
 
   if (loading) {
     return (
-      <Card className="p-6 bg-content2/90 dark:bg-content1 rounded-2xl border border-default-200/50">
+      <Card className="p-6 bg-content2 dark:bg-content1 rounded-2xl border border-default-200/50">
         <div className="animate-pulse">
           {/* Header Section */}
           <div className="mb-3 pb-3 border-b border-divider">
@@ -207,7 +207,7 @@ export function CostBreakdownWidget({
   }
 
   return (
-    <Card className="p-6 bg-content2/90 dark:bg-content1 rounded-2xl border border-default-200/50">
+    <Card className="p-6 bg-content2 dark:bg-content1 rounded-2xl border border-default-200/50">
       {/* Header Section */}
       <div className="mb-2.5 pb-2.5 border-b border-divider flex flex-col sm:flex-row justify-between items-start sm:items-center">
         <h3 className="text-lg font-medium text-default-900">Cost Breakdown</h3>

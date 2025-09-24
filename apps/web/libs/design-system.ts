@@ -33,12 +33,9 @@ export const designSystem = {
 
   // Background patterns
   background: {
-    gradient: "bg-gradient-to-b from-background via-primary/4 to-background ",
-    mesh: "absolute inset-0 -z-10 opacity-30",
+    gradient: " ",
+    mesh: "",
     pattern: `
-      background-image: linear-gradient(to right, rgba(99,102,241,0.08) 1px, transparent 1px),
-                        linear-gradient(to bottom, rgba(99,102,241,0.08) 1px, transparent 1px);
-      background-size: 80px 80px;
     `,
   },
 

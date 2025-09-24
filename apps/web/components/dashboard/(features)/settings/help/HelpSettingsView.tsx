@@ -140,7 +140,7 @@ export default function HelpSettingsView() {
     <div className="space-y-6 pb-8">
       {/* Previous Tickets */}
       {tickets && tickets.length > 0 && (
-        <Card className="rounded-2xl border border-default-100 shadow-none bg-content2/90 dark:bg-content1">
+        <Card className="rounded-2xl border border-default-100 shadow-none bg-content2 dark:bg-content1">
           <CardBody className="px-6 py-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-semibold text-default-800">

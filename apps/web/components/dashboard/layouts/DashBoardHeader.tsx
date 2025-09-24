@@ -66,7 +66,7 @@ export default function DashBoardHeader({ className }: { className?: string }) {
 
   return (
     <header
-      className={`flex bg-content2/90 dark:bg-content1 px-6 py-4 rounded-2xl justify-between items-center w-full h-[68px] ${className || ""}`}
+      className={`flex bg-content2 dark:bg-content1 px-6 py-4 rounded-2xl justify-between items-center w-full h-[68px] ${className || ""}`}
     >
       {/* Left side - Sidebar toggle and page title */}
       <div className="flex items-center gap-4 min-w-0">
@@ -83,7 +83,10 @@ export default function DashBoardHeader({ className }: { className?: string }) {
         </div>
 
         {/* AI Agent Toggle */}
-        <Tooltip content={isAgentOpen ? "Close AI Assistant" : "Open AI Assistant"} placement="bottom">
+        <Tooltip
+          content={isAgentOpen ? "Close AI Assistant" : "Open AI Assistant"}
+          placement="bottom"
+        >
           <Button
             isIconOnly
             variant="light"

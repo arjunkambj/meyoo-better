@@ -12,14 +12,14 @@ export default function BillingSettingsView() {
       <PlanUsageAlert variant="full" />
 
       {/* Current Plan - Moved to top */}
-      <Card className="rounded-2xl border border-default-100 shadow-none bg-content2/90 dark:bg-content1">
+      <Card className="rounded-2xl border border-default-100 shadow-none bg-content2 dark:bg-content1">
         <CardBody className="px-5 py-5">
           <PlanOverview />
         </CardBody>
       </Card>
 
       {/* Billing History */}
-      <Card className="rounded-2xl border border-default-100 shadow-none bg-content2/90 dark:bg-content1">
+      <Card className="rounded-2xl border border-default-100 shadow-none bg-content2 dark:bg-content1">
         <CardBody className="p-0">
           <InvoicesList />
         </CardBody>

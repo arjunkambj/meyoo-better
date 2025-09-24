@@ -1,62 +1,70 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
-import {
-  BellRing,
-  LayoutDashboard,
-  Receipt,
-  Sparkles,
-  TrendingUp,
-  Users,
-} from "lucide-react";
-import React, { useState } from "react";
+import Image from "next/image";
 
-import { cn } from "@/libs/utils";
 import { designSystem } from "@/libs/design-system";
 import { Icon } from "@iconify/react";
 
+type FeatureCard = {
+  id: number;
+  img: string;
+  title: string;
+  description: string;
+  badge: string;
+};
+
+const featureData: FeatureCard[] = [
+  {
+    id: 1,
+    img: "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&q=80&w=1200",
+    title: "Profit Pulse dashboard",
+    description:
+      "See covers, spend, and net margin in one snapshot so you can coach the shift before it ends.",
+    badge: "Live Ops",
+  },
+  {
+    id: 2,
+    img: "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&q=80&w=1200",
+    title: "Menu intel, no spreadsheets",
+    description:
+      "Meyoo surfaces top sellers, low performers, and real food cost so your menu decisions are quick and data backed.",
+    badge: "Menu Science",
+  },
+  {
+    id: 3,
+    img: "https://images.unsplash.com/photo-1542831371-29b0f74f9713?auto=format&fit=crop&q=80&w=1200",
+    title: "Team pacing alerts",
+    description:
+      "Notifications keep FOH and BOH aligned on ticket times, so service feels effortless even when slammed.",
+    badge: "Guest Flow",
+  },
+  {
+    id: 4,
+    img: "https://images.unsplash.com/photo-1521119989659-a83eee488004?auto=format&fit=crop&q=80&w=1200",
+    title: "Shift recap, auto-delivered",
+    description:
+      "Every morning you get a digest with labor, sales, and comps so you can make the call before the next service.",
+    badge: "Daily Digest",
+  },
+  {
+    id: 5,
+    img: "https://images.unsplash.com/photo-1481833761820-0509d3217039?auto=format&fit=crop&q=80&w=1200",
+    title: "Inventory that updates itself",
+    description:
+      "Connect vendors once and Meyoo keeps pars, price changes, and reorder points synced for you.",
+    badge: "Smart Stock",
+  },
+  {
+    id: 6,
+    img: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&q=80&w=1200",
+    title: "Service standards, standardized",
+    description:
+      "Roll out updated playbooks to every location and watch adoption in real time with task tracking.",
+    badge: "Playbooks",
+  },
+];
+
 const Feature = () => {
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
-
-  const items = [
-    {
-      title: "Profit you can trust",
-      description:
-        "Revenue, ad spend, fees, and returns roll into one daily profit view—no spreadsheets needed.",
-      icon: TrendingUp,
-    },
-    {
-      title: "Every channel, one dashboard",
-      description:
-        "Shopify, Meta, Google, and more live side by side so the whole team works from the same numbers.",
-      icon: LayoutDashboard,
-    },
-    {
-      title: "Costs stay accurate",
-      description:
-        "Set COGS, shipping, and payment fees once. Meyoo applies them automatically to every order.",
-      icon: Receipt,
-    },
-    {
-      title: "Alerts before margins slip",
-      description:
-        "Get nudges when ROAS drops or profit falls so you can fix issues the same day.",
-      icon: BellRing,
-    },
-    {
-      title: "Ask the AI copilot",
-      description:
-        "Type questions like 'Which campaign lost us money yesterday?' and get plain-language answers.",
-      icon: Sparkles,
-    },
-    {
-      title: "Built for your whole team",
-      description:
-        "Invite founders, finance, and agencies with the right permissions and shared dashboards.",
-      icon: Users,
-    },
-  ];
-
   return (
     <section
       className={`relative flex w-full items-center justify-center overflow-hidden ${designSystem.spacing.section} ${designSystem.background.gradient}`}
@@ -71,44 +79,42 @@ const Feature = () => {
           </span>
         </div>
         <h2 className={`relative z-20 ${designSystem.typography.sectionTitle}`}>
-          Make confident decisions daily
+          Meyoo keeps every shift controlled
         </h2>
         <p className={designSystem.typography.sectionSubtitle}>
-          We designed Meyoo for operators who want the real story on profits
-          without chasing screenshots from different tools.
+          Operators use Meyoo to bring sales, labor, and guest signals into one
+          command center—so decisions happen while service is still underway.
         </p>
 
-        <div
-          className={`relative mx-auto mt-10 grid w-full max-w-7xl grid-cols-1 ${designSystem.spacing.gap.md} md:grid-cols-2 lg:grid-cols-3`}
-        >
-          {items.map((item, idx) => (
-            <div
-              key={idx}
-              className="group relative block h-full w-full p-2"
-              onMouseEnter={() => setHoveredIndex(idx)}
-              onMouseLeave={() => setHoveredIndex(null)}
+        <div className="mx-auto mt-12 grid w-full max-w-7xl grid-cols-1 gap-10 px-4 sm:px-6 md:grid-cols-2 lg:grid-cols-3">
+          {featureData.map((item, index) => (
+            <article
+              key={item.id}
+              className={`${designSystem.card.base} group relative flex h-full flex-col rounded-2xl p-4`}
             >
-              <AnimatePresence mode="wait" initial={false}>
-                {hoveredIndex === idx && (
-                  <motion.span
-                    className="absolute inset-0 block h-full w-full rounded-2xl"
-                    layoutId="hoverBackground"
-                    key={idx}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.3 }}
-                  />
-                )}
-              </AnimatePresence>
-
-              <Card
-                title={item.title}
-                description={item.description}
-                icon={item.icon}
-                className="flex flex-col items-center justify-center"
-              />
-            </div>
+              <div className="relative aspect-[4/3] overflow-hidden rounded-xl">
+                <Image
+                  src={item.img}
+                  alt={item.title}
+                  fill
+                  sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                  className="pointer-events-none object-cover"
+                  priority={index === 0}
+                />
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/30 via-black/5 to-transparent" />
+              </div>
+              <div className="mt-4 w-full space-y-3 p-3">
+                <p className="text-xs uppercase tracking-[0.15em] text-muted-foreground font-medium">
+                  {item.badge}
+                </p>
+                <h3 className="text-lg font-semibold tracking-tight">
+                  {item.title}
+                </h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {item.description}
+                </p>
+              </div>
+            </article>
           ))}
         </div>
       </div>
@@ -117,28 +123,3 @@ const Feature = () => {
 };
 
 export { Feature };
-
-const Card = ({
-  className,
-  title,
-  description,
-  icon: Icon,
-}: {
-  className?: string;
-  title: string;
-  description: string;
-  icon: React.ComponentType<{ className?: string }>;
-}) => {
-  return (
-    <div
-      className={cn(
-        `relative z-20 flex h-full ${designSystem.card.base} flex-col items-center justify-center gap-4 rounded-2xl p-6 sm:p-8 text-center backdrop-blur-sm transition-all duration-300`,
-        className
-      )}
-    >
-      <Icon className="text-primary/60 mt-3 size-8 stroke-1" />
-      <h1 className={designSystem.typography.cardTitle}>{title}</h1>
-      <p className={designSystem.typography.cardDescription}>{description}</p>
-    </div>
-  );
-};

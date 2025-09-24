@@ -78,7 +78,7 @@ const Faq = () => {
               and we&apos;ll point you in the right direction.
             </p>
             <Button size="lg" color="primary" className="w-full sm:w-fit ">
-              View all FAQs
+              Contact Support
             </Button>
           </div>
           <Accordion

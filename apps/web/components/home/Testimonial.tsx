@@ -72,19 +72,19 @@ const Testimonial = () => {
         {testimonials.map((testimonial) => (
           <div
             key={testimonial.id}
-            className=" ring-1 bg-primary/5 ring-primary/10 backdrop-blur-sm w-full rounded-2xl p-6 sm:p-8 transition-all duration-300"
+            className="group relative flex h-full w-full rounded-2xl bg-primary/5 p-6 ring-1 ring-primary/10 transition duration-300 ease-out sm:p-8"
           >
-            <div className="flex flex-col h-full relative">
-              <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full text-primary/40">
-                <Icon icon="ri:double-quotes-l" width={40} />
+            <div className="relative flex h-full flex-col">
+              <div className="mb-6 inline-flex h-12 w-12 items-center justify-center rounded-full text-primary/50 transition-colors duration-300 group-hover:text-primary/70">
+                <Icon icon="ri:double-quotes-l" width={36} />
               </div>
 
-              <h3 className="text-2xl font-semibold text-foreground leading-tight mb-6">
+              <h3 className="mb-5 text-xl font-semibold tracking-tight text-foreground md:text-2xl">
                 {testimonial.title}
               </h3>
 
-              <div className="flex-1 mb-8">
-                <p className={`$ text-muted-foreground leading-relaxed`}>
+              <div className="mb-8 flex-1">
+                <p className="text-base leading-7 text-muted-foreground">
                   {testimonial.description}
                 </p>
               </div>
@@ -95,8 +95,8 @@ const Testimonial = () => {
                   src={testimonial.user.avatar}
                   name={testimonial.user.name}
                 />
-                <div>
-                  <p className="font-medium text-base text-default-900">
+                <div className="space-y-1">
+                  <p className="text-base font-semibold text-default-900">
                     {testimonial.user.name}
                   </p>
                   <p className="text-sm text-default-600">
@@ -105,6 +105,7 @@ const Testimonial = () => {
                 </div>
               </div>
             </div>
+            <div className="pointer-events-none absolute inset-0 rounded-2xl opacity-0 ring-1 ring-primary/40 transition-opacity duration-300 group-hover:opacity-100" />
           </div>
         ))}
       </div>

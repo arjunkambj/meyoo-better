@@ -17,7 +17,7 @@ export const tiers: Array<Tier> = [
   {
     key: TiersEnum.Free,
     title: "Free",
-    description: "Try Meyoo with a new store or side project.",
+    description: "Good for New Stores",
     href: "/auth",
     mostPopular: false,
     price: "$0",
@@ -98,7 +98,7 @@ export const tiers: Array<Tier> = [
     href: "/auth",
     featured: false,
     mostPopular: false,
-    description: "For high-volume operators who need priority help.",
+    description: "For High-Volume Stores",
     price: {
       [FrequencyEnum.Monthly]: "$160",
       [FrequencyEnum.Yearly]: "$1,599",

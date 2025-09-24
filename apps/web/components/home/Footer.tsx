@@ -57,7 +57,7 @@ const Footer = () => {
                   Brand with Meyoo.
                 </span>
               </h2>
-              <p className="mt-4 max-w-[600px] text-base text-muted-foreground sm:text-lg">
+              <p className=" max-w-[600px] text-base text-muted-foreground sm:text-lg">
                 Connect every channel and get real-time clarity on true profit.
               </p>
               <div className="mt-6 flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center sm:justify-center sm:gap-4">

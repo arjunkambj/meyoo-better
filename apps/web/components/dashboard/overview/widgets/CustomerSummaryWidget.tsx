@@ -44,14 +44,15 @@ function Metric({
     }
   };
 
-  const changeColor =
+  // Align change chip design with Order/AdSpend widgets
+  const changeBadgeClasses =
     change === undefined
-      ? "text-default-400"
+      ? "bg-default-100/80 dark:bg-default-100/10 text-default-600"
       : change > 0
-        ? "text-success"
+        ? "bg-success-100/60 dark:bg-success-500/20 text-success-700"
         : change < 0
-          ? "text-danger"
-          : "text-warning";
+          ? "bg-danger-100/60 dark:bg-danger-500/20 text-danger-700"
+          : "bg-warning-100/60 dark:bg-warning-500/20 text-warning-700";
 
   return (
     <div
@@ -82,7 +83,7 @@ function Metric({
           {change !== undefined && (
             <div
               aria-label={`Change ${change >= 0 ? "up" : "down"} ${Math.abs(change).toFixed(0)} percent`}
-              className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded ${changeColor} ${change >= 0 ? "bg-success-50 dark:bg-success-100/20" : change < 0 ? "bg-danger-50 dark:bg-danger-100/20" : "bg-warning-50 dark:bg-warning-100/20"}`}
+              className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-md ${changeBadgeClasses}`}
             >
               <Icon
                 icon={

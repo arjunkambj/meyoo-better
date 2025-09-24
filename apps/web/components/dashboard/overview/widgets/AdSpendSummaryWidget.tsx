@@ -49,22 +49,20 @@ function Metric({
           ? "bg-danger-100/60 dark:bg-danger-500/20 text-danger-700"
           : "bg-warning-100/60 dark:bg-warning-500/20 text-warning-700";
 
-  const containerBaseClasses =
-    "group rounded-2xl border border-default-100 bg-white dark:bg-default-50 transition-colors";
+  // Match Customer metric container styles
+  const containerClasses = isPrimary
+    ? "p-3 bg-background dark:bg-default-100/50 rounded-xl"
+    : "py-2.5 border-b border-default-200 last:border-0";
 
   return (
     <div
-      className={`${containerBaseClasses} ${
-        isPrimary
-          ? "p-4 shadow-sm"
-          : "p-3 hover:bg-default-100/80 dark:hover:bg-default-100/20"
-      }`}
+      className={containerClasses}
       aria-label={`${label} metric`}
     >
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-2">
           <span
-            className={`${isPrimary ? "text-sm font-semibold" : "text-xs"} text-default-900`}
+            className={`${isPrimary ? "text-sm font-medium" : "text-xs"} text-default-900`}
           >
             {label}
           </span>
@@ -78,7 +76,7 @@ function Metric({
         </div>
         <div className="flex items-center gap-2">
           <span
-            className={`${isPrimary ? "text-xl font-bold" : "text-sm font-semibold"} text-default-900`}
+            className={`${isPrimary ? "text-xl font-bold" : "text-sm font-semibold"} text-default-800`}
           >
             {formatValue()}
           </span>
@@ -138,7 +136,7 @@ export function AdSpendSummaryWidget({
   if (loading) {
     return (
       <Card
-        className="p-6 bg-default-100 dark:bg-content1 border border-default-50 rounded-2xl"
+        className="p-6 bg-content2 dark:bg-content1 rounded-2xl border border-default-200/50"
         shadow="none"
       >
         <div className="animate-pulse">
@@ -155,10 +153,10 @@ export function AdSpendSummaryWidget({
 
   return (
     <Card
-      className="p-6 bg-default-100/90 dark:bg-content1 border border-default-50 rounded-2xl h-full"
+      className="p-5 bg-default-100 dark:bg-content1 border border-default-50 rounded-2xl h-full"
       shadow="none"
     >
-      <div className="mb-5 pb-4 border-b border-default-100">
+      <div className="mb-3.5 pb-3.5 border-b border-divider">
         <div className="flex items-center gap-2">
           <Icon
             icon="solar:chart-square-bold-duotone"
@@ -171,7 +169,7 @@ export function AdSpendSummaryWidget({
         </div>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-1">
         <Metric
           change={adSpendChange}
           currency={currency}

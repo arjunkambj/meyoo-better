@@ -16,7 +16,6 @@ export type SendAgentMessageArgs = {
   message: string;
   title?: string;
   system?: string;
-  model?: string;
 };
 
 const DEFAULT_THREAD_PAGE_SIZE = 25;
@@ -58,7 +57,7 @@ export function useAgent({
   const messageUIMsgs = useUIMessages(
     api.agent.chat.listMessages as any,
     threadId ? { threadId } : ("skip" as any),
-    { initialNumItems: messagePageSize, stream: false },
+    { initialNumItems: messagePageSize, stream: true },
   );
 
   const renameThreadMutation = useMutation(api.agent.chat.renameThread);
@@ -83,7 +82,7 @@ export function useAgent({
   const messages = (messageUIMsgs?.results ?? []) as unknown as AgentUIMessage[] | undefined;
 
   const sendMessage = useCallback(
-    async ({ message, threadId: existingThreadId, title, system, model }: SendAgentMessageArgs) => {
+    async ({ message, threadId: existingThreadId, title, system }: SendAgentMessageArgs) => {
       setIsSending(true);
       try {
         const result = await sendMessageAction({
@@ -92,7 +91,6 @@ export function useAgent({
           options: {
             title,
             system,
-            model,
           },
         });
         setLastSendResult(result);

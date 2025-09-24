@@ -369,6 +369,8 @@ export const onboarding = defineTable({
       completedSteps: v.optional(v.array(v.string())),
       firecrawlSeededAt: v.optional(v.string()),
       firecrawlSeededUrl: v.optional(v.string()),
+      firecrawlSummary: v.optional(v.string()),
+      firecrawlPageCount: v.optional(v.number()),
     }),
   ),
 

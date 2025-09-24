@@ -10,7 +10,7 @@ export type AgentChatInputProps = {
   disabled?: boolean;
   busy?: boolean;
   className?: string;
-  onSend: (message: string, model: string) => void | Promise<void>;
+  onSend: (message: string) => void | Promise<void>;
 };
 
 export default function AgentChatInput({
@@ -22,14 +22,13 @@ export default function AgentChatInput({
 }: AgentChatInputProps) {
   const [message, setMessage] = useState("");
 
-  const DEFAULT_MODEL = 'gpt-4.1';
   const canSend = message.trim().length > 0 && !busy && !disabled;
 
   const handleSend = useCallback(async () => {
     if (!canSend) return;
     const content = message.trim();
     setMessage("");
-    await onSend(content, DEFAULT_MODEL);
+    await onSend(content);
   }, [canSend, message, onSend]);
 
   return (

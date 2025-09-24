@@ -103,7 +103,16 @@ export const listMessages = query({
       threadId: args.threadId,
     });
 
-    if (!thread || thread.userId !== userId) {
+    if (!thread) {
+      return {
+        page: [],
+        continueCursor: null,
+        isDone: true,
+        streams: undefined,
+      };
+    }
+
+    if (thread.userId !== userId) {
       throw new ConvexError("Thread not found");
     }
 

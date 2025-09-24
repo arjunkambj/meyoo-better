@@ -21,6 +21,7 @@
     "@convex-dev/rag": "^0.5.3",
     "@convex-dev/resend": "^0.1.13",
     "@convex-dev/workpool": "^0.2.18",
+    "@mendable/firecrawl-js": "^4.3.5",
     "@oslojs/crypto": "^1.0.1",
     "@react-email/render": "^1.2.1",
     "@repo/types": "workspace:*",

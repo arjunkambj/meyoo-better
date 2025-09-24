@@ -39,8 +39,6 @@ export default function ChatUI() {
     { id: string; role: "user" | "assistant"; text: string }[]
   >([]);
 
-  // Using the backend default model (gpt-4.1); no model picker UI.
-
   const startNewChat = useCallback(() => {
     // Clear active thread; first send will create a new one
     setActiveId(undefined);
@@ -53,7 +51,7 @@ export default function ChatUI() {
   }, []);
 
   const handleSend = useCallback(
-    async (message: string, model: string) => {
+    async (message: string) => {
       // If currently viewing history, switch to chat when sending
       setViewMode("chat");
       // Add optimistic user message and a temporary assistant thinking bubble
@@ -70,7 +68,6 @@ export default function ChatUI() {
           message,
           threadId: activeId,
           title: message.slice(0, 32),
-          model,
         });
         if (!activeId && res?.threadId) {
           setActiveId(res.threadId);

@@ -9,7 +9,6 @@ import { requireUserAndOrg } from "../utils/auth";
 type SendMessageOptions = {
   title?: string;
   system?: string;
-  model?: string;
 };
 
 type SendMessageArgs = {
@@ -38,7 +37,6 @@ export const sendMessage = action({
       v.object({
         title: v.optional(v.string()),
         system: v.optional(v.string()),
-        model: v.optional(v.string()),
       }),
     ),
   },
@@ -59,7 +57,7 @@ export const sendMessage = action({
       throw new ConvexError("Not authenticated");
     }
 
-    const agentInstance = createAgent({ model: args.options?.model });
+    const agentInstance = createAgent();
 
     let threadId = args.threadId ?? null;
     if (threadId) {
@@ -98,7 +96,7 @@ export const sendMessage = action({
       },
       {
         storageOptions: { saveMessages: "all" },
-        saveStreamDeltas: true,
+        saveStreamDeltas: { returnImmediately: true },
       },
     );
 

@@ -1040,12 +1040,16 @@ export const connectShopifyStore = mutation({
 
     if (seedUrl) {
       try {
-        await ctx.scheduler.runAfter(0, api.agent.firecrawl.seedDocsFromFirecrawl, {
-          url: seedUrl,
-          includePaths: FIRECRAWL_SEED_INCLUDE_PATHS,
-          excludePaths: FIRECRAWL_SEED_EXCLUDE_PATHS,
-          maxPages: FIRECRAWL_SEED_MAX_PAGES,
-        });
+        await ctx.scheduler.runAfter(
+          0,
+          api.agent.firecrawlSeed.seedDocsFromFirecrawl,
+          {
+            url: seedUrl,
+            includePaths: FIRECRAWL_SEED_INCLUDE_PATHS,
+            excludePaths: FIRECRAWL_SEED_EXCLUDE_PATHS,
+            maxPages: FIRECRAWL_SEED_MAX_PAGES,
+          },
+        );
         await ctx.scheduler.runAfter(0, api.agent.brandSummary.upsertBrandSummary, {});
       } catch (error) {
         console.error(

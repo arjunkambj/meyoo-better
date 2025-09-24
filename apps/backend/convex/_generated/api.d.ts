@@ -14,6 +14,7 @@ import type * as agent_agent from "../agent/agent.js";
 import type * as agent_brandSummary from "../agent/brandSummary.js";
 import type * as agent_chat from "../agent/chat.js";
 import type * as agent_firecrawl from "../agent/firecrawl.js";
+import type * as agent_firecrawlSeed from "../agent/firecrawlSeed.js";
 import type * as agent_mcpActions from "../agent/mcpActions.js";
 import type * as agent_tools from "../agent/tools.js";
 import type * as analytics_calculations from "../analytics/calculations.js";
@@ -117,6 +118,7 @@ declare const fullApi: ApiFromModules<{
   "agent/brandSummary": typeof agent_brandSummary;
   "agent/chat": typeof agent_chat;
   "agent/firecrawl": typeof agent_firecrawl;
+  "agent/firecrawlSeed": typeof agent_firecrawlSeed;
   "agent/mcpActions": typeof agent_mcpActions;
   "agent/tools": typeof agent_tools;
   "analytics/calculations": typeof analytics_calculations;

@@ -1,7 +1,7 @@
 import { convexAuthNextjsToken } from "@convex-dev/auth/nextjs/server";
 import axios from "axios";
 import { genRequestId, tagFromToken } from "@/libs/logging/trace";
-import { fetchMutation } from "convex/nextjs";
+import { fetchAction, fetchMutation } from "convex/nextjs";
 import { type NextRequest, NextResponse } from "next/server";
 
 import { api } from "@/libs/convexApi";
@@ -103,22 +103,39 @@ export async function GET(req: NextRequest) {
 
     // Fetch and store ad accounts immediately after connection
     try {
-      const fetchResult = await fetch(
-        `${process.env.NEXT_PUBLIC_APP_URL}/api/v1/meta/fetch-accounts`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Cookie: req.headers.get("cookie") || "",
-          },
-        },
-      );
+      const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
 
-      if (!fetchResult.ok) {
+      if (!convexUrl) {
         logger.warn("Failed to fetch ad accounts after connection", {
-          status: fetchResult.status,
+          reason: "missing_convex_url",
           requestId,
         });
+      } else {
+        const accountsResult = await fetchAction(
+          api.integrations.meta.fetchMetaAccountsAction,
+          {},
+          { token, url: convexUrl },
+        );
+
+        if (!accountsResult.success || !accountsResult.accounts?.length) {
+          logger.warn("Failed to fetch ad accounts after connection", {
+            reason: accountsResult.error || "empty_result",
+            requestId,
+          });
+        } else {
+          await fetchMutation(
+            api.integrations.meta.storeAdAccountsFromCallback,
+            { accounts: accountsResult.accounts },
+            { token, url: convexUrl },
+          );
+
+          if (process.env.META_DEBUG === "1") {
+            logger.info("Meta ad accounts stored", {
+              requestId,
+              count: accountsResult.accounts.length,
+            });
+          }
+        }
       }
     } catch (error) {
       logger.warn("Error fetching ad accounts", { error, requestId });

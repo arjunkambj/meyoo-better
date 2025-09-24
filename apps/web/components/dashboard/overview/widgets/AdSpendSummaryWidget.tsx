@@ -50,7 +50,7 @@ function Metric({
           : "bg-warning-100/60 dark:bg-warning-500/20 text-warning-700";
 
   const containerBaseClasses =
-    "group rounded-xl border border-default-100 bg-white dark:bg-default-50 transition-colors";
+    "group rounded-2xl border border-default-100 bg-white dark:bg-default-50 transition-colors";
 
   return (
     <div
@@ -138,7 +138,7 @@ export function AdSpendSummaryWidget({
   if (loading) {
     return (
       <Card
-        className="p-6 bg-default-100/90 dark:bg-content1 border border-default-50 rounded-2xl"
+        className="p-6 bg-default-100 dark:bg-content1 border border-default-50 rounded-2xl"
         shadow="none"
       >
         <div className="animate-pulse">
@@ -160,7 +160,11 @@ export function AdSpendSummaryWidget({
     >
       <div className="mb-5 pb-4 border-b border-default-100">
         <div className="flex items-center gap-2">
-          <Icon icon="solar:chart-square-bold-duotone" width={20} className="text-primary" />
+          <Icon
+            icon="solar:chart-square-bold-duotone"
+            width={20}
+            className="text-primary"
+          />
           <h3 className="text-lg font-medium text-default-900">
             Ad Spend Summary
           </h3>

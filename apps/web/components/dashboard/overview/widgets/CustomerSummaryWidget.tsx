@@ -55,13 +55,13 @@ function Metric({
 
   return (
     <div
-      className={`${isPrimary ? "p-3 bg-default-50 dark:bg-default-100/50 rounded-lg" : "py-2.5 border-b border-divider last:border-0"}`}
+      className={`${isPrimary ? "p-3 bg-background dark:bg-default-100/50 rounded-xl" : "py-2.5 border-b border-default-200 last:border-0"}`}
       aria-label={`${label} metric`}
     >
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-2">
           <span
-            className={`${isPrimary ? "text-sm font-semibold" : "text-xs"} text-default-700`}
+            className={`${isPrimary ? "text-sm font-medium" : "text-xs"} text-default-900`}
           >
             {label}
           </span>
@@ -75,7 +75,7 @@ function Metric({
         </div>
         <div className="flex items-center gap-2">
           <span
-            className={`${isPrimary ? "text-xl font-bold" : "text-sm font-semibold"} text-foreground`}
+            className={`${isPrimary ? "text-xl font-bold" : "text-sm font-semibold"} text-default-800`}
           >
             {formatValue()}
           </span>
@@ -152,12 +152,16 @@ export function CustomerSummaryWidget({
 
   return (
     <Card
-      className="p-5 bg-content2 dark:bg-content1 rounded-2xl border border-default-200/50 h-full"
+      className="p-5 bg-default-100 dark:bg-content1 border border-default-50 rounded-2xl"
       shadow="none"
     >
       <div className="mb-3.5 pb-3.5 border-b border-divider">
         <div className="flex items-center gap-2">
-          <Icon icon="solar:users-group-two-rounded-bold-duotone" width={20} className="text-primary" />
+          <Icon
+            icon="solar:users-group-two-rounded-bold-duotone"
+            width={20}
+            className="text-primary"
+          />
           <h3 className="text-lg font-medium text-default-900">
             Customer Summary
           </h3>

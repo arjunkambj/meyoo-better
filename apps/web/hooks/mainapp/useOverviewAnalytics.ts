@@ -119,6 +119,18 @@ export function useOverviewAnalytics(dateRange?: {
           change: summary.roasChange || 0,
           decimal: 2,
         },
+        poas: {
+          label: "POAS",
+          value: summary.poas || 0,
+          change: summary.poasChange || 0,
+          decimal: 2,
+        },
+        ncROAS: {
+          label: "ncROAS",
+          value: summary.ncROAS || 0,
+          change: summary.ncROASChange || 0,
+          decimal: 2,
+        },
 
         // Growth
         moMRevenueGrowth: {
@@ -199,6 +211,12 @@ export function useOverviewAnalytics(dateRange?: {
           label: "Meta Ad Spend",
           value: summary.metaAdSpend || 0,
           change: summary.metaAdSpendChange || 0,
+          prefix: currencySymbol,
+        },
+        googleAdSpend: {
+          label: "Google Ad Spend",
+          value: summary.googleAdSpend || 0,
+          change: summary.googleAdSpendChange || 0,
           prefix: currencySymbol,
         },
         metaSpendPercentage: {
@@ -345,20 +363,22 @@ export function useOverviewAnalytics(dateRange?: {
         repeatCustomerRate: {
           label: "Repeat Rate",
           value:
-            summary.customers > 0
+            summary.repeatCustomerRate ||
+            (summary.customers > 0
               ? (summary.returningCustomers / summary.customers) * 100
-              : 0,
-          change: 0, // TODO: Calculate proper change
+              : 0),
+          change: summary.repeatCustomerRateChange || 0,
           suffix: "%",
           decimal: 1,
         },
         customerAcquisitionCost: {
           label: "CAC",
           value:
-            summary.newCustomers > 0
+            summary.customerAcquisitionCost ||
+            (summary.newCustomers > 0
               ? summary.adSpend / summary.newCustomers
-              : 0,
-          change: 0, // TODO: Calculate proper change
+              : 0),
+          change: summary.customerAcquisitionCostChange || 0,
           prefix: currencySymbol,
           decimal: 2,
         },
@@ -374,6 +394,13 @@ export function useOverviewAnalytics(dateRange?: {
           suffix: "%",
           decimal: 1,
         },
+        returnRate: {
+          label: "Return Rate",
+          value: summary.returnRate || 0,
+          change: summary.returnRateChange || 0,
+          suffix: "%",
+          decimal: 1,
+        },
 
         // Unit Economics
         unitsSold: {
@@ -383,8 +410,27 @@ export function useOverviewAnalytics(dateRange?: {
         },
         avgOrderProfit: {
           label: "Avg Order Profit",
-          value: summary.orders > 0 ? summary.profit / summary.orders : 0,
-          change: 0, // TODO: Calculate proper change
+          value: summary.avgOrderProfit ||
+            (summary.orders > 0 ? summary.profit / summary.orders : 0),
+          change: summary.avgOrderProfitChange || 0,
+          prefix: currencySymbol,
+          decimal: 2,
+        },
+        avgOrderCost: {
+          label: "Avg Order Cost",
+          value: summary.avgOrderCost ||
+            (summary.orders > 0
+              ? (summary.revenue - summary.profit) / summary.orders
+              : 0),
+          change: summary.avgOrderCostChange || 0,
+          prefix: currencySymbol,
+          decimal: 2,
+        },
+        adSpendPerOrder: {
+          label: "Ad Spend / Order",
+          value: summary.adSpendPerOrder ||
+            (summary.orders > 0 ? summary.adSpend / summary.orders : 0),
+          change: summary.adSpendPerOrderChange || 0,
           prefix: currencySymbol,
           decimal: 2,
         },

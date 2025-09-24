@@ -26,6 +26,11 @@ export function WidgetsContainer({
   const displayWidgets = Array.isArray(widgets) ? widgets : [];
   const showSkeletons = isLoading && displayWidgets.length > 0;
 
+  const getWrapperClass = (widgetId: string) =>
+    widgetId === "costBreakdown"
+      ? "h-full lg:col-span-2 xl:col-span-2"
+      : "h-full";
+
   if (displayWidgets.length === 0) {
     return null;
   }
@@ -34,45 +39,18 @@ export function WidgetsContainer({
     <div className="space-y-4">
       <h2 className="text-lg font-semibold">Analytics Widgets</h2>
       <div className="space-y-4">
-        {showSkeletons ? (
-          <>
-            {/* Check if costBreakdown is included */}
-            {displayWidgets.includes("costBreakdown") && (
-              <WidgetSkeleton variant="large" />
-            )}
-
-            {/* Other widgets skeleton */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-              {displayWidgets
-                .filter((w) => w !== "costBreakdown")
-                .map((_, index) => (
-                  <WidgetSkeleton key={index} />
-                ))}
-            </div>
-          </>
-        ) : (
-          <>
-            {/* Cost Breakdown takes full width */}
-            {displayWidgets.includes("costBreakdown") && (
-              <div className="w-full">
-                <WidgetRenderer
-                  isLoading={false}
-                  metricsData={metricsData}
-                  overviewMetrics={overviewMetrics}
-                  primaryCurrency={primaryCurrency}
-                  showCostSetupWarning={showCostSetupWarning}
-                  widgetId="costBreakdown"
-                />
-              </div>
-            )}
-
-            {/* Grid for non-costBreakdown widgets */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-              {displayWidgets
-                .filter((widgetId) => widgetId !== "costBreakdown")
-                .map((widgetId) => (
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+          {showSkeletons
+            ? displayWidgets.map((widgetId) => (
+                <div key={`skeleton-${widgetId}`} className={getWrapperClass(widgetId)}>
+                  <WidgetSkeleton
+                    variant={widgetId === "costBreakdown" ? "large" : "default"}
+                  />
+                </div>
+              ))
+            : displayWidgets.map((widgetId) => (
+                <div key={widgetId} className={getWrapperClass(widgetId)}>
                   <WidgetRenderer
-                    key={widgetId}
                     isLoading={false}
                     metricsData={metricsData}
                     overviewMetrics={overviewMetrics}
@@ -80,10 +58,9 @@ export function WidgetsContainer({
                     showCostSetupWarning={showCostSetupWarning}
                     widgetId={widgetId}
                   />
-                ))}
-            </div>
-          </>
-        )}
+                </div>
+              ))}
+        </div>
       </div>
     </div>
   );

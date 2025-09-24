@@ -1,10 +1,12 @@
 "use client";
 
 import { Spacer } from "@heroui/react";
+import { useQuery } from "convex-helpers/react/cache/hooks";
 import { useAtomValue } from "jotai";
 import { usePathname } from "next/navigation";
 import React, { useCallback, useMemo, useState } from "react";
 import { PlanUsageAlert } from "@/components/shared/billing/PlanUsageAlert";
+import { api } from "@/libs/convexApi";
 import {
   useDashboard,
   useOverviewAnalytics,
@@ -18,6 +20,33 @@ import { DashboardHeader } from "./components/DashboardHeader";
 import { MetricsContainer } from "./components/MetricsContainer";
 import { WidgetsContainer } from "./components/WidgetsContainer";
 import { DevTools } from "./DevTools";
+
+type OverviewMetricView = { value: number; change?: number };
+
+const derivePreviousValue = (current: number, changePercent?: number) => {
+  if (!Number.isFinite(current) || current === 0) {
+    return 0;
+  }
+  if (changePercent === undefined || !Number.isFinite(changePercent)) {
+    return current;
+  }
+
+  const ratio = 1 + changePercent / 100;
+
+  if (!Number.isFinite(ratio) || ratio <= 0) {
+    return 0;
+  }
+
+  return current / ratio;
+};
+
+const computePercentChange = (current: number, previous: number) => {
+  if (!Number.isFinite(previous) || previous === 0) {
+    return current > 0 ? 100 : 0;
+  }
+
+  return ((current - previous) / previous) * 100;
+};
 
 export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
   const [isCustomizing, setIsCustomizing] = useState(false);
@@ -47,6 +76,58 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
 
   // Get platform-specific metrics
   const platformMetrics = usePlatformMetrics(dateRange);
+  const channelRevenue = useQuery(
+    api.web.analytics.getChannelRevenue,
+    dateRange
+      ? { dateRange: { startDate: dateRange.start, endDate: dateRange.end } }
+      : {},
+  );
+
+  const utmRoas = useMemo(() => {
+    if (!channelRevenue || !channelRevenue.channels) {
+      return { value: 0, change: 0 };
+    }
+
+    const paidChannels = channelRevenue.channels.filter((channel) =>
+      ["Meta Ads", "Google Ads"].includes(channel.name),
+    );
+
+    const currentRevenue = paidChannels.reduce(
+      (sum, channel) => sum + (channel.revenue || 0),
+      0,
+    );
+
+    const previousRevenue = paidChannels.reduce((sum, channel) => {
+      const prev = derivePreviousValue(channel.revenue || 0, channel.change);
+
+      return sum + prev;
+    }, 0);
+
+    const metaAdSpendMetric =
+      (overviewMetrics?.metaAdSpend as OverviewMetricView | undefined) ||
+      undefined;
+    const googleAdSpendMetric =
+      (overviewMetrics?.googleAdSpend as OverviewMetricView | undefined) ||
+      undefined;
+
+    const currentMetaAdSpend = metaAdSpendMetric?.value || 0;
+    const currentGoogleAdSpend = googleAdSpendMetric?.value || 0;
+    const currentAdSpend = currentMetaAdSpend + currentGoogleAdSpend;
+
+    const previousAdSpend =
+      derivePreviousValue(currentMetaAdSpend, metaAdSpendMetric?.change) +
+      derivePreviousValue(currentGoogleAdSpend, googleAdSpendMetric?.change);
+
+    const currentRoas =
+      currentAdSpend > 0 ? currentRevenue / currentAdSpend : 0;
+    const previousRoas =
+      previousAdSpend > 0 ? previousRevenue / previousAdSpend : 0;
+
+    return {
+      value: currentRoas,
+      change: computePercentChange(currentRoas, previousRoas),
+    };
+  }, [channelRevenue, overviewMetrics]);
 
   // Combine all metrics data
   const allMetricsData = useMemo(() => {
@@ -105,12 +186,22 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
       returningCustomers: overviewMetrics?.returningCustomers?.value || 0,
       repeatCustomerRate: overviewMetrics?.repeatCustomerRate?.value || 0,
       customerAcquisitionCost:
-        overviewMetrics?.customerAcquisitionCost?.value || 0,
+        overviewMetrics?.customerAcquisitionCost?.value ??
+        (overviewMetrics?.newCustomers?.value &&
+        overviewMetrics?.totalAdSpend?.value
+          ? overviewMetrics.totalAdSpend.value /
+            overviewMetrics.newCustomers.value
+          : 0),
       cacPercentageOfAOV: overviewMetrics?.cacPercentageOfAOV?.value || 0,
 
       // Units
       unitsSold: overviewMetrics?.unitsSold?.value || 0,
-      avgOrderProfit: overviewMetrics?.avgOrderProfit?.value || 0,
+      avgOrderProfit:
+        overviewMetrics?.avgOrderProfit?.value ??
+        (overviewMetrics?.orders?.value && overviewMetrics?.netProfit?.value
+          ? overviewMetrics.netProfit.value /
+            overviewMetrics.orders.value
+          : 0),
       profitPerOrder: overviewMetrics?.profitPerOrder?.value || 0,
       profitPerUnit: overviewMetrics?.profitPerUnit?.value || 0,
 
@@ -121,33 +212,41 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
 
       // Widget-specific metrics
       poas:
-        overviewMetrics?.netProfit?.value &&
+        overviewMetrics?.poas?.value ??
+        (overviewMetrics?.netProfit?.value &&
         overviewMetrics?.totalAdSpend?.value
-          ? overviewMetrics.netProfit.value / overviewMetrics.totalAdSpend.value
-          : 0,
-      roasUTM: 0, // TODO: Calculate from UTM tracked orders
+          ? overviewMetrics.netProfit.value /
+            overviewMetrics.totalAdSpend.value
+          : 0),
+      roasUTM: utmRoas.value,
+      roasUTMChange: utmRoas.change,
       ncROAS:
-        overviewMetrics?.newCustomers?.value &&
+        overviewMetrics?.ncROAS?.value ??
+        (overviewMetrics?.newCustomers?.value &&
         overviewMetrics?.totalAdSpend?.value
           ? (overviewMetrics.newCustomers.value *
               (overviewMetrics?.avgOrderValue?.value || 0)) /
             overviewMetrics.totalAdSpend.value
-          : 0,
+          : 0),
       repurchaseRate: overviewMetrics?.repeatCustomerRate?.value || 0,
+      returnRate: overviewMetrics?.returnRate?.value || 0,
       adSpendPerOrder:
-        overviewMetrics?.orders?.value && overviewMetrics?.totalAdSpend?.value
+        overviewMetrics?.adSpendPerOrder?.value ??
+        (overviewMetrics?.orders?.value &&
+        overviewMetrics?.totalAdSpend?.value
           ? overviewMetrics.totalAdSpend.value / overviewMetrics.orders.value
-          : 0,
+          : 0),
       avgOrderCost:
-        overviewMetrics?.avgOrderValue?.value &&
+        overviewMetrics?.avgOrderCost?.value ??
+        (overviewMetrics?.avgOrderValue?.value &&
         overviewMetrics?.avgOrderProfit?.value
           ? overviewMetrics.avgOrderValue.value -
             overviewMetrics.avgOrderProfit.value
-          : 0,
+          : 0),
       // Platform metrics (numbers only)
       ...(platformNumbers as Record<string, number>),
     };
-  }, [overviewMetrics, platformMetrics]);
+  }, [overviewMetrics, platformMetrics, utmRoas]);
 
   const handleCustomizationApply = useCallback(
     async (kpiItems: string[], widgetItems: string[]) => {

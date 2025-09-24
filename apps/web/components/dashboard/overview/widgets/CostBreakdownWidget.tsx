@@ -14,6 +14,59 @@ import {
 
 import { formatCurrency, formatCurrencyCompact } from "@/libs/utils/format";
 
+type CostCategoryKey =
+  | "adSpend"
+  | "cogs"
+  | "shipping"
+  | "transaction"
+  | "custom"
+  | "handling"
+  | "operating"
+  | "taxes";
+
+const COST_STYLES: Record<CostCategoryKey, { colorHex: string; iconBg: string; iconColor: string }> = {
+  adSpend: {
+    colorHex: "#2563EB",
+    iconBg: "bg-blue-500/10",
+    iconColor: "text-blue-600",
+  },
+  cogs: {
+    colorHex: "#16A34A",
+    iconBg: "bg-emerald-500/10",
+    iconColor: "text-emerald-600",
+  },
+  shipping: {
+    colorHex: "#F97316",
+    iconBg: "bg-orange-500/10",
+    iconColor: "text-orange-500",
+  },
+  transaction: {
+    colorHex: "#7C3AED",
+    iconBg: "bg-violet-500/10",
+    iconColor: "text-violet-600",
+  },
+  custom: {
+    colorHex: "#DB2777",
+    iconBg: "bg-rose-500/10",
+    iconColor: "text-rose-600",
+  },
+  handling: {
+    colorHex: "#0D9488",
+    iconBg: "bg-teal-500/10",
+    iconColor: "text-teal-600",
+  },
+  operating: {
+    colorHex: "#0EA5E9",
+    iconBg: "bg-sky-500/10",
+    iconColor: "text-sky-600",
+  },
+  taxes: {
+    colorHex: "#DC2626",
+    iconBg: "bg-red-500/10",
+    iconColor: "text-red-600",
+  },
+};
+
 interface CostBreakdownWidgetProps {
   cogs: number;
   shippingCosts: number;
@@ -38,7 +91,7 @@ export function CostBreakdownWidget({
   handlingFees,
   operatingCosts = 0,
   taxes = 0,
-  totalRevenue = 0,
+  totalRevenue: _totalRevenue = 0,
   currency = "USD",
   loading = false,
   showCostSetupWarning = false,
@@ -47,110 +100,90 @@ export function CostBreakdownWidget({
 
   // Calculate total costs and prepare chart data
   const { chartData, costBreakdown } = useMemo(() => {
-    const costs = {
-      totalAdSpend,
-      cogs,
-      shippingCosts,
-      transactionFees,
-      customCosts,
-      handlingFees,
-      operatingCosts,
-      taxes,
-    };
-
-    const total = Object.values(costs).reduce((sum, val) => sum + val, 0);
-    const profit = totalRevenue - total;
-
-    // Prepare data for pie chart - only include non-zero values
-    const pieData = [
-      { name: "Ad Spend", value: totalAdSpend, fill: "#0070F3" },
-      { name: "COGS", value: cogs, fill: "#10B981" },
-      { name: "Shipping", value: shippingCosts, fill: "#F59E0B" },
-      { name: "Transaction Fees", value: transactionFees, fill: "#8B5CF6" },
-      { name: "Custom Costs", value: customCosts, fill: "#EC4899" },
-      { name: "Handling", value: handlingFees, fill: "#14B8A6" },
-      { name: "Operating", value: operatingCosts, fill: "#6366F1" },
-      { name: "Taxes", value: taxes, fill: "#F97316" },
-    ].filter((item) => item.value > 0);
-
-    // Sort by value for better visualization
-    pieData.sort((a, b) => b.value - a.value);
-
-    // Prepare cost breakdown grid - always show all 8 categories
-    const breakdown = [
+    const breakdownConfig: Array<{
+      key: CostCategoryKey;
+      label: string;
+      value: number;
+      icon: string;
+    }> = [
       {
         key: "adSpend",
         label: "Ad Spend",
         value: totalAdSpend,
-        percentage: total > 0 ? (totalAdSpend / total) * 100 : 0,
-        color: "#0070F3",
         icon: "solar:ad-bold-duotone",
       },
       {
         key: "cogs",
         label: "COGS",
         value: cogs,
-        percentage: total > 0 ? (cogs / total) * 100 : 0,
-        color: "#10B981",
         icon: "solar:box-bold-duotone",
       },
       {
         key: "shipping",
         label: "Shipping",
         value: shippingCosts,
-        percentage: total > 0 ? (shippingCosts / total) * 100 : 0,
-        color: "#F59E0B",
         icon: "solar:delivery-bold-duotone",
       },
       {
         key: "transaction",
         label: "Transaction",
         value: transactionFees,
-        percentage: total > 0 ? (transactionFees / total) * 100 : 0,
-        color: "#8B5CF6",
         icon: "solar:card-bold-duotone",
       },
       {
         key: "custom",
         label: "Custom",
         value: customCosts,
-        percentage: total > 0 ? (customCosts / total) * 100 : 0,
-        color: "#EC4899",
         icon: "solar:settings-bold-duotone",
       },
       {
         key: "handling",
         label: "Handling",
         value: handlingFees,
-        percentage: total > 0 ? (handlingFees / total) * 100 : 0,
-        color: "#14B8A6",
         icon: "solar:hand-money-bold-duotone",
       },
       {
         key: "operating",
         label: "Operating",
         value: operatingCosts,
-        percentage: total > 0 ? (operatingCosts / total) * 100 : 0,
-        color: "#6366F1",
         icon: "solar:buildings-bold-duotone",
       },
       {
         key: "taxes",
         label: "Taxes",
         value: taxes,
-        percentage: total > 0 ? (taxes / total) * 100 : 0,
-        color: "#F97316",
         icon: "solar:document-text-bold-duotone",
       },
     ];
 
-    // Sort by value descending for display order
-    const sortedBreakdown = [...breakdown].sort((a, b) => b.value - a.value);
+    const totalCosts = breakdownConfig.reduce((sum, item) => sum + item.value, 0);
+
+    const pieData = breakdownConfig
+      .filter((item) => item.value > 0)
+      .map((item) => ({
+        name: item.label,
+        value: item.value,
+        fill: COST_STYLES[item.key].colorHex,
+      }))
+      .sort((a, b) => b.value - a.value);
+
+    const breakdown = breakdownConfig
+      .map((item) => {
+        const styles = COST_STYLES[item.key];
+
+        return {
+          ...item,
+          percentage: totalCosts > 0 ? (item.value / totalCosts) * 100 : 0,
+          colorHex: styles.colorHex,
+          iconBg: styles.iconBg,
+          iconColor: styles.iconColor,
+        };
+      })
+      .sort((a, b) => b.value - a.value);
 
     return {
-      netProfit: profit,
       chartData: pieData,
-      costBreakdown: sortedBreakdown,
+      costBreakdown: breakdown,
     };
   }, [
     cogs,
@@ -161,7 +194,6 @@ export function CostBreakdownWidget({
     handlingFees,
     operatingCosts,
     taxes,
-    totalRevenue,
   ]);
 
   if (loading) {
@@ -255,18 +287,9 @@ export function CostBreakdownWidget({
                     data={chartData}
                     cx="50%"
                     cy="50%"
-                    labelLine={false}
-                    label={(entry: { value: number }) => {
-                      const total = chartData.reduce(
-                        (sum, item) => sum + item.value,
-                        0
-                      );
-                      const percent = (entry.value / total) * 100;
-                      return percent >= 3 ? `${percent.toFixed(0)}%` : "";
-                    }}
-                    outerRadius={70}
                     innerRadius={45}
-                    fill="#8884d8"
+                    outerRadius={70}
+                    fill="#2563EB"
                     dataKey="value"
                   >
                     {chartData.map((entry) => (
@@ -312,14 +335,9 @@ export function CostBreakdownWidget({
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2 flex-1">
                     <div
-                      className="w-8 h-8 rounded-md flex items-center justify-center shrink-0"
-                      style={{ backgroundColor: `${item.color}15` }}
+                      className={`w-8 h-8 rounded-md flex items-center justify-center shrink-0 ${item.iconBg}`}
                     >
-                      <Icon
-                        icon={item.icon}
-                        style={{ color: item.color }}
-                        width={18}
-                      />
+                      <Icon icon={item.icon} className={item.iconColor} width={18} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5">
@@ -347,17 +365,17 @@ export function CostBreakdownWidget({
                           <div className="flex-1 max-w-[60px]">
                             <div
                               className="w-full bg-default-100 rounded-full h-0.5"
-                            role="progressbar"
-                            aria-valuenow={Number(item.percentage.toFixed(1))}
-                            aria-valuemin={0}
-                            aria-valuemax={100}
-                            aria-label={`${item.label} share`}
-                          >
+                              role="progressbar"
+                              aria-valuenow={Number(item.percentage.toFixed(1))}
+                              aria-valuemin={0}
+                              aria-valuemax={100}
+                              aria-label={`${item.label} share`}
+                            >
                               <div
                                 className="h-0.5 rounded-full transition-all"
                                 style={{
-                                  backgroundColor: item.color,
-                                  opacity: 0.8,
+                                  backgroundColor: item.colorHex,
+                                  opacity: 0.85,
                                   width: `${Math.min(item.percentage, 100)}%`,
                                 }}
                               />
@@ -368,7 +386,11 @@ export function CostBreakdownWidget({
                     </div>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className={`text-sm font-semibold ${item.value > 0 ? 'text-default-900' : 'text-default-400'}`}>
+                    <p
+                      className={`text-sm font-semibold ${
+                        item.value > 0 ? "text-default-900" : "text-default-400"
+                      }`}
+                    >
                       {item.value > 0
                         ? (Math.abs(item.value) >= 1000
                           ? formatCurrencyCompact(item.value, currency)

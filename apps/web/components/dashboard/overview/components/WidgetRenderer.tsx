@@ -33,13 +33,13 @@ export function WidgetRenderer({
           currency={primaryCurrency}
           loading={isLoading}
           ncROAS={metricsData.ncROAS ?? 0}
-          ncROASChange={0}
+          ncROASChange={overviewMetrics?.ncROAS?.change ?? 0}
           poas={metricsData.poas ?? 0}
-          poasChange={0}
+          poasChange={overviewMetrics?.poas?.change ?? 0}
           roas={metricsData.blendedRoas ?? 0}
           roasChange={overviewMetrics?.blendedRoas?.change ?? 0}
           roasUTM={metricsData.roasUTM ?? 0}
-          roasUTMChange={0}
+          roasUTMChange={metricsData.roasUTMChange ?? 0}
           totalAdSpend={metricsData.totalAdSpend ?? 0}
         />
       );
@@ -71,7 +71,7 @@ export function WidgetRenderer({
           newCustomersChange={overviewMetrics?.newCustomers?.change ?? 0}
           repurchaseRate={metricsData.repurchaseRate ?? 0}
           repurchaseRateChange={overviewMetrics?.repeatCustomerRate?.change ?? 0}
-          returnRate={metricsData.returnRate || 0}
+          returnRate={metricsData.returnRate ?? 0}
           returnRateChange={overviewMetrics?.returnRate?.change ?? 0}
           totalCustomers={metricsData.totalCustomers ?? 0}
           totalCustomersChange={overviewMetrics?.totalCustomers?.change ?? 0}
@@ -81,9 +81,11 @@ export function WidgetRenderer({
       return (
         <OrderSummaryWidget
           adSpendPerOrder={metricsData.adSpendPerOrder ?? 0}
-          adSpendPerOrderChange={0}
+          adSpendPerOrderChange={
+            overviewMetrics?.adSpendPerOrder?.change ?? 0
+          }
           avgOrderCost={metricsData.avgOrderCost ?? 0}
-          avgOrderCostChange={0}
+          avgOrderCostChange={overviewMetrics?.avgOrderCost?.change ?? 0}
           avgOrderProfit={metricsData.avgOrderProfit ?? 0}
           avgOrderProfitChange={overviewMetrics?.avgOrderProfit?.change ?? 0}
           avgOrderValue={metricsData.avgOrderValue ?? 0}

@@ -40,24 +40,31 @@ function Metric({
     }
   };
 
-  const changeColor =
+  const changeBadgeClasses =
     change === undefined
-      ? "text-default-400"
+      ? "bg-default-100/80 dark:bg-default-100/10 text-default-600"
       : change > 0
-        ? "text-success"
+        ? "bg-success-100/60 dark:bg-success-500/20 text-success-700"
         : change < 0
-          ? "text-danger"
-          : "text-warning";
+          ? "bg-danger-100/60 dark:bg-danger-500/20 text-danger-700"
+          : "bg-warning-100/60 dark:bg-warning-500/20 text-warning-700";
+
+  const containerBaseClasses =
+    "group rounded-xl border border-default-100 bg-white dark:bg-default-50 transition-colors";
 
   return (
     <div
-      className={`${isPrimary ? "p-3 bg-default-50 dark:bg-default-100/50 rounded-lg" : "py-2.5 border-b border-divider last:border-0"}`}
+      className={`${containerBaseClasses} ${
+        isPrimary
+          ? "p-4 shadow-sm"
+          : "p-3 hover:bg-default-100/80 dark:hover:bg-default-100/20"
+      }`}
       aria-label={`${label} metric`}
     >
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-2">
           <span
-            className={`${isPrimary ? "text-sm font-semibold" : "text-xs"} text-default-700`}
+            className={`${isPrimary ? "text-sm font-semibold" : "text-xs"} text-default-900`}
           >
             {label}
           </span>
@@ -71,14 +78,14 @@ function Metric({
         </div>
         <div className="flex items-center gap-2">
           <span
-            className={`${isPrimary ? "text-xl font-bold" : "text-sm font-semibold"} text-foreground`}
+            className={`${isPrimary ? "text-xl font-bold" : "text-sm font-semibold"} text-default-900`}
           >
             {formatValue()}
           </span>
           {change !== undefined && (
             <div
               aria-label={`Change ${change >= 0 ? "up" : "down"} ${Math.abs(change).toFixed(0)} percent`}
-              className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded ${changeColor} ${change >= 0 ? "bg-success-50 dark:bg-success-100/20" : change < 0 ? "bg-danger-50 dark:bg-danger-100/20" : "bg-warning-50 dark:bg-warning-100/20"}`}
+              className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-md ${changeBadgeClasses}`}
             >
               <Icon
                 icon={
@@ -131,7 +138,7 @@ export function AdSpendSummaryWidget({
   if (loading) {
     return (
       <Card
-        className="p-6 bg-content2 dark:bg-content1 rounded-2xl border border-default-200/50"
+        className="p-6 bg-default-100/90 dark:bg-content1 border border-default-50 rounded-2xl"
         shadow="none"
       >
         <div className="animate-pulse">
@@ -148,10 +155,10 @@ export function AdSpendSummaryWidget({
 
   return (
     <Card
-      className="p-5 bg-content2 dark:bg-content1 rounded-2xl border border-default-200/50 h-full"
+      className="p-6 bg-default-100/90 dark:bg-content1 border border-default-50 rounded-2xl h-full"
       shadow="none"
     >
-      <div className="mb-3.5 pb-3.5 border-b border-divider">
+      <div className="mb-5 pb-4 border-b border-default-100">
         <div className="flex items-center gap-2">
           <Icon icon="solar:chart-square-bold-duotone" width={20} className="text-primary" />
           <h3 className="text-lg font-medium text-default-900">
@@ -160,7 +167,7 @@ export function AdSpendSummaryWidget({
         </div>
       </div>
 
-      <div className="space-y-1">
+      <div className="space-y-3">
         <Metric
           change={adSpendChange}
           currency={currency}

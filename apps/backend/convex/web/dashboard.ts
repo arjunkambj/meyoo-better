@@ -39,6 +39,18 @@ export const getDashboardSummary = query({
       avgOrderValueChange: v.float64(),
       roas: v.float64(),
       roasChange: v.float64(),
+      poas: v.float64(),
+      poasChange: v.float64(),
+      ncROAS: v.float64(),
+      ncROASChange: v.float64(),
+      adSpendPerOrder: v.float64(),
+      adSpendPerOrderChange: v.float64(),
+      avgOrderProfit: v.float64(),
+      avgOrderProfitChange: v.float64(),
+      avgOrderCost: v.float64(),
+      avgOrderCostChange: v.float64(),
+      customerAcquisitionCost: v.float64(),
+      customerAcquisitionCostChange: v.float64(),
       // Additional metrics
       grossSales: v.float64(),
       grossSalesChange: v.float64(),
@@ -84,6 +96,10 @@ export const getDashboardSummary = query({
       newCustomersChange: v.float64(),
       returningCustomers: v.float64(),
       returningCustomersChange: v.float64(),
+      repeatCustomerRate: v.float64(),
+      repeatCustomerRateChange: v.float64(),
+      returnRate: v.float64(),
+      returnRateChange: v.float64(),
       // Strict calendar month-over-month growth (revenue)
       calendarMoMRevenueGrowth: v.float64(),
       period: v.object({
@@ -229,6 +245,10 @@ export const getDashboardSummary = query({
       const netProfit = revenue - totalCosts;
       const contributionMargin =
         revenue - (cogs + adSpend + shippingCosts + transactionFees);
+      const poas = adSpend > 0 ? netProfit / adSpend : 0;
+      const avgOrderProfit = orderCount > 0 ? netProfit / orderCount : 0;
+      const avgOrderCost = avgOrderValue - avgOrderProfit;
+      const adSpendPerOrder = orderCount > 0 ? adSpend / orderCount : 0;
 
       // Count unique customers
       const uniqueCustomers = new Set(
@@ -242,6 +262,8 @@ export const getDashboardSummary = query({
         customerCount > 0 ? Math.round(customerCount * 0.3) : 0;
       const returningCustomers =
         customerCount > 0 ? customerCount - newCustomers : 0;
+      const customerAcquisitionCost =
+        newCustomers > 0 ? adSpend / newCustomers : 0;
 
       // Compute strict calendar MoM revenue growth using endDateStr's month
       const end = new Date(endDateStr);
@@ -285,6 +307,23 @@ export const getDashboardSummary = query({
             100
           : 0;
 
+      const returnedOrders = filteredOrders.filter((o) => {
+        const status = (o.financialStatus ?? "").toString().toLowerCase();
+
+        return status === "refunded" || status === "partially_refunded";
+      }).length;
+      const returnRate =
+        orderCount > 0 ? (returnedOrders / orderCount) * 100 : 0;
+      const repeatCustomerRate =
+        customerCount > 0
+          ? (returningCustomers / customerCount) * 100
+          : 0;
+
+      const ncROAS =
+        newCustomers > 0 && adSpend > 0 && avgOrderValue > 0
+          ? (avgOrderValue * newCustomers) / adSpend
+          : 0;
+
       return {
         revenue,
         revenueChange: 0,
@@ -304,6 +343,18 @@ export const getDashboardSummary = query({
         avgOrderValueChange: 0,
         roas,
         roasChange: 0,
+        poas,
+        poasChange: 0,
+        ncROAS,
+        ncROASChange: 0,
+        adSpendPerOrder,
+        adSpendPerOrderChange: 0,
+        avgOrderProfit,
+        avgOrderProfitChange: 0,
+        avgOrderCost,
+        avgOrderCostChange: 0,
+        customerAcquisitionCost,
+        customerAcquisitionCostChange: 0,
         grossSales,
         grossSalesChange: 0,
         grossProfit,
@@ -356,6 +407,10 @@ export const getDashboardSummary = query({
         newCustomersChange: 0,
         returningCustomers,
         returningCustomersChange: 0,
+        repeatCustomerRate,
+        repeatCustomerRateChange: 0,
+        returnRate,
+        returnRateChange: 0,
         calendarMoMRevenueGrowth,
         period: {
           start: startDateStr,
@@ -387,6 +442,7 @@ export const getDashboardSummary = query({
       unitsSold: number;
       newCustomers: number;
       returningCustomers: number;
+      returns: number;
     };
     const createSummaryAcc = (): SummaryAcc => ({
       revenue: 0,
@@ -410,6 +466,7 @@ export const getDashboardSummary = query({
       unitsSold: 0,
       newCustomers: 0,
       returningCustomers: 0,
+      returns: 0,
     });
 
     const previousSummary = previousMetrics.reduce<SummaryAcc>(
@@ -435,6 +492,7 @@ export const getDashboardSummary = query({
         acc.unitsSold += m.unitsSold || 0;
         acc.newCustomers += m.newCustomers || 0;
         acc.returningCustomers += m.returningCustomers || 0;
+        acc.returns += m.returns || 0;
 
         return acc;
       },
@@ -474,6 +532,7 @@ export const getDashboardSummary = query({
         acc.unitsSold += m.unitsSold || 0;
         acc.newCustomers += m.newCustomers || 0;
         acc.returningCustomers += m.returningCustomers || 0;
+        acc.returns += m.returns || 0;
 
         return acc;
       },
@@ -488,6 +547,15 @@ export const getDashboardSummary = query({
     const avgOrderValue =
       summary.orders > 0 ? summary.revenue / summary.orders : 0;
     const roas = summary.adSpend > 0 ? summary.revenue / summary.adSpend : 0;
+    const poas = summary.adSpend > 0 ? summary.profit / summary.adSpend : 0;
+    const avgOrderProfit =
+      summary.orders > 0 ? summary.profit / summary.orders : 0;
+    const avgOrderCost =
+      summary.orders > 0
+        ? (summary.revenue - summary.profit) / summary.orders
+        : 0;
+    const adSpendPerOrder =
+      summary.orders > 0 ? summary.adSpend / summary.orders : 0;
 
     // Additional calculated metrics
     const grossProfitMargin =
@@ -510,6 +578,20 @@ export const getDashboardSummary = query({
       summary.adSpend > 0 ? (summary.metaAdSpend / summary.adSpend) * 100 : 0;
     const googleSpendPercentage =
       summary.adSpend > 0 ? (summary.googleAdSpend / summary.adSpend) * 100 : 0;
+    const ncROAS =
+      summary.newCustomers > 0 && summary.adSpend > 0 && summary.orders > 0
+        ? (avgOrderValue * summary.newCustomers) / summary.adSpend
+        : 0;
+    const returnRate =
+      summary.orders > 0 ? (summary.returns / summary.orders) * 100 : 0;
+    const repeatCustomerRate =
+      summary.customers > 0
+        ? (summary.returningCustomers / summary.customers) * 100
+        : 0;
+    const customerAcquisitionCost =
+      summary.newCustomers > 0
+        ? summary.adSpend / summary.newCustomers
+        : 0;
 
     // Calculate previous period derived metrics
     const prevProfitMargin =
@@ -523,6 +605,23 @@ export const getDashboardSummary = query({
     const prevRoas =
       previousSummary.adSpend > 0
         ? previousSummary.revenue / previousSummary.adSpend
+        : 0;
+    const prevPoas =
+      previousSummary.adSpend > 0
+        ? previousSummary.profit / previousSummary.adSpend
+        : 0;
+    const prevAvgOrderProfit =
+      previousSummary.orders > 0
+        ? previousSummary.profit / previousSummary.orders
+        : 0;
+    const prevAvgOrderCost =
+      previousSummary.orders > 0
+        ? (previousSummary.revenue - previousSummary.profit) /
+          previousSummary.orders
+        : 0;
+    const prevAdSpendPerOrder =
+      previousSummary.orders > 0
+        ? previousSummary.adSpend / previousSummary.orders
         : 0;
     const prevGrossProfitMargin =
       previousSummary.grossSales > 0
@@ -551,6 +650,25 @@ export const getDashboardSummary = query({
     const prevGoogleSpendPercentage =
       previousSummary.adSpend > 0
         ? (previousSummary.googleAdSpend / previousSummary.adSpend) * 100
+        : 0;
+    const prevNcROAS =
+      previousSummary.newCustomers > 0 &&
+      previousSummary.adSpend > 0 &&
+      previousSummary.orders > 0
+        ? (prevAvgOrderValue * previousSummary.newCustomers) /
+          previousSummary.adSpend
+        : 0;
+    const prevReturnRate =
+      previousSummary.orders > 0
+        ? (previousSummary.returns / previousSummary.orders) * 100
+        : 0;
+    const prevRepeatCustomerRate =
+      previousSummary.customers > 0
+        ? (previousSummary.returningCustomers / previousSummary.customers) * 100
+        : 0;
+    const prevCustomerAcquisitionCost =
+      previousSummary.newCustomers > 0
+        ? previousSummary.adSpend / previousSummary.newCustomers
         : 0;
 
     // Compute strict calendar MoM revenue growth using endDateStr's month
@@ -599,6 +717,27 @@ export const getDashboardSummary = query({
       avgOrderValueChange: calculateChange(avgOrderValue, prevAvgOrderValue),
       roas,
       roasChange: calculateChange(roas, prevRoas),
+      poas,
+      poasChange: calculateChange(poas, prevPoas),
+      ncROAS,
+      ncROASChange: calculateChange(ncROAS, prevNcROAS),
+      adSpendPerOrder,
+      adSpendPerOrderChange: calculateChange(
+        adSpendPerOrder,
+        prevAdSpendPerOrder,
+      ),
+      avgOrderProfit,
+      avgOrderProfitChange: calculateChange(
+        avgOrderProfit,
+        prevAvgOrderProfit,
+      ),
+      avgOrderCost,
+      avgOrderCostChange: calculateChange(avgOrderCost, prevAvgOrderCost),
+      customerAcquisitionCost,
+      customerAcquisitionCostChange: calculateChange(
+        customerAcquisitionCost,
+        prevCustomerAcquisitionCost,
+      ),
 
       grossSalesChange: calculateChange(
         summary.grossSales,
@@ -686,6 +825,13 @@ export const getDashboardSummary = query({
         summary.returningCustomers,
         previousSummary.returningCustomers,
       ),
+      repeatCustomerRate,
+      repeatCustomerRateChange: calculateChange(
+        repeatCustomerRate,
+        prevRepeatCustomerRate,
+      ),
+      returnRate,
+      returnRateChange: calculateChange(returnRate, prevReturnRate),
       calendarMoMRevenueGrowth,
 
       period: {

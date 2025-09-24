@@ -19,7 +19,7 @@
     "@convex-dev/agent": "^0.2.10",
     "@convex-dev/auth": "^0.0.88",
     "@convex-dev/rag": "^0.5.3",
-    "@convex-dev/resend": "^0.2.0",
+    "@convex-dev/resend": "^0.1.13",
     "@convex-dev/workpool": "^0.2.18",
     "@oslojs/crypto": "^1.0.1",
     "@react-email/render": "^1.2.1",

@@ -1,85 +1,93 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Divider, Select, SelectItem } from "@heroui/react";
+import { Button, Divider } from "@heroui/react";
 import AgentChatInput from "@/components/agent/components/AgentChatInput";
 import NewChatButton from "@/components/agent/components/NewChatButton";
-import type { ChatItem } from "@/components/agent/components/ChatHistory";
 import AssistantMessage from "@/components/agent/components/AssistantMessage";
 import UserMessage from "@/components/agent/components/UserMessage";
+import { useAgent } from "@/hooks/useAgent";
 import { nanoid } from "nanoid";
-
-type Message = {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-};
+import TypingMessage from "@/components/agent/components/TypingMessage";
+import { Icon } from "@iconify/react";
+import MessageSkeleton from "@/components/agent/components/MessageSkeleton";
+import HistorySkeleton from "@/components/agent/components/HistorySkeleton";
+import ChatHistoryItem from "@/components/agent/components/ChatHistoryItem";
+import RenameThreadDialog from "@/components/agent/components/RenameThreadDialog";
+import ThinkingSpinnerAlt from "@/components/agent/components/ThinkingSpinnerAlt";
 
 export default function ChatUI() {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [conversations, setConversations] = useState<ChatItem[]>([]);
   const [activeId, setActiveId] = useState<string | undefined>(undefined);
+  const [viewMode, setViewMode] = useState<"chat" | "history">("chat");
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameTarget, setRenameTarget] = useState<{ id: string; title: string } | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+
+  const {
+    threads,
+    messages,
+    isLoadingMessages,
+    isLoadingThreads,
+    isSending,
+    sendMessage,
+    renameThread,
+    deleteThread,
+  } = useAgent({ threadId: activeId });
+
+  // Local optimistic messages shown immediately while waiting for server.
+  const [localMessages, setLocalMessages] = useState<
+    { id: string; role: "user" | "assistant"; text: string }[]
+  >([]);
 
   const models = useMemo(
     () => [
       {
-        value: "gpt-5-fast",
-        label: "gpt-5 fast",
+        value: "gpt-4.1",
+        label: "GPT‑4.1",
       },
     ],
     []
   );
 
   const startNewChat = useCallback(() => {
-    // Prepare a new chat session without adding it to history yet.
-    // We only add to history upon first message send.
-    const id = nanoid(8);
-    setActiveId(id);
-    setMessages([]);
+    // Clear active thread; first send will create a new one
+    setActiveId(undefined);
+    setViewMode("chat");
   }, []);
 
   const onSelectConversation = useCallback((id: string) => {
     setActiveId(id);
-    // In a real app, load messages for that conversation.
-    setMessages([]);
+    setViewMode("chat");
   }, []);
 
   const handleSend = useCallback(
     async (message: string, model: string) => {
-      // Ensure we have a chat id; if none, start one now but don't add to history until below.
-      const chatId = activeId ?? nanoid(8);
-      if (!activeId) setActiveId(chatId);
+      // If currently viewing history, switch to chat when sending
+      setViewMode("chat");
+      // Add optimistic user message and a temporary assistant thinking bubble
+      const userId = `local-u-${nanoid(6)}`;
+      const thinkingId = `local-a-${nanoid(6)}`;
+      setLocalMessages((prev) => [
+        ...prev,
+        { id: userId, role: "user", text: message },
+        { id: thinkingId, role: "assistant", text: "__thinking__" },
+      ]);
 
-      const userMsg: Message = {
-        id: nanoid(6),
-        role: "user",
-        content: message,
-      };
-      setMessages((prev) => [...prev, userMsg]);
-
-      // Simulated assistant echo. Wire up to backend later.
-      const assistantMsg: Message = {
-        id: nanoid(6),
-        role: "assistant",
-        content: message,
-      };
-      setTimeout(() => setMessages((prev) => [...prev, assistantMsg]), 250);
-
-      // Add to history if not present, otherwise update placeholder title.
-      setConversations((prev) => {
-        const exists = prev.some((c) => c.id === chatId);
-        if (!exists) {
-          return [{ id: chatId, title: message.slice(0, 32) }, ...prev].slice(0, 10);
+      try {
+        const res = await sendMessage({
+          message,
+          threadId: activeId,
+          title: message.slice(0, 32),
+          model,
+        });
+        if (!activeId && res?.threadId) {
+          setActiveId(res.threadId);
         }
-        return prev.map((c) =>
-          c.id === chatId && (c.title === "New chat" || !c.title)
-            ? { ...c, title: message.slice(0, 32) }
-            : c
-        );
-      });
+      } finally {
+        // Clear handled via effect when server messages hydrate
+      }
     },
-    [activeId]
+    [activeId, sendMessage]
   );
 
   // Auto-scroll on new messages
@@ -87,53 +95,138 @@ export default function ChatUI() {
     const el = scrollRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
-  }, [messages.length]);
+  }, [messages?.length, localMessages.length]);
+
+  const displayedMessages = useMemo(() => {
+    if (messages && messages.length > 0) return messages;
+    return localMessages;
+  }, [messages, localMessages]);
+
+  // Clear optimistic messages once server messages are present to avoid first-render blink
+  useEffect(() => {
+    if (localMessages.length > 0 && messages && messages.length > 0) {
+      setLocalMessages([]);
+    }
+  }, [messages?.length]);
+
+  const conversationOptions = useMemo(() => {
+    return (threads ?? []).map((t) => ({ id: t.threadId, title: t.title ?? "New chat" }));
+  }, [threads]);
+
+  const isNewChat = !activeId;
+  const showLoadingSkeleton = !!activeId && isLoadingMessages;
 
   return (
     <div className="h-full flex flex-col">
       <div className="px-2 pt-2 pb-1 flex items-center gap-2">
-        <div className="text-sm font-medium truncate flex-1">AI Assistant</div>
-        <Select
-          aria-label="Chat history"
+        <Button
+          isIconOnly
           size="sm"
-          placeholder="History"
-          className="min-w-28 max-w-44"
-          selectedKeys={activeId ? new Set([activeId]) : new Set([])}
-          onSelectionChange={(keys) => {
-            const id = Array.from(keys)[0]?.toString();
-            if (id) onSelectConversation(id);
-          }}
+          variant="flat"
+          aria-label={viewMode === "chat" ? "Open chat history" : "Back to chat"}
+          title={viewMode === "chat" ? "History" : "Chat"}
+          onPress={() => setViewMode(viewMode === "chat" ? "history" : "chat")}
+          className="bg-content2 border border-default-100 hover:bg-content3"
         >
-          {conversations.length === 0 ? (
-            <SelectItem key="_empty" isDisabled>
-              No history
-            </SelectItem>
-          ) : (
-            conversations.map((c) => (
-              <SelectItem key={c.id} textValue={c.title}>
-                {c.title}
-              </SelectItem>
-            ))
-          )}
-        </Select>
+          <Icon icon={viewMode === "chat" ? "solar:clock-circle-bold" : "solar:chat-square-like-bold"} width={18} className="text-default-700" />
+        </Button>
+        <div className="flex-1" />
         <NewChatButton onNew={startNewChat} />
       </div>
       <Divider className="my-1" />
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-2 pb-2">
-        {messages.length === 0 ? (
-          <div className="pt-2 text-default-500 text-xs">
-            Say hello to start chatting.
-          </div>
+        {viewMode === "history" ? (
+          isLoadingThreads ? (
+            <HistorySkeleton />
+          ) : conversationOptions.length === 0 ? (
+            <div className="h-full flex items-center justify-center text-center px-6">
+              <div>
+                <div className="text-sm font-medium">No conversations yet</div>
+                <div className="text-xs text-default-500 mt-1">Start a new chat to see it here.</div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-1 pt-1 pr-1">
+              {conversationOptions.map((c) => (
+                <ChatHistoryItem
+                  key={c.id}
+                  id={c.id}
+                  title={c.title}
+                  active={c.id === activeId}
+                  onSelect={onSelectConversation}
+                  onRename={(id) => {
+                    setRenameTarget({ id, title: c.title });
+                    setRenameOpen(true);
+                  }}
+                  onDelete={async (id) => {
+                    // handled below via useAgent deleteThread
+                    await deleteThread(id);
+                    if (activeId === id) setActiveId(undefined);
+                  }}
+                />
+              ))}
+            </div>
+          )
         ) : (
-          <div className="space-y-1">
-            {messages.map((m) =>
-              m.role === "assistant" ? (
-                <AssistantMessage key={m.id} content={m.content} onVote={(v) => console.log("vote", v)} />
-              ) : (
-                <UserMessage key={m.id} content={m.content} />
-              )
-            )}
-          </div>
+          !displayedMessages || displayedMessages.length === 0 ? (
+            showLoadingSkeleton ? (
+              <MessageSkeleton rows={4} />
+            ) : (
+              <div className="h-full flex items-center justify-center text-center px-6">
+                <div>
+                  <div className="flex justify-center mb-3">
+                    <div className="w-10 h-10 rounded-full bg-content2 flex items-center justify-center">
+                      <Icon icon="solar:magic-stick-3-bold" width={22} className="text-default-600" />
+                    </div>
+                  </div>
+                  <div className="text-sm font-medium">Start a new conversation</div>
+                  <div className="text-xs text-default-500 mt-1">
+                    {isNewChat ? "Ask anything about your store’s data, inventory, orders, or ads." : "No messages here yet. Say hello to get started."}
+                  </div>
+                </div>
+              </div>
+            )
+          ) : (
+            <div className="space-y-1">
+              {displayedMessages.map((m) => {
+                if (m.role === "assistant") {
+                  const streaming = (m as any).status === "streaming";
+                  const text = (m as any).text ?? "";
+                  const parts = (m as any).parts ?? [];
+
+                  if (text.trim().length === 0 && streaming) {
+                    // Try to infer tool activity label from parts
+                    const toolName = (() => {
+                      const toolPart = parts.find((p: any) => p?.type === "tool" || p?.type === "step-start");
+                      const name = toolPart?.toolName || toolPart?.name || toolPart?.tool || "";
+                      if (typeof name !== "string") return "";
+                      const n = name.toLowerCase();
+                      if (n.includes("inventory")) return "Reading inventory details…";
+                      if (n.includes("meta") || n.includes("ads")) return "Reading meta analytics…";
+                      if (n.includes("order")) return "Summarizing orders…";
+                      if (n.includes("brand")) return "Fetching brand summary…";
+                      return "Thinking…";
+                    })();
+                    return <ThinkingSpinnerAlt key={m.id} label={toolName} />;
+                  }
+
+                  if (text === "__thinking__") {
+                    return <TypingMessage key={m.id} />;
+                  }
+
+                  return (
+                    <AssistantMessage
+                      key={m.id}
+                      content={text}
+                      streaming={streaming}
+                      onVote={(v) => console.log("vote", v)}
+                    />
+                  );
+                }
+                return <UserMessage key={m.id} content={(m as any).text} />;
+              })}
+            </div>
+          )
         )}
       </div>
       <div className="border-t border-default-100 p-1">
@@ -142,8 +235,18 @@ export default function ChatUI() {
           defaultModel={models[0]?.value}
           onSend={handleSend}
           showModelSelector={false}
+          busy={isSending}
         />
       </div>
+      <RenameThreadDialog
+        isOpen={renameOpen}
+        initialTitle={renameTarget?.title}
+        onClose={() => setRenameOpen(false)}
+        onConfirm={async (nextTitle) => {
+          if (!renameTarget) return;
+          await renameThread({ threadId: renameTarget.id, title: nextTitle });
+        }}
+      />
     </div>
   );
 }

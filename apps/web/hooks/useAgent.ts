@@ -1,6 +1,6 @@
 import { useAction, useMutation, usePaginatedQuery } from "convex/react";
+import { useUIMessages } from "@convex-dev/agent/react";
 import { useCallback, useMemo, useState } from "react";
-import type { UIMessage } from "ai";
 import { api } from "@/libs/convexApi";
 
 export type AgentThread = {
@@ -22,6 +22,14 @@ export type SendAgentMessageArgs = {
 const DEFAULT_THREAD_PAGE_SIZE = 25;
 const DEFAULT_MESSAGE_PAGE_SIZE = 40;
 
+export type AgentUIMessage = {
+  id: string;
+  role: "user" | "assistant" | "system";
+  text: string;
+  status?: string; // e.g. "streaming" or success
+  parts?: any[]; // optional UI parts for tool/status awareness
+};
+
 export function useAgent({
   threadId,
   threadPageSize = DEFAULT_THREAD_PAGE_SIZE,
@@ -39,12 +47,10 @@ export function useAgent({
     },
   );
 
-  const messagePagination = usePaginatedQuery(
-    api.agent.chat.listMessages,
-    threadId ? { threadId } : "skip",
-    {
-      initialNumItems: messagePageSize,
-    },
+  const messageUIMsgs = useUIMessages(
+    api.agent.chat.listMessages as any,
+    threadId ? { threadId } : ("skip" as any),
+    { initialNumItems: messagePageSize, stream: false },
   );
 
   const renameThreadMutation = useMutation(api.agent.chat.renameThread);
@@ -56,7 +62,6 @@ export function useAgent({
     | undefined
     | {
         threadId: string;
-        response: string;
         savedMessageIds: string[];
         usage?: {
           inputTokens?: number;
@@ -67,7 +72,7 @@ export function useAgent({
   >(undefined);
 
   const threads = threadPagination.results as AgentThread[] | undefined;
-  const messages = (messagePagination?.results ?? []) as UIMessage[] | undefined;
+  const messages = (messageUIMsgs?.results ?? []) as unknown as AgentUIMessage[] | undefined;
 
   const sendMessage = useCallback(
     async ({ message, threadId: existingThreadId, title, system, model }: SendAgentMessageArgs) => {
@@ -112,9 +117,9 @@ export function useAgent({
       threadsStatus: threadPagination.status,
       isLoadingThreads: threadPagination.isLoading,
       messages: threadId ? messages : undefined,
-      loadMoreMessages: messagePagination?.loadMore,
-      messagesStatus: messagePagination?.status,
-      isLoadingMessages: messagePagination?.isLoading ?? false,
+      loadMoreMessages: messageUIMsgs?.loadMore,
+      messagesStatus: messageUIMsgs?.status,
+      isLoadingMessages: messageUIMsgs?.status === "LoadingFirstPage",
       sendMessage,
       isSending,
       lastSendResult,
@@ -127,9 +132,8 @@ export function useAgent({
       threadPagination.isLoading,
       threads,
       messages,
-      messagePagination?.loadMore,
-      messagePagination?.status,
-      messagePagination?.isLoading,
+      messageUIMsgs?.loadMore,
+      messageUIMsgs?.status,
       threadId,
       sendMessage,
       isSending,

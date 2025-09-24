@@ -1,6 +1,6 @@
 import { Email } from "@convex-dev/auth/providers/Email";
 import { generateRandomString, type RandomReader } from "@oslojs/crypto/random";
-import { Resend as ResendAPI } from "resend";
+// Switched from raw Resend SDK to Convex Resend Component via HTTP endpoint
 
 export const ResendOTP = Email({
   id: "resend-otp",
@@ -18,28 +18,19 @@ export const ResendOTP = Email({
 
     return generateRandomString(random, alphabet, length);
   },
-  async sendVerificationRequest({ identifier: email, provider, token }) {
-    const resend = new ResendAPI(provider.apiKey);
-    const { error } = await resend.emails.send({
-      from: "Meyoo <noreply@mail.meyoo.io>",
-      to: [email],
-      subject: `Your Meyoo verification code`,
-      html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2>Sign in to Meyoo</h2>
-          <p>Your verification code is:</p>
-          <div style="background: #f5f5f5; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 8px; margin: 20px 0;">
-            ${token}
-          </div>
-          <p style="color: #666; font-size: 14px;">This code will expire in 10 minutes.</p>
-          <p style="color: #666; font-size: 14px;">If you didn't request this code, you can safely ignore this email.</p>
-        </div>
-      `,
-      text: `Your Meyoo verification code is: ${token}\n\nThis code will expire in 10 minutes.`,
+  async sendVerificationRequest({ identifier: email, token }) {
+    const base = process.env.NEXT_PUBLIC_CONVEX_URL;
+    if (!base) {
+      throw new Error("NEXT_PUBLIC_CONVEX_URL not set");
+    }
+    const res = await fetch(`${base}/emails/send-otp`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ to: email, token }),
     });
-
-    if (error) {
-      throw new Error(JSON.stringify(error));
+    if (!res.ok) {
+      const msg = await res.text().catch(() => "Failed to send OTP");
+      throw new Error(`OTP email failed: ${res.status} ${msg}`);
     }
   },
 });

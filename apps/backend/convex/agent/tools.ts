@@ -208,6 +208,17 @@ export const ordersSummaryTool = createTool<
       dateRange,
     })) as OrdersOverview | null;
 
+    // Fallback revenue when analytics pipeline hasn't populated metrics yet
+    let revenueFallback: number | null = null;
+    if (overview && overview.totalOrders > 0 && Number(overview.totalRevenue ?? 0) === 0) {
+      try {
+        const fallback = await ctx.runQuery(api.web.orders.getRevenueSumForRange, { dateRange });
+        if (fallback.totalOrders > 0) {
+          revenueFallback = Number(fallback.totalRevenue ?? 0);
+        }
+      } catch {}
+    }
+
     const zeroState = {
       dateRange,
       totals: {
@@ -255,13 +266,20 @@ export const ordersSummaryTool = createTool<
     };
 
     const financials = {
-      totalRevenue: Number(overview.totalRevenue ?? 0),
+      totalRevenue: revenueFallback !== null
+        ? Number(revenueFallback)
+        : Number(overview.totalRevenue ?? 0),
       totalCosts: Number(overview.totalCosts ?? 0),
       netProfit: Number(overview.netProfit ?? 0),
       avgOrderValue: Number(overview.avgOrderValue ?? 0),
       grossMargin: Number(overview.grossMargin ?? 0),
       customerAcquisitionCost: Number(overview.customerAcquisitionCost ?? 0),
     };
+
+    // If we used a fallback revenue and AOV is zero, compute a basic AOV
+    if (revenueFallback !== null && totals.totalOrders > 0 && financials.avgOrderValue === 0) {
+      financials.avgOrderValue = Number((revenueFallback / totals.totalOrders).toFixed(2));
+    }
 
     const fulfillment = {
       fulfillmentRate: Number(overview.fulfillmentRate ?? 0),
@@ -711,6 +729,212 @@ export const brandSummaryTool = createTool<
   },
 });
 
+export const productsInventoryTool = createTool<
+  {
+    page?: number;
+    pageSize?: number;
+    stockLevel?: "all" | "healthy" | "low" | "critical" | "out";
+    search?: string;
+    sortBy?: string;
+    sortOrder?: "asc" | "desc";
+  },
+  {
+    summary: string;
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+    items: Array<{
+      id: string;
+      name: string;
+      sku: string;
+      category: string;
+      vendor: string;
+      stock: number;
+      reserved: number;
+      available: number;
+      reorderPoint: number;
+      stockStatus: "healthy" | "low" | "critical" | "out";
+      price: number;
+      cost: number;
+      margin: number;
+      turnoverRate: number;
+      unitsSold?: number;
+      lastSold?: string;
+      abcCategory: "A" | "B" | "C";
+      variants?: Array<{
+        id: string;
+        sku: string;
+        title: string;
+        price: number;
+        stock: number;
+        reserved: number;
+        available: number;
+      }>;
+    }>;
+  }
+>({
+  description: "List all products with inventory details, variants, and stock status (paginated).",
+  args: z.object({
+    page: z.number().int().positive().optional(),
+    pageSize: z.number().int().positive().max(200).optional(),
+    stockLevel: z.enum(["all", "healthy", "low", "critical", "out"]).optional(),
+    search: z.string().optional(),
+    sortBy: z.string().optional(),
+    sortOrder: z.enum(["asc", "desc"]).optional(),
+  }),
+  handler: async (ctx, args) => {
+    await requireUserAndOrg(ctx);
+
+    const page = args.page && args.page > 0 ? args.page : 1;
+    const pageSize = args.pageSize && args.pageSize > 0 ? Math.min(args.pageSize, 200) : 50;
+
+    const result = await ctx.runQuery(api.web.inventory.getProductsList, {
+      page,
+      pageSize,
+      stockLevel: args.stockLevel && args.stockLevel !== "all" ? args.stockLevel : undefined,
+      searchTerm: args.search,
+      sortBy: args.sortBy,
+      sortOrder: args.sortOrder as any,
+    });
+
+    const items = result.data.map((p: any) => ({
+      id: String(p.id),
+      name: String(p.name ?? ""),
+      sku: String(p.sku ?? ""),
+      category: String(p.category ?? ""),
+      vendor: String(p.vendor ?? ""),
+      stock: Number(p.stock ?? 0),
+      reserved: Number(p.reserved ?? 0),
+      available: Number(p.available ?? 0),
+      reorderPoint: Number(p.reorderPoint ?? 0),
+      stockStatus: p.stockStatus as any,
+      price: Number(p.price ?? 0),
+      cost: Number(p.cost ?? 0),
+      margin: Number(p.margin ?? 0),
+      turnoverRate: Number(p.turnoverRate ?? 0),
+      unitsSold: typeof p.unitsSold === "number" ? p.unitsSold : undefined,
+      lastSold: typeof p.lastSold === "string" ? p.lastSold : undefined,
+      abcCategory: (p.abcCategory ?? "C") as any,
+      variants: Array.isArray(p.variants)
+        ? p.variants.map((v: any) => ({
+            id: String(v.id),
+            sku: String(v.sku ?? ""),
+            title: String(v.title ?? ""),
+            price: Number(v.price ?? 0),
+            stock: Number(v.stock ?? 0),
+            reserved: Number(v.reserved ?? 0),
+            available: Number(v.available ?? 0),
+          }))
+        : undefined,
+    }));
+
+    const summary = `Found ${result.pagination.total} products (${result.pagination.totalPages} pages). Page ${result.pagination.page} of ${result.pagination.totalPages}.`;
+
+    return {
+      summary,
+      page: result.pagination.page,
+      pageSize: result.pagination.pageSize,
+      total: result.pagination.total,
+      totalPages: result.pagination.totalPages,
+      items,
+    };
+  },
+});
+
+export const orgMembersTool = createTool<
+  Record<string, never>,
+  {
+    summary: string;
+    counts: {
+      total: number;
+      active: number;
+      suspended: number;
+      owners: number;
+      team: number;
+    };
+    owner: null | {
+      id: string;
+      name?: string;
+      email?: string;
+      image?: string;
+      role: "StoreOwner" | "StoreTeam";
+      status: "active" | "suspended" | "removed";
+    };
+    members: Array<{
+      id: string;
+      name?: string;
+      email?: string;
+      image?: string;
+      role: "StoreOwner" | "StoreTeam";
+      status: "active" | "suspended" | "removed";
+      isOwner: boolean;
+    }>;
+  }
+>({
+  description:
+    "List all organization members, including the owner, with role and status details.",
+  args: z.object({}),
+  handler: async (ctx) => {
+    await requireUserAndOrg(ctx);
+
+    // Use existing query that joins memberships with user profiles
+    const team = (await ctx.runQuery(api.core.teams.getTeamMembers, {})) as Array<
+      {
+        _id: string;
+        email?: string;
+        name?: string;
+        image?: string;
+        role: "StoreOwner" | "StoreTeam";
+        status: "active" | "suspended" | "removed";
+      }
+    >;
+
+    // Map to clean shape
+    const members = team.map((u) => ({
+      id: String(u._id),
+      name: u.name,
+      email: u.email,
+      image: u.image,
+      role: u.role,
+      status: u.status,
+      isOwner: u.role === "StoreOwner",
+    }));
+
+    const owners = members.filter((m) => m.isOwner);
+    const owner = owners[0]
+      ? {
+          id: owners[0].id,
+          name: owners[0].name,
+          email: owners[0].email,
+          image: owners[0].image,
+          role: owners[0].role,
+          status: owners[0].status,
+        }
+      : null;
+
+    const counts = {
+      total: members.length,
+      active: members.filter((m) => m.status === "active").length,
+      suspended: members.filter((m) => m.status === "suspended").length,
+      owners: owners.length,
+      team: members.filter((m) => m.role === "StoreTeam").length,
+    } as const;
+
+    const summary =
+      members.length === 0
+        ? "No members found for this organization."
+        : `Organization has ${counts.total} members (${counts.owners} owner, ${counts.team} team). ${counts.active} active, ${counts.suspended} suspended.`;
+
+    return {
+      summary,
+      counts,
+      owner,
+      members,
+    };
+  },
+});
+
 export const agentTools = {
   ordersSummary: ordersSummaryTool,
   inventoryLowStock: inventoryLowStockTool,
@@ -719,6 +943,8 @@ export const agentTools = {
   currentDate: currentDateTool,
   pnlSnapshot: pnlSnapshotTool,
   brandSummary: brandSummaryTool,
+  productsInventory: productsInventoryTool,
+  orgMembers: orgMembersTool,
 };
 
 export type AgentToolset = typeof agentTools;

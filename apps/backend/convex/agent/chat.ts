@@ -1,5 +1,5 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { listUIMessages } from "@convex-dev/agent";
+import { listUIMessages, syncStreams, vStreamArgs } from "@convex-dev/agent";
 import { ConvexError, v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { components } from "../_generated/api";
@@ -85,11 +85,13 @@ export const listMessages = query({
   args: {
     threadId: v.string(),
     paginationOpts: paginationOptsValidator,
+    streamArgs: v.optional(vStreamArgs),
   },
   returns: v.object({
     page: v.array(v.any()),
     continueCursor: v.union(v.string(), v.null()),
     isDone: v.boolean(),
+    streams: v.optional(v.any()),
   }),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -111,12 +113,19 @@ export const listMessages = query({
         cursor: args.paginationOpts.cursor ?? null,
         numItems: args.paginationOpts.numItems ?? 40,
       },
-  });
+      streamArgs: args.streamArgs ?? undefined,
+    });
+
+    const streams = await syncStreams(ctx, components.agent, {
+      threadId: args.threadId,
+      streamArgs: args.streamArgs ?? undefined,
+    });
 
     return {
       page: result.page,
       continueCursor: result.continueCursor ?? null,
       isDone: result.isDone,
+      streams,
     };
   },
 });

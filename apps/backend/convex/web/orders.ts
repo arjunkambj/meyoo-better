@@ -631,6 +631,43 @@ export const getOrdersOverview = query({
 });
 
 /**
+ * Fallback: Sum order revenue by created-at range when analytics are unavailable.
+ */
+export const getRevenueSumForRange = query({
+  args: {
+    dateRange: v.object({ startDate: v.string(), endDate: v.string() }),
+  },
+  returns: v.object({
+    totalRevenue: v.number(),
+    totalOrders: v.number(),
+  }),
+  handler: async (ctx, args) => {
+    const auth = await getUserAndOrg(ctx);
+    if (!auth) return { totalRevenue: 0, totalOrders: 0 };
+
+    const startTs = toDateTimestamp(args.dateRange.startDate);
+    const endTs = toDateTimestamp(args.dateRange.endDate, true);
+
+    const orders = await ctx.db
+      .query("shopifyOrders")
+      .withIndex("by_organization_and_created", (q) =>
+        q
+          .eq("organizationId", auth.orgId as Id<"organizations">)
+          .gte("shopifyCreatedAt", startTs)
+          .lte("shopifyCreatedAt", endTs),
+      )
+      .collect();
+
+    const totalRevenue = orders.reduce(
+      (sum, o) => sum + Number(o.totalPrice || 0),
+      0,
+    );
+
+    return { totalRevenue: roundMoney(totalRevenue), totalOrders: orders.length };
+  },
+});
+
+/**
  * Get paginated orders list
  */
 export const getOrdersList = query({

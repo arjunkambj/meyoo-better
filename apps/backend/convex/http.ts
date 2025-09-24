@@ -8,6 +8,7 @@ import {
   shopRedact,
 } from "./webhooks/gdpr";
 import { shopifyWebhook, shopifyWebhookHealth } from "./webhooks/shopify";
+import { sendOtp } from "./emails/http";
 
 const http = httpRouter();
 
@@ -63,6 +64,13 @@ http.route({
   path: "/sync/google",
   method: "POST",
   handler: syncGoogle,
+});
+
+// Email endpoints
+http.route({
+  path: "/emails/send-otp",
+  method: "POST",
+  handler: sendOtp,
 });
 
 export default http;

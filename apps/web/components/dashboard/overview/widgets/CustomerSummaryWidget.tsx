@@ -65,7 +65,7 @@ function Metric({
 
   return (
     <div
-      className={`${isPrimary ? "p-3 bg-background border border-default-50 rounded-xl" : "py-2.5 border-b border-default-200 last:border-0"}`}
+      className={`${isPrimary ? "py-2 px-3 bg-background border border-default-50 rounded-xl" : "py-2.5 px-3 border-b border-default-200 last:border-0"}`}
       aria-label={`${label} metric`}
     >
       <div className="flex justify-between items-center">

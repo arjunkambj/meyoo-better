@@ -4,6 +4,7 @@ import { components } from "../_generated/api";
 import { action } from "../_generated/server";
 import type { ActionCtx } from "../_generated/server";
 import { createAgent, ensureThreadBelongsToUser } from "./agent";
+import { requireUserAndOrg } from "../utils/auth";
 
 type SendMessageOptions = {
   title?: string;
@@ -25,7 +26,6 @@ type SendMessageUsage = {
 
 type SendMessageResult = {
   threadId: string;
-  response: string;
   usage?: SendMessageUsage;
   savedMessageIds: string[];
 };
@@ -44,7 +44,6 @@ export const sendMessage = action({
   },
   returns: v.object({
     threadId: v.string(),
-    response: v.string(),
     usage: v.optional(
       v.object({
         inputTokens: v.optional(v.number()),
@@ -77,22 +76,52 @@ export const sendMessage = action({
       throw new ConvexError("Failed to create conversation thread");
     }
 
-    const result = await agentInstance.generateText(
+    // Enrich system prompt with org/store currency to avoid generic "dollars"
+    const { orgId } = await requireUserAndOrg(ctx);
+    const store = await ctx.db
+      .query("shopifyStores")
+      .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
+      .first();
+    const currencyCode = (store?.primaryCurrency as string | undefined) ?? "USD";
+    const currencyInstruction = `Use the ${currencyCode} currency for all money amounts and format with the correct symbol; do not say the word 'dollars' unless the currency is USD.`;
+
+    const combinedSystem = [args.options?.system, currencyInstruction]
+      .filter(Boolean)
+      .join(" ");
+
+    const result = await agentInstance.streamText(
       ctx,
       { userId, threadId },
       {
         prompt: args.message,
-        ...(args.options?.system ? { system: args.options.system } : {}),
+        system: combinedSystem,
       },
       {
         storageOptions: { saveMessages: "all" },
+        saveStreamDeltas: true,
       },
     );
 
+    const usage = result.usage
+      ? {
+          inputTokens:
+            typeof result.usage.inputTokens === "number"
+              ? result.usage.inputTokens
+              : undefined,
+          outputTokens:
+            typeof result.usage.outputTokens === "number"
+              ? result.usage.outputTokens
+              : undefined,
+          totalTokens:
+            typeof result.usage.totalTokens === "number"
+              ? result.usage.totalTokens
+              : undefined,
+        }
+      : undefined;
+
     return {
       threadId,
-      response: result.text,
-      usage: result.usage,
+      usage,
       savedMessageIds:
         result.savedMessages?.map((message) => message._id) ?? [],
     };

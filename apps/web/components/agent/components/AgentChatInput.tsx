@@ -1,9 +1,9 @@
 "use client";
 
-import {useCallback, useMemo, useState} from "react";
-import {Button, Dropdown, DropdownItem, DropdownMenu, DropdownTrigger, Textarea, Tooltip} from "@heroui/react";
-import {Icon} from "@iconify/react";
-import {cn} from "@heroui/theme";
+import { useCallback, useMemo, useState } from "react";
+import { Button, Textarea, Tooltip } from "@heroui/react";
+import { Icon } from "@iconify/react";
+import { cn } from "@heroui/theme";
 
 type ModelOption = {
   value: string;
@@ -60,44 +60,25 @@ export default function AgentChatInput({
   return (
     <div className={cn("w-full", className)}>
       <div className="flex items-end gap-1">
-        {showModelSelector ? (
-          <Dropdown placement="top-start">
-            <DropdownTrigger>
-              <Button size="sm" variant="flat" className="shrink-0">
-                {selectedLabel}
-              </Button>
-            </DropdownTrigger>
-            <DropdownMenu
-              aria-label="Model selector"
-              selectedKeys={new Set([model])}
-              selectionMode="single"
-              onSelectionChange={(keys) => {
-                const next = Array.from(keys as Set<any>)[0]?.toString() ?? "";
-                setModel(next);
-                onModelChange?.(next);
-              }}
-            >
-              {models.map((m) => (
-                <DropdownItem key={m.value} description={m.helper}>
-                  {m.label}
-                </DropdownItem>
-              ))}
-            </DropdownMenu>
-          </Dropdown>
-        ) : null}
-
         <div className="flex-1 relative">
           <Textarea
             aria-label="Chat message"
             className="w-full"
+            variant="bordered"
             size="sm"
-            minRows={1}
+            minRows={4}
             maxRows={4}
             isDisabled={disabled}
             isReadOnly={busy}
             placeholder={placeholder}
             value={message}
             onValueChange={setMessage}
+            classNames={{
+              // Keep background stable; highlight border on hover/focus
+              inputWrapper:
+                "bg-transparent hover:bg-transparent focus-within:bg-transparent border-default hover:border-primary focus-within:border-primary",
+              input: "bg-transparent",
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();

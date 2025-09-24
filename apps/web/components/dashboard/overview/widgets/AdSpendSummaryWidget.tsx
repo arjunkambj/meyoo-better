@@ -60,8 +60,8 @@ function Metric({
 
   // Match Customer metric container styles
   const containerClasses = isPrimary
-    ? "p-3 bg-background border border-default-50 rounded-xl"
-    : "py-2.5 border-b border-default-200 last:border-0";
+    ? "py-2 px-3 bg-background border border-default-50 rounded-xl"
+    : "py-2.5 px-3 border-b border-default-200 last:border-0";
 
   return (
     <div className={containerClasses} aria-label={`${label} metric`}>

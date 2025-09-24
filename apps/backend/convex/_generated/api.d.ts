@@ -23,6 +23,7 @@ import type * as authHelpers from "../authHelpers.js";
 import type * as billing_organizationHelpers from "../billing/organizationHelpers.js";
 import type * as billing_trackUsage from "../billing/trackUsage.js";
 import type * as core_costs from "../core/costs.js";
+import type * as core_currency from "../core/currency.js";
 import type * as core_dashboard from "../core/dashboard.js";
 import type * as core_memberships from "../core/memberships.js";
 import type * as core_onboarding from "../core/onboarding.js";
@@ -124,6 +125,7 @@ declare const fullApi: ApiFromModules<{
   "billing/organizationHelpers": typeof billing_organizationHelpers;
   "billing/trackUsage": typeof billing_trackUsage;
   "core/costs": typeof core_costs;
+  "core/currency": typeof core_currency;
   "core/dashboard": typeof core_dashboard;
   "core/memberships": typeof core_memberships;
   "core/onboarding": typeof core_onboarding;

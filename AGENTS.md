@@ -2,6 +2,17 @@
 
 ALways USE CONTEXT& to Fetch docs
 
+## Agent & Components Usage Rules
+
+- Always fetch latest Context7 docs before editing code that touches Convex Agent, Resend, or other Convex components (`/get-convex/agent`, `/get-convex/resend`, etc.).
+- When wiring components, keep middleware order stable:
+  - `app.use(workpool, { name: "mainWorkpool" })`
+  - `app.use(actionRetrier)`
+  - `app.use(rag)`
+  - `app.use(agent)`
+  - `app.use(resend)`
+- In Convex actions, never use `ctx.db` directly — use `ctx.runQuery`/`ctx.runMutation` to access the database.
+
 ## Project Structure & Module Organization
 
 - Monorepo managed by Turbo and Bun.

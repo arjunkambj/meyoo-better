@@ -42,20 +42,21 @@ function tokenizeMarkdown(src: string): Block[] {
       const lang = line.slice(3).trim() || undefined;
       i++;
       const codeLines: string[] = [];
-      while (i < lines.length && !lines[i].startsWith("```") ) {
-        codeLines.push(lines[i]);
+      while (i < lines.length && !(lines[i] ?? '').startsWith("```") ) {
+        codeLines.push(lines[i] ?? "");
         i++;
       }
       // consume closing fence if present
-      if (i < lines.length && lines[i].startsWith("```") ) i++;
+      if (i < lines.length && (lines[i] ?? '').startsWith("```") ) i++;
       blocks.push({ type: "code", lang, value: codeLines.join("\n") });
       continue;
     }
     // heading
     const h = line.match(/^(#{1,6})\s+(.*)$/);
     if (h) {
-      const depth = h[1].length as HeadingBlock["depth"];
-      blocks.push({ type: "heading", depth, value: h[2].trim() });
+      const depth = (h?.[1]?.length ?? 1) as HeadingBlock["depth"];
+      const headingValue = (h?.[2] ?? "").trim();
+      blocks.push({ type: "heading", depth, value: headingValue });
       i++;
       continue;
     }
@@ -68,8 +69,8 @@ function tokenizeMarkdown(src: string): Block[] {
     // blockquote (gather contiguous > lines)
     if (/^>\s?/.test(line)) {
       const quote: string[] = [];
-      while (i < lines.length && /^>\s?/.test(lines[i])) {
-        quote.push(lines[i].replace(/^>\s?/, ""));
+      while (i < lines.length && /^>\s?/.test(lines[i] ?? '')) {
+        quote.push((lines[i] ?? '').replace(/^>\s?/, ""));
         i++;
       }
       blocks.push({ type: "blockquote", value: quote.join("\n") });
@@ -78,8 +79,8 @@ function tokenizeMarkdown(src: string): Block[] {
     // unordered list
     if (/^\s*[-+*]\s+/.test(line)) {
       const items: string[] = [];
-      while (i < lines.length && /^\s*[-+*]\s+/.test(lines[i])) {
-        items.push(lines[i].replace(/^\s*[-+*]\s+/, ""));
+      while (i < lines.length && /^\s*[-+*]\s+/.test(lines[i] ?? '')) {
+        items.push((lines[i] ?? '').replace(/^\s*[-+*]\s+/, ""));
         i++;
       }
       blocks.push({ type: "list", ordered: false, items });
@@ -88,8 +89,8 @@ function tokenizeMarkdown(src: string): Block[] {
     // ordered list
     if (/^\s*\d+\.\s+/.test(line)) {
       const items: string[] = [];
-      while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])) {
-        items.push(lines[i].replace(/^\s*\d+\.\s+/, ""));
+      while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i] ?? '')) {
+        items.push((lines[i] ?? '').replace(/^\s*\d+\.\s+/, ""));
         i++;
       }
       blocks.push({ type: "list", ordered: true, items });
@@ -98,15 +99,16 @@ function tokenizeMarkdown(src: string): Block[] {
     // paragraph: collect until blank or other block
     const paras: string[] = [line];
     i++;
-    while (i < lines.length && lines[i].trim() &&
-           !lines[i].startsWith("```") &&
-           !/^(#{1,6})\s+/.test(lines[i]) &&
-           !/^>\s?/.test(lines[i]) &&
-           !/^\s*[-+*]\s+/.test(lines[i]) &&
-           !/^\s*\d+\.\s+/.test(lines[i]) &&
-           !/^(\*\s*\*\s*\*|-{3,}|_{3,})\s*$/.test(lines[i].trim())
+    while (
+      i < lines.length && (lines[i] ?? '').trim() &&
+      !(lines[i] ?? '').startsWith("```") &&
+      !/^(#{1,6})\s+/.test(lines[i] ?? '') &&
+      !/^>\s?/.test(lines[i] ?? '') &&
+      !/^\s*[-+*]\s+/.test(lines[i] ?? '') &&
+      !/^\s*\d+\.\s+/.test(lines[i] ?? '') &&
+      !/^(\*\s*\*\s*\*|-{3,}|_{3,})\s*$/.test((lines[i] ?? '').trim())
     ) {
-      paras.push(lines[i]);
+      paras.push(lines[i] ?? '');
       i++;
     }
     blocks.push({ type: "paragraph", value: paras.join(" ") });
@@ -171,41 +173,42 @@ export default function AgentResponseFormatter({ content, className, onCopy }: A
       {blocks.map((b, i) => {
         switch (b.type) {
           case "heading": {
-            const Tag = (`h${b.depth}` as unknown) as keyof JSX.IntrinsicElements;
-            const size = b.depth <= 2 ? "text-sm" : b.depth === 3 ? "text-[13px]" : "text-xs";
+            const block = b as HeadingBlock;
+            const Tag = (`h${block.depth}` as unknown) as keyof React.JSX.IntrinsicElements;
+            const size = block.depth <= 2 ? "text-sm" : block.depth === 3 ? "text-[13px]" : "text-xs";
             return (
               <Tag key={i} className={`font-semibold ${size} mt-2 mb-1`}>
-                {renderInline(b.value)}
+                {renderInline(block.value)}
               </Tag>
             );
           }
           case "blockquote":
             return (
               <div key={i} className="pl-3 border-l-3 border-default-200 text-default-700 text-sm my-1">
-                {renderInline(b.value)}
+                {renderInline((b as QuoteBlock).value)}
               </div>
             );
           case "list":
-            return b.ordered ? (
+            return (b as ListBlock).ordered ? (
               <ol key={i} className="list-decimal pl-4 space-y-1 text-sm my-1">
-                {b.items.map((it, idx) => (
+                {(b as ListBlock).items.map((it, idx) => (
                   <li key={idx}>{renderInline(it)}</li>
                 ))}
               </ol>
             ) : (
               <ul key={i} className="list-disc pl-4 space-y-1 text-sm my-1">
-                {b.items.map((it, idx) => (
+                {(b as ListBlock).items.map((it, idx) => (
                   <li key={idx}>{renderInline(it)}</li>
                 ))}
               </ul>
             );
           case "code": {
-            const codeText = b.value;
+            const codeText = (b as CodeBlock).value;
             return (
               <div key={i} className="my-2 rounded-medium border border-default-100 overflow-hidden">
                 <div className="flex items-center justify-between bg-content2 px-2 py-1">
                   <span className="text-[10px] text-default-500 uppercase tracking-wide">
-                    {b.lang || "code"}
+                    {(b as CodeBlock).lang || "code"}
                   </span>
                   <Tooltip content="Copy code">
                     <Button isIconOnly size="sm" variant="light" onPress={() => onCopy?.(codeText)}>

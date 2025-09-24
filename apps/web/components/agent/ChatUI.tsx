@@ -6,7 +6,7 @@ import AgentChatInput from "@/components/agent/components/AgentChatInput";
 import NewChatButton from "@/components/agent/components/NewChatButton";
 import AssistantMessage from "@/components/agent/components/AssistantMessage";
 import UserMessage from "@/components/agent/components/UserMessage";
-import { useAgent } from "@/hooks/useAgent";
+import { useAgent, type AgentUIMessage, type UIMessagePart } from "@/hooks/useAgent";
 import { nanoid } from "nanoid";
 import TypingMessage from "@/components/agent/components/TypingMessage";
 import { Icon } from "@iconify/react";
@@ -39,15 +39,7 @@ export default function ChatUI() {
     { id: string; role: "user" | "assistant"; text: string }[]
   >([]);
 
-  const models = useMemo(
-    () => [
-      {
-        value: "gpt-4.1",
-        label: "GPT‑4.1",
-      },
-    ],
-    []
-  );
+  // Using the backend default model (gpt-4.1); no model picker UI.
 
   const startNewChat = useCallback(() => {
     // Clear active thread; first send will create a new one
@@ -97,17 +89,17 @@ export default function ChatUI() {
     el.scrollTop = el.scrollHeight;
   }, [messages?.length, localMessages.length]);
 
-  const displayedMessages = useMemo(() => {
-    if (messages && messages.length > 0) return messages;
-    return localMessages;
+  const displayedMessages: AgentUIMessage[] = useMemo(() => {
+    if (messages && messages.length > 0) return messages as AgentUIMessage[];
+    return localMessages as unknown as AgentUIMessage[];
   }, [messages, localMessages]);
 
   // Clear optimistic messages once server messages are present to avoid first-render blink
   useEffect(() => {
-    if (localMessages.length > 0 && messages && messages.length > 0) {
+    if (localMessages.length > 0 && (messages?.length ?? 0) > 0) {
       setLocalMessages([]);
     }
-  }, [messages?.length]);
+  }, [messages?.length, localMessages.length]);
 
   const conversationOptions = useMemo(() => {
     return (threads ?? []).map((t) => ({ id: t.threadId, title: t.title ?? "New chat" }));
@@ -190,16 +182,16 @@ export default function ChatUI() {
             <div className="space-y-1">
               {displayedMessages.map((m) => {
                 if (m.role === "assistant") {
-                  const streaming = (m as any).status === "streaming";
-                  const text = (m as any).text ?? "";
-                  const parts = (m as any).parts ?? [];
+                  const streaming = m.status === "streaming";
+                  const text = m.text ?? "";
+                  const parts = (m.parts ?? []) as UIMessagePart[];
 
                   if (text.trim().length === 0 && streaming) {
                     // Try to infer tool activity label from parts
                     const toolName = (() => {
-                      const toolPart = parts.find((p: any) => p?.type === "tool" || p?.type === "step-start");
-                      const name = toolPart?.toolName || toolPart?.name || toolPart?.tool || "";
-                      if (typeof name !== "string") return "";
+                      const toolPart = parts.find((p) => p && p.type && (p.type === "tool" || p.type === "step-start")) as UIMessagePart | undefined;
+                      const rawName = toolPart ? (toolPart.toolName ?? toolPart.name ?? toolPart.tool) : undefined;
+                      const name = typeof rawName === 'string' ? rawName : "";
                       const n = name.toLowerCase();
                       if (n.includes("inventory")) return "Reading inventory details…";
                       if (n.includes("meta") || n.includes("ads")) return "Reading meta analytics…";
@@ -223,20 +215,14 @@ export default function ChatUI() {
                     />
                   );
                 }
-                return <UserMessage key={m.id} content={(m as any).text} />;
+                return <UserMessage key={m.id} content={m.text} />;
               })}
             </div>
           )
         )}
       </div>
       <div className="border-t border-default-100 p-1">
-        <AgentChatInput
-          models={models}
-          defaultModel={models[0]?.value}
-          onSend={handleSend}
-          showModelSelector={false}
-          busy={isSending}
-        />
+        <AgentChatInput onSend={handleSend} busy={isSending} />
       </div>
       <RenameThreadDialog
         isOpen={renameOpen}

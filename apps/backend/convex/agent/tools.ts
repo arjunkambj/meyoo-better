@@ -216,7 +216,9 @@ export const ordersSummaryTool = createTool<
         if (fallback.totalOrders > 0) {
           revenueFallback = Number(fallback.totalRevenue ?? 0);
         }
-      } catch {}
+      } catch (err) {
+        console.debug('Revenue fallback unavailable:', err);
+      }
     }
 
     const zeroState = {
@@ -783,13 +785,88 @@ export const productsInventoryTool = createTool<
     sortBy: z.string().optional(),
     sortOrder: z.enum(["asc", "desc"]).optional(),
   }),
-  handler: async (ctx, args) => {
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{
+    summary: string;
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+    items: Array<{
+      id: string;
+      name: string;
+      sku: string;
+      category: string;
+      vendor: string;
+      stock: number;
+      reserved: number;
+      available: number;
+      reorderPoint: number;
+      stockStatus: 'healthy' | 'low' | 'critical' | 'out';
+      price: number;
+      cost: number;
+      margin: number;
+      turnoverRate: number;
+      unitsSold?: number;
+      lastSold?: string;
+      abcCategory: 'A' | 'B' | 'C';
+      variants?: Array<{
+        id: string;
+        sku: string;
+        title: string;
+        price: number;
+        stock: number;
+        reserved: number;
+        available: number;
+      }>;
+    }>;
+  }> => {
     await requireUserAndOrg(ctx);
 
     const page = args.page && args.page > 0 ? args.page : 1;
     const pageSize = args.pageSize && args.pageSize > 0 ? Math.min(args.pageSize, 200) : 50;
 
-    const result = await ctx.runQuery(api.web.inventory.getProductsList, {
+    type ProductListResult = {
+      data: Array<{
+        id: string;
+        name: string;
+        sku: string;
+        image?: string;
+        category: string;
+        vendor: string;
+        stock: number;
+        reserved: number;
+        available: number;
+        reorderPoint: number;
+        stockStatus: 'healthy' | 'low' | 'critical' | 'out';
+        price: number;
+        cost: number;
+        margin: number;
+        turnoverRate: number;
+        unitsSold?: number;
+        lastSold?: string;
+        abcCategory: 'A' | 'B' | 'C';
+        variants?: Array<{
+          id: string;
+          sku: string;
+          title: string;
+          price: number;
+          stock: number;
+          reserved: number;
+          available: number;
+        }>;
+      }>;
+      pagination: {
+        page: number;
+        pageSize: number;
+        total: number;
+        totalPages: number;
+      };
+    };
+
+    const result: ProductListResult = await ctx.runQuery(api.web.inventory.getProductsList, {
       page,
       pageSize,
       stockLevel: args.stockLevel && args.stockLevel !== "all" ? args.stockLevel : undefined,
@@ -808,14 +885,14 @@ export const productsInventoryTool = createTool<
       reserved: Number(p.reserved ?? 0),
       available: Number(p.available ?? 0),
       reorderPoint: Number(p.reorderPoint ?? 0),
-      stockStatus: p.stockStatus as any,
+      stockStatus: p.stockStatus as 'healthy' | 'low' | 'critical' | 'out',
       price: Number(p.price ?? 0),
       cost: Number(p.cost ?? 0),
       margin: Number(p.margin ?? 0),
       turnoverRate: Number(p.turnoverRate ?? 0),
       unitsSold: typeof p.unitsSold === "number" ? p.unitsSold : undefined,
       lastSold: typeof p.lastSold === "string" ? p.lastSold : undefined,
-      abcCategory: (p.abcCategory ?? "C") as any,
+      abcCategory: (p.abcCategory ?? "C") as 'A' | 'B' | 'C',
       variants: Array.isArray(p.variants)
         ? p.variants.map((v: any) => ({
             id: String(v.id),

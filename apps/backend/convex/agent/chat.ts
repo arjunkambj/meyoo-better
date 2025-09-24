@@ -113,7 +113,6 @@ export const listMessages = query({
         cursor: args.paginationOpts.cursor ?? null,
         numItems: args.paginationOpts.numItems ?? 40,
       },
-      streamArgs: args.streamArgs ?? undefined,
     });
 
     const streams = await syncStreams(ctx, components.agent, {

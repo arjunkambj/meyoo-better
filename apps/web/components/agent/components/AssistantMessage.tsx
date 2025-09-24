@@ -16,14 +16,16 @@ export default function AssistantMessage({
   onVote?: (v: "up" | "down") => void;
   streaming?: boolean;
 }) {
-  const [copied, setCopied] = useState(false);
+  const [, setCopied] = useState(false);
 
   const handleCopyAll = async () => {
     try {
       await navigator.clipboard.writeText(content);
       setCopied(true);
       setTimeout(() => setCopied(false), 1000);
-    } catch {}
+    } catch (err) {
+      console.debug('copy failed', err);
+    }
   };
 
   return (

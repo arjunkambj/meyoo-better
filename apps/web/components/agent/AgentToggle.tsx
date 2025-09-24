@@ -15,7 +15,7 @@ export default function AgentToggle() {
     <Tooltip content="AI Assistant" placement="left">
       <Button
         isIconOnly
-        className="fixed right-4 bottom-20 z-40 bg-primary text-primary-foreground shadow-lg hover:shadow-xl transition-all"
+        className="fixed right-4 bottom-20 z-40 bg-primary text-primary-foreground border border-primary-600/30 hover:bg-primary/90 transition-colors"
         radius="full"
         size="lg"
         onPress={() => setIsOpen(true)}

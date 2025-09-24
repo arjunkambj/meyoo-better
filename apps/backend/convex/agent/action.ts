@@ -1,6 +1,6 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { ConvexError, v } from "convex/values";
-import { components } from "../_generated/api";
+import { components, api } from "../_generated/api";
 import { action } from "../_generated/server";
 import type { ActionCtx } from "../_generated/server";
 import { createAgent, ensureThreadBelongsToUser } from "./agent";
@@ -78,11 +78,11 @@ export const sendMessage = action({
 
     // Enrich system prompt with org/store currency to avoid generic "dollars"
     const { orgId } = await requireUserAndOrg(ctx);
-    const store = await ctx.db
-      .query("shopifyStores")
-      .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
-      .first();
-    const currencyCode = (store?.primaryCurrency as string | undefined) ?? "USD";
+    const primaryCurrency = await ctx.runQuery(
+      api.core.currency.getPrimaryCurrencyForOrg,
+      { orgId },
+    );
+    const currencyCode = (primaryCurrency ?? "USD").toString();
     const currencyInstruction = `Use the ${currencyCode} currency for all money amounts and format with the correct symbol; do not say the word 'dollars' unless the currency is USD.`;
 
     const combinedSystem = [args.options?.system, currencyInstruction]
@@ -102,19 +102,20 @@ export const sendMessage = action({
       },
     );
 
-    const usage = result.usage
+    const resolvedUsage = await result.usage;
+    const usage = resolvedUsage
       ? {
           inputTokens:
-            typeof result.usage.inputTokens === "number"
-              ? result.usage.inputTokens
+            typeof resolvedUsage.inputTokens === "number"
+              ? resolvedUsage.inputTokens
               : undefined,
           outputTokens:
-            typeof result.usage.outputTokens === "number"
-              ? result.usage.outputTokens
+            typeof resolvedUsage.outputTokens === "number"
+              ? resolvedUsage.outputTokens
               : undefined,
           totalTokens:
-            typeof result.usage.totalTokens === "number"
-              ? result.usage.totalTokens
+            typeof resolvedUsage.totalTokens === "number"
+              ? resolvedUsage.totalTokens
               : undefined,
         }
       : undefined;

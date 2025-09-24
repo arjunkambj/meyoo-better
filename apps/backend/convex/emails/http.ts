@@ -14,7 +14,7 @@ export const sendOtp = httpAction(async (ctx, request) => {
       );
     }
 
-    await ctx.runMutation(internal.emails.sendOtpEmail, { to, token });
+    await ctx.runMutation(internal.emails.send.sendOtpEmail, { to, token });
     return new Response(JSON.stringify({ ok: true }), { status: 200 });
   } catch (err) {
     return new Response(
@@ -23,4 +23,3 @@ export const sendOtp = httpAction(async (ctx, request) => {
     );
   }
 });
-

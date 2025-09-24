@@ -22,12 +22,20 @@ export type SendAgentMessageArgs = {
 const DEFAULT_THREAD_PAGE_SIZE = 25;
 const DEFAULT_MESSAGE_PAGE_SIZE = 40;
 
+export type UIMessagePart = {
+  type: string;
+  toolName?: string;
+  name?: string;
+  tool?: string;
+  [key: string]: unknown;
+};
+
 export type AgentUIMessage = {
   id: string;
   role: "user" | "assistant" | "system";
   text: string;
   status?: string; // e.g. "streaming" or success
-  parts?: any[]; // optional UI parts for tool/status awareness
+  parts?: UIMessagePart[]; // optional UI parts for tool/status awareness
 };
 
 export function useAgent({

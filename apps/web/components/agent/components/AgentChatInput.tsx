@@ -1,61 +1,36 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { Button, Textarea, Tooltip } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { cn } from "@heroui/theme";
 
-type ModelOption = {
-  value: string;
-  label: string;
-  helper?: string;
-};
-
 export type AgentChatInputProps = {
-  models: ModelOption[];
-  defaultModel?: string;
   placeholder?: string;
   disabled?: boolean;
   busy?: boolean;
   className?: string;
   onSend: (message: string, model: string) => void | Promise<void>;
-  onModelChange?: (model: string) => void;
-  showModelSelector?: boolean;
 };
 
 export default function AgentChatInput({
-  models,
-  defaultModel,
   placeholder = "Ask anything…",
   disabled = false,
   busy = false,
   className,
   onSend,
-  onModelChange,
-  showModelSelector = true,
 }: AgentChatInputProps) {
   const [message, setMessage] = useState("");
 
-  const initialModel = useMemo(() => {
-    if (defaultModel) return defaultModel;
-    return models[0]?.value ?? "";
-  }, [defaultModel, models]);
-
-  const [model, setModel] = useState<string>(initialModel);
-
-  const selectedLabel = useMemo(
-    () => models.find((m) => m.value === model)?.label ?? model,
-    [models, model]
-  );
-
-  const canSend = message.trim().length > 0 && !busy && !disabled && !!model;
+  const DEFAULT_MODEL = 'gpt-4.1';
+  const canSend = message.trim().length > 0 && !busy && !disabled;
 
   const handleSend = useCallback(async () => {
     if (!canSend) return;
     const content = message.trim();
     setMessage("");
-    await onSend(content, model);
-  }, [canSend, message, model, onSend]);
+    await onSend(content, DEFAULT_MODEL);
+  }, [canSend, message, onSend]);
 
   return (
     <div className={cn("w-full", className)}>

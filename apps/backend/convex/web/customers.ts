@@ -1003,6 +1003,14 @@ export const getGeographicDistribution = query({
         revenue: v.number(),
         orders: v.number(),
         avgOrderValue: v.number(),
+        zipCodes: v.array(
+          v.object({
+            zipCode: v.string(),
+            city: v.optional(v.string()),
+            customers: v.number(),
+            revenue: v.number(),
+          }),
+        ),
       }),
     ),
     cities: v.array(
@@ -1069,10 +1077,23 @@ export const getGeographicDistribution = query({
         revenue: number;
       }
     >();
+    const countryZipCodeMap = new Map<
+      string,
+      Map<
+        string,
+        {
+          zipCode: string;
+          city?: string;
+          customers: number;
+          revenue: number;
+        }
+      >
+    >();
 
     customers.forEach((customer) => {
       const country = customer.defaultAddress?.country || "Unknown";
       const city = customer.defaultAddress?.city || "Unknown";
+      const zip = customer.defaultAddress?.zip?.trim();
       const customerOrders = customerOrdersMap.get(customer._id) || [];
 
       // Calculate customer metrics from orders
@@ -1114,13 +1135,47 @@ export const getGeographicDistribution = query({
         cityData.customers++;
         cityData.revenue += lifetimeValue;
       }
+
+      if (zip) {
+        if (!countryZipCodeMap.has(country)) {
+          countryZipCodeMap.set(country, new Map());
+        }
+
+        const countryZipMap = countryZipCodeMap.get(country);
+        if (countryZipMap) {
+          if (!countryZipMap.has(zip)) {
+            countryZipMap.set(zip, {
+              zipCode: zip,
+              city: customer.defaultAddress?.city || undefined,
+              customers: 0,
+              revenue: 0,
+            });
+          }
+
+          const zipData = countryZipMap.get(zip);
+          if (zipData) {
+            zipData.customers += 1;
+            zipData.revenue += lifetimeValue;
+
+            if (!zipData.city && customer.defaultAddress?.city) {
+              zipData.city = customer.defaultAddress.city;
+            }
+          }
+        }
+      }
     });
 
     // Convert to arrays and calculate averages
-    const countries = Array.from(countryMap.values()).map((c) => ({
-      ...c,
-      avgOrderValue: c.orders > 0 ? c.revenue / c.orders : 0,
-    }));
+    const countries = Array.from(countryMap.values()).map((c) => {
+      const zipCodes = Array.from(countryZipCodeMap.get(c.country)?.values() ?? [])
+        .sort((a, b) => b.revenue - a.revenue);
+
+      return {
+        ...c,
+        avgOrderValue: c.orders > 0 ? c.revenue / c.orders : 0,
+        zipCodes,
+      };
+    });
 
     const cities = Array.from(cityMap.values())
       .sort((a, b) => b.revenue - a.revenue)

@@ -1,16 +1,16 @@
-"use client"
+"use client";
 
-import { ComponentPropsWithoutRef, useEffect, useRef } from "react"
-import { useInView, useMotionValue, useSpring } from "motion/react"
+import { ComponentPropsWithoutRef, useEffect, useRef } from "react";
+import { useInView, useMotionValue, useSpring } from "motion/react";
 
-import { cn } from "@/libs/utils"
+import { cn } from "@/libs/utils";
 
 interface NumberTickerProps extends ComponentPropsWithoutRef<"span"> {
-  value: number
-  startValue?: number
-  direction?: "up" | "down"
-  delay?: number
-  decimalPlaces?: number
+  value: number;
+  startValue?: number;
+  direction?: "up" | "down";
+  delay?: number;
+  decimalPlaces?: number;
 }
 
 export function NumberTicker({
@@ -22,48 +22,48 @@ export function NumberTicker({
   decimalPlaces = 0,
   ...props
 }: NumberTickerProps) {
-  const ref = useRef<HTMLSpanElement>(null)
-  const motionValue = useMotionValue(startValue)
+  const ref = useRef<HTMLSpanElement>(null);
+  const motionValue = useMotionValue(startValue);
   const springValue = useSpring(motionValue, {
     damping: 24,
     stiffness: 320,
-  })
-  const previousValue = useRef(startValue)
-  const hasAnimated = useRef(false)
-  const isInView = useInView(ref, { once: true, margin: "0px" })
+  });
+  const previousValue = useRef(startValue);
+  const hasAnimated = useRef(false);
+  const isInView = useInView(ref, { once: true, margin: "0px" });
 
   useEffect(() => {
-    if (!isInView) return
+    if (!isInView) return;
 
     const fromValue = hasAnimated.current
       ? previousValue.current
       : direction === "down"
         ? Math.max(startValue, value)
-        : Math.min(startValue, value)
+        : Math.min(startValue, value);
 
-    motionValue.set(fromValue)
+    motionValue.set(fromValue);
 
     const timer = window.setTimeout(() => {
-      motionValue.set(value)
-      previousValue.current = value
-      hasAnimated.current = true
-    }, delay * 1000)
+      motionValue.set(value);
+      previousValue.current = value;
+      hasAnimated.current = true;
+    }, delay * 1000);
 
-    return () => window.clearTimeout(timer)
-  }, [value, direction, delay, motionValue, isInView, startValue])
+    return () => window.clearTimeout(timer);
+  }, [value, direction, delay, motionValue, isInView, startValue]);
 
   useEffect(
     () =>
       springValue.on("change", (latest) => {
-        if (!ref.current) return
+        if (!ref.current) return;
 
         ref.current.textContent = Intl.NumberFormat("en-US", {
           minimumFractionDigits: decimalPlaces,
           maximumFractionDigits: decimalPlaces,
-        }).format(Number(latest.toFixed(decimalPlaces)))
+        }).format(Number(latest.toFixed(decimalPlaces)));
       }),
     [springValue, decimalPlaces]
-  )
+  );
 
   return (
     <span
@@ -79,5 +79,5 @@ export function NumberTicker({
         maximumFractionDigits: decimalPlaces,
       }).format(startValue)}
     </span>
-  )
+  );
 }

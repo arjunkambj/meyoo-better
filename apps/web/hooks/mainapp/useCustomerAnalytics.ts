@@ -182,6 +182,12 @@ export function useCustomerAnalytics(dateRange?: {
       revenue: country.revenue,
       avgOrderValue: country.avgOrderValue,
       percentage: (country.customers / total) * 100,
+      zipCodes: country.zipCodes?.map((zip) => ({
+        zipCode: zip.zipCode,
+        city: zip.city ?? undefined,
+        customers: zip.customers,
+        revenue: zip.revenue,
+      })),
     }));
   }, [geographicData, totalCustomersAcrossCountries]);
 

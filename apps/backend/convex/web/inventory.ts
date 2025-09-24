@@ -11,6 +11,7 @@ import { getUserAndOrg } from "../utils/auth";
 
 const aggregateInventoryLevels = (
   levels: Array<Doc<"shopifyInventory">>,
+  variants?: Array<Doc<"shopifyProductVariants">>,
 ): Map<
   Id<"shopifyProductVariants">,
   { available: number; incoming: number; committed: number }
@@ -36,6 +37,28 @@ const aggregateInventoryLevels = (
         incoming,
         committed,
       });
+    }
+  }
+
+  if (variants) {
+    for (const variant of variants) {
+      const quantity =
+        typeof variant.inventoryQuantity === "number"
+          ? variant.inventoryQuantity
+          : 0;
+      const existing = totals.get(variant._id);
+
+      if (existing) {
+        if (quantity > existing.available) {
+          existing.available = quantity;
+        }
+      } else {
+        totals.set(variant._id, {
+          available: quantity,
+          incoming: 0,
+          committed: 0,
+        });
+      }
     }
   }
 
@@ -159,7 +182,12 @@ const buildVariantSalesMap = (
     if (!variant) return;
 
     const order = orderById.get(item.orderId.toString());
-    const price = variant.price || 0;
+    const unitPrice =
+      typeof item.price === "number" ? item.price : variant.price || 0;
+    const discount =
+      typeof item.totalDiscount === "number" ? item.totalDiscount : 0;
+    const quantity = typeof item.quantity === "number" ? item.quantity : 0;
+    const lineRevenue = Math.max(0, unitPrice * quantity - discount);
     const cost = getVariantCost(variant);
 
     const current = sales.get(item.variantId) || {
@@ -168,9 +196,9 @@ const buildVariantSalesMap = (
       cogs: 0,
     };
 
-    current.units += item.quantity;
-    current.revenue += item.quantity * price;
-    current.cogs += item.quantity * cost;
+    current.units += quantity;
+    current.revenue += lineRevenue;
+    current.cogs += quantity * cost;
 
     if (order) {
       const soldAt = order.shopifyCreatedAt;
@@ -222,6 +250,41 @@ const buildProductSalesMap = (
   });
 
   return productSales;
+};
+
+type SalesTotals = {
+  units: number;
+  revenue: number;
+  cogs: number;
+};
+
+const computeSalesTotals = (
+  items: Array<Doc<"shopifyOrderItems">>,
+  variantLookup: Map<Id<"shopifyProductVariants">, Doc<"shopifyProductVariants">>,
+): SalesTotals => {
+  let units = 0;
+  let revenue = 0;
+  let cogs = 0;
+
+  for (const item of items) {
+    const quantity = typeof item.quantity === "number" ? item.quantity : 0;
+    units += quantity;
+
+    const variant = item.variantId ? variantLookup.get(item.variantId) : undefined;
+    const unitPrice =
+      typeof item.price === "number"
+        ? item.price
+        : variant?.price ?? 0;
+    const discount =
+      typeof item.totalDiscount === "number" ? item.totalDiscount : 0;
+    const lineRevenue = Math.max(0, unitPrice * quantity - discount);
+    revenue += lineRevenue;
+
+    const unitCost = variant ? getVariantCost(variant) : unitPrice * 0.6;
+    cogs += unitCost * quantity;
+  }
+
+  return { units, revenue, cogs };
 };
 
 const assignABCCategories = (
@@ -364,7 +427,14 @@ export const getInventoryOverview = query({
       .withIndex("by_organization", (q) => q.eq("organizationId", _orgId))
       .collect();
 
-    const inventoryTotals = aggregateInventoryLevels(inventory);
+    const inventoryTotals = aggregateInventoryLevels(inventory, variants);
+
+    const { start, end } = normalizeDateRange(
+      args.dateRange,
+      DEFAULT_ANALYSIS_DAYS,
+    );
+    const analysisWindowMs = Math.max(1, end.getTime() - start.getTime());
+    const analysisDays = Math.max(1, Math.ceil(analysisWindowMs / MS_IN_DAY));
 
     // Calculate metrics
     const totalProducts = products.length;
@@ -420,7 +490,7 @@ export const getInventoryOverview = query({
       )
       .collect();
 
-    const orderItems = await ctx.db
+    const allOrderItems = await ctx.db
       .query("shopifyOrderItems")
       .withIndex("by_organization", (q) => q.eq("organizationId", _orgId))
       .collect();
@@ -428,7 +498,7 @@ export const getInventoryOverview = query({
     const soldVariantIds = new Set<string>();
 
     recentOrdersInRange.forEach((order) => {
-      const items = orderItems.filter((item) => item.orderId === order._id);
+      const items = allOrderItems.filter((item) => item.orderId === order._id);
 
       items.forEach((item) => {
         if (item.variantId) soldVariantIds.add(item.variantId);
@@ -448,167 +518,78 @@ export const getInventoryOverview = query({
       }
     });
 
-    // Calculate average turnover rate (COGS sold / Average inventory value)
-    // Get sales data for the period
-    const thirtyDaysAgo = new Date();
-
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-    const ordersForTurnover = await ctx.db
-      .query("shopifyOrders")
-      .withIndex("by_organization_and_created", (q) =>
-        q
-          .eq("organizationId", user.organizationId as Id<"organizations">)
-          .gte("shopifyCreatedAt", thirtyDaysAgo.getTime()),
-      )
-      .collect();
-
-    // Calculate total COGS sold in period
-    let totalCOGSSold = 0;
-
-    ordersForTurnover.forEach((order) => {
-      const items = orderItems.filter((item) => item.orderId === order._id);
-
-      items.forEach((item) => {
-        const variant = variants.find((v) => v._id === item.variantId);
-
-        if (variant) {
-          const cost = getVariantCost(variant);
-
-          totalCOGSSold += cost * item.quantity;
-        }
-      });
+    const variantMap = new Map<
+      Id<"shopifyProductVariants">,
+      Doc<"shopifyProductVariants">
+    >();
+    variants.forEach((variant) => {
+      variantMap.set(variant._id, variant);
     });
 
-    // Annual turnover rate = (COGS sold in 30 days * 12) / Current inventory value
-    const avgTurnoverRate =
-      totalCOGS > 0
-        ? Math.round(((totalCOGSSold * 12) / totalCOGS) * 10) / 10
-        : 0;
-
-    // Calculate stock coverage days based on average daily sales
-    // Use existing orders data from turnover calculation
-    let totalUnitsSoldIn30Days = 0;
-
-    ordersForTurnover.forEach((order) => {
-      const items = orderItems.filter((item) => item.orderId === order._id);
-
-      totalUnitsSoldIn30Days += items.reduce(
-        (sum, item) => sum + item.quantity,
-        0,
-      );
-    });
-
-    const avgDailyUnitsSold = totalUnitsSoldIn30Days / 30;
-
-    // Total units in stock
-    const totalUnitsInStock = inventory.reduce(
-      (sum, inv) => sum + (inv.available || 0),
-      0,
+    const { orders, orderItems } = await fetchOrdersWithItems(
+      ctx,
+      _orgId,
+      start,
+      end,
     );
 
-    // Stock coverage = Total units in stock / Average daily units sold
+    const salesTotals = computeSalesTotals(orderItems, variantMap);
+    const totalSales = salesTotals.revenue;
+    const unitsSold = salesTotals.units;
+    const totalCOGSSold = salesTotals.cogs;
+    const totalProfit = totalSales - totalCOGSSold;
+
+    const avgDailyUnitsSold = unitsSold / analysisDays;
+
+    const totalUnitsInStock = variants.reduce((sum, variant) => {
+      const totals = inventoryTotals.get(variant._id);
+      return sum + (totals?.available ?? 0);
+    }, 0);
+
+    const annualizationFactor = 365 / analysisDays;
+    const avgTurnoverRate =
+      totalCOGS > 0
+        ? Math.round(
+            ((totalCOGSSold * annualizationFactor) / totalCOGS) * 10,
+          ) /
+            10
+        : 0;
+
     const stockCoverageDays =
       avgDailyUnitsSold > 0
         ? Math.round(totalUnitsInStock / avgDailyUnitsSold)
         : totalUnitsInStock > 0
           ? 90
-          : 0; // Default to 90 days if no sales but have stock
+          : 0;
 
-    // Calculate sales metrics for the date range
-    const dateRangeStart = args.dateRange?.startDate
-      ? new Date(args.dateRange.startDate)
-      : thirtyDaysAgo;
-    const dateRangeEnd = args.dateRange?.endDate
-      ? new Date(args.dateRange.endDate)
-      : new Date();
-
-    const ordersInDateRange = await ctx.db
-      .query("shopifyOrders")
-      .withIndex("by_organization_and_created", (q) =>
-        q
-          .eq("organizationId", user.organizationId as Id<"organizations">)
-          .gte("shopifyCreatedAt", dateRangeStart.getTime())
-          .lte("shopifyCreatedAt", dateRangeEnd.getTime()),
-      )
-      .collect();
-
-    let totalSales = 0;
-    let unitsSold = 0;
-    let totalProfit = 0;
-
-    ordersInDateRange.forEach((order) => {
-      const items = orderItems.filter((item) => item.orderId === order._id);
-
-      items.forEach((item) => {
-        const variant = variants.find((v) => v._id === item.variantId);
-
-        if (variant) {
-          const price = variant.price || 0;
-          const cost = getVariantCost(variant);
-
-          totalSales += price * item.quantity;
-          unitsSold += item.quantity;
-          totalProfit += (price - cost) * item.quantity;
-        }
-      });
-    });
-
-    const averageSalePrice = unitsSold > 0 ? totalSales / unitsSold : 0;
+    const averageSalePrice = orders.length > 0 ? totalSales / orders.length : 0;
     const averageProfit = totalSales > 0 ? (totalProfit / totalSales) * 100 : 0;
 
-    // Calculate changes by comparing with previous period
-    // Calculate previous period dates
-    const periodDuration = dateRangeEnd.getTime() - dateRangeStart.getTime();
-    const prevEndDate = new Date(dateRangeStart.getTime() - 1); // Day before current start
+    const periodDuration = analysisWindowMs;
+    const prevEndDate = new Date(start.getTime() - 1);
     const prevStartDate = new Date(prevEndDate.getTime() - periodDuration);
 
-    // Get previous period orders
-    const prevOrders = await ctx.db
-      .query("shopifyOrders")
-      .withIndex("by_organization_and_created", (q) =>
-        q
-          .eq("organizationId", user.organizationId as Id<"organizations">)
-          .gte("shopifyCreatedAt", prevStartDate.getTime())
-          .lte("shopifyCreatedAt", prevEndDate.getTime()),
-      )
-      .collect();
-
-    // Calculate previous period metrics
-    let prevTotalSales = 0;
-    let prevUnitsSold = 0;
-    let prevTotalCOGSSold = 0;
-
-    prevOrders.forEach((order) => {
-      const items = orderItems.filter((item) => item.orderId === order._id);
-
-      items.forEach((item) => {
-        const variant = variants.find((v) => v._id === item.variantId);
-
-        if (variant) {
-          const price = variant.price || 0;
-          const cost = getVariantCost(variant);
-
-          prevTotalSales += price * item.quantity;
-          prevUnitsSold += item.quantity;
-          prevTotalCOGSSold += cost * item.quantity;
-        }
-      });
-    });
-
-    // Previous period turnover rate
+    const { orderItems: prevOrderItems } = await fetchOrdersWithItems(
+      ctx,
+      _orgId,
+      prevStartDate,
+      prevEndDate,
+    );
+    const prevTotals = computeSalesTotals(prevOrderItems, variantMap);
+    const prevAnalysisDays = Math.max(1, Math.ceil(periodDuration / MS_IN_DAY));
+    const prevAnnualizationFactor = 365 / prevAnalysisDays;
     const prevTurnoverRate =
       totalCOGS > 0
-        ? Math.round(((prevTotalCOGSSold * 12) / totalCOGS) * 10) / 10
+        ? Math.round(
+            ((prevTotals.cogs * prevAnnualizationFactor) / totalCOGS) * 10,
+          ) /
+            10
         : 0;
-
-    // Previous period stock coverage (simplified - use current inventory as approximation)
-    const prevAvgDailyUnitsSold =
-      prevUnitsSold / Math.max(1, prevOrders.length);
+    const prevAvgDailyUnitsSold = prevTotals.units / prevAnalysisDays;
     const prevStockCoverageDays =
       prevAvgDailyUnitsSold > 0
         ? Math.round(totalUnitsInStock / prevAvgDailyUnitsSold)
-        : stockCoverageDays; // Use current if no previous sales
+        : stockCoverageDays;
 
     // Calculate percentage changes
     const calculateChange = (current: number, previous: number): number => {
@@ -626,8 +607,8 @@ export const getInventoryOverview = query({
       turnoverRate: calculateChange(avgTurnoverRate, prevTurnoverRate),
       healthScore: 0,
       stockCoverage: calculateChange(stockCoverageDays, prevStockCoverageDays),
-      totalSales: calculateChange(totalSales, prevTotalSales),
-      unitsSold: calculateChange(unitsSold, prevUnitsSold),
+      totalSales: calculateChange(totalSales, prevTotals.revenue),
+      unitsSold: calculateChange(unitsSold, prevTotals.units),
     };
 
     return {
@@ -744,7 +725,7 @@ export const getProductsList = query({
         .collect(),
     ]);
 
-    const inventoryTotals = aggregateInventoryLevels(inventory);
+    const inventoryTotals = aggregateInventoryLevels(inventory, variants);
 
     const { start, end } = normalizeDateRange(
       args.dateRange,
@@ -990,7 +971,7 @@ export const getStockHealth = query({
       .withIndex("by_organization", (q) => q.eq("organizationId", auth.orgId as Id<"organizations">))
       .collect();
 
-    const inventoryTotals = aggregateInventoryLevels(inventory);
+    const inventoryTotals = aggregateInventoryLevels(inventory, variants);
 
     // Count by stock status
     let healthy = 0;
@@ -1259,7 +1240,7 @@ export const getStockAlerts = query({
         .collect(),
     ]);
 
-    const inventoryTotals = aggregateInventoryLevels(inventory);
+    const inventoryTotals = aggregateInventoryLevels(inventory, variants);
 
     const { start, end } = normalizeDateRange(undefined, DEFAULT_ANALYSIS_DAYS);
     const analysisWindowMs = Math.max(1, end.getTime() - start.getTime());
@@ -1792,7 +1773,7 @@ export const getInventoryTurnover = query({
         .collect(),
     ]);
 
-    const inventoryTotals = aggregateInventoryLevels(inventory);
+    const inventoryTotals = aggregateInventoryLevels(inventory, variants);
 
     const inventoryCost = variants.reduce((sum, variant) => {
       const totals = inventoryTotals.get(variant._id);

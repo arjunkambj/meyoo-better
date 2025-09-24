@@ -1,16 +1,39 @@
 "use client";
-import { Button, Chip, Tab, Tabs, Divider } from "@heroui/react";
+import { Button, Chip, Tab, Tabs } from "@heroui/react";
 import { Icon } from "@iconify/react";
-import { BadgeCheck } from "lucide-react";
 import { useQuery } from "convex-helpers/react/cache/hooks";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useSetAtom } from "jotai";
 import { setSettingsPendingAtom } from "@/store/atoms";
 
 import { frequencies, tiers } from "@/components/home/pricing/constants";
-import { type Frequency, FrequencyEnum } from "@/components/home/pricing/types";
+import {
+  type Frequency,
+  FrequencyEnum,
+  TiersEnum,
+} from "@/components/home/pricing/types";
 import { api } from "@/libs/convexApi";
 import { AVAILABLE_PLANS, useBilling } from "@/hooks";
+import { PricingTierCard } from "@/components/shared/billing/PricingTierCard";
+import {
+  SHOPIFY_PLAN_NAME_BY_TIER_KEY,
+  getTierKeyFromPlanName,
+} from "@/components/shared/billing/planUtils";
+
+const PLAN_ORDER: TiersEnum[] = [
+  TiersEnum.Free,
+  TiersEnum.Pro,
+  TiersEnum.Team,
+  TiersEnum.Custom,
+  TiersEnum.Enterprise,
+];
+
+const TIER_LIMITS: Partial<Record<TiersEnum, number>> = {
+  [TiersEnum.Free]: 300,
+  [TiersEnum.Pro]: 1200,
+  [TiersEnum.Team]: 3500,
+  [TiersEnum.Custom]: 7500,
+};
 
 export default function AvailablePlans() {
   const { currentUsage, isLoading, error, upgradePlan, clearError } =
@@ -21,7 +44,10 @@ export default function AvailablePlans() {
     api.core.shopDomainHelper.getCurrentShopDomain
   );
 
-  const currentPlan = currentUsage?.plan || "free";
+  const currentTierKey = useMemo(() => {
+    const tier = getTierKeyFromPlanName(currentUsage?.plan ?? null);
+    return tier ?? TiersEnum.Free;
+  }, [currentUsage?.plan]);
   const [selectedFrequency, setSelectedFrequency] = useState<Frequency>(
     (frequencies[0] as Frequency) ?? (frequencies[0] as Frequency)
   );
@@ -123,175 +149,73 @@ export default function AvailablePlans() {
       )}
 
       {/* Plans Grid with Full Features - Matching Home Pricing Style */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         {availablePlans.map((tier) => {
-          const isCurrentPlan =
-            tier.title.toLowerCase() === currentPlan.toLowerCase();
+          const planName = SHOPIFY_PLAN_NAME_BY_TIER_KEY[tier.key];
+          const isCurrentPlan = tier.key === currentTierKey;
+          const currentPlanIndex = PLAN_ORDER.indexOf(currentTierKey);
+          const tierIndex = PLAN_ORDER.indexOf(tier.key);
+          const isDowngrade =
+            tierIndex !== -1 &&
+            currentPlanIndex !== -1 &&
+            tierIndex < currentPlanIndex;
+
+          const tierLimit = TIER_LIMITS[tier.key];
+          const currentOrderUsage = currentUsage?.currentUsage || 0;
+          const exceedsDowngradeLimit = Boolean(
+            isDowngrade && tierLimit && currentOrderUsage > tierLimit
+          );
+
+          const isProcessing = loadingTier === planName;
+          const disabled =
+            isCurrentPlan || isLoading || exceedsDowngradeLimit || isProcessing;
+
+          const buttonLabel = (() => {
+            if (isCurrentPlan) return "Current Plan";
+            if (exceedsDowngradeLimit) return "Over limit for downgrade";
+            if (isProcessing) return "Processing...";
+            if (isLoading) return "Processing...";
+            return isDowngrade
+              ? `Switch to ${tier.title}`
+              : `Upgrade to ${tier.title}`;
+          })();
 
           return (
-            <div
+            <PricingTierCard
               key={tier.key}
-              className={`relative flex flex-col rounded-3xl pb-2 shadow-none bg-content2 dark:bg-content1 transition-colors ${
-                tier.mostPopular
-                  ? "border-2 border-primary"
-                  : isCurrentPlan
-                    ? "border-2 border-success"
-                    : "border border-default-100"
-              }`}
-            >
-              <div className="flex flex-col px-6 py-4">
-                <h3 className="text-xl font-semibold text-default-800">
-                  {tier.title}
-                </h3>
-                <div className="mt-4 gap-2 flex flex-col">
-                  <div className="text-4xl font-semibold tracking-tight text-default-800">
-                    {typeof tier.price === "string"
-                      ? tier.price
-                      : tier.price[selectedFrequency.key]}
-                  </div>
-                  <div className="text-xs font-medium text-default-500">
-                    {selectedFrequency.priceSuffix}
-                  </div>
-                </div>
-
-                <p className="mt-4 text-sm text-default-500">
-                  {tier.description}
-                </p>
-
-                <Button
-                  fullWidth
-                  color={
-                    isCurrentPlan
-                      ? "success"
-                      : tier.mostPopular
-                        ? "primary"
-                        : "default"
-                  }
-                  disabled={(() => {
-                    if (isCurrentPlan || isLoading) return true;
-
-                    // Check if downgrade is blocked due to usage
-                    const tierLimits: Record<string, number> = {
-                      free: 300,
-                      starter: 1200,
-                      growth: 3500,
-                      business: 7500,
-                    };
-
-                    const tierLimit = tierLimits[tier.title.toLowerCase()] || 0;
-                    const currentOrderUsage = currentUsage?.currentUsage || 0;
-
-                    const planOrder = ["free", "starter", "growth", "business"];
-                    const currentPlanIndex = planOrder.indexOf(
-                      currentPlan.toLowerCase()
-                    );
-                    const tierIndex = planOrder.indexOf(
-                      tier.title.toLowerCase()
-                    );
-                    const isDowngrade = tierIndex < currentPlanIndex;
-
-                    // Disable if downgrading and usage exceeds lower plan limit
-                    return isDowngrade && currentOrderUsage > tierLimit;
-                  })()}
-                  isLoading={loadingTier === tier.title + " Plan"}
-                  endContent={
-                    !isCurrentPlan && (
-                      <Icon icon="solar:arrow-right-linear" width={14} />
-                    )
-                  }
-                  size="sm"
-                  variant={
-                    isCurrentPlan
-                      ? "solid"
-                      : tier.mostPopular
-                        ? "solid"
-                        : "flat"
-                  }
-                  className="mt-2 h-9"
-                  onPress={() => {
-                    if (!isCurrentPlan) {
-                      // Map tier to Shopify plan name using stable identifiers
-                      // Use key mapping aligned with TiersEnum
-                      const planMappingByKey: Record<string, string> = {
-                        free: "Free Plan",
-                        pro: "Starter Plan",
-                        team: "Growth Plan",
-                        custom: "Business Plan",
-                        enterprise: "Enterprise Plan",
-                      };
-
-                      // Fallback: map by title in case keys change
-                      const planMappingByTitle: Record<string, string> = {
-                        free: "Free Plan",
-                        starter: "Starter Plan",
-                        growth: "Growth Plan",
-                        business: "Business Plan",
-                        enterprise: "Enterprise Plan",
-                      };
-
-                      const key = String(tier.key).toLowerCase();
-                      const title = tier.title.toLowerCase();
-                      const shopifyPlanName =
-                        planMappingByKey[key] || planMappingByTitle[title];
-
-                      if (shopifyPlanName) {
-                        handlePlanUpgrade(shopifyPlanName);
-                      }
-                    }
-                  }}
-                >
-                  {(() => {
-                    if (isCurrentPlan) return "Current Plan";
-
-                    // Get tier's order limit
-                    const tierLimits: Record<string, number> = {
-                      free: 300,
-                      starter: 1200,
-                      growth: 3500,
-                      business: 7500,
-                    };
-
-                    const tierLimit = tierLimits[tier.title.toLowerCase()] || 0;
-                    const currentOrderUsage = currentUsage?.currentUsage || 0;
-
-                    // Check if this is a downgrade
-                    const planOrder = ["free", "starter", "growth", "business"];
-                    const currentPlanIndex = planOrder.indexOf(
-                      currentPlan.toLowerCase()
-                    );
-                    const tierIndex = planOrder.indexOf(
-                      tier.title.toLowerCase()
-                    );
-                    const isDowngrade = tierIndex < currentPlanIndex;
-
-                    // Prevent downgrade if current usage exceeds the lower plan's limit
-                    if (isDowngrade && currentOrderUsage > tierLimit) {
-                      return `Over limit for downgrade`;
-                    }
-
-                    if (isLoading) return "Processing...";
-                    return isDowngrade
-                      ? `Switch to ${tier.title}`
-                      : `Upgrade to ${tier.title}`;
-                  })()}
-                </Button>
-              </div>
-
-              <Divider className="my-2" />
-
-              <div className="flex flex-col justify-between px-6 pt-2 pb-4">
-                <ul className="space-y-3">
-                  {tier.features?.map((feature) => (
-                    <li key={feature} className="flex items-center">
-                      <BadgeCheck className="size-5 shrink-0 text-default-600" />
-                      <span className="ml-3 text-sm text-default-600">
-                        {feature}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
+              tier={tier}
+              selectedFrequency={selectedFrequency}
+              highlight={
+                isCurrentPlan ? "active" : tier.mostPopular ? "popular" : null
+              }
+              button={{
+                label: buttonLabel,
+                size: "sm",
+                className: "h-9",
+                color: isCurrentPlan
+                  ? "success"
+                  : tier.key === TiersEnum.Free
+                    ? "default"
+                    : "primary",
+                variant: isCurrentPlan
+                  ? "solid"
+                  : tier.mostPopular
+                    ? "solid"
+                    : "flat",
+                disabled,
+                isLoading: isProcessing,
+                endContent:
+                  disabled || !planName || isCurrentPlan
+                    ? undefined
+                    : (
+                        <Icon icon="solar:arrow-right-linear" width={14} />
+                      ),
+                onPress: () => {
+                  if (!planName || disabled) return;
+                  void handlePlanUpgrade(planName);
+                },
+              }}
+            />
           );
         })}
       </div>

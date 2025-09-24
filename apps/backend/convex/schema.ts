@@ -39,6 +39,7 @@ import {
   shopifyFulfillments,
   shopifyInventory,
   shopifySessions,
+  shopifyAnalytics,
 } from "./schema/shopify";
 import {
   syncProfiles,
@@ -90,6 +91,7 @@ export default defineSchema({
   shopifyFulfillments,
   shopifyInventory,
   shopifySessions,
+  shopifyAnalytics,
 
   // Meta tables
   metaAdAccounts,

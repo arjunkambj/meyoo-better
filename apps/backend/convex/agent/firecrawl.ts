@@ -1,9 +1,9 @@
 import { action, internalMutation, internalQuery } from "../_generated/server";
 import { v } from "convex/values";
-import { requireUserAndOrg } from "../utils/auth";
 import { rag } from "../rag";
 import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
+import { resolveOrgIdForContext } from "../utils/org";
 
 const FIRECRAWL_API_BASE =
   process.env.FIRECRAWL_API_BASE_URL ?? "https://api.firecrawl.dev";
@@ -130,9 +130,15 @@ export const seedDocsFromFirecrawl = action({
     excludePaths: v.optional(v.array(v.string())),
     maxPages: v.optional(v.number()),
     force: v.optional(v.boolean()),
+    organizationId: v.optional(v.id("organizations")),
+    shopDomain: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const { orgId } = await requireUserAndOrg(ctx);
+    const { orgId } = await resolveOrgIdForContext(ctx, {
+      organizationId: args.organizationId ?? null,
+      shopDomain: args.shopDomain ?? null,
+      url: args.url,
+    });
 
     const onboarding = await ctx.runQuery(
       internal.agent.firecrawl.getOnboardingForOrg,

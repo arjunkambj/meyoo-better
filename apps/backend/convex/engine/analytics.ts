@@ -212,6 +212,7 @@ export const gatherAnalyticsData = internalQuery({
     productCostComponents: v.array(v.any()),
     metaInsights: v.array(v.any()),
     costs: v.array(v.any()),
+    shopifyAnalytics: v.array(v.any()),
     startDate: v.string(),
     endDate: v.string(),
     organizationId: v.string(),
@@ -269,6 +270,19 @@ export const gatherAnalyticsData = internalQuery({
       )
       .collect();
 
+    const analytics = await ctx.db
+      .query("shopifyAnalytics")
+      .withIndex("by_organization_date", (q) =>
+        q.eq("organizationId", args.organizationId as Id<"organizations">),
+      )
+      .collect();
+
+    const filteredAnalytics = analytics.filter((entry) => {
+      return (
+        entry.date >= args.startDate && entry.date <= args.endDate
+      );
+    });
+
     // production: avoid noisy analytics logs
 
     return {
@@ -279,6 +293,7 @@ export const gatherAnalyticsData = internalQuery({
       productCostComponents,
       metaInsights,
       costs,
+      shopifyAnalytics: filteredAnalytics,
       startDate: args.startDate,
       endDate: args.endDate,
       organizationId: args.organizationId,
@@ -351,6 +366,14 @@ type DailyMetric = {
   returns: number;
   customerAcquisitionCost: number;
   uniqueCustomers: Set<string>;
+  shopifySessions: number;
+  shopifyVisitors: number;
+  shopifyPageViews: number;
+  shopifyConversions: number;
+  shopifyBounceRate: number;
+  shopifyConversionRate: number;
+  blendedSessionConversionRate: number;
+  uniqueVisitors?: number;
   updatedAt: string;
 };
 
@@ -421,6 +444,16 @@ type AnalyticsData = {
     costPerThruPlay?: number;
   }>;
   costs: any[];
+  shopifyAnalytics: Array<{
+    date: string;
+    trafficSource?: string;
+    sessions?: number;
+    visitors?: number;
+    pageViews?: number;
+    bounceRate?: number;
+    conversionRate?: number;
+    conversions?: number;
+  }>;
   startDate: string;
   endDate: string;
   organizationId: string;
@@ -447,6 +480,8 @@ function calculateDailyMetrics(data: AnalyticsData): DailyMetric[] {
   const perVariantHandlingByDate: Record<string, number> = {};
   const perVariantPaymentByDate: Record<string, number> = {};
   const perVariantPaymentRevenueCovered: Record<string, number> = {};
+  const bounceRateByDate: Record<string, { weighted: number; sessions: number }> = {};
+  const conversionRateByDate: Record<string, { weighted: number; sessions: number }> = {};
 
   // Process Shopify orders
   for (const order of data.shopifyOrders) {
@@ -585,6 +620,55 @@ function calculateDailyMetrics(data: AnalyticsData): DailyMetric[] {
         ? metrics.metaAdSpend / metrics.metaConversions
         : 0;
     metrics.metaCostPerThruPlay = 0;
+  }
+
+  // Process Shopify analytics aggregates (sessions, visitors, etc.)
+  for (const analytics of data.shopifyAnalytics || []) {
+    const date = new Date(analytics.date || Date.now())
+      .toISOString()
+      .substring(0, 10);
+
+    if (!metricsByDate[date]) {
+      metricsByDate[date] = initializeMetrics(date, data.organizationId);
+    }
+
+    const metrics = metricsByDate[date];
+    const sessions = analytics.sessions ?? 0;
+    const visitors = analytics.visitors ?? 0;
+    const pageViews = analytics.pageViews ?? 0;
+
+    metrics.shopifySessions += sessions;
+    metrics.shopifyVisitors += visitors;
+    metrics.shopifyPageViews += pageViews;
+
+    if (analytics.conversions !== undefined) {
+      metrics.shopifyConversions += analytics.conversions;
+    } else if (
+      analytics.conversionRate !== undefined &&
+      sessions > 0
+    ) {
+      metrics.shopifyConversions +=
+        (analytics.conversionRate * sessions) / 100;
+    }
+
+    if (visitors > 0) {
+      metrics.uniqueVisitors = (metrics.uniqueVisitors || 0) + visitors;
+    }
+
+    if (analytics.bounceRate !== undefined && sessions > 0) {
+      const bucket = bounceRateByDate[date] || { weighted: 0, sessions: 0 };
+      bucket.weighted += analytics.bounceRate * sessions;
+      bucket.sessions += sessions;
+      bounceRateByDate[date] = bucket;
+    }
+
+    if (analytics.conversionRate !== undefined && sessions > 0) {
+      const bucket =
+        conversionRateByDate[date] || { weighted: 0, sessions: 0 };
+      bucket.weighted += analytics.conversionRate * sessions;
+      bucket.sessions += sessions;
+      conversionRateByDate[date] = bucket;
+    }
   }
 
   // Process costs - apply to all dates that have orders
@@ -806,6 +890,43 @@ function calculateDailyMetrics(data: AnalyticsData): DailyMetric[] {
 
   // Calculate derived metrics and finalize
   return Object.values(metricsByDate).map((metrics) => {
+    const bounceBucket = bounceRateByDate[metrics.date];
+    if (bounceBucket && bounceBucket.sessions > 0) {
+      metrics.shopifyBounceRate =
+        bounceBucket.weighted / bounceBucket.sessions;
+    }
+
+    const conversionBucket = conversionRateByDate[metrics.date];
+    const analyticsConversionRate =
+      conversionBucket && conversionBucket.sessions > 0
+        ? conversionBucket.weighted / conversionBucket.sessions
+        : undefined;
+
+    if (metrics.shopifySessions > 0) {
+      metrics.shopifyConversionRate =
+        metrics.orders > 0
+          ? (metrics.orders / metrics.shopifySessions) * 100
+          : 0;
+      metrics.blendedSessionConversionRate = metrics.shopifyConversionRate;
+    } else if (analyticsConversionRate !== undefined) {
+      metrics.shopifyConversionRate = analyticsConversionRate;
+      metrics.blendedSessionConversionRate = analyticsConversionRate;
+    } else {
+      metrics.shopifyConversionRate = 0;
+      metrics.blendedSessionConversionRate = 0;
+    }
+
+    metrics.shopifyBounceRate = Number(
+      (metrics.shopifyBounceRate ?? 0).toFixed(2),
+    );
+    metrics.shopifyConversions = Number(
+      (metrics.shopifyConversions ?? 0).toFixed(2),
+    );
+
+    if (metrics.shopifyVisitors > 0) {
+      metrics.uniqueVisitors = metrics.shopifyVisitors;
+    }
+
     // Total costs
     metrics.totalCosts =
       metrics.cogs +
@@ -964,6 +1085,14 @@ function initializeMetrics(date: string, organizationId: string): DailyMetric {
     repeatCustomerRate: 0,
     customerAcquisitionCost: 0,
     uniqueCustomers: new Set(),
+    shopifySessions: 0,
+    shopifyVisitors: 0,
+    shopifyPageViews: 0,
+    shopifyConversions: 0,
+    shopifyBounceRate: 0,
+    shopifyConversionRate: 0,
+    blendedSessionConversionRate: 0,
+    uniqueVisitors: 0,
 
     // Platform metrics
     metaAdSpend: 0,

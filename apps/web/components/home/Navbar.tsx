@@ -7,6 +7,7 @@ import { Icon } from "@iconify/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
 
 import { Logo } from "@/components/shared/Logo";
 
@@ -153,16 +154,27 @@ export default function CenteredNavbar() {
           {/* Right side - CTA */}
           <NavbarContent className="hidden md:flex  shrink-0" justify="end">
             <NavbarItem>
-              <Button
-                as={Link}
-                className="font-semibold px-6"
-                color="primary"
-                endContent={<Icon icon="solar:arrow-right-linear" width={18} />}
-                href="/signin"
-                size="md"
-              >
-                Start free trial
-              </Button>
+              <Unauthenticated>
+                <Button
+                  as={Link}
+                  className="w-full font-semibold"
+                  color="primary"
+                  href="/signin"
+                >
+                  Get Started Now
+                  <Icon className="ml-2" icon="mdi:arrow-right" />
+                </Button>
+              </Unauthenticated>
+              <AuthLoading>
+                <Button as={Link} href="/signin" color="primary">
+                  Get Started Now
+                </Button>
+              </AuthLoading>
+              <Authenticated>
+                <Button as={Link} href="/overview" color="primary">
+                  Dashboard
+                </Button>
+              </Authenticated>
             </NavbarItem>
           </NavbarContent>
 
@@ -215,7 +227,7 @@ export default function CenteredNavbar() {
                         key={item.name}
                         variant="light"
                         className="text-xl font-medium text-muted-foreground hover:text-primary transition-colors duration-300 text-left justify-start p-0 h-auto min-w-0"
-                        onClick={() => {
+                        onPress={() => {
                           if (item.href.startsWith("/")) {
                             router.push(item.href);
                           } else {
@@ -230,17 +242,40 @@ export default function CenteredNavbar() {
 
                     {/* CTA buttons */}
                     <div className="pt-8 space-y-4">
-                      <Button
-                        as={Link}
-                        className="w-full font-semibold"
-                        color="primary"
-                        href="/signin"
-                        radius="full"
-                        size="lg"
-                      >
-                        Get Started Now
-                        <Icon className="ml-2" icon="mdi:arrow-right" />
-                      </Button>
+                      <Unauthenticated>
+                        <Button
+                          as={Link}
+                          className="w-full font-semibold"
+                          color="primary"
+                          href="/signin"
+                          radius="full"
+                          size="lg"
+                        >
+                          Get Started Now
+                          <Icon className="ml-2" icon="mdi:arrow-right" />
+                        </Button>
+                      </Unauthenticated>
+                      <AuthLoading>
+                        <Button
+                          className="w-full font-semibold"
+                          color="primary"
+                          radius="full"
+                          size="lg"
+                        >
+                          Get Started Now
+                        </Button>
+                      </AuthLoading>
+                      <Authenticated>
+                        <Button
+                          className="w-full font-semibold"
+                          color="primary"
+                          href="/signin"
+                          radius="full"
+                          size="lg"
+                        >
+                          Dashboard
+                        </Button>
+                      </Authenticated>
                     </div>
                   </div>
                 </div>

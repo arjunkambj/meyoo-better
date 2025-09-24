@@ -1165,6 +1165,10 @@ export const initial = internalAction({
                               undefined,
                             city:
                               (customer as any).addresses[0].city || undefined,
+                            zip:
+                              (customer as any).addresses[0].zip ||
+                              (customer as any).addresses[0].zipCode ||
+                              undefined,
                           }
                         : undefined,
                       tags: customer.tags || [],
@@ -1342,43 +1346,156 @@ export const syncSessions = internalAction({
       }
 
       // Initialize Shopify client
-      const _client = new ShopifyGraphQLClient({
+      const client = new ShopifyGraphQLClient({
         shopDomain: store.shopDomain,
         accessToken: store.accessToken,
       });
 
-      // Fetch analytics data including sessions
-      const _analyticsQuery = `
-        query getAnalytics($startDate: DateTime!, $endDate: DateTime!) {
-          shop {
-            shopifyAnalytics {
-              report(
-                query: {
-                  name: "sessions_over_time"
-                  dimensions: ["date", "referrer_source", "landing_page"]
-                  metrics: ["sessions", "visitors", "page_views", "bounce_rate", "conversion_rate"]
-                  filters: [
-                    { key: "date", operator: ">=", value: $startDate }
-                    { key: "date", operator: "<=", value: $endDate }
-                  ]
-                }
-              ) {
-                tableData {
-                  rows {
-                    cells {
-                      value
-                    }
-                  }
-                }
-              }
-            }
+      let analyticsEntriesProcessed = 0;
+
+      // Attempt to fetch Shopify analytics data (sessions, visitors, conversion)
+      try {
+        const analyticsResponse = await client.getAnalyticsSessions(
+          args.dateRange.startDate,
+          args.dateRange.endDate
+        );
+
+        const tableData =
+          analyticsResponse.data?.shop?.shopifyAnalytics?.report?.tableData;
+
+        if (tableData?.columns && tableData.rows) {
+          const columnNames = tableData.columns
+            .map((c) => (c?.name ?? "").toLowerCase())
+            .map((name) => name.trim());
+
+          type Accumulator = {
+            date: string;
+            source: string;
+            sessions: number;
+            visitors: number;
+            pageViews: number;
+            bounceWeighted: number;
+            conversionWeighted: number;
+            weightedSessions: number;
+          };
+
+          const aggregates = new Map<string, Accumulator>();
+
+          const parseNumber = (value: string | undefined | null) => {
+            if (!value) return 0;
+            const cleaned = value.replace(/%/g, "").trim();
+            const parsed = Number(cleaned);
+            return Number.isFinite(parsed) ? parsed : 0;
+          };
+
+          for (const row of tableData.rows) {
+            const cells = row.cells ?? [];
+            const values: Record<string, string> = {};
+
+            columnNames.forEach((col, idx) => {
+              if (!col) return;
+              values[col] = cells[idx]?.value ?? "";
+            });
+
+            const dateRaw = values["date"] || values["day"] || "";
+            if (!dateRaw) continue;
+
+            const date = new Date(dateRaw).toISOString().substring(0, 10);
+            const sourceRaw =
+              values["referrer_source"] || values["traffic_source"] || "unknown";
+            const source = sourceRaw.toLowerCase() || "unknown";
+
+            const sessions = parseNumber(values["sessions"]);
+            if (sessions <= 0) continue;
+
+            const visitors = parseNumber(values["visitors"]);
+            const pageViews = parseNumber(values["page_views"]);
+            const bounceRate = parseNumber(values["bounce_rate"]);
+            const conversionRate = parseNumber(values["conversion_rate"]);
+
+            const key = `${date}::${source}`;
+            const acc = aggregates.get(key) ?? {
+              date,
+              source,
+              sessions: 0,
+              visitors: 0,
+              pageViews: 0,
+              bounceWeighted: 0,
+              conversionWeighted: 0,
+              weightedSessions: 0,
+            };
+
+            acc.sessions += sessions;
+            acc.visitors += visitors;
+            acc.pageViews += pageViews;
+            acc.bounceWeighted += bounceRate * sessions;
+            acc.conversionWeighted += conversionRate * sessions;
+            acc.weightedSessions += sessions;
+
+            aggregates.set(key, acc);
           }
+
+          const entries = Array.from(aggregates.values()).map((acc) => {
+            const averageBounce =
+              acc.weightedSessions > 0
+                ? acc.bounceWeighted / acc.weightedSessions
+                : undefined;
+            const averageConversion =
+              acc.weightedSessions > 0
+                ? acc.conversionWeighted / acc.weightedSessions
+                : undefined;
+            const conversions =
+              averageConversion !== undefined
+                ? (averageConversion / 100) * acc.sessions
+                : undefined;
+
+            return {
+              date: acc.date,
+              trafficSource: acc.source || "unknown",
+              sessions: acc.sessions,
+              visitors: acc.visitors || undefined,
+              pageViews: acc.pageViews || undefined,
+              bounceRate:
+                averageBounce !== undefined ? Number(averageBounce.toFixed(2)) : undefined,
+              conversionRate:
+                averageConversion !== undefined
+                  ? Number(averageConversion.toFixed(2))
+                  : undefined,
+              conversions:
+                conversions !== undefined ? Number(conversions.toFixed(2)) : undefined,
+              dataSource: "shopify_analytics",
+            };
+          });
+
+          if (entries.length > 0) {
+            await ctx.runMutation(
+              internal.integrations.shopify.storeAnalyticsInternal,
+              {
+                organizationId: args.organizationId,
+                storeId: args.storeId,
+                entries,
+              }
+            );
+            analyticsEntriesProcessed = entries.length;
+          }
+        } else if (analyticsResponse.errors && analyticsResponse.errors.length) {
+          logger.warn("Shopify analytics query returned errors", {
+            organizationId: args.organizationId,
+            errors: analyticsResponse.errors,
+          });
         }
-      `;
+      } catch (analyticsError) {
+        logger.info("Falling back to order-derived sessions", {
+          organizationId: args.organizationId,
+          reason:
+            analyticsError instanceof Error
+              ? analyticsError.message
+              : String(analyticsError),
+        });
+      }
 
       // Note: Shopify Analytics API requires Shopify Plus
-      // For regular stores, we'll extract session data from orders
-      // This is a fallback approach using order attribution data
+      // For regular stores, we'll extract session data from orders as a fallback
 
       const ordersWithAttribution = (await ctx.runQuery(
         internal.integrations.shopify.getOrdersWithAttribution,
@@ -1461,6 +1578,7 @@ export const syncSessions = internalAction({
       logger.info("Session sync completed", {
         sessionsProcessed,
         ordersProcessed: ordersWithAttribution.length,
+        analyticsEntriesProcessed,
       });
 
       return {

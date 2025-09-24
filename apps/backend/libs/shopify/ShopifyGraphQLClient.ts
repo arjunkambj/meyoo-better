@@ -1296,6 +1296,71 @@ export class ShopifyGraphQLClient {
   }
 
   /**
+   * Fetch Shopify analytics report data (sessions, visitors, etc.)
+   */
+  async getAnalyticsSessions(startDate: string, endDate: string) {
+    const query = `
+      query getAnalytics($startDate: DateTime!, $endDate: DateTime!) {
+        shop {
+          shopifyAnalytics {
+            report(
+              query: {
+                name: "sessions_over_time"
+                dimensions: ["date", "referrer_source"]
+                metrics: [
+                  "sessions"
+                  "visitors"
+                  "page_views"
+                  "bounce_rate"
+                  "conversion_rate"
+                ]
+                filters: [
+                  { key: "date", operator: ">=", value: $startDate }
+                  { key: "date", operator: "<=", value: $endDate }
+                ]
+              }
+            ) {
+              tableData {
+                columns {
+                  name
+                }
+                rows {
+                  cells {
+                    value
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    const startIso = new Date(`${startDate}T00:00:00Z`).toISOString();
+    const endIso = new Date(`${endDate}T23:59:59Z`).toISOString();
+
+    const variables = {
+      startDate: startIso,
+      endDate: endIso,
+    };
+
+    return this.makeRequest<{
+      shop?: {
+        shopifyAnalytics?: {
+          report?: {
+            tableData?: {
+              columns?: Array<{ name: string }>;
+              rows?: Array<{
+                cells?: Array<{ value?: string | null }>;
+              }>;
+            };
+          };
+        };
+      };
+    }>(query, variables);
+  }
+
+  /**
    * Fetch orders with attribution data for session tracking
    */
   async fetchOrdersWithAttribution(startDate: string, endDate: string) {

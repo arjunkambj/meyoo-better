@@ -303,6 +303,7 @@ export const shopifyCustomers = defineTable({
       country: v.optional(v.string()),
       province: v.optional(v.string()),
       city: v.optional(v.string()),
+      zip: v.optional(v.string()),
     }),
   ),
 
@@ -518,3 +519,24 @@ export const shopifySessions = defineTable({
   .index("by_conversion", ["hasConverted"])
   .index("by_referrer_source", ["referrerSource"])
   .index("by_store_and_date", ["storeId", "startTime"]);
+
+// Shopify analytics aggregates (sessions, traffic sources, etc.)
+export const shopifyAnalytics = defineTable({
+  organizationId: v.id("organizations"),
+  storeId: v.id("shopifyStores"),
+
+  date: v.string(), // YYYY-MM-DD
+  trafficSource: v.string(), // e.g., direct, google, facebook
+
+  sessions: v.number(),
+  visitors: v.optional(v.number()),
+  pageViews: v.optional(v.number()),
+  bounceRate: v.optional(v.number()),
+  conversionRate: v.optional(v.number()),
+  conversions: v.optional(v.number()),
+
+  dataSource: v.optional(v.string()), // shopify_analytics, inferred_orders, etc.
+  syncedAt: v.number(),
+})
+  .index("by_organization_date", ["organizationId", "date"])
+  .index("by_store_date_source", ["storeId", "date", "trafficSource"]);

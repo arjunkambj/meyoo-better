@@ -52,17 +52,17 @@ export function InventoryOverviewCards({
   const cards = [
     {
       title: "Inventory Value",
-      value: `${currencySymbol}${formatNumber(metrics.totalCOGS)}`,
-      change: metrics.changes.totalCOGS,
+      value: `${currencySymbol}${formatNumber(metrics.totalValue)}`,
+      change: metrics.changes.totalValue,
       icon: "solar:box-bold-duotone",
-      subtitle: `Cost value of ${metrics.totalSKUs} SKUs`,
+      subtitle: `Total value across ${metrics.totalSKUs} SKUs`,
     },
     {
-      title: "Average Sale Price",
+      title: "Average Order Value",
       value: `${currencySymbol}${metrics.averageSalePrice.toFixed(2)}`,
       change: 0,
       icon: "solar:tag-price-bold-duotone",
-      subtitle: "Per unit sold",
+      subtitle: "Per order in range",
     },
     {
       title: "Stock Coverage",
@@ -104,4 +104,3 @@ export function InventoryOverviewCards({
     </div>
   );
 }
-

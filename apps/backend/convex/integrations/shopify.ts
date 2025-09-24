@@ -3736,6 +3736,83 @@ export const updateOrderSessionInternal = internalMutation({
 });
 
 /**
+ * Upsert Shopify analytics aggregates (sessions, traffic sources, etc.)
+ */
+export const storeAnalyticsInternal = internalMutation({
+  args: {
+    organizationId: v.id("organizations"),
+    storeId: v.id("shopifyStores"),
+    entries: v.array(
+      v.object({
+        date: v.string(),
+        trafficSource: v.string(),
+        sessions: v.number(),
+        visitors: v.optional(v.number()),
+        pageViews: v.optional(v.number()),
+        bounceRate: v.optional(v.number()),
+        conversionRate: v.optional(v.number()),
+        conversions: v.optional(v.number()),
+        dataSource: v.optional(v.string()),
+      }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    for (const entry of args.entries) {
+      const normalizedSource = entry.trafficSource || "unknown";
+
+      const existing = await ctx.db
+        .query("shopifyAnalytics")
+        .withIndex("by_store_date_source", (q) =>
+          q
+            .eq("storeId", args.storeId)
+            .eq("date", entry.date)
+            .eq("trafficSource", normalizedSource)
+        )
+        .first();
+
+      const baseUpdate: Record<string, unknown> = {
+        sessions: entry.sessions,
+        syncedAt: Date.now(),
+      };
+
+      if (entry.dataSource !== undefined) {
+        baseUpdate.dataSource = entry.dataSource;
+      }
+
+      if (entry.visitors !== undefined) baseUpdate.visitors = entry.visitors;
+      if (entry.pageViews !== undefined) baseUpdate.pageViews = entry.pageViews;
+      if (entry.bounceRate !== undefined)
+        baseUpdate.bounceRate = entry.bounceRate;
+      if (entry.conversionRate !== undefined)
+        baseUpdate.conversionRate = entry.conversionRate;
+      if (entry.conversions !== undefined)
+        baseUpdate.conversions = entry.conversions;
+
+      if (existing) {
+        await ctx.db.patch(existing._id, baseUpdate as any);
+      } else {
+        await ctx.db.insert("shopifyAnalytics", {
+          organizationId: args.organizationId,
+          storeId: args.storeId,
+          date: entry.date,
+          trafficSource: normalizedSource,
+          sessions: entry.sessions,
+          visitors: entry.visitors,
+          pageViews: entry.pageViews,
+          bounceRate: entry.bounceRate,
+          conversionRate: entry.conversionRate,
+          conversions: entry.conversions,
+          dataSource: entry.dataSource ?? "shopify_analytics",
+          syncedAt: Date.now(),
+        });
+      }
+    }
+
+    return null;
+  },
+});
+
+/**
  * Get orders with attribution fields for a date range
  */
 export const getOrdersWithAttribution = internalQuery({

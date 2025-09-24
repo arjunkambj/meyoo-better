@@ -130,18 +130,18 @@ const Pricing = () => {
                 key={tier.key}
                 className={`h-full w-full ${designSystem.card.base} rounded-2xl pb-5 transition duration-300 sm:w-80`}
               >
-                <CardHeader className="flex flex-col gap-4 px-6 py-6">
-                  <h3 className="text-lg font-semibold tracking-tight text-foreground">
+                <CardHeader className="flex flex-col gap-4  py-6">
+                  <h3 className="text-lg font-semibold text-center tracking-tight text-foreground">
                     {tier.title}
                   </h3>
-                  <p className="text-sm leading-relaxed text-muted-foreground">
+                  <p className="text-sm text-center leading-relaxed text-muted-foreground">
                     {tier.description}
                   </p>
-                  <div className="flex flex-col gap-1">
-                    <div className="flex items-end gap-1 text-4xl font-semibold tracking-tight text-foreground">
+                  <div className="flex flex-col items-center gap-1">
+                    <div className="flex items-end gap-1 text-4xl font-semibold text-center tracking-tight text-foreground">
                       {shouldAnimate ? (
                         <>
-                          <span className="text-2xl font-medium text-muted-foreground">
+                          <span className="text-2xl font-medium text-center text-muted-foreground">
                             $
                           </span>
                           <NumberTicker
@@ -152,10 +152,14 @@ const Pricing = () => {
                           />
                         </>
                       ) : (
-                        <span>{price}</span>
+                        <span className="text-2xl font-medium text-center text-muted-foreground">
+                          {price}
+                        </span>
                       )}
                     </div>
-                    <div className="text-xs text-muted-foreground">{periodCopy}</div>
+                    <div className="text-xs text-center text-muted-foreground">
+                      {periodCopy}
+                    </div>
                   </div>
 
                   <Button

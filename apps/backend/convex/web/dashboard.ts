@@ -541,6 +541,8 @@ export const getDashboardSummary = query({
 
     // production: avoid noisy dashboard logs
 
+    const { returns, ...summaryWithoutReturns } = summary;
+
     // Calculate current derived metrics
     const profitMargin =
       summary.revenue > 0 ? (summary.profit / summary.revenue) * 100 : 0;
@@ -583,7 +585,7 @@ export const getDashboardSummary = query({
         ? (avgOrderValue * summary.newCustomers) / summary.adSpend
         : 0;
     const returnRate =
-      summary.orders > 0 ? (summary.returns / summary.orders) * 100 : 0;
+      summary.orders > 0 ? (returns / summary.orders) * 100 : 0;
     const repeatCustomerRate =
       summary.customers > 0
         ? (summary.returningCustomers / summary.customers) * 100
@@ -699,7 +701,7 @@ export const getDashboardSummary = query({
         : 0;
 
     return {
-      ...summary,
+      ...summaryWithoutReturns,
       // Add change percentages for all metrics
       revenueChange: calculateChange(summary.revenue, previousSummary.revenue),
       profitChange: calculateChange(summary.profit, previousSummary.profit),

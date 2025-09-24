@@ -567,6 +567,7 @@ export const saveInitialCosts = mutation({
 
     // Create or update cost records for analytics (idempotent during onboarding)
     const now = Date.now();
+    let analyticsNeedsRefresh = false;
 
     // Create shipping cost record (flat per order)
     if (args.shippingCost !== undefined && args.shippingCost > 0) {
@@ -581,14 +582,24 @@ export const saveInitialCosts = mutation({
         .first();
 
       if (existingPerOrder) {
-        await ctx.db.patch(existingPerOrder._id, {
-          calculation: "fixed",
-          value: args.shippingCost,
-          frequency: "per_order",
-          isActive: true,
-          isDefault: true,
-          updatedAt: now,
-        } as any);
+        const shouldUpdate =
+          existingPerOrder.calculation !== "fixed" ||
+          existingPerOrder.frequency !== "per_order" ||
+          existingPerOrder.value !== args.shippingCost ||
+          !existingPerOrder.isActive ||
+          !existingPerOrder.isDefault;
+
+        if (shouldUpdate) {
+          await ctx.db.patch(existingPerOrder._id, {
+            calculation: "fixed",
+            value: args.shippingCost,
+            frequency: "per_order",
+            isActive: true,
+            isDefault: true,
+            updatedAt: now,
+          } as any);
+          analyticsNeedsRefresh = true;
+        }
       } else {
         await ctx.db.insert("costs", {
           organizationId: user.organizationId as Id<"organizations">,
@@ -604,6 +615,7 @@ export const saveInitialCosts = mutation({
           effectiveFrom: now,
           createdAt: now,
         } as any);
+        analyticsNeedsRefresh = true;
       }
     }
 
@@ -617,14 +629,24 @@ export const saveInitialCosts = mutation({
         .first();
 
       if (existingPayment) {
-        await ctx.db.patch(existingPayment._id, {
-          calculation: "percentage",
-          value: args.paymentFeePercent,
-          frequency: "percentage",
-          isActive: true,
-          isDefault: true,
-          updatedAt: now,
-        } as any);
+        const shouldUpdate =
+          existingPayment.calculation !== "percentage" ||
+          existingPayment.frequency !== "percentage" ||
+          existingPayment.value !== args.paymentFeePercent ||
+          !existingPayment.isActive ||
+          !existingPayment.isDefault;
+
+        if (shouldUpdate) {
+          await ctx.db.patch(existingPayment._id, {
+            calculation: "percentage",
+            value: args.paymentFeePercent,
+            frequency: "percentage",
+            isActive: true,
+            isDefault: true,
+            updatedAt: now,
+          } as any);
+          analyticsNeedsRefresh = true;
+        }
       } else {
         await ctx.db.insert("costs", {
           organizationId: user.organizationId as Id<"organizations">,
@@ -640,6 +662,7 @@ export const saveInitialCosts = mutation({
           effectiveFrom: now,
           createdAt: now,
         } as any);
+        analyticsNeedsRefresh = true;
       }
     }
 
@@ -656,14 +679,24 @@ export const saveInitialCosts = mutation({
         .first();
 
       if (existingOp) {
-        await ctx.db.patch(existingOp._id, {
-          calculation: "fixed",
-          value: args.operatingCosts,
-          frequency: "monthly",
-          isActive: true,
-          isDefault: true,
-          updatedAt: now,
-        } as any);
+        const shouldUpdate =
+          existingOp.calculation !== "fixed" ||
+          existingOp.frequency !== "monthly" ||
+          existingOp.value !== args.operatingCosts ||
+          !existingOp.isActive ||
+          !existingOp.isDefault;
+
+        if (shouldUpdate) {
+          await ctx.db.patch(existingOp._id, {
+            calculation: "fixed",
+            value: args.operatingCosts,
+            frequency: "monthly",
+            isActive: true,
+            isDefault: true,
+            updatedAt: now,
+          } as any);
+          analyticsNeedsRefresh = true;
+        }
       } else {
         await ctx.db.insert("costs", {
           organizationId: user.organizationId,
@@ -679,6 +712,7 @@ export const saveInitialCosts = mutation({
           effectiveFrom: now,
           createdAt: now,
         } as any);
+        analyticsNeedsRefresh = true;
       }
     }
 
@@ -693,6 +727,13 @@ export const saveInitialCosts = mutation({
       onboardingStep: actualNextStep,
       updatedAt: Date.now(),
     });
+
+    if (analyticsNeedsRefresh) {
+      await ctx.scheduler.runAfter(0, internal.engine.analytics.calculateAnalytics, {
+        organizationId: user.organizationId,
+        dateRange: { daysBack: 90 },
+      });
+    }
 
     // production: avoid noisy onboarding logs
 

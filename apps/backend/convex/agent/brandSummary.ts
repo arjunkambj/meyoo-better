@@ -1,8 +1,8 @@
 import { action, internalQuery } from "../_generated/server";
 import { v } from "convex/values";
-import { requireUserAndOrg } from "../utils/auth";
 import { rag } from "../rag";
 import { api, internal } from "../_generated/api";
+import { resolveOrgIdForContext } from "../utils/org";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_LOOKBACK_DAYS = 30;
@@ -61,9 +61,15 @@ export const computeBrandMetrics = internalQuery({
 export const upsertBrandSummary = action({
   args: {
     lookbackDays: v.optional(v.number()),
+    organizationId: v.optional(v.id("organizations")),
+    shopDomain: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const { user: _user, orgId } = await requireUserAndOrg(ctx);
+    const { orgId } = await resolveOrgIdForContext(ctx, {
+      organizationId: args.organizationId ?? null,
+      shopDomain: args.shopDomain ?? null,
+    });
+
     const lookback = args.lookbackDays ?? DEFAULT_LOOKBACK_DAYS;
     const since = Date.now() - lookback * DAY_MS;
 

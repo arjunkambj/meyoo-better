@@ -6,6 +6,7 @@ import { useAtom } from "jotai";
 import { useEffect, useState } from "react";
 import { agentSidebarOpenAtom } from "@/store/atoms";
 import { cn } from "@heroui/theme";
+import ChatUI from "@/components/agent/ChatUI";
 
 export default function AgentSidebar({
   children,
@@ -89,12 +90,14 @@ export default function AgentSidebar({
         )}
         <div
           className={cn(
-            "h-full flex items-center justify-center text-muted-foreground text-xl",
+            "h-full flex flex-col",
             "transition-opacity duration-500 delay-150",
             isAnimating ? "opacity-100" : "opacity-0"
           )}
         >
-          {children || "Coming Soon"}
+          <div className="flex-1 overflow-hidden">
+            {children ?? <ChatUI />}
+          </div>
         </div>
       </aside>
     </>

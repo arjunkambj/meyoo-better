@@ -65,8 +65,8 @@ const Feature = () => {
         className={`${designSystem.spacing.container} flex w-full flex-col items-center justify-center`}
       >
         <div className={designSystem.typography.sectionChip}>
-          <Icon icon="solar:star-bold" width={16} className="text-primary/70" />
-          <span className="text-xs uppercase tracking-[0.15em] font-medium text-primary/70">
+          <Icon icon="solar:star-bold" width={18} className="text-primary/70" />
+          <span className="text-sm uppercase tracking-[0.15em] font-medium text-primary/70">
             Why Meyoo
           </span>
         </div>

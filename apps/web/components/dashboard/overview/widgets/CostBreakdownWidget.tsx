@@ -4,13 +4,7 @@ import { Button, Card, Tooltip } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { useRouter } from "next/navigation";
 import { useMemo } from "react";
-import {
-  Cell,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip as RechartsTooltip,
-} from "recharts";
+import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts";
 
 import { formatCurrency, formatCurrencyCompact } from "@/libs/utils/format";
 
@@ -24,7 +18,10 @@ type CostCategoryKey =
   | "operating"
   | "taxes";
 
-const COST_STYLES: Record<CostCategoryKey, { colorHex: string; iconBg: string; iconColor: string }> = {
+const COST_STYLES: Record<
+  CostCategoryKey,
+  { colorHex: string; iconBg: string; iconColor: string }
+> = {
   adSpend: {
     colorHex: "#2563EB",
     iconBg: "bg-blue-500/10",
@@ -156,7 +153,10 @@ export function CostBreakdownWidget({
       },
     ];
 
-    const totalCosts = breakdownConfig.reduce((sum, item) => sum + item.value, 0);
+    const totalCosts = breakdownConfig.reduce(
+      (sum, item) => sum + item.value,
+      0
+    );
 
     const pieData = breakdownConfig
       .filter((item) => item.value > 0)
@@ -198,13 +198,20 @@ export function CostBreakdownWidget({
 
   if (loading) {
     return (
-      <Card className="p-5 bg-content2 dark:bg-content1 rounded-2xl border border-default-200/50">
+      <Card
+        aria-busy="true"
+        aria-live="polite"
+        className="p-6 bg-content2 dark:bg-content1 rounded-2xl border border-default-200/50"
+        role="status"
+      >
+        <span className="sr-only">Loading cost breakdown…</span>
         <div className="animate-pulse">
           {/* Header Section */}
           <div className="mb-3.5 pb-3.5 border-b border-divider">
             <div className="flex items-center gap-2">
               <div className="w-5 h-5 bg-default-200 rounded" />
               <div className="h-5 bg-default-200 rounded w-36" />
+              <div className="ml-auto hidden sm:block h-7 w-24 bg-default-200 rounded" />
             </div>
           </div>
 
@@ -212,8 +219,14 @@ export function CostBreakdownWidget({
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
             {/* Pie Chart Section - Left Side */}
             <div className="lg:col-span-2 flex flex-col items-center justify-center h-full">
-              <div className="w-full h-full min-h-[200px] flex items-center justify-center">
-                <div className="h-32 w-32 bg-default-200 rounded-full" />
+              <div className="w-full h-full min-h-[240px] flex items-center justify-center">
+                <div className="relative">
+                  <div className="h-40 w-40 bg-default-200 rounded-full" />
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <div className="h-3 w-10 bg-default-300/60 rounded mb-1" />
+                    <div className="h-4 w-16 bg-default-300/60 rounded" />
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -224,7 +237,7 @@ export function CostBreakdownWidget({
                 {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
                   <div
                     key={i}
-                    className="bg-white dark:bg-content1 border border-divider rounded-xl p-3"
+                    className="bg-background border border-default-50 rounded-xl p-3"
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5">
@@ -255,12 +268,18 @@ export function CostBreakdownWidget({
   }
 
   return (
-    <Card className="p-5 bg-content2 dark:bg-content1 rounded-2xl border border-default-200/50 h-full">
+    <Card className="p-5 bg-default-100 dark:bg-content1 border border-default-50 rounded-2xl h-full">
       {/* Header Section */}
       <div className="mb-3.5 pb-3.5 border-b border-divider flex flex-col sm:flex-row justify-between items-start sm:items-center">
         <div className="flex items-center gap-2">
-          <Icon icon="solar:wallet-bold-duotone" width={20} className="text-primary" />
-          <h3 className="text-lg font-medium text-default-900">Cost Breakdown</h3>
+          <Icon
+            icon="solar:wallet-bold-duotone"
+            width={20}
+            className="text-primary"
+          />
+          <h3 className="text-lg font-medium text-default-900">
+            Cost Breakdown
+          </h3>
         </div>
         {showCostSetupWarning && (
           <Button
@@ -280,15 +299,15 @@ export function CostBreakdownWidget({
         {/* Pie Chart Section - Left Side */}
         <div className="lg:col-span-2 flex flex-col items-center justify-center h-full">
           {chartData.length > 0 ? (
-            <div className="w-full h-full min-h-[200px] relative">
+            <div className="w-full h-full min-h-[240px] relative">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={chartData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={45}
-                    outerRadius={70}
+                    innerRadius={52}
+                    outerRadius={84}
                     fill="#2563EB"
                     dataKey="value"
                   >
@@ -300,9 +319,7 @@ export function CostBreakdownWidget({
               </ResponsiveContainer>
               {/* Center label */}
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <div className="text-xs text-default-500">
-                  Total
-                </div>
+                <div className="text-xs text-default-500">Total</div>
                 <div className="text-sm font-bold text-default-900">
                   {formatCurrencyCompact(
                     chartData.reduce((sum, item) => sum + item.value, 0),
@@ -330,14 +347,18 @@ export function CostBreakdownWidget({
             {costBreakdown.map((item) => (
               <div
                 key={item.key}
-                className="bg-white dark:bg-content1 border border-divider rounded-lg p-2.5"
+                className="bg-background border border-default-50 rounded-xl p-3"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2 flex-1">
                     <div
                       className={`w-8 h-8 rounded-md flex items-center justify-center shrink-0 ${item.iconBg}`}
                     >
-                      <Icon icon={item.icon} className={item.iconColor} width={18} />
+                      <Icon
+                        icon={item.icon}
+                        className={item.iconColor}
+                        width={18}
+                      />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5">
@@ -392,9 +413,9 @@ export function CostBreakdownWidget({
                       }`}
                     >
                       {item.value > 0
-                        ? (Math.abs(item.value) >= 1000
+                        ? Math.abs(item.value) >= 1000
                           ? formatCurrencyCompact(item.value, currency)
-                          : formatCurrency(item.value, currency))
+                          : formatCurrency(item.value, currency)
                         : "—"}
                     </p>
                   </div>

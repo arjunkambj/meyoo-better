@@ -48,10 +48,10 @@ const Faq = () => {
           <div className={designSystem.typography.sectionChip}>
             <Icon
               icon="solar:question-circle-bold"
-              width={16}
+              width={18}
               className="text-primary/70"
             />
-            <span className="text-xs uppercase tracking-[0.15em] font-medium text-primary/70">
+            <span className="text-sm uppercase tracking-[0.15em] font-medium text-primary/70">
               Support & FAQ
             </span>
           </div>

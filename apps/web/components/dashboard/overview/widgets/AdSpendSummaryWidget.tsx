@@ -13,6 +13,7 @@ interface MetricProps {
   currency?: string;
   isPrimary?: boolean;
   hint?: string;
+  goodWhenLower?: boolean;
 }
 
 function Metric({
@@ -23,6 +24,7 @@ function Metric({
   currency = "USD",
   isPrimary = false,
   hint,
+  goodWhenLower = false,
 }: MetricProps) {
   const formatValue = () => {
     if (typeof value === "string") return value;
@@ -40,25 +42,29 @@ function Metric({
     }
   };
 
+  const isGood =
+    change === undefined || change === 0
+      ? null
+      : goodWhenLower
+        ? change < 0
+        : change > 0;
+
   const changeBadgeClasses =
     change === undefined
       ? "bg-default-100/80 dark:bg-default-100/10 text-default-600"
-      : change > 0
-        ? "bg-success-100/60 dark:bg-success-500/20 text-success-700"
-        : change < 0
-          ? "bg-danger-100/60 dark:bg-danger-500/20 text-danger-700"
-          : "bg-warning-100/60 dark:bg-warning-500/20 text-warning-700";
+      : change === 0
+        ? "bg-warning-100/60 dark:bg-warning-500/20 text-warning-700"
+        : isGood
+          ? "bg-success-100/60 dark:bg-success-500/20 text-success-700"
+          : "bg-danger-100/60 dark:bg-danger-500/20 text-danger-700";
 
   // Match Customer metric container styles
   const containerClasses = isPrimary
-    ? "p-3 bg-background dark:bg-default-100/50 rounded-xl"
+    ? "p-3 bg-background border border-default-50 rounded-xl"
     : "py-2.5 border-b border-default-200 last:border-0";
 
   return (
-    <div
-      className={containerClasses}
-      aria-label={`${label} metric`}
-    >
+    <div className={containerClasses} aria-label={`${label} metric`}>
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-2">
           <span
@@ -177,6 +183,7 @@ export function AdSpendSummaryWidget({
           isPrimary={true}
           label="Total Ad Spend"
           hint="Total advertising spend across all channels"
+          goodWhenLower
           value={totalAdSpend}
         />
 

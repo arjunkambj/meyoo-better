@@ -17,6 +17,7 @@ interface MetricProps {
   currency?: string;
   isPrimary?: boolean;
   hint?: string;
+  goodWhenLower?: boolean;
 }
 
 function Metric({
@@ -27,6 +28,7 @@ function Metric({
   currency = "USD",
   isPrimary = false,
   hint,
+  goodWhenLower = false,
 }: MetricProps) {
   const formatValue = () => {
     if (typeof value === "string") return value;
@@ -45,18 +47,25 @@ function Metric({
   };
 
   // Align change chip design with Order/AdSpend widgets
+  const isGood =
+    change === undefined || change === 0
+      ? null
+      : goodWhenLower
+        ? change < 0
+        : change > 0;
+
   const changeBadgeClasses =
     change === undefined
       ? "bg-default-100/80 dark:bg-default-100/10 text-default-600"
-      : change > 0
-        ? "bg-success-100/60 dark:bg-success-500/20 text-success-700"
-        : change < 0
-          ? "bg-danger-100/60 dark:bg-danger-500/20 text-danger-700"
-          : "bg-warning-100/60 dark:bg-warning-500/20 text-warning-700";
+      : change === 0
+        ? "bg-warning-100/60 dark:bg-warning-500/20 text-warning-700"
+        : isGood
+          ? "bg-success-100/60 dark:bg-success-500/20 text-success-700"
+          : "bg-danger-100/60 dark:bg-danger-500/20 text-danger-700";
 
   return (
     <div
-      className={`${isPrimary ? "p-3 bg-background dark:bg-default-100/50 rounded-xl" : "py-2.5 border-b border-default-200 last:border-0"}`}
+      className={`${isPrimary ? "p-3 bg-background border-default-50 rounded-xl" : "py-2.5 border-b border-default-200 last:border-0"}`}
       aria-label={`${label} metric`}
     >
       <div className="flex justify-between items-center">
@@ -200,6 +209,7 @@ export function CustomerSummaryWidget({
           format="percentage"
           label="Return Rate"
           hint="Percentage of orders that were returned"
+          goodWhenLower
           value={returnRate}
         />
 
@@ -209,6 +219,7 @@ export function CustomerSummaryWidget({
           format="currency"
           label="CAC"
           hint="Customer Acquisition Cost per new customer"
+          goodWhenLower
           value={cac}
         />
       </div>

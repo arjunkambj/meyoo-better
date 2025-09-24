@@ -19,7 +19,8 @@ import {
   parseDate,
   today,
 } from "@internationalized/date";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 
 // RangeValue type from @react-aria (equivalent to HeroUI's expected type)
 interface RangeValue<T> {
@@ -30,19 +31,15 @@ interface RangeValue<T> {
 import { useAtom } from "jotai";
 
 import { createLogger } from "@/libs/logging/Logger";
-import { analyticsDateRangeAtom } from "@/store/atoms";
+import {
+  analyticsDateRangeFamily,
+  type AnalyticsDateRange,
+} from "@/store/atoms";
 
 const logger = createLogger("GlobalDateRangePicker");
 
 // Use the compatible RangeValue type
 type CalendarDateRange = RangeValue<CalendarDate>;
-
-// Analytics date range format with string dates
-interface AnalyticsDateRange {
-  start: string; // YYYY-MM-DD
-  end: string; // YYYY-MM-DD
-  preset?: string;
-}
 
 // Helper function to format single date
 const formatSingleDate = (date?: CalendarDate): string => {
@@ -96,6 +93,8 @@ interface GlobalDateRangePickerProps {
   maxDate?: CalendarDate;
   selectedPreset?: string | null;
   useGlobalState?: boolean; // Whether to use Jotai atom for state
+  stateKey?: string; // Optional scoped key when using global state
+  defaultPreset?: keyof typeof allDateRangePresets; // Optional preset applied on first load
 }
 
 // Comprehensive date range presets
@@ -139,11 +138,23 @@ export default function GlobalDateRangePicker({
   maxDate: _maxDate,
   selectedPreset: externalSelectedPreset,
   useGlobalState = true,
+  stateKey,
+  defaultPreset,
 }: GlobalDateRangePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const pathname = usePathname();
+
+  const globalScopeKey = useMemo(
+    () => stateKey ?? pathname ?? "default",
+    [pathname, stateKey],
+  );
 
   // Use Jotai atom for global state management
-  const [globalDateRange, setGlobalDateRange] = useAtom(analyticsDateRangeAtom);
+  const [globalDateRange, setGlobalDateRange] = useAtom(
+    analyticsDateRangeFamily(globalScopeKey),
+  );
+
+  const hasAppliedDefaultPresetRef = useRef(false);
 
   const [selectedPreset, setSelectedPreset] = useState<string | null>(
     externalSelectedPreset ||
@@ -493,6 +504,50 @@ export default function GlobalDateRangePicker({
     },
     [onAnalyticsChange, useGlobalState, setGlobalDateRange]
   );
+
+  const applyDefaultPresetIfNeeded = useCallback(() => {
+    if (
+      !useGlobalState ||
+      !defaultPreset ||
+      hasAppliedDefaultPresetRef.current
+    ) {
+      return;
+    }
+
+    if (!presets.includes(defaultPreset)) {
+      hasAppliedDefaultPresetRef.current = true;
+      return;
+    }
+
+    if (globalDateRange?.preset === defaultPreset) {
+      hasAppliedDefaultPresetRef.current = true;
+      return;
+    }
+
+    const range = getDateRangeFromPreset(defaultPreset);
+    const analyticsRange = toAnalyticsDateRange(range, defaultPreset);
+
+    setGlobalDateRange(analyticsRange);
+    setSelectedPreset(defaultPreset);
+
+    if (onAnalyticsChange) {
+      onAnalyticsChange(analyticsRange);
+    }
+
+    hasAppliedDefaultPresetRef.current = true;
+  }, [
+    defaultPreset,
+    getDateRangeFromPreset,
+    globalDateRange,
+    onAnalyticsChange,
+    presets,
+    setGlobalDateRange,
+    useGlobalState,
+  ]);
+
+  useEffect(() => {
+    applyDefaultPresetIfNeeded();
+  }, [applyDefaultPresetIfNeeded]);
 
   // Handle select mode change
   const handleSelectChange = useCallback(

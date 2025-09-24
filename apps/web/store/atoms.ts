@@ -1,9 +1,9 @@
 import { getLocalTimeZone, today } from "@internationalized/date";
 import { atom } from "jotai";
-import { atomWithStorage } from "jotai/utils";
+import { atomFamily, atomWithStorage } from "jotai/utils";
 
 // Analytics date range interface
-interface AnalyticsDateRange {
+export interface AnalyticsDateRange {
   start: string; // YYYY-MM-DD
   end: string; // YYYY-MM-DD
   preset?: string;
@@ -21,10 +21,13 @@ function getDefaultDateRange(): AnalyticsDateRange {
   };
 }
 
-// Global analytics date range atom
-export const analyticsDateRangeAtom = atom<AnalyticsDateRange>(
-  getDefaultDateRange(),
+// Global analytics date range atoms scoped by key (e.g. route pathname)
+export const analyticsDateRangeFamily = atomFamily(
+  (_scope?: string) => atom<AnalyticsDateRange>(getDefaultDateRange()),
 );
+
+// Default analytics date range atom (legacy/global consumers)
+export const analyticsDateRangeAtom = analyticsDateRangeFamily("default");
 
 // UI State atoms
 export const sidebarOpenAtom = atomWithStorage("sidebar-open", true);

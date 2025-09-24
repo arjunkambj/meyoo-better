@@ -2,6 +2,7 @@
 
 import { Spacer } from "@heroui/react";
 import { useAtomValue } from "jotai";
+import { usePathname } from "next/navigation";
 import React, { useCallback, useMemo, useState } from "react";
 import { PlanUsageAlert } from "@/components/shared/billing/PlanUsageAlert";
 import {
@@ -10,7 +11,7 @@ import {
   usePlatformMetrics,
   useUser,
 } from "@/hooks";
-import { analyticsDateRangeAtom, devToolsVisibleAtom } from "@/store/atoms";
+import { analyticsDateRangeFamily, devToolsVisibleAtom } from "@/store/atoms";
 
 import { CustomizationModalUnified } from "./CustomizationModalUnified";
 import { DashboardHeader } from "./components/DashboardHeader";
@@ -20,9 +21,12 @@ import { DevTools } from "./DevTools";
 
 export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
   const [isCustomizing, setIsCustomizing] = useState(false);
+  const pathname = usePathname();
 
   // Use global date range
-  const dateRange = useAtomValue(analyticsDateRangeAtom);
+  const dateRange = useAtomValue(
+    analyticsDateRangeFamily(pathname ?? "default"),
+  );
   const devToolsVisible = useAtomValue(devToolsVisibleAtom);
 
   // Get user's primary currency and cost setup status

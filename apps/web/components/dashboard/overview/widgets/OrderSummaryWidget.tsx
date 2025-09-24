@@ -52,32 +52,35 @@ function Metric({
           : "text-warning";
 
   return (
-    <div className="py-2" aria-label={`${label} metric`}>
+    <div
+      className={`${isPrimary ? "p-3 bg-default-50 dark:bg-default-100/50 rounded-lg" : "py-2.5 border-b border-divider last:border-0"}`}
+      aria-label={`${label} metric`}
+    >
       <div className="flex justify-between items-center">
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           <span
-            className={`${isPrimary ? "text-sm" : "text-xs"} text-default-800 font-medium`}
+            className={`${isPrimary ? "text-sm font-semibold" : "text-xs"} text-default-700`}
           >
             {label}
           </span>
           {hint && (
             <Tooltip content={hint} placement="top" delay={200} closeDelay={50}>
               <span className="text-default-400 cursor-help">
-                <Icon icon="solar:info-circle-bold" width={14} />
+                <Icon icon="solar:info-circle-linear" width={14} />
               </span>
             </Tooltip>
           )}
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           <span
-            className={`${isPrimary ? "text-lg font-bold" : "text-sm font-semibold"} text-foreground`}
+            className={`${isPrimary ? "text-xl font-bold" : "text-sm font-semibold"} text-foreground`}
           >
             {formatValue()}
           </span>
           {change !== undefined && (
             <div
               aria-label={`Change ${change >= 0 ? "up" : "down"} ${Math.abs(change).toFixed(0)} percent`}
-              className={`flex items-center gap-0.5 ${changeColor}`}
+              className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded ${changeColor} ${change >= 0 ? "bg-success-50 dark:bg-success-100/20" : change < 0 ? "bg-danger-50 dark:bg-danger-100/20" : "bg-warning-50 dark:bg-warning-100/20"}`}
             >
               <Icon
                 icon={
@@ -85,7 +88,7 @@ function Metric({
                     ? "solar:arrow-up-linear"
                     : "solar:arrow-down-linear"
                 }
-                width={10}
+                width={12}
               />
               <span className="text-xs font-medium">
                 {Math.abs(change).toFixed(0)}%
@@ -107,6 +110,8 @@ interface OrderSummaryWidgetProps {
   avgOrderProfitChange?: number;
   avgOrderCost: number;
   avgOrderCostChange?: number;
+  prepaidRate?: number;
+  prepaidRateChange?: number;
   currency?: string;
   loading?: boolean;
 }
@@ -120,6 +125,8 @@ export function OrderSummaryWidget({
   avgOrderProfitChange,
   avgOrderCost,
   avgOrderCostChange,
+  prepaidRate = 0,
+  prepaidRateChange,
   currency = "USD",
   loading = false,
 }: OrderSummaryWidgetProps) {
@@ -146,11 +153,14 @@ export function OrderSummaryWidget({
       className="p-5 bg-content2 dark:bg-content1 rounded-2xl border border-default-200/50 h-full"
       shadow="none"
     >
-      <div className="mb-2.5 pb-2.5 border-b border-divider">
-        <h3 className="text-lg font-medium text-default-900">Order Summary</h3>
+      <div className="mb-3.5 pb-3.5 border-b border-divider">
+        <div className="flex items-center gap-2">
+          <Icon icon="solar:bag-3-bold-duotone" width={20} className="text-primary" />
+          <h3 className="text-lg font-medium text-default-900">Order Summary</h3>
+        </div>
       </div>
 
-      <div className="space-y-0.5">
+      <div className="space-y-1">
         <Metric
           change={avgOrderValueChange}
           currency={currency}
@@ -186,6 +196,15 @@ export function OrderSummaryWidget({
           label="Avg. Order Cost"
           hint="Average cost per order including COGS"
           value={avgOrderCost}
+        />
+
+        <Metric
+          change={prepaidRateChange}
+          format="currency"
+          label="Prepaid Rate"
+          hint="Average prepaid amount per order"
+          currency={currency}
+          value={prepaidRate}
         />
       </div>
     </Card>

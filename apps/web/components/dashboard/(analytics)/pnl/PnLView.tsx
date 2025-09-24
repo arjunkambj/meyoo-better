@@ -12,7 +12,16 @@ import { PnLTable } from "./components/PnLTable";
 export const PnLView = memo(function PnLView() {
   const [dateRange, setDateRange] = useState<
     { startDate: string; endDate: string } | undefined
-  >();
+  >(() => {
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 30);
+
+    return {
+      startDate: startDate.toISOString().slice(0, 10),
+      endDate: endDate.toISOString().slice(0, 10),
+    };
+  });
 
   const {
     kpiMetrics,
@@ -36,6 +45,8 @@ export const PnLView = memo(function PnLView() {
       <AnalyticsHeader
         leftActions={
           <GlobalDateRangePicker
+            defaultPreset="last_30_days"
+            stateKey="analytics:pnl"
             onAnalyticsChange={handleAnalyticsRangeChange}
           />
         }

@@ -6,7 +6,6 @@ import { useAtom } from "jotai";
 import { useEffect, useState } from "react";
 import { agentSidebarOpenAtom } from "@/store/atoms";
 import { cn } from "@heroui/theme";
-import { ChatSidebar } from "@/components/agent/ai-elements";
 
 export default function AgentSidebar({
   children,
@@ -51,8 +50,9 @@ export default function AgentSidebar({
           </Button>
         </div>
       )}
-      <ChatSidebar className="h-full" />
-      {children}
+      <div className="h-full flex items-center justify-center text-muted-foreground text-xl">
+        Coming Soon
+      </div>
     </aside>
   );
 }

@@ -16,16 +16,8 @@ export * from "./useDevTools";
 export * from "./useFeatureAccess";
 // Export specific functions from useIntegration to avoid conflicts
 export {
-  useConnectShopify,
   useIntegration,
-  useMeta,
-  useProductManagement,
-  useShopify,
-  useShopifyOrders,
-  useShopifyProducts,
-  useShopifyProductVariants,
   useShopifyProductVariantsPaginated,
-  useSyncMonitor,
 } from "./useIntegration";
 export * from "./useIntegrationRequests";
 

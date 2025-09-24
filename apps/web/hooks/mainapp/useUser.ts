@@ -79,28 +79,6 @@ export function useCurrentUser() {
 }
 
 /**
- * Get user ID
- */
-export function useUserId() {
-  const { user } = useUser();
-
-  return user?._id;
-}
-
-/**
- * Get user by ID
- */
-export function useUserById(userId: Id<"users"> | undefined) {
-  const user = useQuery(api.core.users.getUser, userId ? { userId } : "skip");
-
-  return {
-    user,
-    loading: user === undefined,
-    error: user === null ? "User not found" : null,
-  };
-}
-
-/**
  * Get team members for current organization
  */
 export function useTeamMembers() {
@@ -116,31 +94,6 @@ export function useTeamMembers() {
 // ============ ORGANIZATION HOOKS ============
 
 /**
- * Get organization ID for current user
- */
-export function useOrganizationId() {
-  const { user } = useUser();
-
-  return user?.organizationId;
-}
-
-/**
- * Get current user's organization
- */
-export function useCurrentUserOrganization() {
-  const organization = useQuery(api.core.organizations.getCurrentOrganization);
-
-  return {
-    organization,
-    loading: organization === undefined,
-    error:
-      organization === null && organization !== undefined
-        ? "Organization not found"
-        : null,
-  };
-}
-
-/**
  * Get organization's configured timezone (single source of truth)
  */
 export function useOrganizationTimeZone() {
@@ -151,196 +104,12 @@ export function useOrganizationTimeZone() {
   return { timezone, loading };
 }
 
-/**
- * Get organization by ID
- */
-export function useOrganizationById(organizationId?: Id<"organizations">) {
-  const organization = useQuery(
-    api.core.organizations.getOrganization,
-    organizationId ? { organizationId } : "skip",
-  );
-
-  return {
-    organization,
-    loading: organization === undefined,
-    error:
-      organization === null && organization !== undefined
-        ? "Organization not found"
-        : null,
-  };
-}
-
-/**
- * Get organization members
- */
-export function useOrganizationMembers(organizationId?: Id<"organizations">) {
-  const members = useQuery(
-    api.core.organizations.getOrganization,
-    organizationId ? { organizationId } : "skip",
-  );
-
-  return {
-    members: members || [],
-    loading: members === undefined,
-    error: null,
-  };
-}
-
 // ============ MUTATION HOOKS ============
 
-/**
- * Update user profile
- */
-export function useUpdateUserProfile() {
-  const mutation = useMutation(api.core.users.updateProfile);
-
-  return async (data: {
-    name?: string;
-    email?: string;
-    phone?: string;
-    timezone?: string;
-    notificationPreferences?: {
-      email: boolean;
-      push: boolean;
-      sms: boolean;
-    };
-  }) => {
-    try {
-      const result = await mutation(data);
-
-      return { success: true, data: result };
-    } catch (error) {
-      // Failed to update profile
-
-      return {
-        success: false,
-        error:
-          error instanceof Error ? error.message : "Failed to update profile",
-      };
-    }
-  };
-}
-
-/**
- * Update organization details
- */
-export function useUpdateOrganization() {
-  const mutation = useMutation(api.core.organizations.updateOrganization);
-
-  return async (data: {
-    name?: string;
-    businessType?: string;
-    businessCategory?: string;
-    industry?: string;
-    timezone?: string;
-    primaryCurrency?: string;
-  }) => {
-    try {
-      const result = await mutation(data);
-
-      return { success: true, data: result };
-    } catch (error) {
-      // Failed to update organization
-
-      return {
-        success: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : "Failed to update organization",
-      };
-    }
-  };
-}
-
-/**
- * Invite team member
- */
-export function useInviteTeamMember() {
-  const mutation = useMutation(api.core.users.inviteTeamMember);
-
-  return async (data: {
-    email: string;
-    role: "StoreTeam";
-  }) => {
-    try {
-      const result = await mutation(data);
-
-      return { success: result.success, message: result.message };
-    } catch (error) {
-      // Failed to invite team member
-
-      return {
-        success: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : "Failed to invite team member",
-      };
-    }
-  };
-}
-
-// ============ HELPER HOOKS ============
-
-/**
- * Check if user has specific permission
- */
-export function useHasPermission(action: "view" | "edit" | "delete" | "admin") {
-  const { user } = useUser();
-
-  if (!user) return false;
-
-  switch (user.role) {
-    case "StoreOwner":
-      return true; // Full access
-
-    case "StoreTeam":
-      return action === "view" || action === "edit";
-
-    default:
-      return false;
-  }
-}
-
-/**
- * Check if user is onboarded
- */
 export function useIsOnboarded() {
   const { user } = useUser();
 
   return user?.isOnboarded || false;
-}
-
-/**
- * Get user's billing information
- */
-export function useUserBilling() {
-  const billing = useQuery(api.core.users.getUserBilling);
-
-  return {
-    billing,
-    loading: billing === undefined,
-    plan: billing?.plan || "free",
-    isPremium: billing?.isPremium || false,
-    status: billing?.status || "active",
-    billingCycle: billing?.billingCycle || "monthly",
-  };
-}
-
-/**
- * Get user's current plan
- */
-export function useUserPlan() {
-  const { billing } = useUserBilling();
-
-  const plan = billing?.plan || "free";
-
-  return {
-    plan,
-    isFreePlan: plan === "free",
-    isPaidPlan: plan !== "free",
-  };
 }
 
 /**

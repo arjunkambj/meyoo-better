@@ -349,20 +349,3 @@ export function useCustomerAnalytics(dateRange?: {
     setSelectedSegment,
   };
 }
-
-/**
- * Hook for fetching customer segments for dashboard widget
- */
-export function useCustomerSegments(dateRange?: {
-  startDate: string;
-  endDate: string;
-}) {
-  const data = useQuery(api.web.customers.getCustomerSegments, {
-    dateRange,
-  });
-
-  return {
-    data,
-    isLoading: data === undefined,
-  };
-}

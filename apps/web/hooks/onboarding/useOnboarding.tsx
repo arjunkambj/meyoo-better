@@ -200,12 +200,6 @@ export function useUpdateOnboardingState() {
 /**
  * Check if a specific step is completed
  */
-export function useIsStepCompleted(stepName: string) {
-  const { completedSteps } = useOnboarding();
-
-  return completedSteps.includes(stepName);
-}
-
 /**
  * Get progress percentage
  */

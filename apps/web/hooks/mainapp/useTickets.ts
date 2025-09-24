@@ -107,7 +107,7 @@ export function useTicket(ticketId: Id<"tickets"> | undefined) {
 /**
  * Get all tickets (admin only)
  */
-export function useAllTickets(filters?: {
+function useAllTickets(filters?: {
   status?: "open" | "in_progress" | "resolved" | "closed";
   priority?: "low" | "medium" | "high" | "urgent";
   limit?: number;
@@ -206,7 +206,7 @@ export function useCreateTicket() {
 /**
  * Add response to ticket
  */
-export function useAddTicketResponse() {
+function useAddTicketResponse() {
   const addResponse = useMutation(api.web.tickets.addTicketResponse);
 
   return {
@@ -231,7 +231,7 @@ export function useAddTicketResponse() {
 /**
  * Update ticket status
  */
-export function useUpdateTicketStatus() {
+function useUpdateTicketStatus() {
   // Admin-side status update lives under meyoo namespace
   const updateStatus = useMutation(api.meyoo.tickets.updateTicketStatus);
 
@@ -329,55 +329,6 @@ export function useTickets() {
 
     getRecentTickets: (limit = 5) => {
       return userTickets.tickets.slice(0, limit);
-    },
-  };
-}
-
-/**
- * Admin ticket management hook
- */
-export function useAdminTickets() {
-  const allTickets = useAllTickets();
-  const { updateStatus } = useUpdateTicketStatus();
-
-  return {
-    // All tickets
-    tickets: allTickets.tickets,
-    loading: allTickets.loading,
-    error: allTickets.error,
-
-    // Statistics
-    stats: {
-      total: allTickets.totalCount,
-      open: allTickets.openCount,
-      inProgress: allTickets.inProgressCount,
-      highPriority: allTickets.highPriorityCount,
-    },
-
-    // Actions
-    updateStatus,
-
-    // Filters
-    getByStatus: (
-      status: "open" | "in_progress" | "resolved" | "closed",
-    ) => {
-      return (allTickets.tickets as TicketListItem[]).filter(
-        (t: TicketListItem) => t.status === status,
-      );
-    },
-
-    getByPriority: (priority: "low" | "medium" | "high" | "urgent") => {
-      return (allTickets.tickets as TicketListItem[]).filter(
-        (t: TicketListItem) => t.priority === priority,
-      );
-    },
-
-    getUrgentTickets: () => {
-      return (allTickets.tickets as TicketListItem[]).filter(
-        (t: TicketListItem) =>
-          t.priority === "urgent" ||
-          (t.priority === "high" && t.status === "open"),
-      );
     },
   };
 }

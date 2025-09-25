@@ -1,6 +1,5 @@
 import { Agent } from "@convex-dev/agent";
 import { openai } from "@ai-sdk/openai";
-import { stepCountIs } from "ai";
 import { components } from "../_generated/api";
 import type { ActionCtx, MutationCtx } from "../_generated/server";
 import { ConvexError } from "convex/values";
@@ -9,7 +8,7 @@ import { agentTools } from "./tools";
 type AnyCtx = MutationCtx | ActionCtx;
 type RegisteredTools = typeof agentTools;
 
-const DEFAULT_MODEL_ID = "gpt-5";
+const DEFAULT_MODEL_ID = "gpt-4.1";
 const DEFAULT_NAME = "Meyoo Assistant";
 const buildDefaultInstructions = (currentDate: string) =>
   [
@@ -28,7 +27,7 @@ export function createAgent(): Agent<object, RegisteredTools> {
     languageModel: openai.chat(DEFAULT_MODEL_ID),
     instructions: buildDefaultInstructions(currentDate),
     tools: agentTools,
-    stopWhen: stepCountIs(10),
+    maxSteps: 10,
   });
 }
 

@@ -420,7 +420,7 @@ export const initial = internalAction({
           );
 
           totalRecordsProcessed = dailyInsights.length;
-          if (logEnabled) {
+          if (LOG_META_ENABLED) {
             logger.info("Insights stored", { at: new Date().toISOString(), organizationId: args.organizationId, count: dailyInsights.length });
           }
         }
@@ -447,7 +447,7 @@ export const initial = internalAction({
             }
           );
           totalRecordsProcessed += campaigns.data.length;
-          if (logEnabled) {
+          if (LOG_META_ENABLED) {
             logger.info("Campaigns stored", { at: new Date().toISOString(), organizationId: args.organizationId, count: campaigns.data.length });
           }
         }
@@ -577,12 +577,12 @@ export const pullDaily = internalAction({
           insights: dailyInsights,
         },
       );
-      if (logEnabled) {
+      if (LOG_META_ENABLED) {
         logger.info("Pull daily stored", { at: new Date().toISOString(), organizationId: args.organizationId, count: dailyInsights.length });
       }
     }
 
-    if (logEnabled) {
+    if (LOG_META_ENABLED) {
       logger.info("Pull daily done", { at: new Date().toISOString(), organizationId: args.organizationId, insights: insights.length });
     }
     return { success: true };

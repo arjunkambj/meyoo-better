@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Rules
+
+-Donnt add Shadow and border for card, button, while making ui,
+
 ## Project Overview
 
 This is a Turborepo monorepo using Bun as the package manager. The project appears to be a multi-channel e-commerce analytics and management platform with integrations for Shopify, Meta (Facebook), and Google Ads.

@@ -9,12 +9,14 @@ This is a Turborepo monorepo using Bun as the package manager. The project appea
 ## Architecture
 
 ### Apps
+
 - **web** (port 3000): Customer-facing Next.js app for storefront dashboard
 - **meyoo** (port 3001): Internal admin backoffice Next.js app
-- **mobile**: Expo Router + React Native client (planned NativeWind + Hero Native adoption)
+- **mobile**: Expo Router + React Native client using NativeWind and HeroUI Native
 - **backend**: Convex serverless backend with real-time database
 
 ### Packages
+
 - **@repo/types**: Shared TypeScript types
 - **@repo/ui**: Shared React component library
 - **@repo/time**: Time utility functions
@@ -54,6 +56,7 @@ bun run format            # Format with Prettier
 The Convex backend is organized as follows:
 
 ### Directory Structure
+
 - **core/**: Shared domain logic (users, organizations, onboarding, costs, usage)
 - **engine/**: Scheduling, analytics, events, rate limiting, workpool jobs
 - **integrations/**: Shopify/Meta/Google adapters and storage pipelines
@@ -65,6 +68,7 @@ The Convex backend is organized as follows:
 - **sync/**: HTTP endpoints for sync triggers
 
 ### Convex Conventions
+
 - Public functions use `query`/`mutation`/`action` in web/ and meyoo/ directories
 - Internal functions use `internalQuery`/`internalMutation`/`internalAction` elsewhere
 - External I/O only in actions/httpAction; database operations in queries/mutations
@@ -76,6 +80,7 @@ The Convex backend is organized as follows:
 - All functions must include argument and return validators
 
 ### Database Schema
+
 - System fields automatically added: `_id` and `_creationTime`
 - Index naming convention: "by_field1_and_field2" for compound indexes
 - Always use `v.null()` validator when returning null values
@@ -84,6 +89,7 @@ The Convex backend is organized as follows:
 ## Frontend Architecture
 
 ### Tech Stack
+
 - Next.js 15 with App Router and Turbopack
 - TypeScript with strict mode
 - HeroUI component library
@@ -91,9 +97,10 @@ The Convex backend is organized as follows:
 - Framer Motion for animations
 - Recharts for data visualization
 - Convex for real-time data
-- Expo + React Native for mobile (with NativeWind + Hero Native on the roadmap)
+- Expo + React Native for mobile with NativeWind styling and HeroUI Native components
 
 ### Authentication
+
 - Convex Auth with email/password
 - Session-based authentication
 - Protected routes use `getAuthUserId(ctx)`
@@ -101,6 +108,7 @@ The Convex backend is organized as follows:
 ## Environment Variables
 
 Key environment variables used (see turbo.json for full list):
+
 - `NEXT_PUBLIC_CONVEX_URL`: Convex deployment URL
 - `SHOPIFY_API_KEY`, `SHOPIFY_API_SECRET`: Shopify OAuth credentials
 - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`: Google OAuth
@@ -110,6 +118,7 @@ Key environment variables used (see turbo.json for full list):
 ## Testing & Quality
 
 Currently no test framework is configured. Use these commands for code quality:
+
 - `bun run lint` - Run ESLint with auto-fix
 - `bun run check-types` - TypeScript type checking
 - `bun run format` - Prettier formatting
@@ -117,3 +126,26 @@ Currently no test framework is configured. Use these commands for code quality:
 ## Additional Context
 
 See `rules_convex.md` for detailed Convex patterns and best practices specific to this codebase.
+
+## avaible heroui native componetns
+
+Accordion
+Avatar
+Button
+Card
+Checkbox
+Chip
+Dialog
+Divider
+Drop Shadow View
+Error View
+Form Field
+Radio
+Radio Group
+Scroll Shadow
+Skeleton
+Skeleton Group
+Spinner
+Surface
+Switch
+Text Field

@@ -18,6 +18,7 @@ ALways USE CONTEXT& to Fetch docs
 - Monorepo managed by Turbo and Bun.
 - Apps
   - `apps/web` — Next.js (App Router) storefront; code in `app/`, shared UI in `components/`, utilities under `libs/`.
+  - `apps/mobile` — Expo Router React Native app with NativeWind styling and HeroUI Native components.
 - `apps/admin` — Next.js Admin panel (formerly `apps/meyoo`); minimal scaffold plus standard folders (`components/`, `hooks/`, `libs/`, `config/`, `constants/`, `store/`, `types/`, `styles/`). Dev on port 3001.
   - `apps/backend` — Convex backend. Functions and jobs under `convex/` organized by domain:
     - `convex/web/*` — storefront APIs
@@ -65,7 +66,7 @@ ALways USE CONTEXT& to Fetch docs
 - Styling: Tailwind CSS 4 with semantic, utility-first classes.
 - Icons: always use `@iconify/react` for icons.
 - Tables/Charts: TanStack Table and Recharts are available in web.
-- Mobile: plan for NativeWind styling with Hero Native (HeroUI for React Native) in the Expo app.
+- Mobile: use NativeWind for styling and HeroUI Native (HeroUI for React Native) components in the Expo app; avoid mixing other UI kits without alignment.
 
 ### Convex Types in Frontend
 
@@ -115,3 +116,26 @@ ALways USE CONTEXT& to Fetch docs
 
 - Store secrets only in per‑app `*.env.local` (never commit). Refer via `process.env` or Convex env.
 - Node ≥ 18 and Bun ≥ 1.2.18 required.
+
+## avaible heroui native componetns
+
+Accordion
+Avatar
+Button
+Card
+Checkbox
+Chip
+Dialog
+Divider
+Drop Shadow View
+Error View
+Form Field
+Radio
+Radio Group
+Scroll Shadow
+Skeleton
+Skeleton Group
+Spinner
+Surface
+Switch
+Text Field

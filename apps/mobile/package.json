@@ -14,10 +14,14 @@
     "watch-types": "tsc --noEmit --watch"
   },
   "dependencies": {
+    "@auth/core": "0.37.0",
+    "@convex-dev/auth": "^0.0.90",
     "@expo/metro-runtime": "~6.1.2",
     "@react-navigation/native": "^7.1.8",
+    "convex": "^1.27.3",
     "expo": "~54.0.10",
     "expo-router": "~6.0.8",
+    "expo-secure-store": "^15.0.7",
     "expo-splash-screen": "~31.0.10",
     "expo-status-bar": "~3.0.8",
     "nativewind": "^4.2.1",

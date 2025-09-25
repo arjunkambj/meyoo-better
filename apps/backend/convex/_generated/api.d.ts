@@ -79,6 +79,7 @@ import type * as sync_http from "../sync/http.js";
 import type * as utils_auth from "../utils/auth.js";
 import type * as utils_billing from "../utils/billing.js";
 import type * as utils_crypto from "../utils/crypto.js";
+import type * as utils_env from "../utils/env.js";
 import type * as utils_onboarding from "../utils/onboarding.js";
 import type * as utils_org from "../utils/org.js";
 import type * as utils_shop from "../utils/shop.js";
@@ -183,6 +184,7 @@ declare const fullApi: ApiFromModules<{
   "utils/auth": typeof utils_auth;
   "utils/billing": typeof utils_billing;
   "utils/crypto": typeof utils_crypto;
+  "utils/env": typeof utils_env;
   "utils/onboarding": typeof utils_onboarding;
   "utils/org": typeof utils_org;
   "utils/shop": typeof utils_shop;

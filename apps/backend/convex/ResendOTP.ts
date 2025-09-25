@@ -4,7 +4,7 @@ import { requireEnv } from "./utils/env";
 // Switched from raw Resend SDK to Convex Resend Component via HTTP endpoint
 
 const AUTH_RESEND_KEY = requireEnv("AUTH_RESEND_KEY");
-const NEXT_PUBLIC_CONVEX_URL = requireEnv("NEXT_PUBLIC_CONVEX_URL");
+const NEXT_PUBLIC_CONVEX_URL = requireEnv("CONVEX_SITE_URL");
 
 export const ResendOTP = Email({
   id: "resend-otp",

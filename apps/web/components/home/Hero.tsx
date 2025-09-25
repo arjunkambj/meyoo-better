@@ -19,26 +19,26 @@ const Hero = () => {
           {/* Left Column - Text Content */}
           <div className="text-left flex flex-col">
             {/* Trust Badge with Avatars */}
-            <div className="inline-flex bg-primary/10 border border-primary/05 rounded-full px-4 py-1 items-center gap-2 mb-6 w-fit">
-              <AvatarGroup max={4} size="sm" className="-space-x-1">
+            <div className="inline-flex items-center gap-3 px-4 py-1.5 mb-6 w-fit rounded-full border border-primary/20 bg-primary/5 text-primary/80 backdrop-blur-sm dark:border-primary/40 dark:bg-primary/20 dark:text-primary/90">
+              <AvatarGroup max={4} size="sm" className="-space-x-1.5">
                 <Avatar
                   src="https://i.pravatar.cc/150?u=a042581f4e29026024d"
-                  className="w-4 h-4 ring-2 ring-background"
+                  className="h-3.5 w-3.5 rounded-full ring-1 ring-background dark:ring-default-50/60"
                 />
                 <Avatar
                   src="https://i.pravatar.cc/150?u=a04258a2462d826712d"
-                  className="w-4 h-4 ring-2 ring-background"
+                  className="h-3.5 w-3.5 rounded-full ring-1 ring-background dark:ring-default-50/60"
                 />
                 <Avatar
                   src="https://i.pravatar.cc/150?u=a042581f4e29026704d"
-                  className="w-4 h-4 ring-2 ring-background"
+                  className="h-3.5 w-3.5 rounded-full ring-1 ring-background dark:ring-default-50/60"
                 />
                 <Avatar
                   src="https://i.pravatar.cc/150?u=a04258114e29026302d"
-                  className="w-4 h-4 ring-2 ring-background"
+                  className="h-3.5 w-3.5 rounded-full ring-1 ring-background dark:ring-default-50/60"
                 />
               </AvatarGroup>
-              <span className="text-xs uppercase tracking-[0.15em] font-medium text-primary/70">
+              <span className="text-xs uppercase tracking-[0.15em] font-medium text-primary/80 dark:text-primary/70">
                 Trusted by 1000+ founders
               </span>
               <Icon

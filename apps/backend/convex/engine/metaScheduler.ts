@@ -11,11 +11,15 @@ if (Number.isNaN(META_TICK_MINUTES) || META_TICK_MINUTES <= 0) {
   throw new Error("META_TICK_MINUTES must be a positive number");
 }
 
-const META_BATCH_SIZE_ENV = optionalEnv("META_BATCH_SIZE");
-const META_BATCH_SIZE = META_BATCH_SIZE_ENV ? Number(META_BATCH_SIZE_ENV) : undefined;
-if (META_BATCH_SIZE_ENV && (Number.isNaN(META_BATCH_SIZE) || META_BATCH_SIZE <= 0)) {
-  throw new Error("META_BATCH_SIZE must be a positive number when provided");
-}
+const META_BATCH_SIZE = (() => {
+  const raw = optionalEnv("META_BATCH_SIZE");
+  if (!raw) return undefined;
+  const parsed = Number(raw);
+  if (Number.isNaN(parsed) || parsed <= 0) {
+    throw new Error("META_BATCH_SIZE must be a positive number when provided");
+  }
+  return parsed;
+})();
 
 const LOG_META_ENABLED = optionalEnv("LOG_META") === "1";
 

@@ -17,7 +17,7 @@ export const designSystem = {
     sectionLabel:
       "text-center mb-4 text-xs uppercase tracking-[0.15em] font-medium text-primary/70",
     sectionChip:
-      "inline-flex items-center gap-2 bg-primary/10 backdrop-blur-sm rounded-full px-5 py-2 mb-6",
+      "inline-flex items-center gap-2 mb-6 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-primary/80 backdrop-blur-sm dark:border-primary/40 dark:bg-primary/20 dark:text-primary/90",
     sectionTitle:
       "text-center text-3xl font-semibold tracking-tight sm:text-4xl lg:text-5xl",
     sectionSubtitle:

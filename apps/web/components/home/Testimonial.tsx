@@ -72,11 +72,11 @@ const Testimonial = () => {
         {testimonials.map((testimonial) => (
           <div
             key={testimonial.id}
-            className="group relative flex h-full w-full rounded-2xl bg-primary/5 p-6 ring-1 ring-primary/10 transition duration-300 ease-out sm:p-8"
+            className="group relative flex h-full w-full rounded-2xl border border-primary/15 bg-primary/5 p-6 transition-colors duration-300 ease-out sm:p-8 dark:border-default-200/20 dark:bg-gradient-to-br dark:from-default-100/15 dark:via-default-100/10 dark:to-default-200/5 dark:backdrop-blur"
           >
             <div className="relative flex h-full flex-col">
-              <div className="mb-6 inline-flex h-12 w-12 items-center justify-center rounded-full text-primary/50 transition-colors duration-300 group-hover:text-primary/70">
-                <Icon icon="ri:double-quotes-l" width={36} />
+              <div className="mb-5 inline-flex size-10 items-center justify-center rounded-full  text-primary/70 transition-all duration-300 group-hover:scale-105 group-hover:bg-primary/20 group-hover:text-primary dark:text-primary/70">
+                <Icon icon="ri:double-quotes-l" width={26} />
               </div>
 
               <h3 className="mb-5 text-xl font-semibold tracking-tight text-foreground md:text-2xl">
@@ -84,8 +84,8 @@ const Testimonial = () => {
               </h3>
 
               <div className="mb-8 flex-1">
-                <p className="text-base leading-7 text-muted-foreground">
-                  {testimonial.description}
+                <p className="text-base leading-7 italic text-default-700 ">
+                  &ldquo;{testimonial.description}&rdquo;
                 </p>
               </div>
 
@@ -96,10 +96,10 @@ const Testimonial = () => {
                   name={testimonial.user.name}
                 />
                 <div className="space-y-1">
-                  <p className="text-base font-semibold text-default-900">
+                  <p className="text-base font-semibold text-default-800 ">
                     {testimonial.user.name}
                   </p>
-                  <p className="text-sm text-default-600">
+                  <p className="text-sm text-default-700">
                     {testimonial.user.location}
                   </p>
                 </div>

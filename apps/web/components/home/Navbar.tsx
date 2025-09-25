@@ -171,7 +171,12 @@ export default function CenteredNavbar() {
                 </Button>
               </AuthLoading>
               <Authenticated>
-                <Button as={Link} href="/overview" color="primary">
+                <Button
+                  as={Link}
+                  className="px-8"
+                  href="/overview"
+                  color="primary"
+                >
                   Dashboard
                 </Button>
               </Authenticated>

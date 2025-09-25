@@ -65,6 +65,7 @@ ALways USE CONTEXT& to Fetch docs
 - Styling: Tailwind CSS 4 with semantic, utility-first classes.
 - Icons: always use `@iconify/react` for icons.
 - Tables/Charts: TanStack Table and Recharts are available in web.
+- Mobile: plan for NativeWind styling with Hero Native (HeroUI for React Native) in the Expo app.
 
 ### Convex Types in Frontend
 

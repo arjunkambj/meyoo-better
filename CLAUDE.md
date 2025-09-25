@@ -11,6 +11,7 @@ This is a Turborepo monorepo using Bun as the package manager. The project appea
 ### Apps
 - **web** (port 3000): Customer-facing Next.js app for storefront dashboard
 - **meyoo** (port 3001): Internal admin backoffice Next.js app
+- **mobile**: Expo Router + React Native client (planned NativeWind + Hero Native adoption)
 - **backend**: Convex serverless backend with real-time database
 
 ### Packages
@@ -90,6 +91,7 @@ The Convex backend is organized as follows:
 - Framer Motion for animations
 - Recharts for data visualization
 - Convex for real-time data
+- Expo + React Native for mobile (with NativeWind + Hero Native on the roadmap)
 
 ### Authentication
 - Convex Auth with email/password

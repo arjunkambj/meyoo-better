@@ -31,6 +31,12 @@
 - **Recharts** - Data visualization
 - **TypeScript** - Type-safe development
 
+### Mobile
+
+- **Expo + React Native** - Cross-platform mobile foundation (Expo Router)
+- **NativeWind** *(planned)* - Tailwind-class styling for React Native screens
+- **Hero Native** *(planned)* - HeroUI's native component library for consistent mobile UI
+
 ### Backend
 
 - **Convex** - Real-time serverless database
@@ -61,6 +67,7 @@ meyoo-better/
 ├── apps/
 │   ├── web/                 # Customer-facing dashboard (Port 3000)
 │   ├── admin/               # Admin backoffice app (Port 3001)
+│   ├── mobile/              # Expo Router mobile client
 │   └── backend/             # Convex serverless backend
 ├── packages/
 │   ├── @repo/types/         # Shared TypeScript types

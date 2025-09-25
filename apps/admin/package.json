@@ -15,7 +15,7 @@
     "@auth/core": "0.37.0",
     "@convex-dev/auth": "^0.0.88",
     "@heroui/react": "^2.8.3",
-    "convex": "^1.27.0",
+    "convex": "^1.27.3",
     "framer-motion": "^12.23.12",
     "next": "^15.5.2",
     "next-themes": "^0.4.6",

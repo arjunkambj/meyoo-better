@@ -5,19 +5,19 @@
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
     "paths": {
-      "@/*": [
-        "./*"
-      ]
+      "@/*": ["./*"],
+      "@repo/convex/*": ["../backend/convex/_generated/*"],
+      "@repo/types/*": ["../../packages/types/*"]
     },
-    "types": [
-      "expo-router/types"
-    ]
+    "types": ["expo-router/types"]
   },
   "include": [
-    "app/**/*.ts",
-    "app/**/*.tsx",
+    "**/*.ts",
+    "**/*.tsx",
+    "types/**/*.d.ts",
+    "nativewind-env.d.ts",
     ".expo/types/**/*.ts",
-    "expo-env.d.ts",
-    "nativewind-env.d.ts"
-  ]
+    "expo-env.d.ts"
+  ],
+  "exclude": ["../backend/convex/agent/**/*"]
 }

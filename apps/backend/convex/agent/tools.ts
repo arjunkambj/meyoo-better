@@ -380,40 +380,37 @@ export const inventoryLowStockTool = createTool<
   },
 });
 
+const analyticsSummaryArgs = z.object({
+  startDate: isoDate,
+  endDate: isoDate,
+  granularity: z
+    .enum(["daily", "weekly", "monthly"])
+    .default("daily"),
+  metrics: z
+    .array(z.string())
+    .optional()
+    .describe("Specific metric field names to include (optional)"),
+});
+
+type AnalyticsSummaryArgs = z.input<typeof analyticsSummaryArgs>;
+
+type AnalyticsSummaryResult = {
+  summary: string;
+  totals: Record<string, number>;
+  records: AnalyticsRow[];
+};
+
 export const analyticsSummaryTool = createTool<
-  {
-    startDate: string;
-    endDate: string;
-    granularity: "daily" | "weekly" | "monthly";
-    metrics?: string[];
-  },
-  {
-    summary: string;
-    totals: Record<string, number>;
-    records: AnalyticsRow[];
-  }
+  AnalyticsSummaryArgs,
+  AnalyticsSummaryResult
 >({
   description:
     "Summarize store performance metrics over a date range (daily/weekly/monthly).",
-  args: z.object({
-    startDate: isoDate,
-    endDate: isoDate,
-    granularity: z
-      .enum(["daily", "weekly", "monthly"])
-      .default("daily"),
-    metrics: z
-      .array(z.string())
-      .optional()
-      .describe("Specific metric field names to include (optional)"),
-  }),
+  args: analyticsSummaryArgs,
   handler: async (
     ctx,
     { startDate, endDate, granularity, metrics },
-  ): Promise<{
-    summary: string;
-    totals: Record<string, number>;
-    records: AnalyticsRow[];
-  }> => {
+  ): Promise<AnalyticsSummaryResult> => {
     const rows =
       ((await ctx.runQuery(api.web.analytics.getMetrics, {
         dateRange: { startDate, endDate },

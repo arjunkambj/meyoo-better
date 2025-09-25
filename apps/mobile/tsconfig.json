@@ -1,5 +1,5 @@
 {
-  "extends": "@repo/typescript-config/base.json",
+  "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "module": "esnext",
     "moduleResolution": "bundler",
@@ -17,6 +17,7 @@
     "app/**/*.ts",
     "app/**/*.tsx",
     ".expo/types/**/*.ts",
-    "expo-env.d.ts"
+    "expo-env.d.ts",
+    "nativewind-env.d.ts"
   ]
 }

@@ -5,10 +5,14 @@ import { api } from "@/libs/convexApi";
 import { ShopifyGraphQLClient } from "@/libs/shopify/ShopifyGraphQLClient";
 import { registerWebhooks } from "@/libs/shopify/webhook-register";
 import { createLogger } from "@/libs/logging/Logger";
+import { optionalEnv, requireEnv } from "@/libs/env";
 import type { Session } from "@shopify/shopify-api";
 import type { GenericId as Id } from "convex/values";
 
 const logger = createLogger("Shopify.Callback.Helpers");
+const SHOPIFY_API_KEY = requireEnv("SHOPIFY_API_KEY");
+const NEXT_PUBLIC_APP_URL = requireEnv("NEXT_PUBLIC_APP_URL");
+const SHOPIFY_WEBHOOK_DEBUG = optionalEnv("SHOPIFY_WEBHOOK_DEBUG") === "1";
 
 /**
  * Normalizes a shop domain by removing protocol and trailing slashes
@@ -48,9 +52,8 @@ export async function fetchShopData(session: Session): Promise<Record<string, un
  * Creates authentication signature for Shopify OAuth
  */
 export function createAuthSignature(shopDomain: string, nonce: string): string {
-  const secret = process.env.SHOPIFY_API_KEY || "";
   return crypto
-    .createHmac("sha256", secret)
+    .createHmac("sha256", SHOPIFY_API_KEY)
     .update(`${shopDomain}:${nonce}`)
     .digest("hex");
 }
@@ -66,9 +69,7 @@ export async function registerStoreWebhooks(
     const webhookStatus = await fetchMutation(
       api.integrations.shopify.checkAndSetWebhooksRegistered,
       { shopDomain: session.shop },
-      token 
-        ? { token, url: process.env.NEXT_PUBLIC_CONVEX_URL as string }
-        : { url: process.env.NEXT_PUBLIC_CONVEX_URL as string },
+      token ? { token } : undefined,
     );
 
     if (webhookStatus.shouldRegister) {
@@ -78,14 +79,12 @@ export async function registerStoreWebhooks(
         await fetchMutation(
           api.integrations.shopify.setWebhooksRegisteredByDomain,
           { shopDomain: session.shop, value: false },
-          token
-            ? { token, url: process.env.NEXT_PUBLIC_CONVEX_URL as string }
-            : { url: process.env.NEXT_PUBLIC_CONVEX_URL as string },
+          token ? { token } : undefined,
         );
         return false;
       }
       // Only log success in debug mode
-      if (process.env.SHOPIFY_WEBHOOK_DEBUG === "1") {
+      if (SHOPIFY_WEBHOOK_DEBUG) {
         logger.info("Shopify webhooks registered");
       }
       return true;
@@ -109,7 +108,7 @@ export async function triggerInitialSync(
     const products = await fetchQuery(
       api.integrations.shopify.getProducts,
       { limit: 1 },
-      { token, url: process.env.NEXT_PUBLIC_CONVEX_URL as string },
+      { token },
     );
 
     const hasAnyProduct = Boolean(products && products.length > 0);
@@ -120,7 +119,7 @@ export async function triggerInitialSync(
       const sessions = await fetchQuery(
         api.web.sync.getSyncSessions,
         { limit: 1, platform: "shopify", status: "completed" },
-        { token, url: process.env.NEXT_PUBLIC_CONVEX_URL as string },
+        { token },
       );
       hasCompletedSync = Boolean(sessions && sessions.length > 0);
     } catch {
@@ -135,7 +134,7 @@ export async function triggerInitialSync(
           platform: "shopify",
           dateRange: { daysBack: 60 },
         },
-        { token, url: process.env.NEXT_PUBLIC_CONVEX_URL as string },
+        { token },
       );
     }
   } catch (error) {
@@ -179,15 +178,13 @@ export async function getRedirectUrl(
   token: string,
   shopDomain: string,
 ): Promise<string> {
-  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || "")
-    .trim()
-    .replace(/\/$/, "");
+  const baseUrl = NEXT_PUBLIC_APP_URL.trim().replace(/\/$/, "");
 
   try {
     const status = await fetchQuery(
       api.core.onboarding.getOnboardingStatus,
       {},
-      { token, url: process.env.NEXT_PUBLIC_CONVEX_URL as string },
+      { token },
     );
 
     if (status?.completed) {

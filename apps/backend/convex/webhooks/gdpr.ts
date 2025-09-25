@@ -1,5 +1,8 @@
 import { httpAction } from "../_generated/server";
 import { WebhookUtils } from "../integrations/_base";
+import { requireEnv } from "../utils/env";
+
+const SHOPIFY_API_SECRET = requireEnv("SHOPIFY_API_SECRET");
 
 /**
  * GDPR Webhook HTTP Handlers
@@ -52,21 +55,9 @@ export const customerRedact = httpAction(async (ctx, request) => {
     const rawBody = await request.text();
 
     // Verify webhook signature
-    const apiSecret = process.env.SHOPIFY_API_SECRET;
-    if (!apiSecret) {
-      console.error("[GDPR Customer Redact] Missing SHOPIFY_API_SECRET");
-      return new Response(
-        JSON.stringify({ error: "Server configuration error" }),
-        {
-          status: 500,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    }
-
     const isValid =
       process.env.NODE_ENV === "development" ||
-      (signature ? await WebhookUtils.verifyHMAC(rawBody, signature, apiSecret) : false);
+      (signature ? await WebhookUtils.verifyHMAC(rawBody, signature, SHOPIFY_API_SECRET) : false);
 
     if (!isValid) {
       console.error("[GDPR Customer Redact] Invalid signature", {
@@ -171,21 +162,9 @@ export const customerDataRequest = httpAction(async (ctx, request) => {
     const rawBody = await request.text();
 
     // Verify webhook signature
-    const apiSecret = process.env.SHOPIFY_API_SECRET;
-    if (!apiSecret) {
-      console.error("[GDPR Data Request] Missing SHOPIFY_API_SECRET");
-      return new Response(
-        JSON.stringify({ error: "Server configuration error" }),
-        {
-          status: 500,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    }
-
     const isValid =
       process.env.NODE_ENV === "development" ||
-      (signature ? await WebhookUtils.verifyHMAC(rawBody, signature, apiSecret) : false);
+      (signature ? await WebhookUtils.verifyHMAC(rawBody, signature, SHOPIFY_API_SECRET) : false);
 
     if (!isValid) {
       console.error("[GDPR Data Request] Invalid signature", {
@@ -291,21 +270,9 @@ export const shopRedact = httpAction(async (ctx, request) => {
     const rawBody = await request.text();
 
     // Verify webhook signature
-    const apiSecret = process.env.SHOPIFY_API_SECRET;
-    if (!apiSecret) {
-      console.error("[GDPR Shop Redact] Missing SHOPIFY_API_SECRET");
-      return new Response(
-        JSON.stringify({ error: "Server configuration error" }),
-        {
-          status: 500,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    }
-
     const isValid =
       process.env.NODE_ENV === "development" ||
-      (signature ? await WebhookUtils.verifyHMAC(rawBody, signature, apiSecret) : false);
+      (signature ? await WebhookUtils.verifyHMAC(rawBody, signature, SHOPIFY_API_SECRET) : false);
 
     if (!isValid) {
       console.error("[GDPR Shop Redact] Invalid signature", {

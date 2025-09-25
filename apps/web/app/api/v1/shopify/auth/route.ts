@@ -1,8 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import shopify from "@/libs/shopify/shopify";
+import { requireEnv } from "@/libs/env";
 
 export const runtime = "nodejs";
+
+const SHOPIFY_REDIRECT_URI = requireEnv("SHOPIFY_REDIRECT_URI");
 
 export async function GET(req: NextRequest) {
   try {
@@ -23,7 +26,7 @@ export async function GET(req: NextRequest) {
 
     return shopify.auth.begin({
       shop: sanitizedShop || "",
-      callbackPath: process.env.SHOPIFY_REDIRECT_URI || "",
+      callbackPath: SHOPIFY_REDIRECT_URI,
       isOnline: false,
       rawRequest: req,
     });
@@ -34,5 +37,4 @@ export async function GET(req: NextRequest) {
     );
   }
 }
-
 

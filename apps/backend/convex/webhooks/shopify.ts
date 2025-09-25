@@ -4,9 +4,12 @@ import { internal } from "../_generated/api";
 import { httpAction } from "../_generated/server";
 import { WebhookUtils } from "../integrations/_base";
 import { toNum, toMoney, toMs as toTs } from "../utils/shopify";
+import { optionalEnv, requireEnv } from "../utils/env";
 import type { Id } from "../_generated/dataModel";
 
 const logger = createSimpleLogger("Webhooks.Shopify");
+const SHOPIFY_API_SECRET = requireEnv("SHOPIFY_API_SECRET");
+const LOG_WEBHOOKS_ENABLED = optionalEnv("LOG_WEBHOOKS") === "1";
 
 // Removed unused priority helper (incorrect reference and not used)
 
@@ -68,21 +71,11 @@ export const shopifyWebhook = httpAction(async (ctx, request) => {
     const rawBody = await request.text();
 
     // Verify webhook signature
-    const apiSecret = process.env.SHOPIFY_API_SECRET;
-    if (!apiSecret) {
-      logger.error("Missing SHOPIFY_API_SECRET");
-      return new Response(
-        JSON.stringify({ error: "Server configuration error" }),
-        {
-          status: 500,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    }
-
     const isValid =
       process.env.NODE_ENV === "development" ||
-      (signature ? await WebhookUtils.verifyHMAC(rawBody, signature, apiSecret) : false);
+      (signature
+        ? await WebhookUtils.verifyHMAC(rawBody, signature, SHOPIFY_API_SECRET)
+        : false);
 
     if (!isValid) {
       logger.error("Invalid signature", {
@@ -118,7 +111,7 @@ export const shopifyWebhook = httpAction(async (ctx, request) => {
     } catch (_e) { void 0; }
 
     // Lightweight receipt log (gated by env)
-    if (process.env.LOG_WEBHOOKS === "1") {
+    if (LOG_WEBHOOKS_ENABLED) {
       logger.info("Webhook received", {
         at: new Date().toISOString(),
         topic,
@@ -134,7 +127,7 @@ export const shopifyWebhook = httpAction(async (ctx, request) => {
     );
 
     if (alreadyProcessed?.duplicate) {
-      if (process.env.LOG_WEBHOOKS === "1") {
+      if (LOG_WEBHOOKS_ENABLED) {
         logger.info("Webhook duplicate skipped", {
           at: new Date().toISOString(),
           topic,
@@ -151,7 +144,7 @@ export const shopifyWebhook = httpAction(async (ctx, request) => {
     // Inline topic handling – minimal writes + analytics touch
     await handleTopicInline(ctx as any, { topic, payload, organizationId, domain });
 
-    if (process.env.LOG_WEBHOOKS === "1") {
+    if (LOG_WEBHOOKS_ENABLED) {
       logger.info("Webhook processed", {
         at: new Date().toISOString(),
         topic,

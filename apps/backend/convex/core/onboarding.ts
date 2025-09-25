@@ -14,21 +14,9 @@ import { ONBOARDING_STEPS } from "@repo/types";
  * Handles the 5-step onboarding process and triggers initial 60-day sync
  */
 
-const FIRECRAWL_SEED_URL = process.env.FIRECRAWL_SEED_URL || null;
-const FIRECRAWL_SEED_INCLUDE_PATHS = process.env.FIRECRAWL_SEED_INCLUDE_PATHS
-  ?.split(",")
-  .map((path) => path.trim())
-  .filter((path) => path.length > 0);
-const FIRECRAWL_SEED_EXCLUDE_PATHS = process.env.FIRECRAWL_SEED_EXCLUDE_PATHS
-  ?.split(",")
-  .map((path) => path.trim())
-  .filter((path) => path.length > 0);
-const FIRECRAWL_SEED_MAX_PAGES = (() => {
-  const raw = process.env.FIRECRAWL_SEED_MAX_PAGES;
-  if (!raw) return undefined;
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) ? parsed : undefined;
-})();
+const FIRECRAWL_SEED_URL = null;
+const IS_PRODUCTION_ENVIRONMENT = process.env.NODE_ENV === "production";
+const DEV_FIRECRAWL_TEST_URL = "https://shopcelestia.in/";
 
 // ============ QUERIES ============
 
@@ -1034,9 +1022,11 @@ export const connectShopifyStore = mutation({
 
     const seedUrl = FIRECRAWL_SEED_URL
       ? FIRECRAWL_SEED_URL
-      : domain.startsWith("http")
-        ? domain
-        : `https://${domain}`;
+      : IS_PRODUCTION_ENVIRONMENT
+        ? domain.startsWith("http")
+          ? domain
+          : `https://${domain}`
+        : DEV_FIRECRAWL_TEST_URL;
 
     if (seedUrl) {
       try {
@@ -1045,9 +1035,6 @@ export const connectShopifyStore = mutation({
           api.agent.firecrawlSeed.seedDocsFromFirecrawl,
           {
             url: seedUrl,
-            includePaths: FIRECRAWL_SEED_INCLUDE_PATHS,
-            excludePaths: FIRECRAWL_SEED_EXCLUDE_PATHS,
-            maxPages: FIRECRAWL_SEED_MAX_PAGES,
           },
         );
         await ctx.scheduler.runAfter(0, api.agent.brandSummary.upsertBrandSummary, {});

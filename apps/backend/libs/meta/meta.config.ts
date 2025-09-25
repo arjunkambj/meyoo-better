@@ -1,6 +1,10 @@
+import { optionalEnv } from "../env";
+
+const META_API_VERSION = optionalEnv("META_API_VERSION") ?? "v23.0";
+
 export const META_CONFIG = {
   // Keep in sync with official latest Graph API.
-  API_VERSION: process.env.META_API_VERSION || "v21.0",
+  API_VERSION: META_API_VERSION,
   BASE_URL: "https://graph.facebook.com",
 
   // Valid sync types

@@ -1,7 +1,8 @@
 import ShopifyOnboardingClient from "@/components/onboarding/client/ShopifyOnboardingClient";
+import { requireEnv } from "@/libs/env";
 
 export default function ShopifyOnboardingPage() {
-  const installUri = process.env.NEXT_PUBLIC_APP_INSTALL_URI || null;
+  const installUri = requireEnv("NEXT_PUBLIC_APP_INSTALL_URI");
   return (
     <section className="max-w-3xl mx-auto h-full">
       {/* Header */}

@@ -3,8 +3,10 @@ import { internalAction, internalMutation, internalQuery } from "../_generated/s
 import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { createSimpleLogger } from "../../libs/logging/simple";
+import { optionalEnv } from "../utils/env";
 
 const logger = createSimpleLogger("TokenManager");
+const META_APP_ID = optionalEnv("META_APP_ID");
 
 type Platform = "meta";
 
@@ -42,7 +44,7 @@ async function getValidAccessTokenImpl(
         // Validate token app ownership before attempting exchange
         const { debugToken } = await import("./metaTokens");
         const info = await debugToken(session.accessToken);
-        const desiredAppId = process.env.META_APP_ID;
+        const desiredAppId = META_APP_ID;
         const tokenAppId = info?.data?.app_id ?? info?.app_id;
 
         // Persist appId and last check

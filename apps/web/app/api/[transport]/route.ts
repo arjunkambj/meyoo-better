@@ -3,13 +3,12 @@ import { createMcpHandler, withMcpAuth } from "mcp-handler";
 import { z } from "zod";
 import { api } from "../../../../backend/convex/_generated/api";
 import { ConvexHttpClient } from "convex/browser";
+import { optionalEnv, requireEnv } from "@/libs/env";
 
-const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
-if (!convexUrl) {
-  throw new Error("NEXT_PUBLIC_CONVEX_URL environment variable is not set");
-}
+const CONVEX_URL = requireEnv("NEXT_PUBLIC_CONVEX_URL");
+const REDIS_URL = optionalEnv("REDIS_URL");
 
-const convexClient = new ConvexHttpClient(convexUrl);
+const convexClient = new ConvexHttpClient(CONVEX_URL);
 
 const resolveApiToken = (
   extra: { authInfo?: AuthInfo },
@@ -423,7 +422,7 @@ Video Performance:
     },
   },
   {
-    redisUrl: process.env.REDIS_URL,
+    redisUrl: REDIS_URL,
     basePath: "/api",
     maxDuration: 60,
     verboseLogs: process.env.NODE_ENV === "development",

@@ -6,8 +6,10 @@ import { parseMoney, roundMoney } from "../../libs/utils/money";
 import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { internalAction } from "../_generated/server";
+import { optionalEnv } from "../utils/env";
 
 const logger = createSimpleLogger("MetaSync");
+const LOG_META_ENABLED = optionalEnv("LOG_META") === "1";
 
 // Type definitions
 interface MetaAction {
@@ -334,7 +336,6 @@ export const initial = internalAction({
     // production: avoid verbose startup logs
 
     try {
-      const logEnabled = process.env.LOG_META === "1";
       // Get session to resolve primary account, but fetch a fresh/valid token via tokenManager
       const session = await ctx.runQuery(
         internal.integrations.metaInternal.getActiveSessionInternal,
@@ -357,7 +358,7 @@ export const initial = internalAction({
       );
 
       const client = new MetaAPIClient(accessToken);
-      if (logEnabled) {
+      if (LOG_META_ENABLED) {
         logger.info("Initial sync start", { at: new Date().toISOString(), organizationId: args.organizationId });
       }
 
@@ -535,8 +536,7 @@ export const pullDaily = internalAction({
     date: v.string(), // YYYY-MM-DD
   },
   handler: async (ctx, args) => {
-    const logEnabled = process.env.LOG_META === "1";
-    if (logEnabled) {
+    if (LOG_META_ENABLED) {
       logger.info("Pull daily start", { at: new Date().toISOString(), organizationId: args.organizationId });
     }
     // Resolve token

@@ -1,5 +1,9 @@
+import { optionalEnv } from "@/libs/env";
+
+const NEXT_PUBLIC_META_API_VERSION = optionalEnv("NEXT_PUBLIC_META_API_VERSION") ?? "v23.0";
+
 export const META_CONFIG = {
-  API_VERSION: process.env.NEXT_PUBLIC_META_API_VERSION || "v21.0",
+  API_VERSION: NEXT_PUBLIC_META_API_VERSION,
   BASE_URL: "https://graph.facebook.com",
 
   // Valid sync types

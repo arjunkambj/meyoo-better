@@ -7,6 +7,9 @@ import { verifyShopProvisionSignature } from "./utils/crypto";
 import { findExistingUser, normalizeEmail } from "./authHelpers";
 import { ensureShopifyOnboarding } from "./utils/onboarding";
 import { isIanaTimeZone } from "@repo/time";
+import { optionalEnv } from "./utils/env";
+
+const SHOPIFY_API_VERSION = optionalEnv("SHOPIFY_API_VERSION") ?? "2025-07";
 
 export const createOrAttachFromShopifyOAuth = mutation({
   args: {
@@ -128,7 +131,7 @@ export const createOrAttachFromShopifyOAuth = mutation({
         operatingCountry: args.shopData?.country,
         primaryCurrency: args.shopData?.currency || "USD",
         isGlobalStore: false,
-        apiVersion: (process.env.SHOPIFY_API_VERSION as string) || "2025-07",
+        apiVersion: SHOPIFY_API_VERSION,
         webhooksRegistered: false,
         isActive: true,
         lastSyncAt: undefined,

@@ -1,4 +1,7 @@
 import { normalizeShopDomain } from './shop';
+import { requireEnv } from './env';
+
+const SHOPIFY_API_KEY = requireEnv('SHOPIFY_API_KEY');
 
 // Timing-safe string comparison to avoid subtle equality issues
 export const timingSafeEqual = (a: string, b: string) => {
@@ -29,11 +32,8 @@ export const verifyShopProvisionSignature = async (
   nonce: string,
   sig: string,
 ) => {
-  const SECRET = process.env.SHOPIFY_API_KEY;
-  if (!SECRET) throw new Error('Missing SHOPIFY_API_KEY');
   const canonicalShop = normalizeShopDomain(shop);
   const provided = (sig || '').toLowerCase();
-  const expected = (await hmacHex(SECRET, `${canonicalShop}:${nonce}`)).toLowerCase();
+  const expected = (await hmacHex(SHOPIFY_API_KEY, `${canonicalShop}:${nonce}`)).toLowerCase();
   return timingSafeEqual(provided, expected);
 };
-

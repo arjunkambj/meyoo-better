@@ -4,9 +4,12 @@ import {
   SHOPIFY_CONFIG,
 } from "../../config/integrations/shopify.config";
 import { createLogger } from "../../libs/logging";
+import { optionalEnv, requireEnv } from "../env";
 import shopify from "./shopify";
 
 const logger = createLogger("webhook-register");
+const IS_DEBUG_MODE = optionalEnv("SHOPIFY_WEBHOOK_DEBUG") === "1";
+const NEXT_PUBLIC_CONVEX_SITE_URL = requireEnv("NEXT_PUBLIC_CONVEX_SITE_URL");
 
 export type WebhookRegistrationResult = {
   success: boolean;
@@ -19,7 +22,7 @@ export async function registerWebhooks(
   session: Session,
   maxRetries: number = 3,
 ): Promise<WebhookRegistrationResult> {
-  const isDebugMode = process.env.SHOPIFY_WEBHOOK_DEBUG === "1";
+  const isDebugMode = IS_DEBUG_MODE;
   if (isDebugMode) {
     logger.info(
       `[Webhook Registration] Starting webhook registration for shop: ${session.shop}`,
@@ -150,9 +153,7 @@ export async function registerWebhooks(
     ];
 
     // Build callback URL using only NEXT_PUBLIC_CONVEX_SITE_URL
-    const baseUrl = (process.env.NEXT_PUBLIC_CONVEX_SITE_URL || "")
-      .trim()
-      .replace(/\/$/, "");
+    const baseUrl = NEXT_PUBLIC_CONVEX_SITE_URL.trim().replace(/\/$/, "");
     if (!baseUrl) {
       throw new Error(
         "NEXT_PUBLIC_CONVEX_SITE_URL is required for webhook registration",
@@ -248,7 +249,7 @@ export async function registerWebhooks(
       lowercaseTopic: string,
       attempts: number = 0,
     ): Promise<{ success: boolean; topic?: string; error?: string }> => {
-      const isDebugMode = process.env.SHOPIFY_WEBHOOK_DEBUG === "1";
+      const isDebugMode = IS_DEBUG_MODE;
       const graphqlTopic = webhookTopicMapping[lowercaseTopic];
 
       if (!graphqlTopic) {

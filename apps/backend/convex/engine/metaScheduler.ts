@@ -3,6 +3,21 @@ import { createSimpleLogger } from "../../libs/logging/simple";
 import { internal } from "../_generated/api";
 import { internalAction, internalMutation, internalQuery } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
+import { optionalEnv } from "../utils/env";
+
+const TICK_MINUTES_ENV = optionalEnv("META_TICK_MINUTES");
+const META_TICK_MINUTES = TICK_MINUTES_ENV ? Number(TICK_MINUTES_ENV) : 6;
+if (Number.isNaN(META_TICK_MINUTES) || META_TICK_MINUTES <= 0) {
+  throw new Error("META_TICK_MINUTES must be a positive number");
+}
+
+const META_BATCH_SIZE_ENV = optionalEnv("META_BATCH_SIZE");
+const META_BATCH_SIZE = META_BATCH_SIZE_ENV ? Number(META_BATCH_SIZE_ENV) : undefined;
+if (META_BATCH_SIZE_ENV && (Number.isNaN(META_BATCH_SIZE) || META_BATCH_SIZE <= 0)) {
+  throw new Error("META_BATCH_SIZE must be a positive number when provided");
+}
+
+const LOG_META_ENABLED = optionalEnv("LOG_META") === "1";
 
 // List Meta ad accounts (all orgs)
 export const listMetaAccounts = internalQuery({
@@ -76,7 +91,7 @@ export const tick = internalAction({
   returns: v.object({ processed: v.number(), deferred: v.number() }),
   handler: async (ctx) => {
     const logger = createSimpleLogger("MetaScheduler");
-    const tickMinutes = Number(process.env.META_TICK_MINUTES || 6);
+    const tickMinutes = META_TICK_MINUTES;
     const accounts = await ctx.runQuery(internal.engine.metaScheduler.listMetaAccounts, {});
     if (accounts.length === 0) return { processed: 0, deferred: 0 };
 
@@ -93,10 +108,10 @@ export const tick = internalAction({
     const ticksPerHour = Math.max(1, Math.floor(60 / tickMinutes));
     const nominalPerTick = Math.max(1, Math.floor((bucket?.limit ?? 10_000) / ticksPerHour));
     const remaining = Math.max(0, (bucket?.limit ?? 10_000) - (bucket?.used ?? 0));
-    const ceiling = Number(process.env.META_BATCH_SIZE || nominalPerTick);
+    const ceiling = META_BATCH_SIZE ?? nominalPerTick;
     const capacity = Math.min(nominalPerTick, remaining, ceiling);
     const toTake = Math.min(capacity, accounts.length);
-    if (process.env.LOG_META === "1") {
+    if (LOG_META_ENABLED) {
       logger.info("Meta tick start", {
         at: new Date().toISOString(),
       });
@@ -141,7 +156,7 @@ export const tick = internalAction({
     await ctx.runMutation(internal.engine.metaScheduler.setCursor, { index: nextIndex });
 
     // compute duration if needed in logs
-    if (process.env.LOG_META === "1") {
+    if (LOG_META_ENABLED) {
       logger.info("Meta tick done", {
         at: new Date().toISOString(),
         processed,

@@ -121,7 +121,8 @@ SHOPIFY_WEBHOOK_SECRET=your-webhook-secret
 # Meta (Facebook) Integration
 META_APP_ID=your-meta-app-id
 META_APP_SECRET=your-meta-app-secret
-META_API_VERSION=v18.0
+META_API_VERSION=v23.0
+NEXT_PUBLIC_META_API_VERSION=v23.0
 
 # Google Integration
 GOOGLE_CLIENT_ID=your-google-client-id

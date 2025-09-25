@@ -1,6 +1,7 @@
 import type { Session } from "@shopify/shopify-api";
 
 import { createLogger } from "../logging";
+import { optionalEnv } from "../env";
 
 import shopify, { resolvedHostScheme } from "./shopify";
 
@@ -16,7 +17,7 @@ interface BillingCheckResult {
  * This should match your app handle in Shopify Partners Dashboard
  */
 export function getAppHandle(): string {
-  const handle = process.env.SHOPIFY_APP_HANDLE?.trim();
+  const handle = optionalEnv("SHOPIFY_APP_HANDLE")?.trim();
   if (!handle) {
     logger.error(
       "[Billing] SHOPIFY_APP_HANDLE is missing. Set it to your app handle in env.",

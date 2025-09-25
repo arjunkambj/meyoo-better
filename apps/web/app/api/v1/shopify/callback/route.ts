@@ -6,6 +6,7 @@ import { api } from "@/libs/convexApi";
 import { createLogger } from "@/libs/logging/Logger";
 import shopify, { configuredScopes } from "@/libs/shopify/shopify";
 import { genRequestId, tagFromToken } from "@/libs/logging/trace";
+import { optionalEnv, requireEnv } from "@/libs/env";
 import {
   normalizeShopDomain,
   fetchShopData,
@@ -20,14 +21,14 @@ import {
 const logger = createLogger("Shopify.Callback");
 
 export const runtime = "nodejs";
+const NEXT_PUBLIC_APP_URL = requireEnv("NEXT_PUBLIC_APP_URL");
+const SHOPIFY_WEBHOOK_DEBUG = optionalEnv("SHOPIFY_WEBHOOK_DEBUG") === "1";
 
 export async function GET(req: NextRequest) {
   try {
     const requestId = genRequestId(req);
 
-    const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || "")
-      .trim()
-      .replace(/\/$/, "");
+    const baseUrl = NEXT_PUBLIC_APP_URL.trim().replace(/\/$/, "");
 
     // Process the OAuth callback from Shopify
     const response = await shopify.auth.callback({
@@ -57,7 +58,7 @@ export async function GET(req: NextRequest) {
     const missingScopes = configuredScopes.filter(scope => !normalizedScopes.has(scope));
     
     // Only log scopes in debug mode
-    if (process.env.SHOPIFY_WEBHOOK_DEBUG === "1") {
+    if (SHOPIFY_WEBHOOK_DEBUG) {
       logger.info("Scope validation", { 
         configured: configuredScopes,
         granted: Array.from(grantedScopes),
@@ -108,13 +109,13 @@ export async function GET(req: NextRequest) {
         const currentUser = await fetchQuery(
           api.core.users.getCurrentUser,
           {},
-          { token, url: process.env.NEXT_PUBLIC_CONVEX_URL as string },
+          { token },
         );
 
         const existing = await fetchQuery(
           api.integrations.shopify.getPublicStoreByDomain,
           { shopDomain },
-          { token, url: process.env.NEXT_PUBLIC_CONVEX_URL as string },
+          { token },
         );
 
         if (existing && currentUser?.organizationId && existing.organizationId !== currentUser.organizationId) {
@@ -133,14 +134,13 @@ export async function GET(req: NextRequest) {
               nonce,
               sig,
             },
-            { token, url: process.env.NEXT_PUBLIC_CONVEX_URL as string },
+            { token },
           );
 
           // Issue tokens for the store's linked user and set cookies
           const tokens = await fetchAction(
             api.installations.issueTokensFromShopifyOAuth,
             { shop: shopDomain, nonce, sig },
-            { url: process.env.NEXT_PUBLIC_CONVEX_URL as string },
           );
 
           // Register webhooks as needed for this store
@@ -168,7 +168,6 @@ export async function GET(req: NextRequest) {
         },
         {
           token,
-          url: process.env.NEXT_PUBLIC_CONVEX_URL as string,
         },
       );
 
@@ -183,7 +182,7 @@ export async function GET(req: NextRequest) {
       }
 
       // Success logging only in debug mode
-      if (process.env.SHOPIFY_WEBHOOK_DEBUG === "1") {
+      if (SHOPIFY_WEBHOOK_DEBUG) {
         const userTag = tagFromToken(token) || "anon";
         logger.info("Shopify connected", { user: userTag, connected: true, requestId });
       }
@@ -219,7 +218,6 @@ export async function GET(req: NextRequest) {
               nonce,
               sig,
             },
-            { url: process.env.NEXT_PUBLIC_CONVEX_URL as string },
           ),
         "provisioning user/org",
       );
@@ -230,7 +228,6 @@ export async function GET(req: NextRequest) {
           await fetchAction(
             api.installations.issueTokensFromShopifyOAuth,
             { shop: session.shop, nonce, sig },
-            { url: process.env.NEXT_PUBLIC_CONVEX_URL as string },
           );
 
         let tokens: { token: string; refreshToken: string } | null = null;
@@ -264,7 +261,6 @@ export async function GET(req: NextRequest) {
             {
               // Use freshly issued Convex token for accurate status
               token: tokens.token,
-              url: process.env.NEXT_PUBLIC_CONVEX_URL as string,
             },
           );
 

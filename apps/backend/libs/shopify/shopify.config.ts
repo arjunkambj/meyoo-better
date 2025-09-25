@@ -2,10 +2,14 @@
  * Shopify integration configuration
  */
 
+import { optionalEnv } from "../env";
+
+const SHOPIFY_API_VERSION = optionalEnv("SHOPIFY_API_VERSION") ?? "2025-07";
+
 export const SHOPIFY_CONFIG = {
   // API Configuration
   API: {
-    VERSION: process.env.SHOPIFY_API_VERSION || "2025-07",
+    VERSION: SHOPIFY_API_VERSION,
     RATE_LIMIT: {
       REST: 2, // requests per second
       GRAPHQL: {

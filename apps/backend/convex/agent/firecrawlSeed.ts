@@ -9,9 +9,10 @@ import { rag } from '../rag';
 import { internal } from '../_generated/api';
 import type { Id } from '../_generated/dataModel';
 import { resolveOrgIdForContext } from '../utils/org';
+import { requireEnv } from '../utils/env';
 
-const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY;
-const DEFAULT_MAX_PAGES = 10;
+const FIRECRAWL_API_KEY = requireEnv('FIRECRAWL_API_KEY');
+const DEFAULT_MAX_PAGES: number | undefined = undefined;
 const SUMMARY_PAGE_LIMIT = 5;
 const SUMMARY_SNIPPET_LENGTH = 600;
 
@@ -118,7 +119,7 @@ export const seedDocsFromFirecrawl = action({
     let parsedUrl: URL;
     try {
       parsedUrl = new URL(args.url);
-    } catch (error) {
+    } catch (_error) {
       throw new Error(`Invalid URL provided: ${args.url}`);
     }
 
@@ -149,14 +150,25 @@ export const seedDocsFromFirecrawl = action({
 
     let crawlResult;
     try {
-      crawlResult = await firecrawl.crawl(args.url, {
-        limit: maxPages,
-        includePaths: args.includePaths ?? undefined,
-        excludePaths: args.excludePaths ?? undefined,
+      const crawlOptions: Parameters<typeof firecrawl.crawl>[1] = {
         scrapeOptions: {
           formats: ['markdown'],
         },
-      });
+      };
+
+      if (maxPages !== undefined) {
+        crawlOptions.limit = maxPages;
+      }
+
+      if (args.includePaths && args.includePaths.length > 0) {
+        crawlOptions.includePaths = args.includePaths;
+      }
+
+      if (args.excludePaths && args.excludePaths.length > 0) {
+        crawlOptions.excludePaths = args.excludePaths;
+      }
+
+      crawlResult = await firecrawl.crawl(args.url, crawlOptions);
     } catch (error) {
       console.error('Firecrawl crawl failed:', error);
       throw new Error(

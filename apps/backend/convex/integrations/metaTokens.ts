@@ -1,9 +1,12 @@
 import { createSimpleLogger } from "../../libs/logging/simple";
+import { optionalEnv, requireEnv } from "../utils/env";
 
 const logger = createSimpleLogger("MetaTokens");
 
-const GRAPH_VERSION = process.env.META_API_VERSION || "v21.0";
-const GRAPH_BASE = process.env.META_BASE_URL || "https://graph.facebook.com";
+const GRAPH_VERSION = optionalEnv("META_API_VERSION") ?? "v23.0";
+const GRAPH_BASE = optionalEnv("META_BASE_URL") ?? "https://graph.facebook.com";
+const META_APP_ID = requireEnv("META_APP_ID");
+const META_APP_SECRET = requireEnv("META_APP_SECRET");
 
 export interface MetaTokenExchangeResponse {
   access_token: string;
@@ -18,18 +21,11 @@ export interface MetaTokenExchangeResponse {
 export async function exchangeForLongLivedUserToken(
   currentAccessToken: string,
 ): Promise<MetaTokenExchangeResponse> {
-  const appId = process.env.META_APP_ID;
-  const appSecret = process.env.META_APP_SECRET;
-
-  if (!appId || !appSecret) {
-    throw new Error("Missing META_APP_ID or META_APP_SECRET");
-  }
-
   const url = new URL(`${GRAPH_BASE}/${GRAPH_VERSION}/oauth/access_token`);
 
   url.searchParams.set("grant_type", "fb_exchange_token");
-  url.searchParams.set("client_id", appId);
-  url.searchParams.set("client_secret", appSecret);
+  url.searchParams.set("client_id", META_APP_ID);
+  url.searchParams.set("client_secret", META_APP_SECRET);
   url.searchParams.set("fb_exchange_token", currentAccessToken);
 
   const res = await fetch(url.toString(), { method: "GET" });
@@ -53,12 +49,7 @@ export async function exchangeForLongLivedUserToken(
  * Requires an app access token in the form APP_ID|APP_SECRET.
  */
 export async function debugToken(inputToken: string): Promise<any> {
-  const appId = process.env.META_APP_ID;
-  const appSecret = process.env.META_APP_SECRET;
-  if (!appId || !appSecret) {
-    throw new Error("Missing META_APP_ID or META_APP_SECRET");
-  }
-  const appAccessToken = `${appId}|${appSecret}`;
+  const appAccessToken = `${META_APP_ID}|${META_APP_SECRET}`;
 
   const url = new URL(`${GRAPH_BASE}/${GRAPH_VERSION}/debug_token`);
   url.searchParams.set("input_token", inputToken);

@@ -1,4 +1,7 @@
 import { LATEST_API_VERSION } from "@shopify/shopify-api";
+import { optionalEnv } from "@/libs/env";
+
+const NEXT_PUBLIC_META_API_VERSION = optionalEnv("NEXT_PUBLIC_META_API_VERSION") ?? "v23.0";
 
 export const INTEGRATIONS = {
   shopify: {
@@ -38,7 +41,7 @@ export const INTEGRATIONS = {
 
   meta: {
     enabled: true,
-    apiVersion: process.env.NEXT_PUBLIC_META_API_VERSION || "v21.0", // Graph API
+    apiVersion: NEXT_PUBLIC_META_API_VERSION, // Graph API
     insightFields: [
       "account_id",
       "account_name",

@@ -5,8 +5,11 @@ import { createLogger } from "@/libs/logging/Logger";
 import { createManagedPricingRedirectUrl } from "@/libs/shopify/billing";
 import shopify from "@/libs/shopify/shopify";
 import { genRequestId, tagFromToken } from "@/libs/logging/trace";
+import { requireEnv } from "@/libs/env";
 
 const logger = createLogger("Billing.Request");
+
+const NEXT_PUBLIC_APP_URL = requireEnv("NEXT_PUBLIC_APP_URL");
 
 export const runtime = "nodejs";
 
@@ -74,7 +77,7 @@ export async function POST(req: NextRequest) {
     const organization = await fetchQuery(
       api.billing.organizationHelpers.getOrganizationByUser,
       {},
-      { token, url: process.env.NEXT_PUBLIC_CONVEX_URL as string },
+      { token },
     );
 
     if (!organization) {
@@ -104,7 +107,7 @@ export async function POST(req: NextRequest) {
         : "https";
       return `${scheme}://${noLeadingSlashes}`;
     };
-    const baseAppUrl = normalizeWithScheme(process.env.NEXT_PUBLIC_APP_URL);
+    const baseAppUrl = normalizeWithScheme(NEXT_PUBLIC_APP_URL);
     const safeReturnPath =
       typeof returnPath === "string" && returnPath.startsWith("/")
         ? returnPath

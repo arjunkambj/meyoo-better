@@ -3,6 +3,9 @@ import { v } from "convex/values";
 import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { action, internalQuery, mutation, query } from "../_generated/server";
+import { optionalEnv } from "../utils/env";
+
+const CONVEX_CLOUD_URL = optionalEnv("CONVEX_CLOUD_URL");
 
 /**
  * Admin API
@@ -617,7 +620,7 @@ export const resetTestData = mutation({
     }
 
     // Safety check - only allow for non-production environments
-    if (process.env.CONVEX_CLOUD_URL?.includes("prod")) {
+    if (CONVEX_CLOUD_URL?.includes("prod")) {
       throw new Error("Cannot reset data in production environment");
     }
 
@@ -768,7 +771,7 @@ export const resetMetaData = mutation({
       throw new Error("Admin access required");
     }
 
-    if (process.env.CONVEX_CLOUD_URL?.includes("prod")) {
+    if (CONVEX_CLOUD_URL?.includes("prod")) {
       throw new Error("Cannot reset data in production environment");
     }
 
@@ -912,7 +915,7 @@ export const resetShopifyData = mutation({
       throw new Error("Admin access required");
     }
 
-    if (process.env.CONVEX_CLOUD_URL?.includes("prod")) {
+    if (CONVEX_CLOUD_URL?.includes("prod")) {
       throw new Error("Cannot reset data in production environment");
     }
 
@@ -1180,7 +1183,7 @@ export const resetEverything = mutation({
       throw new Error("Admin access required");
     }
 
-    if (process.env.CONVEX_CLOUD_URL?.includes("prod")) {
+    if (CONVEX_CLOUD_URL?.includes("prod")) {
       throw new Error("Cannot reset data in production environment");
     }
 

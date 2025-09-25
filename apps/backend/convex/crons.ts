@@ -1,6 +1,15 @@
 import { cronJobs } from "convex/server";
 
 import { internal } from "./_generated/api";
+import { optionalEnv } from "./utils/env";
+
+const META_TICK_MINUTES_ENV = optionalEnv("META_TICK_MINUTES");
+const META_TICK_MINUTES = META_TICK_MINUTES_ENV
+  ? Number(META_TICK_MINUTES_ENV)
+  : 6;
+if (Number.isNaN(META_TICK_MINUTES) || META_TICK_MINUTES <= 0) {
+  throw new Error("META_TICK_MINUTES must be a positive number");
+}
 
 const crons = cronJobs();
 
@@ -41,7 +50,7 @@ export default crons;
 // Fixed-interval Meta tick (default 6 minutes) with batch size controlled in handler
 crons.interval(
   "meta batch tick",
-  { minutes: Number(process.env.META_TICK_MINUTES || 6) },
+  { minutes: META_TICK_MINUTES },
   internal.engine.metaScheduler.tick,
   {},
 );

@@ -167,34 +167,13 @@ export async function getSessionForBilling(
 }
 
 /**
- * Helper function to create a mock session for development/testing
- */
-export function createMockSession(shopDomain: string): Session {
-  return new Session({
-    id: `offline_${shopDomain}`,
-    shop: shopDomain,
-    state: "offline",
-    isOnline: false,
-    accessToken: process.env.SHOPIFY_DEV_ACCESS_TOKEN || "mock-token",
-    scope: "read_products,write_products,read_orders,write_orders",
-  });
-}
-
-/**
- * Session retrieval with fallback to mock in development
+ * Session retrieval
  */
 export async function getShopifySession(
   shopDomain?: string,
   organizationId?: string,
 ): Promise<Session | null> {
   const session = await getSessionForBilling(shopDomain, organizationId);
-
-  // In development, fall back to mock session if no real session found
-  if (!session && process.env.NODE_ENV === "development" && shopDomain) {
-    logger.warn("Using mock session for development", { shopDomain });
-
-    return createMockSession(shopDomain);
-  }
 
   return session;
 }
@@ -207,4 +186,3 @@ export const ShopifySessionManager = {
   isSessionValid,
   getSessionForBilling,
 };
-

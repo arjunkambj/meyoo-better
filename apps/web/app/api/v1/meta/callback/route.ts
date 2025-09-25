@@ -7,10 +7,16 @@ import { type NextRequest, NextResponse } from "next/server";
 import { api } from "@/libs/convexApi";
 import { META_CONFIG } from "@/config/integrations/meta.config";
 import { createLogger } from "@/libs/logging/Logger";
+import { optionalEnv, requireEnv } from "@/libs/env";
 
 const logger = createLogger("Meta.Callback");
 
 export const runtime = "nodejs";
+
+const NEXT_PUBLIC_APP_URL = requireEnv("NEXT_PUBLIC_APP_URL");
+const META_APP_ID = requireEnv("META_APP_ID");
+const META_APP_SECRET = requireEnv("META_APP_SECRET");
+const META_DEBUG_ENABLED = optionalEnv("META_DEBUG") === "1";
 
 export async function GET(req: NextRequest) {
   try {
@@ -20,11 +26,13 @@ export async function GET(req: NextRequest) {
     const state = searchParams.get("state");
     const error = searchParams.get("error");
 
+    const appBase = NEXT_PUBLIC_APP_URL.replace(/\/$/, "");
+
     if (error) {
       logger.warn("Meta OAuth error", { error, requestId });
 
       return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_APP_URL}/onboarding/marketing?error=${encodeURIComponent(error)}`,
+        `${appBase}/onboarding/marketing?error=${encodeURIComponent(error)}`,
       );
     }
 
@@ -32,7 +40,7 @@ export async function GET(req: NextRequest) {
       logger.error("Missing required Meta OAuth parameters");
 
       return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_APP_URL}/onboarding/marketing?error=missing_parameters`,
+        `${appBase}/onboarding/marketing?error=missing_parameters`,
       );
     }
 
@@ -42,18 +50,18 @@ export async function GET(req: NextRequest) {
 
     if (!token) {
       // Only log in debug mode
-      if (process.env.META_DEBUG === "1") {
+      if (META_DEBUG_ENABLED) {
         logger.info("No authenticated user, redirecting to signin");
       }
 
       return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_APP_URL}/signin?returnUrl=${encodeURIComponent("/onboarding/marketing")}`,
+        `${appBase}/signin?returnUrl=${encodeURIComponent("/onboarding/marketing")}`,
       );
     }
 
-    const clientId = process.env.META_APP_ID || "";
-    const clientSecret = process.env.META_APP_SECRET || "";
-    const envBase = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "");
+    const clientId = META_APP_ID;
+    const clientSecret = META_APP_SECRET;
+    const envBase = appBase;
     const origin = `${req.nextUrl.protocol}//${req.nextUrl.host}`;
     const baseUrl = envBase || origin;
     const redirectUri = `${baseUrl}/api/v1/meta/callback`;
@@ -77,7 +85,7 @@ export async function GET(req: NextRequest) {
 
     if (!accessToken) {
       return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_APP_URL}/onboarding/marketing?error=no_access_token`,
+        `${appBase}/onboarding/marketing?error=no_access_token`,
       );
     }
 
@@ -98,43 +106,34 @@ export async function GET(req: NextRequest) {
         userId: userInfo.id || "",
         userName: userInfo.name || "Meta Account",
       },
-      { token, url: process.env.NEXT_PUBLIC_CONVEX_URL as string },
+      { token },
     );
 
     // Fetch and store ad accounts immediately after connection
     try {
-      const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
+      const accountsResult = await fetchAction(
+        api.integrations.meta.fetchMetaAccountsAction,
+        {},
+        { token },
+      );
 
-      if (!convexUrl) {
+      if (!accountsResult.success || !accountsResult.accounts?.length) {
         logger.warn("Failed to fetch ad accounts after connection", {
-          reason: "missing_convex_url",
+          reason: accountsResult.error || "empty_result",
           requestId,
         });
       } else {
-        const accountsResult = await fetchAction(
-          api.integrations.meta.fetchMetaAccountsAction,
-          {},
-          { token, url: convexUrl },
+        await fetchMutation(
+          api.integrations.meta.storeAdAccountsFromCallback,
+          { accounts: accountsResult.accounts },
+          { token },
         );
 
-        if (!accountsResult.success || !accountsResult.accounts?.length) {
-          logger.warn("Failed to fetch ad accounts after connection", {
-            reason: accountsResult.error || "empty_result",
+        if (META_DEBUG_ENABLED) {
+          logger.info("Meta ad accounts stored", {
             requestId,
+            count: accountsResult.accounts.length,
           });
-        } else {
-          await fetchMutation(
-            api.integrations.meta.storeAdAccountsFromCallback,
-            { accounts: accountsResult.accounts },
-            { token, url: convexUrl },
-          );
-
-          if (process.env.META_DEBUG === "1") {
-            logger.info("Meta ad accounts stored", {
-              requestId,
-              count: accountsResult.accounts.length,
-            });
-          }
         }
       }
     } catch (error) {
@@ -142,13 +141,13 @@ export async function GET(req: NextRequest) {
     }
 
     // Only log success in debug mode
-    if (process.env.META_DEBUG === "1") {
+    if (META_DEBUG_ENABLED) {
       logger.info("Meta connected", { user: userTag, connected: true });
     }
 
     // Redirect back to marketing step with success indicator
     const res = NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_APP_URL}/onboarding/marketing?meta_connected=true`,
+      `${appBase}/onboarding/marketing?meta_connected=true`,
     );
     res.headers.set("X-Request-Id", requestId);
     res.headers.set("X-User-Tag", userTag);
@@ -157,7 +156,7 @@ export async function GET(req: NextRequest) {
     const requestId = genRequestId(req);
     logger.error("Meta callback error", error as Error, { requestId });
     const res = NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_APP_URL}/onboarding/marketing?error=callback_error&rid=${encodeURIComponent(requestId)}`,
+      `${NEXT_PUBLIC_APP_URL.replace(/\/$/, "")}/onboarding/marketing?error=callback_error&rid=${encodeURIComponent(requestId)}`,
     );
     res.headers.set("X-Request-Id", requestId);
     return res;

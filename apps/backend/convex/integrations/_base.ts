@@ -22,6 +22,33 @@ export interface DateRange {
   daysBack?: number;
 }
 
+export const DATE_RANGES = {
+  TODAY: 0,
+  YESTERDAY: 1,
+  LAST_7_DAYS: 7,
+  LAST_30_DAYS: 30,
+  LAST_90_DAYS: 90,
+  LAST_YEAR: 365,
+  LAST_2_YEARS: 730,
+  LAST_5_YEARS: 1825,
+  ALL_TIME: null,
+} as const;
+
+export type DateRangePreset = keyof typeof DATE_RANGES;
+
+function buildDateRange(daysBack: number): DateRange {
+  const endDate = new Date();
+  const startDate = new Date();
+
+  startDate.setDate(startDate.getDate() - daysBack);
+
+  return {
+    startDate: startDate.toISOString().split("T")[0],
+    endDate: endDate.toISOString().split("T")[0],
+    daysBack,
+  };
+}
+
 /**
  * Base integration interface that all platforms must implement
  */
@@ -174,16 +201,20 @@ export const SyncUtils = {
    * Calculate date range for initial sync
    */
   getInitialDateRange(daysBack: number = 60): DateRange {
-    const endDate = new Date();
-    const startDate = new Date();
+    return buildDateRange(daysBack);
+  },
 
-    startDate.setDate(startDate.getDate() - daysBack);
+  /**
+   * Convenience helper to map preset ranges to concrete dates
+   */
+  getPresetDateRange(preset: DateRangePreset): DateRange {
+    const daysBack = DATE_RANGES[preset];
 
-    return {
-      startDate: startDate.toISOString().split("T")[0],
-      endDate: endDate.toISOString().split("T")[0],
-      daysBack,
-    };
+    if (daysBack === null) {
+      return {};
+    }
+
+    return buildDateRange(daysBack);
   },
 
   /**

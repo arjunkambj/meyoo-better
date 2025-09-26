@@ -157,7 +157,7 @@ export const seedDocsFromFirecrawl = action({
       // No-op; continue execution but ensure we record that we're in progress
     }
 
-    let onboardingId: Id<'onboarding'> | null = onboarding?._id ?? null;
+    const onboardingId: Id<'onboarding'> | null = onboarding?._id ?? null;
 
     if (onboardingId) {
       await ctx.runMutation(

@@ -3,7 +3,7 @@ import type { GenericActionCtx } from "convex/server";
 import { v } from "convex/values";
 import { ShopifyGraphQLClient } from "../../libs/shopify/ShopifyGraphQLClient";
 import { createSimpleLogger } from "../../libs/logging/simple";
-import { parseMoney } from "../../libs/utils/money";
+import { parseMoney, roundMoney } from "../../libs/utils/money";
 import { internal } from "../_generated/api";
 import type { DataModel, Doc, Id } from "../_generated/dataModel";
 import {
@@ -25,6 +25,25 @@ import { gid, toMs } from "../utils/shopify";
 
 const logger = createSimpleLogger("Shopify");
 
+const BULK_OPS = {
+  INSERT_SIZE: 100,
+  UPDATE_SIZE: 50,
+  LOOKUP_SIZE: 200,
+} as const;
+
+function chunkArray<T>(values: T[], chunkSize: number): T[][] {
+  if (values.length === 0) return [];
+
+  const size = Math.max(1, chunkSize);
+  const chunks: T[][] = [];
+
+  for (let index = 0; index < values.length; index += size) {
+    chunks.push(values.slice(index, index + size));
+  }
+
+  return chunks;
+}
+
 const toOptionalString = (value: unknown): string | undefined => {
   if (value === null || value === undefined) return undefined;
 
@@ -37,6 +56,451 @@ const toOptionalString = (value: unknown): string | undefined => {
 
   return undefined;
 };
+
+const ORDER_COMPARE_FIELDS: ReadonlyArray<keyof Doc<"shopifyOrders">> = [
+  "orderNumber",
+  "name",
+  "customerId",
+  "email",
+  "phone",
+  "shopifyCreatedAt",
+  "updatedAt",
+  "processedAt",
+  "closedAt",
+  "cancelledAt",
+  "financialStatus",
+  "fulfillmentStatus",
+  "totalPrice",
+  "subtotalPrice",
+  "totalTax",
+  "totalDiscounts",
+  "totalShippingPrice",
+  "totalTip",
+  "currency",
+  "totalItems",
+  "totalQuantity",
+  "totalWeight",
+  "tags",
+  "note",
+  "riskLevel",
+  "sourceUrl",
+  "landingSite",
+  "referringSite",
+  "utmSource",
+  "utmMedium",
+  "utmCampaign",
+  "shippingAddress",
+];
+
+const valuesMatch = (a: unknown, b: unknown): boolean => {
+  if (Array.isArray(a) || Array.isArray(b)) {
+    return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+  }
+
+  if (a && typeof a === "object") {
+    return JSON.stringify(a) === JSON.stringify(b ?? null);
+  }
+
+  if (b && typeof b === "object") {
+    return JSON.stringify(a ?? null) === JSON.stringify(b);
+  }
+
+  return a === b;
+};
+
+const hasOrderMeaningfulChange = (
+  existing: Doc<"shopifyOrders">,
+  candidate: Record<string, unknown>,
+): boolean => {
+  for (const field of ORDER_COMPARE_FIELDS) {
+    if (
+      !valuesMatch(
+        (existing as Record<string, unknown>)[field as string],
+        candidate[field as string],
+      )
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+const DELETE_BATCH_SIZE = 200;
+
+const ORGANIZATION_TABLES = [
+  "shopifyProductVariants",
+  "shopifyOrderItems",
+  "shopifyTransactions",
+  "shopifyRefunds",
+  "shopifyFulfillments",
+  "shopifyInventory",
+  "metaAdAccounts",
+  "metaInsights",
+  "metricsDaily",
+  "metricsWeekly",
+  "metricsMonthly",
+  "productMetrics",
+  "customerMetrics",
+  "realtimeMetrics",
+  "costs",
+  "costCategories",
+  "productCostComponents",
+  "integrationSessions",
+  "syncSessions",
+  "invites",
+  "notifications",
+] as const;
+
+type OrganizationDataTable = (typeof ORGANIZATION_TABLES)[number];
+
+const STORE_TABLES = [
+  "shopifyProducts",
+  "shopifyOrders",
+  "shopifyCustomers",
+  "shopifySessions",
+] as const;
+
+type StoreDataTable = (typeof STORE_TABLES)[number];
+
+const organizationTableValidator = v.union(
+  v.literal("shopifyProductVariants"),
+  v.literal("shopifyOrderItems"),
+  v.literal("shopifyTransactions"),
+  v.literal("shopifyRefunds"),
+  v.literal("shopifyFulfillments"),
+  v.literal("shopifyInventory"),
+  v.literal("metaAdAccounts"),
+  v.literal("metaInsights"),
+  v.literal("metricsDaily"),
+  v.literal("metricsWeekly"),
+  v.literal("metricsMonthly"),
+  v.literal("productMetrics"),
+  v.literal("customerMetrics"),
+  v.literal("realtimeMetrics"),
+  v.literal("costs"),
+  v.literal("costCategories"),
+  v.literal("productCostComponents"),
+  v.literal("integrationSessions"),
+  v.literal("syncSessions"),
+  v.literal("invites"),
+  v.literal("notifications"),
+);
+
+const storeTableValidator = v.union(
+  v.literal("shopifyProducts"),
+  v.literal("shopifyOrders"),
+  v.literal("shopifyCustomers"),
+  v.literal("shopifySessions"),
+);
+
+type BatchDeleteResult = {
+  deleted: number;
+  hasMore: boolean;
+};
+
+const normalizeBatchSize = (size?: number): number => {
+  if (typeof size !== "number" || Number.isNaN(size) || size <= 0) {
+    return DELETE_BATCH_SIZE;
+  }
+
+  return Math.min(Math.max(1, Math.floor(size)), 500);
+};
+
+const scheduleOrganizationBatch = async (
+  ctx: any,
+  args: {
+    table: OrganizationDataTable;
+    organizationId: Id<"organizations">;
+    cursor?: string | null;
+    batchSize: number;
+  },
+): Promise<void> => {
+  await ctx.scheduler.runAfter(
+    0,
+    internal.integrations.shopify.deleteOrganizationDataBatch,
+    {
+      table: args.table,
+      organizationId: args.organizationId,
+      cursor: args.cursor ?? undefined,
+      batchSize: args.batchSize,
+    },
+  );
+};
+
+const scheduleStoreBatch = async (
+  ctx: any,
+  args: {
+    table: StoreDataTable;
+    storeId: Id<"shopifyStores">;
+    cursor?: string | null;
+    batchSize: number;
+  },
+): Promise<void> => {
+  await ctx.scheduler.runAfter(
+    0,
+    internal.integrations.shopify.deleteStoreDataBatch,
+    {
+      table: args.table,
+      storeId: args.storeId,
+      cursor: args.cursor ?? undefined,
+      batchSize: args.batchSize,
+    },
+  );
+};
+
+export const deleteOrganizationDataBatch = internalMutation({
+  args: {
+    table: organizationTableValidator,
+    organizationId: v.id("organizations"),
+    cursor: v.optional(v.string()),
+    batchSize: v.optional(v.number()),
+  },
+  returns: v.object({
+    deleted: v.number(),
+    hasMore: v.boolean(),
+  }),
+  handler: async (ctx, args): Promise<BatchDeleteResult> => {
+    const batchSize = normalizeBatchSize(args.batchSize);
+    const table = args.table as OrganizationDataTable;
+
+    const query = (ctx.db.query(table) as any).withIndex(
+      "by_organization" as any,
+      (q: any) => q.eq("organizationId", args.organizationId),
+    );
+
+    const page = await query.paginate({
+      numItems: batchSize,
+      cursor: args.cursor ?? null,
+    });
+
+    for (const record of page.page) {
+      await ctx.db.delete(record._id);
+    }
+
+    if (!page.isDone) {
+      await scheduleOrganizationBatch(ctx, {
+        table,
+        organizationId: args.organizationId,
+        cursor: page.continueCursor,
+        batchSize,
+      });
+    }
+
+    return {
+      deleted: page.page.length,
+      hasMore: !page.isDone,
+    };
+  },
+});
+
+export const deleteStoreDataBatch = internalMutation({
+  args: {
+    table: storeTableValidator,
+    storeId: v.id("shopifyStores"),
+    cursor: v.optional(v.string()),
+    batchSize: v.optional(v.number()),
+  },
+  returns: v.object({
+    deleted: v.number(),
+    hasMore: v.boolean(),
+  }),
+  handler: async (ctx, args): Promise<BatchDeleteResult> => {
+    const batchSize = normalizeBatchSize(args.batchSize);
+    const table = args.table as StoreDataTable;
+
+    const query = (ctx.db.query(table) as any).withIndex(
+      "by_store" as any,
+      (q: any) => q.eq("storeId", args.storeId),
+    );
+
+    const page = await query.paginate({
+      numItems: batchSize,
+      cursor: args.cursor ?? null,
+    });
+
+    for (const record of page.page) {
+      await ctx.db.delete(record._id);
+    }
+
+    if (!page.isDone) {
+      await scheduleStoreBatch(ctx, {
+        table,
+        storeId: args.storeId,
+        cursor: page.continueCursor,
+        batchSize,
+      });
+    }
+
+    return {
+      deleted: page.page.length,
+      hasMore: !page.isDone,
+    };
+  },
+});
+
+export const deleteDashboardsBatch = internalMutation({
+  args: {
+    organizationId: v.id("organizations"),
+    ownerId: v.optional(v.id("users")),
+    cursor: v.optional(v.string()),
+    batchSize: v.optional(v.number()),
+  },
+  returns: v.object({
+    deleted: v.number(),
+    hasMore: v.boolean(),
+  }),
+  handler: async (ctx, args): Promise<BatchDeleteResult> => {
+    const batchSize = normalizeBatchSize(args.batchSize);
+
+    const query = ctx.db
+      .query("dashboards")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", args.organizationId),
+      );
+
+    const page = await query.paginate({
+      numItems: batchSize,
+      cursor: args.cursor ?? null,
+    });
+
+    for (const dashboard of page.page) {
+      await ctx.db.delete(dashboard._id);
+    }
+
+    if (!page.isDone) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.integrations.shopify.deleteDashboardsBatch,
+        {
+          organizationId: args.organizationId,
+          ownerId: args.ownerId,
+          cursor: page.continueCursor,
+          batchSize,
+        },
+      );
+    } else if (args.ownerId) {
+      // Recreate the default dashboard once the cleanup is complete
+      const existingDefault = await ctx.db
+        .query("dashboards")
+        .withIndex("by_organization", (q) =>
+          q.eq("organizationId", args.organizationId),
+        )
+        .first();
+
+      if (!existingDefault) {
+        await ctx.db.insert("dashboards", {
+          organizationId: args.organizationId,
+          name: "Main Dashboard",
+          type: "main",
+          isDefault: true,
+          visibility: "private",
+          createdBy: args.ownerId,
+          updatedAt: Date.now(),
+          config: {
+            kpis: [
+              "netProfit",
+              "revenue",
+              "netProfitMargin",
+              "orders",
+              "avgOrderValue",
+              "blendedRoas",
+              "totalAdSpend",
+              "shopifyConversionRate",
+              "repeatCustomerRate",
+              "moMRevenueGrowth",
+            ],
+            widgets: [
+              "adSpendSummary",
+              "customerSummary",
+              "orderSummary",
+            ],
+          },
+        });
+      }
+    }
+
+    return {
+      deleted: page.page.length,
+      hasMore: !page.isDone,
+    };
+  },
+});
+
+export const deleteShopifyStoreIfEmpty = internalMutation({
+  args: {
+    storeId: v.id("shopifyStores"),
+    organizationId: v.id("organizations"),
+    attempt: v.optional(v.number()),
+  },
+  returns: v.object({
+    deleted: v.boolean(),
+    rescheduled: v.boolean(),
+  }),
+  handler: async (ctx, args) => {
+    const attempt = args.attempt ?? 0;
+
+    const hasOrders = await ctx.db
+      .query("shopifyOrders")
+      .withIndex("by_store", (q) => q.eq("storeId", args.storeId))
+      .take(1);
+
+    const hasProducts = await ctx.db
+      .query("shopifyProducts")
+      .withIndex("by_store", (q) => q.eq("storeId", args.storeId))
+      .take(1);
+
+    const hasCustomers = await ctx.db
+      .query("shopifyCustomers")
+      .withIndex("by_store", (q) => q.eq("storeId", args.storeId))
+      .take(1);
+
+    const hasSessions = await ctx.db
+      .query("shopifySessions")
+      .withIndex("by_store", (q) => q.eq("storeId", args.storeId))
+      .take(1);
+
+    const remaining =
+      hasOrders.length > 0 ||
+      hasProducts.length > 0 ||
+      hasCustomers.length > 0 ||
+      hasSessions.length > 0;
+
+    if (remaining) {
+      if (attempt >= 5) {
+        logger.warn("Store cleanup deferred after max attempts", {
+          storeId: args.storeId,
+          organizationId: args.organizationId,
+        });
+
+        return { deleted: false, rescheduled: false };
+      }
+
+      const delayMs = Math.min(60_000, 2 ** attempt * 1_000);
+
+      await ctx.scheduler.runAfter(
+        delayMs,
+        internal.integrations.shopify.deleteShopifyStoreIfEmpty,
+        {
+          storeId: args.storeId,
+          organizationId: args.organizationId,
+          attempt: attempt + 1,
+        },
+      );
+
+      return { deleted: false, rescheduled: true };
+    }
+
+    await ctx.db.delete(args.storeId);
+
+    logger.info("Deleted Shopify store after dependent data removal", {
+      storeId: args.storeId,
+      organizationId: args.organizationId,
+    });
+
+    return { deleted: true, rescheduled: false };
+  },
+});
 
 // Input types matching storeOrdersInternal validator (for type safety when calling)
 type ShopifyOrderLineItemInput = {
@@ -87,6 +551,13 @@ type ShopifyOrderInput = {
   tags?: string[];
   note?: string;
   riskLevel?: string;
+  sourceUrl?: string;
+  landingSite?: string;
+  referringSite?: string;
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  syncedAt?: number;
   shippingAddress?: {
     country?: string;
     province?: string;
@@ -2122,14 +2593,26 @@ export const storeOrdersInternal = internalMutation({
     const customerShopifyIds = Array.from(customerDataMap.keys());
     const existingCustomers = new Map();
 
-    for (const custShopifyId of customerShopifyIds) {
-      const existing = await ctx.db
-        .query("shopifyCustomers")
-        .withIndex("by_shopify_id_store", (q) =>
-          q.eq("shopifyId", custShopifyId).eq("storeId", store!._id)
-        )
-        .first();
-      if (existing) existingCustomers.set(custShopifyId, existing);
+    for (const batch of chunkArray(
+      customerShopifyIds,
+      BULK_OPS.LOOKUP_SIZE,
+    )) {
+      const results = await Promise.all(
+        batch.map((custShopifyId) =>
+          ctx.db
+            .query("shopifyCustomers")
+            .withIndex("by_shopify_id_store", (q) =>
+              q.eq("shopifyId", custShopifyId).eq("storeId", store!._id)
+            )
+            .first(),
+        ),
+      );
+
+      results.forEach((existing, idx) => {
+        if (existing) {
+          existingCustomers.set(batch[idx]!, existing);
+        }
+      });
     }
 
     // Step 3: Prepare customer inserts/updates
@@ -2175,14 +2658,21 @@ export const storeOrdersInternal = internalMutation({
     const orderShopifyIds = args.orders.map((o) => o.shopifyId);
     const existingOrders = new Map();
 
-    for (const oid of orderShopifyIds) {
-      const order = await ctx.db
-        .query("shopifyOrders")
-        .withIndex("by_shopify_id", (q) => q.eq("shopifyId", oid))
-        .first();
-      if (order && order.storeId === store._id) {
-        existingOrders.set(oid, order);
-      }
+    for (const batch of chunkArray(orderShopifyIds, BULK_OPS.LOOKUP_SIZE)) {
+      const results = await Promise.all(
+        batch.map((oid) =>
+          ctx.db
+            .query("shopifyOrders")
+            .withIndex("by_shopify_id", (q) => q.eq("shopifyId", oid))
+            .first(),
+        ),
+      );
+
+      results.forEach((order, idx) => {
+        if (order && order.storeId === store._id) {
+          existingOrders.set(batch[idx]!, order);
+        }
+      });
     }
 
     // Step 5: Process orders and collect line items
@@ -2238,15 +2728,23 @@ export const storeOrdersInternal = internalMutation({
         tags,
         note: toOptionalString(orderData.note),
         riskLevel: toOptionalString(orderData.riskLevel),
+        sourceUrl: toOptionalString(orderData.sourceUrl),
+        landingSite: toOptionalString(orderData.landingSite),
+        referringSite: toOptionalString(orderData.referringSite),
+        utmSource: toOptionalString(orderData.utmSource),
+        utmMedium: toOptionalString(orderData.utmMedium),
+        utmCampaign: toOptionalString(orderData.utmCampaign),
         shippingAddress,
-        syncedAt: Date.now(),
+        syncedAt: orderData.syncedAt ?? Date.now(),
       };
 
       const existing = existingOrders.get(orderData.shopifyId);
       let orderId: Id<"shopifyOrders">;
 
       if (existing) {
-        await ctx.db.patch(existing._id, orderToStore);
+        if (hasOrderMeaningfulChange(existing, orderToStore)) {
+          await ctx.db.patch(existing._id, orderToStore);
+        }
         orderId = existing._id;
       } else {
         // Re-check by shopifyId to avoid duplicates in concurrent writes
@@ -2259,7 +2757,9 @@ export const storeOrdersInternal = internalMutation({
         const existingForStore = possible.find((o) => o.storeId === store._id);
 
         if (existingForStore) {
-          await ctx.db.patch(existingForStore._id, orderToStore);
+          if (hasOrderMeaningfulChange(existingForStore, orderToStore)) {
+            await ctx.db.patch(existingForStore._id, orderToStore);
+          }
           orderId = existingForStore._id as Id<"shopifyOrders">;
         } else {
           orderId = await ctx.db.insert("shopifyOrders", orderToStore);
@@ -2322,16 +2822,33 @@ export const storeOrdersInternal = internalMutation({
       // Bulk fetch existing line items
       const lineItemShopifyIds = allLineItems.map((item) => item.shopifyId);
       const existingLineItems = new Map();
-      for (const liId of lineItemShopifyIds) {
-        const li = await ctx.db
-          .query("shopifyOrderItems")
-          .withIndex("by_shopify_id", (q) => q.eq("shopifyId", liId))
-          .first();
-        if (li) existingLineItems.set(liId, li);
+      for (const batch of chunkArray(
+        lineItemShopifyIds,
+        BULK_OPS.LOOKUP_SIZE,
+      )) {
+        const results = await Promise.all(
+          batch.map((liId) =>
+            ctx.db
+              .query("shopifyOrderItems")
+              .withIndex("by_shopify_id", (q) => q.eq("shopifyId", liId))
+              .first(),
+          ),
+        );
+
+        results.forEach((li, idx) => {
+          if (li) {
+            existingLineItems.set(batch[idx]!, li);
+          }
+        });
       }
 
       // Process line items
       for (const item of allLineItems) {
+        const perUnitDiscount =
+          item.discountedPrice !== undefined
+            ? Math.max(0, item.price - item.discountedPrice)
+            : 0;
+
         const itemToStore = {
           organizationId: args.organizationId as Id<"organizations">,
           orderId: item.orderId,
@@ -2349,10 +2866,8 @@ export const storeOrdersInternal = internalMutation({
           sku: toOptionalString(item.sku),
           quantity: item.quantity,
           price: item.price,
-          totalDiscount: item.discountedPrice
-            ? item.price - item.discountedPrice
-            : 0,
-          fulfillableQuantity: item.fulfillableQuantity ?? 0,
+          totalDiscount: roundMoney(perUnitDiscount * item.quantity),
+          fulfillableQuantity: item.fulfillableQuantity ?? item.quantity ?? 0,
           fulfillmentStatus: toOptionalString(item.fulfillmentStatus),
         };
 
@@ -2395,18 +2910,19 @@ export const storeOrdersInternal = internalMutation({
 
     if (uniqueCustomerIds.size > 0) {
       try {
-        await ctx.runMutation(
-          internal.analytics.customerCalculations.calculateCustomerMetrics,
+        await ctx.scheduler.runAfter(
+          0,
+          internal.analytics.customerCalculations.enqueueCustomerMetricsCalculation,
           {
             organizationId: args.organizationId,
             customerIds: Array.from(uniqueCustomerIds),
-          }
+          },
         );
         logger.info(
-          `Calculated metrics for ${uniqueCustomerIds.size} customers`
+          `Scheduled customer metrics calculation for ${uniqueCustomerIds.size} customers`
         );
       } catch (error) {
-        logger.error("Failed to calculate customer metrics", error);
+        logger.error("Failed to schedule customer metrics calculation", error);
       }
     }
 
@@ -4157,10 +4673,12 @@ export const handleAppUninstalled = internalMutation({
         organizationId: args.organizationId,
       });
 
+      const organizationId = args.organizationId as Id<"organizations">;
+
       const users = await ctx.db
         .query("users")
         .withIndex("by_organization", (q) =>
-          q.eq("organizationId", args.organizationId as Id<"organizations">)
+          q.eq("organizationId", organizationId)
         )
         .collect();
 
@@ -4237,31 +4755,28 @@ export const handleAppUninstalled = internalMutation({
       }
 
       // STEP 2: RESET ORGANIZATION STATE
-      const orgId = users[0]?.organizationId;
-      if (orgId) {
-        const organization = await ctx.db.get(orgId);
-        if (organization) {
-          await ctx.db.patch(organization._id, {
-            // Reset organization trial flags when app is uninstalled
-            isTrialActive: false,
-            hasTrialExpired: false,
-            isPremium: false,
+      const organization = await ctx.db.get(organizationId);
+      if (organization) {
+        await ctx.db.patch(organization._id, {
+          // Reset organization trial flags when app is uninstalled
+          isTrialActive: false,
+          hasTrialExpired: false,
+          isPremium: false,
 
-            // Update timestamp
-            updatedAt: Date.now(),
-          });
+          // Update timestamp
+          updatedAt: Date.now(),
+        });
 
-          // Delete existing billing record to ensure reinstall goes through billing step
-          const billingRecord = await ctx.db
-            .query("billing")
-            .withIndex("by_organization", (q) =>
-              q.eq("organizationId", organization._id)
-            )
-            .first();
+        // Delete existing billing record to ensure reinstall goes through billing step
+        const billingRecord = await ctx.db
+          .query("billing")
+          .withIndex("by_organization", (q) =>
+            q.eq("organizationId", organization._id)
+          )
+          .first();
 
-          if (billingRecord) {
-            await ctx.db.delete(billingRecord._id);
-          }
+        if (billingRecord) {
+          await ctx.db.delete(billingRecord._id);
         }
       }
 
@@ -4270,365 +4785,89 @@ export const handleAppUninstalled = internalMutation({
         usersReset: users.length,
       });
 
-      // STEP 3: NOW PROCEED WITH DATA DELETION
-      const deletedCounts = {
-        // Shopify data
-        shopifyStores: 0,
-        shopifyProducts: 0,
-        shopifyProductVariants: 0,
-        shopifyOrders: 0,
-        shopifyOrderItems: 0,
-        shopifyCustomers: 0,
-        shopifyTransactions: 0,
-        shopifyRefunds: 0,
-        shopifyFulfillments: 0,
-        shopifyInventory: 0,
-        shopifySessions: 0,
-        // Meta data
-        metaAdAccounts: 0,
-        metaInsights: 0,
-        // Analytics data
-        analytics: 0,
-        // Cost data
-        costs: 0,
-        // Sync data
-        syncData: 0,
-        // Integration data
-        integrationSessions: 0,
-        // Dashboards
-        dashboards: 0,
-        // Team data
-        invites: 0,
-        organizationSeats: 0,
-        notifications: 0,
-      };
+      // STEP 3: SCHEDULE DATA CLEANUP IN BATCHES
+      const storeJobsPerTable: Record<string, number> = {};
+      const organizationJobsPerTable: Record<string, number> = {};
 
-      // Delete all Shopify data
-      // Find and delete all Shopify stores
       const stores = await ctx.db
         .query("shopifyStores")
         .withIndex("by_organization", (q) =>
-          q.eq("organizationId", args.organizationId as Id<"organizations">)
+          q.eq("organizationId", organizationId)
         )
         .collect();
+
+      let storeCleanupJobs = 0;
 
       for (const store of stores) {
-        // Delete products for this store
-        const products = await ctx.db
-          .query("shopifyProducts")
-          .withIndex("by_store", (q) => q.eq("storeId", store._id))
-          .collect();
+        for (const table of STORE_TABLES) {
+          await ctx.scheduler.runAfter(
+            0,
+            internal.integrations.shopify.deleteStoreDataBatch,
+            {
+              table,
+              storeId: store._id,
+              batchSize: DELETE_BATCH_SIZE,
+            },
+          );
 
-        for (const product of products) {
-          await ctx.db.delete(product._id);
-          deletedCounts.shopifyProducts++;
+          storeCleanupJobs += 1;
+          storeJobsPerTable[table] = (storeJobsPerTable[table] ?? 0) + 1;
         }
 
-        // Delete orders for this store
-        const orders = await ctx.db
-          .query("shopifyOrders")
-          .withIndex("by_store", (q) => q.eq("storeId", store._id))
-          .collect();
+        await ctx.scheduler.runAfter(
+          0,
+          internal.integrations.shopify.deleteShopifyStoreIfEmpty,
+          {
+            storeId: store._id,
+            organizationId,
+          },
+        );
 
-        for (const order of orders) {
-          await ctx.db.delete(order._id);
-          deletedCounts.shopifyOrders++;
-        }
-
-        // Delete customers for this store
-        const customers = await ctx.db
-          .query("shopifyCustomers")
-          .withIndex("by_store", (q) => q.eq("storeId", store._id))
-          .collect();
-
-        for (const customer of customers) {
-          await ctx.db.delete(customer._id);
-          deletedCounts.shopifyCustomers++;
-        }
-
-        // Delete the store itself
-        await ctx.db.delete(store._id);
-        deletedCounts.shopifyStores++;
+        storeCleanupJobs += 1;
       }
 
-      // Delete product variants
-      const variants = await ctx.db
-        .query("shopifyProductVariants")
-        .withIndex("by_organization", (q) =>
-          q.eq("organizationId", args.organizationId as Id<"organizations">)
-        )
-        .collect();
+      let organizationCleanupJobs = 0;
 
-      for (const variant of variants) {
-        await ctx.db.delete(variant._id);
-        deletedCounts.shopifyProductVariants++;
+      for (const table of ORGANIZATION_TABLES) {
+        await ctx.scheduler.runAfter(
+          0,
+          internal.integrations.shopify.deleteOrganizationDataBatch,
+          {
+            table,
+            organizationId,
+            batchSize: DELETE_BATCH_SIZE,
+          },
+        );
+
+        organizationCleanupJobs += 1;
+        organizationJobsPerTable[table] =
+          (organizationJobsPerTable[table] ?? 0) + 1;
       }
 
-      // Delete order items
-      const orderItems = await ctx.db
-        .query("shopifyOrderItems")
-        .withIndex("by_organization", (q) =>
-          q.eq("organizationId", args.organizationId as Id<"organizations">)
-        )
-        .collect();
-
-      for (const item of orderItems) {
-        await ctx.db.delete(item._id);
-        deletedCounts.shopifyOrderItems++;
-      }
-
-      // Delete transactions
-      const transactions = await ctx.db
-        .query("shopifyTransactions")
-        .withIndex("by_organization", (q) =>
-          q.eq("organizationId", args.organizationId as Id<"organizations">)
-        )
-        .collect();
-
-      for (const transaction of transactions) {
-        await ctx.db.delete(transaction._id);
-        deletedCounts.shopifyTransactions++;
-      }
-
-      // Delete refunds
-      const refunds = await ctx.db
-        .query("shopifyRefunds")
-        .withIndex("by_organization", (q) =>
-          q.eq("organizationId", args.organizationId as Id<"organizations">)
-        )
-        .collect();
-
-      for (const refund of refunds) {
-        await ctx.db.delete(refund._id);
-        deletedCounts.shopifyRefunds++;
-      }
-
-      // Fulfillments, inventory, sessions trimmed in schema
-
-      // 2. Delete all Meta data
-      const metaAccounts = await ctx.db
-        .query("metaAdAccounts")
-        .withIndex("by_organization", (q) =>
-          q.eq("organizationId", args.organizationId as Id<"organizations">)
-        )
-        .collect();
-
-      for (const account of metaAccounts) {
-        await ctx.db.delete(account._id);
-        deletedCounts.metaAdAccounts++;
-      }
-
-      const metaInsights = await ctx.db
-        .query("metaInsights")
-        .withIndex("by_organization", (q) =>
-          q.eq("organizationId", args.organizationId as Id<"organizations">)
-        )
-        .collect();
-
-      for (const insight of metaInsights) {
-        await ctx.db.delete(insight._id);
-        deletedCounts.metaInsights++;
-      }
-
-      // 5. Delete all analytics data
-      const analyticsTables = [
-        "metricsDaily",
-        "metricsWeekly",
-        "metricsMonthly",
-        "productMetrics",
-        "customerMetrics",
-        "realtimeMetrics",
-      ];
-
-      for (const tableName of analyticsTables) {
-        // Use relaxed typing here because we're iterating dynamic tables that all share a
-        // common "by_organization" index, but TS cannot prove that across the union.
-        const records = await (ctx.db.query as any)(tableName as any)
-          .withIndex("by_organization" as any, (q: any) =>
-            q.eq("organizationId", args.organizationId as Id<"organizations">)
-          )
-          .collect();
-
-        for (const record of records) {
-          await ctx.db.delete(record._id);
-          deletedCounts.analytics++;
-        }
-      }
-
-      // 6. Delete all cost data
-      const costs = await ctx.db
-        .query("costs")
-        .withIndex("by_organization", (q) =>
-          q.eq("organizationId", args.organizationId as Id<"organizations">)
-        )
-        .collect();
-
-      for (const cost of costs) {
-        await ctx.db.delete(cost._id);
-        deletedCounts.costs++;
-      }
-
-      const costCategories = await ctx.db
-        .query("costCategories")
-        .withIndex("by_organization", (q) =>
-          q.eq("organizationId", args.organizationId as Id<"organizations">)
-        )
-        .collect();
-
-      for (const category of costCategories) {
-        await ctx.db.delete(category._id);
-      }
-
-      // Remove product-level cost components
-      const productComponents = await ctx.db
-        .query("productCostComponents")
-        .withIndex("by_organization", (q) =>
-          q.eq("organizationId", args.organizationId as Id<"organizations">)
-        )
-        .collect();
-      for (const row of productComponents) {
-        await ctx.db.delete(row._id);
-      }
-
-      // historicalCostDefaults removed (legacy)
-
-      // Sync orchestration tables trimmed in schema
-
-      // Rate limits trimmed in schema
-
-      // 7. Delete ALL integration sessions (Shopify, Meta, Google)
-      // This ensures complete disconnection from all platforms
-      const integrationSessions = await ctx.db
-        .query("integrationSessions")
-        .withIndex("by_organization", (q) =>
-          q.eq("organizationId", args.organizationId as Id<"organizations">)
-        )
-        .collect();
-
-      for (const session of integrationSessions) {
-        // Log which platform sessions are being deleted for debugging
-        logger.info("Deleting integration session", {
-          platform: session.platform,
-          accountId: session.accountId,
-          organizationId: args.organizationId,
-        });
-        
-        await ctx.db.delete(session._id);
-        deletedCounts.integrationSessions++;
-      }
-
-      // 8. Delete sync sessions
-      const syncSessions = await ctx.db
-        .query("syncSessions")
-        .withIndex("by_organization", (q) =>
-          q.eq("organizationId", args.organizationId as Id<"organizations">)
-        )
-        .collect();
-
-      for (const session of syncSessions) {
-        await ctx.db.delete(session._id);
-      }
-
-      // 9. Delete dashboards (except default)
-      const dashboards = await ctx.db
-        .query("dashboards")
-        .withIndex("by_organization", (q) =>
-          q.eq("organizationId", args.organizationId as Id<"organizations">)
-        )
-        .collect();
-
-      for (const dashboard of dashboards) {
-        await ctx.db.delete(dashboard._id);
-        deletedCounts.dashboards++;
-      }
-
-      // Metric widgets and preferences trimmed in schema
-
-      // 11. Delete team invitations
-      const invites = await ctx.db
-        .query("invites")
-        .withIndex("by_organization", (q) =>
-          q.eq("organizationId", args.organizationId as Id<"organizations">)
-        )
-        .collect();
-
-      for (const invite of invites) {
-        await ctx.db.delete(invite._id);
-        deletedCounts.invites++;
-      }
-
-      // Seats moved to memberships; nothing to delete here
-
-      // 13. Delete organization notifications
-      const notifications = await ctx.db
-        .query("notifications")
-        .withIndex("by_organization", (q) =>
-          q.eq("organizationId", args.organizationId as Id<"organizations">)
-        )
-        .collect();
-
-      for (const notification of notifications) {
-        await ctx.db.delete(notification._id);
-        deletedCounts.notifications++;
-      }
-
-      // 14. Create fresh default dashboard
-      // Organization state was already reset at the beginning
-      if (orgId) {
-        const organization = await ctx.db.get(orgId);
-        
-        if (organization) {
-          // Create a fresh default dashboard (align with web defaults)
-          const owner = users.find((u) => u._id === organization.ownerId);
-
-          if (owner) {
-            await ctx.db.insert("dashboards", {
-              organizationId: organization._id,
-              name: "Main Dashboard",
-              type: "main",
-              isDefault: true,
-              visibility: "private",
-              createdBy: owner._id,
-              updatedAt: Date.now(),
-              config: {
-                kpis: [
-                  // Default KPIs - ordered for new users
-                  "netProfit",
-                  "revenue",
-                  "netProfitMargin",
-                  "orders",
-                  "avgOrderValue",
-                  "blendedRoas", // MER
-                  "totalAdSpend",
-                  "shopifyConversionRate",
-                  "repeatCustomerRate",
-                  "moMRevenueGrowth",
-                ],
-                widgets: [
-                  // Essential widgets for new users
-                  "adSpendSummary",
-                  "customerSummary",
-                  "orderSummary",
-                ],
-              },
-            });
-          }
-        }
-      }
-
-      // Audit logs trimmed in schema
-
-      logger.info(
-        "App uninstall completed - users reset FIRST, then data deleted",
+      await ctx.scheduler.runAfter(
+        0,
+        internal.integrations.shopify.deleteDashboardsBatch,
         {
-          organizationId: args.organizationId as Id<"organizations">,
-          shopDomain: args.shopDomain,
-          deletedCounts,
-          usersReset: users.length,
-          executionOrder: "1. Reset users/org, 2. Delete data",
-          integrationsCleared: ["shopify", "meta"],
-        }
+          organizationId,
+          ownerId: organization?.ownerId as Id<"users"> | undefined,
+          batchSize: DELETE_BATCH_SIZE,
+        },
       );
+
+      organizationCleanupJobs += 1;
+      organizationJobsPerTable.dashboards =
+        (organizationJobsPerTable.dashboards ?? 0) + 1;
+
+      logger.info("App uninstall cleanup scheduled", {
+        organizationId: args.organizationId,
+        shopDomain: args.shopDomain,
+        usersReset: users.length,
+        storeCount: stores.length,
+        storeCleanupJobs,
+        organizationCleanupJobs,
+        storeJobsPerTable,
+        organizationJobsPerTable,
+      });
 
       return null;
     } catch (error) {

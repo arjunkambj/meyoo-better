@@ -1,7 +1,8 @@
 import { v } from "convex/values";
 
 import type { Doc } from "../_generated/dataModel";
-import { internalMutation } from "../_generated/server";
+import { internal } from "../_generated/api";
+import { internalAction, internalMutation } from "../_generated/server";
 
 /**
  * Customer Metrics Calculations
@@ -159,6 +160,37 @@ export const calculateCustomerMetrics = internalMutation({
     }
 
     // production: avoid noisy analytics logs
+  },
+});
+
+/**
+ * Lightweight action wrapper so callers can trigger the heavy mutation
+ * outside of their own transaction and avoid OCC conflicts.
+ */
+export const enqueueCustomerMetricsCalculation = internalAction({
+  args: {
+    organizationId: v.id("organizations"),
+    customerIds: v.optional(v.array(v.id("shopifyCustomers"))),
+  },
+  handler: async (ctx, args) => {
+    try {
+      await ctx.runMutation(
+        internal.analytics.customerCalculations.calculateCustomerMetrics,
+        {
+          organizationId: args.organizationId,
+          customerIds: args.customerIds,
+        },
+      );
+    } catch (error) {
+      console.error(
+        "Failed to calculate customer metrics in background",
+        {
+          organizationId: String(args.organizationId),
+          customerCount: args.customerIds?.length ?? "all",
+          error,
+        },
+      );
+    }
   },
 });
 

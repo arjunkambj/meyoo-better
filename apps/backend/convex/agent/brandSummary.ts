@@ -2,7 +2,9 @@ import { action, internalQuery } from "../_generated/server";
 import { v } from "convex/values";
 import { rag } from "../rag";
 import { api, internal } from "../_generated/api";
+import type { Id } from "../_generated/dataModel";
 import { resolveOrgIdForContext } from "../utils/org";
+import { normalizeShopDomain } from "../utils/shop";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_LOOKBACK_DAYS = 30;
@@ -65,22 +67,40 @@ export const upsertBrandSummary = action({
     shopDomain: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const { orgId } = await resolveOrgIdForContext(ctx, {
-      organizationId: args.organizationId ?? null,
-      shopDomain: args.shopDomain ?? null,
-    });
+    let orgId = args.organizationId ?? null;
+    let normalizedShopDomain: string | null = null;
+
+    if (orgId) {
+      normalizedShopDomain = args.shopDomain
+        ? normalizeShopDomain(args.shopDomain)
+        : null;
+    } else {
+      const resolved = await resolveOrgIdForContext(ctx, {
+        organizationId: args.organizationId ?? null,
+        shopDomain: args.shopDomain ?? null,
+      });
+
+      orgId = resolved.orgId;
+      normalizedShopDomain = resolved.shopDomain;
+    }
+
+    if (!orgId) {
+      throw new Error("Organization context is required to build brand summary");
+    }
+
+    const resolvedOrgId = orgId as Id<"organizations">;
 
     const lookback = args.lookbackDays ?? DEFAULT_LOOKBACK_DAYS;
     const since = Date.now() - lookback * DAY_MS;
 
     const org = await ctx.runQuery(api.core.organizations.getOrganization, {
-      organizationId: orgId,
+      organizationId: resolvedOrgId,
     });
 
     const metrics = await ctx.runQuery(
       internal.agent.brandSummary.computeBrandMetrics,
       {
-        orgId,
+        orgId: resolvedOrgId,
         since,
       },
     );
@@ -88,6 +108,8 @@ export const upsertBrandSummary = action({
     const brandName = org?.name ?? metrics.storeName ?? "Our Brand";
     const storefront = metrics.shopDomain
       ? `https://${metrics.shopDomain}`
+      : normalizedShopDomain
+      ? `https://${normalizedShopDomain}`
       : undefined;
 
     const lines: string[] = [
@@ -124,22 +146,32 @@ export const upsertBrandSummary = action({
 
     const summary = lines.join("\n");
 
+    const summaryMetadata: Record<string, string | number | boolean> = {
+      generatedAt: new Date().toISOString(),
+      lookbackDays: lookback,
+      currency: metrics.currency,
+    };
+
+    if (metrics.storeName) {
+      summaryMetadata.storeName = metrics.storeName;
+    }
+
+    if (metrics.shopDomain) {
+      summaryMetadata.shopDomain = metrics.shopDomain;
+    } else if (normalizedShopDomain) {
+      summaryMetadata.shopDomain = normalizedShopDomain;
+    }
+
     await rag.add(ctx as any, {
-      namespace: String(orgId),
+      namespace: String(resolvedOrgId),
       key: "brand-summary",
       text: summary,
       title: `${brandName} Overview`,
       filterValues: [
         { name: "type", value: "brand-summary" },
-        { name: "resourceId", value: String(orgId) },
+        { name: "resourceId", value: String(resolvedOrgId) },
       ],
-      metadata: {
-        generatedAt: new Date().toISOString(),
-        lookbackDays: lookback,
-        storeName: metrics.storeName,
-        shopDomain: metrics.shopDomain,
-        currency: metrics.currency,
-      },
+      metadata: summaryMetadata,
       importance: 3,
     });
 

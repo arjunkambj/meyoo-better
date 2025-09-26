@@ -11,7 +11,6 @@
     "lint": "expo lint"
   },
   "dependencies": {
-    "mobile": "*",
     "@expo/vector-icons": "^15.0.2",
     "@expo/metro-runtime": "~6.1.2",
     "@react-navigation/bottom-tabs": "^7.4.0",
@@ -40,7 +39,7 @@
     "react-native-web": "~0.21.0"
   },
   "devDependencies": {
-    "@types/react": "~19.1.0",
+    "@types/react": "~19.1.10",
     "typescript": "~5.9.2",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~10.0.0"

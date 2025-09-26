@@ -27,11 +27,9 @@ export const SHOPIFY_CONFIG = {
     INVENTORY_BATCH_SIZE: 25,
   },
 
-  // Database Bulk Operations
-  BULK_OPS: {
-    INSERT_SIZE: 100, // Max records to insert in one operation
-    UPDATE_SIZE: 50, // Max records to update in one operation
-    LOOKUP_SIZE: 200, // Max IDs to lookup in one query
+  // Sync batching controls
+  SYNC: {
+    ORDERS_PERSIST_BATCH_SIZE: 25, // Orders persisted per workpool batch job
   },
 
   // Webhook Topics
@@ -162,19 +160,6 @@ export const SHOPIFY_CONFIG = {
     INVENTORY_LOCATION_LIMIT: 10,
     INITIAL_SYNC_DAYS: 60, // Sync 60 days of data for initial sync (matching Google/Meta)
     ORDER_BATCH_PROCESS_SIZE: 10, // Process orders in batches of 10
-  },
-
-  // Date Range Settings for different sync scenarios
-  DATE_RANGES: {
-    TODAY: 0,
-    YESTERDAY: 1,
-    LAST_7_DAYS: 7,
-    LAST_30_DAYS: 30,
-    LAST_90_DAYS: 90,
-    LAST_YEAR: 365,
-    LAST_2_YEARS: 730,
-    LAST_5_YEARS: 1825, // For lifetime data
-    ALL_TIME: null, // Fetch all available data
   },
 
   // Error Messages

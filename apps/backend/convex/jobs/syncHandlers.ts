@@ -15,6 +15,13 @@ interface SyncResult {
   errors?: string[];
   // Indicates whether any data changed during the sync
   dataChanged?: boolean;
+  batchStats?: {
+    batchesScheduled: number;
+    ordersQueued: number;
+    jobIds: string[];
+  };
+  productsProcessed?: number;
+  customersProcessed?: number;
 }
 
 // Removed unused ScheduledSyncResult interface
@@ -44,6 +51,15 @@ export const handleInitialSync = internalAction({
     errors: v.optional(v.array(v.string())),
     // Some platform syncs include this flag
     dataChanged: v.optional(v.boolean()),
+    batchStats: v.optional(
+      v.object({
+        batchesScheduled: v.number(),
+        ordersQueued: v.number(),
+        jobIds: v.array(v.string()),
+      }),
+    ),
+    productsProcessed: v.optional(v.number()),
+    customersProcessed: v.optional(v.number()),
   }),
   handler: async (ctx, args): Promise<SyncResult> => {
     const startTime = Date.now();
@@ -77,10 +93,68 @@ export const handleInitialSync = internalAction({
               dateRange: {
                 daysBack: args.dateRange?.daysBack || 60,
               },
+              syncSessionId: sessionId as Id<"syncSessions">,
             },
           )) as any;
           // Ensure platform field present
           result = { ...result, platform: args.platform };
+
+          {
+            const batchesScheduled = result.batchStats?.batchesScheduled ?? 0;
+            const baseProcessed =
+              (result.productsProcessed || 0) +
+              (result.customersProcessed || 0);
+
+            if (sessionId) {
+              await ctx.runMutation(
+                internal.jobs.helpers.initializeSyncSessionBatches,
+                {
+                  sessionId,
+                  totalBatches: batchesScheduled,
+                  initialRecordsProcessed: baseProcessed,
+                },
+              );
+            }
+
+            if (sessionId) {
+              const sessionUpdate: {
+                sessionId: Id<"syncSessions">;
+                status:
+                  | "pending"
+                  | "processing"
+                  | "syncing"
+                  | "completed"
+                  | "failed"
+                  | "cancelled";
+                recordsProcessed: number;
+                completedAt?: number;
+                duration?: number;
+              } = {
+                sessionId,
+                status: batchesScheduled > 0 ? "processing" : "completed",
+                recordsProcessed:
+                  batchesScheduled > 0
+                    ? baseProcessed
+                    : result.recordsProcessed || baseProcessed,
+              };
+
+              if (sessionUpdate.status === "completed") {
+                sessionUpdate.completedAt = Date.now();
+                sessionUpdate.duration = Date.now() - startTime;
+              }
+
+              await ctx.runMutation(
+                internal.jobs.helpers.updateSyncSession,
+                sessionUpdate,
+              );
+
+              if (sessionUpdate.status === "processing") {
+                console.log(
+                  `[INITIAL_SYNC] Queued ${batchesScheduled} Shopify order batches for organization ${args.organizationId}. Orders queued: ${result.batchStats?.ordersQueued ?? 0}.`,
+                );
+              }
+            }
+          }
           break;
         case "meta":
           result = (await ctx.runAction(
@@ -100,20 +174,26 @@ export const handleInitialSync = internalAction({
           throw new Error(`Unknown platform: ${args.platform}`);
       }
 
-      // Update sync session with results
-      await ctx.runMutation(internal.jobs.helpers.updateSyncSession, {
-        sessionId: (sessionId ?? undefined) as Id<"syncSessions"> | undefined,
-        status: "completed",
-        recordsProcessed: result.recordsProcessed || 0,
-        completedAt: Date.now(),
-        duration: Date.now() - startTime,
-      });
+      if (args.platform !== "shopify") {
+        await ctx.runMutation(internal.jobs.helpers.updateSyncSession, {
+          sessionId: (sessionId ?? undefined) as Id<"syncSessions"> | undefined,
+          status: "completed",
+          recordsProcessed: result.recordsProcessed || 0,
+          completedAt: Date.now(),
+          duration: Date.now() - startTime,
+        });
+      }
 
       // Analytics calculation should be triggered separately after sync completes
       // This avoids circular dependencies between handlers
 
+      const completionLabel =
+        args.platform === "shopify" && result.batchStats?.batchesScheduled
+          ? "queued"
+          : "completed";
+
       console.log(
-        `[INITIAL_SYNC] ✅ Completed ${args.platform} sync for organization ${args.organizationId} - Processed ${result.recordsProcessed || 0} records in ${Math.round((Date.now() - startTime) / 1000)}s`,
+        `[INITIAL_SYNC] ✅ ${completionLabel} ${args.platform} sync for organization ${args.organizationId} - Processed ${result.recordsProcessed || 0} records in ${Math.round((Date.now() - startTime) / 1000)}s`,
       );
 
       return result;
@@ -131,6 +211,130 @@ export const handleInitialSync = internalAction({
         completedAt: Date.now(),
         duration: Date.now() - startTime,
       });
+
+      throw error;
+    }
+  },
+});
+
+/**
+ * Persist a Shopify order batch via workpool
+ */
+export const handleShopifyOrdersBatch = internalAction({
+  args: {
+    organizationId: v.id("organizations"),
+    storeId: v.id("shopifyStores"),
+    syncSessionId: v.optional(v.id("syncSessions")),
+    batchNumber: v.number(),
+    cursor: v.optional(v.string()),
+    orders: v.array(v.any()),
+    transactions: v.optional(v.array(v.any())),
+    refunds: v.optional(v.array(v.any())),
+    fulfillments: v.optional(v.array(v.any())),
+  },
+  returns: v.object({
+    success: v.boolean(),
+    recordsProcessed: v.number(),
+    duration: v.number(),
+  }),
+  handler: async (ctx, args) => {
+    const start = Date.now();
+
+    try {
+      if (args.orders.length > 0) {
+        await ctx.runMutation(internal.integrations.shopify.storeOrdersInternal, {
+          organizationId: args.organizationId,
+          storeId: args.storeId,
+          orders: args.orders as any,
+        });
+      }
+
+      if (args.transactions && args.transactions.length > 0) {
+        await ctx.runMutation(
+          internal.integrations.shopify.storeTransactionsInternal,
+          {
+            organizationId: args.organizationId,
+            transactions: args.transactions as any,
+          },
+        );
+      }
+
+      if (args.refunds && args.refunds.length > 0) {
+        await ctx.runMutation(internal.integrations.shopify.storeRefundsInternal, {
+          organizationId: args.organizationId,
+          refunds: args.refunds as any,
+        });
+      }
+
+      if (args.fulfillments && args.fulfillments.length > 0) {
+        await ctx.runMutation(
+          internal.integrations.shopify.storeFulfillmentsInternal,
+          {
+            organizationId: args.organizationId,
+            fulfillments: args.fulfillments as any,
+          },
+        );
+      }
+
+      let progress: {
+        totalBatches: number;
+        previousCompleted: number;
+        completedBatches: number;
+        recordsProcessed: number;
+        startedAt: number;
+      } | null = null;
+
+      if (args.syncSessionId) {
+        progress = await ctx.runMutation(
+          internal.jobs.helpers.incrementSyncSessionProgress,
+          {
+            sessionId: args.syncSessionId,
+            batchesCompletedDelta: 1,
+            recordsProcessedDelta: args.orders.length,
+          },
+        );
+
+        if (
+          progress &&
+          progress.totalBatches > 0 &&
+          progress.completedBatches >= progress.totalBatches
+        ) {
+          await ctx.runMutation(internal.jobs.helpers.updateSyncSession, {
+            sessionId: args.syncSessionId,
+            status: "completed",
+            recordsProcessed: progress.recordsProcessed,
+            completedAt: Date.now(),
+            duration: Date.now() - (progress.startedAt || Date.now()),
+          });
+
+          await ctx.runMutation(internal.engine.syncJobs.onInitialSyncComplete, {
+            workId: `shopifyOrdersBatch:${String(args.syncSessionId)}:${args.batchNumber}`,
+            context: {
+              organizationId: args.organizationId,
+              platform: "shopify",
+              sessionId: args.syncSessionId,
+            },
+            result: {
+              recordsProcessed: progress.recordsProcessed,
+            },
+          });
+        }
+      }
+
+      return {
+        success: true,
+        recordsProcessed: args.orders.length,
+        duration: Date.now() - start,
+      };
+    } catch (error) {
+      if (args.syncSessionId) {
+        await ctx.runMutation(internal.jobs.helpers.updateSyncSession, {
+          sessionId: args.syncSessionId,
+          status: "failed",
+          error: error instanceof Error ? error.message : String(error),
+          completedAt: Date.now(),
+        });
+      }
 
       throw error;
     }

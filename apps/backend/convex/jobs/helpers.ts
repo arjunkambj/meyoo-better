@@ -90,3 +90,74 @@ export const updateSyncSession = internalMutation({
     await ctx.db.patch(sessionId, updates);
   },
 });
+
+/**
+ * Initialize sync session batching metadata and baseline progress
+ */
+export const initializeSyncSessionBatches = internalMutation({
+  args: {
+    sessionId: v.id("syncSessions"),
+    totalBatches: v.number(),
+    initialRecordsProcessed: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const session = await ctx.db.get(args.sessionId);
+    if (!session) return;
+
+    const metadata = {
+      ...(session.metadata || {}),
+      totalBatches: args.totalBatches,
+      completedBatches: 0,
+    };
+
+    await ctx.db.patch(args.sessionId, {
+      metadata,
+      recordsProcessed: args.initialRecordsProcessed,
+    });
+  },
+});
+
+/**
+ * Increment sync session batch progress and return updated counters
+ */
+export const incrementSyncSessionProgress = internalMutation({
+  args: {
+    sessionId: v.id("syncSessions"),
+    batchesCompletedDelta: v.number(),
+    recordsProcessedDelta: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const session = await ctx.db.get(args.sessionId);
+    if (!session) return null;
+
+    const metadata = session.metadata || {};
+    const totalBatches = metadata.totalBatches ?? 0;
+    const previousCompleted = metadata.completedBatches ?? 0;
+    const nextCompletedRaw = previousCompleted + args.batchesCompletedDelta;
+    const nextCompleted = totalBatches > 0
+      ? Math.min(totalBatches, nextCompletedRaw)
+      : nextCompletedRaw;
+
+    const nextRecordsProcessed =
+      args.recordsProcessedDelta !== undefined
+        ? (session.recordsProcessed || 0) + args.recordsProcessedDelta
+        : session.recordsProcessed || 0;
+
+    await ctx.db.patch(args.sessionId, {
+      metadata: {
+        ...metadata,
+        totalBatches,
+        completedBatches: nextCompleted,
+      },
+      recordsProcessed: nextRecordsProcessed,
+    });
+
+    return {
+      totalBatches,
+      previousCompleted,
+      completedBatches: nextCompleted,
+      recordsProcessed: nextRecordsProcessed,
+      startedAt: session.startedAt,
+    };
+  },
+});

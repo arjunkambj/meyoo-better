@@ -30,6 +30,7 @@ export type JobType =
   | "sync:immediate" // User-triggered sync
   | "sync:scheduled" // Scheduled sync (daily/hourly)
   | "sync:manual" // Admin/API-triggered manual sync
+  | "sync:shopifyOrdersBatch" // Persist Shopify order batch
   | "analytics:calculate" // Calculate metrics
   | "analytics:rollup" // Aggregate metrics
   | "cleanup:old_data" // Clean old data
@@ -112,6 +113,20 @@ export async function createJob(
           },
           onComplete: options?.onComplete,
           context: options?.context,
+        },
+      );
+      break;
+    case "sync:shopifyOrdersBatch":
+      jobId = await workpool.enqueueAction(
+        ctx as any,
+        internal.jobs.syncHandlers.handleShopifyOrdersBatch,
+        data as any,
+        {
+          retry: {
+            maxAttempts: options?.maxAttempts || 5,
+            initialBackoffMs: options?.initialBackoffMs || 1000,
+            base: 2,
+          },
         },
       );
       break;

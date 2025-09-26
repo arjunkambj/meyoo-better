@@ -27,6 +27,46 @@ export const markFirecrawlSeeded = internalMutation({
         firecrawlSeededUrl: url,
         firecrawlSummary: summary,
         firecrawlPageCount: pageCount,
+        firecrawlSeedingStatus: undefined,
+      },
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+export const markFirecrawlSeedingInProgress = internalMutation({
+  args: {
+    onboardingId: v.id("onboarding"),
+  },
+  handler: async (ctx, { onboardingId }) => {
+    const existing = await ctx.db.get(onboardingId);
+    if (!existing) return;
+
+    await ctx.db.patch(onboardingId, {
+      onboardingData: {
+        ...(existing.onboardingData || {}),
+        firecrawlSeedingStatus: {
+          status: "in_progress",
+          startedAt: Date.now(),
+        },
+      },
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+export const clearFirecrawlSeedingStatus = internalMutation({
+  args: {
+    onboardingId: v.id("onboarding"),
+  },
+  handler: async (ctx, { onboardingId }) => {
+    const existing = await ctx.db.get(onboardingId);
+    if (!existing) return;
+
+    await ctx.db.patch(onboardingId, {
+      onboardingData: {
+        ...(existing.onboardingData || {}),
+        firecrawlSeedingStatus: undefined,
       },
       updatedAt: Date.now(),
     });

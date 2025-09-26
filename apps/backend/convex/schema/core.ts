@@ -325,6 +325,8 @@ export const syncSessions = defineTable({
           status: v.optional(v.string()),
         }),
       ),
+      totalBatches: v.optional(v.number()),
+      completedBatches: v.optional(v.number()),
     }),
   ),
 })
@@ -371,6 +373,15 @@ export const onboarding = defineTable({
       firecrawlSeededUrl: v.optional(v.string()),
       firecrawlSummary: v.optional(v.string()),
       firecrawlPageCount: v.optional(v.number()),
+      firecrawlSeedingStatus: v.optional(
+        v.object({
+          status: v.union(
+            v.literal("scheduled"),
+            v.literal("in_progress"),
+          ),
+          startedAt: v.number(),
+        }),
+      ),
     }),
   ),
 

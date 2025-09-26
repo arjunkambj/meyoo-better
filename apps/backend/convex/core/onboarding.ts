@@ -1028,16 +1028,43 @@ export const connectShopifyStore = mutation({
           : `https://${domain}`
         : DEV_FIRECRAWL_TEST_URL;
 
-    if (seedUrl) {
+    const firecrawlStatus = onboarding.onboardingData?.firecrawlSeedingStatus;
+    const hasSeededFirecrawl = Boolean(
+      onboarding.onboardingData?.firecrawlSeededAt,
+    );
+    const firecrawlBusy =
+      firecrawlStatus?.status === "scheduled" ||
+      firecrawlStatus?.status === "in_progress";
+
+    if (!hasSeededFirecrawl && !firecrawlBusy && seedUrl) {
       try {
+        await ctx.db.patch(onboarding._id, {
+          onboardingData: {
+            ...onboarding.onboardingData,
+            firecrawlSeedingStatus: {
+              status: "scheduled",
+              startedAt: Date.now(),
+            },
+          },
+          updatedAt: Date.now(),
+        });
+
         await ctx.scheduler.runAfter(
           0,
           api.agent.firecrawlSeed.seedDocsFromFirecrawl,
           {
             url: seedUrl,
+            organizationId: user.organizationId as Id<"organizations">,
+            shopDomain: domain,
           },
         );
-        await ctx.scheduler.runAfter(0, api.agent.brandSummary.upsertBrandSummary, {});
+        await ctx.scheduler.runAfter(
+          0,
+          api.agent.brandSummary.upsertBrandSummary,
+          {
+            organizationId: user.organizationId as Id<"organizations">,
+          },
+        );
       } catch (error) {
         console.error(
           "[ONBOARDING] Firecrawl documentation seeding failed",

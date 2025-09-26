@@ -2043,6 +2043,13 @@ export const storeOrdersInternal = internalMutation({
         tags: v.optional(v.array(v.string())),
         note: v.optional(v.string()),
         riskLevel: v.optional(v.string()),
+        sourceUrl: v.optional(v.string()),
+        landingSite: v.optional(v.string()),
+        referringSite: v.optional(v.string()),
+        utmSource: v.optional(v.string()),
+        utmMedium: v.optional(v.string()),
+        utmCampaign: v.optional(v.string()),
+        syncedAt: v.optional(v.number()),
         shippingAddress: v.optional(
           v.object({
             country: v.optional(v.string()),

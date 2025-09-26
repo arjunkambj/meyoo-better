@@ -134,11 +134,38 @@ export const seedDocsFromFirecrawl = action({
       { orgId: orgId as Id<'organizations'> },
     );
 
-    if (onboarding?.onboardingData?.firecrawlSeededAt && args.force !== true) {
+    const firecrawlStatus = onboarding?.onboardingData?.firecrawlSeedingStatus;
+    const alreadySeeded = Boolean(
+      onboarding?.onboardingData?.firecrawlSeededAt,
+    );
+
+    if (alreadySeeded && args.force !== true) {
       return {
         skipped: true,
         reason: 'Firecrawl docs already seeded for this organization.',
       };
+    }
+
+    if (firecrawlStatus?.status === 'in_progress' && args.force !== true) {
+      return {
+        skipped: true,
+        reason: 'Firecrawl seeding is already in progress for this organization.',
+      };
+    }
+
+    if (firecrawlStatus?.status === 'scheduled' || firecrawlStatus?.status === 'in_progress') {
+      // No-op; continue execution but ensure we record that we're in progress
+    }
+
+    let onboardingId: Id<'onboarding'> | null = onboarding?._id ?? null;
+
+    if (onboardingId) {
+      await ctx.runMutation(
+        internal.agent.firecrawl.markFirecrawlSeedingInProgress,
+        {
+          onboardingId,
+        },
+      );
     }
 
     const firecrawl = createFirecrawlClient();
@@ -148,83 +175,95 @@ export const seedDocsFromFirecrawl = action({
       `Starting Firecrawl crawl for ${args.url} with limit ${maxPages}`,
     );
 
-    let crawlResult;
     try {
-      const crawlOptions: Parameters<typeof firecrawl.crawl>[1] = {
-        scrapeOptions: {
-          formats: ['markdown'],
+      let crawlResult;
+      try {
+        const crawlOptions: Parameters<typeof firecrawl.crawl>[1] = {
+          scrapeOptions: {
+            formats: ['markdown'],
+          },
+        };
+
+        if (maxPages !== undefined) {
+          crawlOptions.limit = maxPages;
+        }
+
+        if (args.includePaths && args.includePaths.length > 0) {
+          crawlOptions.includePaths = args.includePaths;
+        }
+
+        if (args.excludePaths && args.excludePaths.length > 0) {
+          crawlOptions.excludePaths = args.excludePaths;
+        }
+
+        crawlResult = await firecrawl.crawl(args.url, crawlOptions);
+      } catch (error) {
+        console.error('Firecrawl crawl failed:', error);
+        throw new Error(
+          `Failed to crawl ${args.url}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+
+      if (crawlResult.status === 'failed' || crawlResult.status === 'cancelled') {
+        console.error(`Crawl failed with status: ${crawlResult.status}`);
+        throw new Error(
+          `Firecrawl crawl did not complete successfully: ${crawlResult.status}`,
+        );
+      }
+
+      console.log(
+        `Crawl completed successfully. Processing ${crawlResult.data?.length ?? 0} pages...`,
+      );
+
+      const relevantPages: FirecrawlDocument[] =
+        crawlResult.data?.filter((page) => (page.markdown ?? '').trim()) ?? [];
+      const pageCount = relevantPages.length;
+      const summary = buildSummary(args.url, relevantPages);
+      const namespace = String(orgId);
+      const hostname = parsedUrl.hostname;
+
+      await rag.add(ctx, {
+        namespace,
+        key: 'firecrawl:summary',
+        text: summary,
+        title: `${hostname} website overview`,
+        filterValues: [
+          { name: 'type', value: 'firecrawl-summary' },
+          { name: 'resourceId', value: hostname },
+        ],
+        metadata: {
+          sourceUrl: args.url,
+          pageCount,
         },
-      };
-
-      if (maxPages !== undefined) {
-        crawlOptions.limit = maxPages;
-      }
-
-      if (args.includePaths && args.includePaths.length > 0) {
-        crawlOptions.includePaths = args.includePaths;
-      }
-
-      if (args.excludePaths && args.excludePaths.length > 0) {
-        crawlOptions.excludePaths = args.excludePaths;
-      }
-
-      crawlResult = await firecrawl.crawl(args.url, crawlOptions);
-    } catch (error) {
-      console.error('Firecrawl crawl failed:', error);
-      throw new Error(
-        `Failed to crawl ${args.url}: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-
-    if (crawlResult.status === 'failed' || crawlResult.status === 'cancelled') {
-      console.error(`Crawl failed with status: ${crawlResult.status}`);
-      throw new Error(
-        `Firecrawl crawl did not complete successfully: ${crawlResult.status}`,
-      );
-    }
-
-    console.log(
-      `Crawl completed successfully. Processing ${crawlResult.data?.length ?? 0} pages...`,
-    );
-
-    const relevantPages: FirecrawlDocument[] =
-      crawlResult.data?.filter((page) => (page.markdown ?? '').trim()) ?? [];
-    const pageCount = relevantPages.length;
-    const summary = buildSummary(args.url, relevantPages);
-    const namespace = String(orgId);
-    const hostname = parsedUrl.hostname;
-
-    await rag.add(ctx, {
-      namespace,
-      key: 'firecrawl:summary',
-      text: summary,
-      title: `${hostname} website overview`,
-      filterValues: [
-        { name: 'type', value: 'firecrawl-summary' },
-        { name: 'resourceId', value: hostname },
-      ],
-      metadata: {
-        sourceUrl: args.url,
-        pageCount,
-      },
-      importance: 2,
-    });
-
-    if (onboarding?._id) {
-      await ctx.runMutation(internal.agent.firecrawl.markFirecrawlSeeded, {
-        onboardingId: onboarding._id,
-        url: args.url,
-        summary,
-        pageCount,
+        importance: 2,
       });
+
+      if (onboardingId) {
+        await ctx.runMutation(internal.agent.firecrawl.markFirecrawlSeeded, {
+          onboardingId,
+          url: args.url,
+          summary,
+          pageCount,
+        });
+      }
+
+      console.log(`Stored Firecrawl summary for ${hostname} (${pageCount} pages)`);
+
+      return {
+        namespace,
+        pageCount,
+        summary,
+      };
+    } catch (error) {
+      if (onboardingId) {
+        await ctx.runMutation(
+          internal.agent.firecrawl.clearFirecrawlSeedingStatus,
+          {
+            onboardingId,
+          },
+        );
+      }
+      throw error;
     }
-
-    console.log(`Stored Firecrawl summary for ${hostname} (${pageCount} pages)`);
-
-    return {
-      namespace,
-      pageCount,
-      summary,
-    };
   },
 });

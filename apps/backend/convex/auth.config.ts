@@ -2,7 +2,6 @@ import { requireEnv } from "./utils/env";
 
 const CONVEX_SITE_URL = requireEnv("CONVEX_SITE_URL");
 const CONVEX_ADMIN_SITE_URL = requireEnv("CONVEX_ADMIN_SITE_URL");
-const CONVEX_MOBILE_SITE_URL = requireEnv("CONVEX_MOBILE_SITE_URL");
 
 export default {
   providers: [
@@ -15,11 +14,6 @@ export default {
     {
       // Admin dashboard origin (Next.js on port 3001 in development).
       domain: CONVEX_ADMIN_SITE_URL,
-      applicationID: "convex",
-    },
-    {
-      // Expo/React Native deep link origin for the mobile app.
-      domain: CONVEX_MOBILE_SITE_URL,
       applicationID: "convex",
     },
   ],

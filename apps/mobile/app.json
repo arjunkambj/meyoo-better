@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "mobile",
-    "slug": "meyoo",
+    "slug": "mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -43,13 +43,6 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    },
-    "extra": {
-      "router": {},
-      "eas": {
-        "projectId": "ce45ffed-adb0-4e59-a517-b72a06abd282"
-      }
-    },
-    "owner": "meyoo"
+    }
   }
 }

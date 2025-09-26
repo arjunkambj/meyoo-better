@@ -9,7 +9,8 @@ export default function Index() {
         alignItems: "center",
       }}
     >
-      <Text>Meyoo From Meyoo</Text>
+      <Text className="text-3xl">Meyoo From Meyoo</Text>
+      <Text className="">Meyoo From Meyoo</Text>
     </View>
   );
 }

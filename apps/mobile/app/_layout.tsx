@@ -26,7 +26,14 @@ export default function RootLayout() {
           : undefined
       }
     >
-      <HeroUINativeProvider>
+      <HeroUINativeProvider
+        config={{
+          colorScheme: "system",
+          textProps: {
+            allowFontScaling: false,
+          },
+        }}
+      >
         <Stack>
           <Stack.Screen name="index" />
         </Stack>

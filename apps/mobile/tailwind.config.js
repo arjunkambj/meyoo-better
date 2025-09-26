@@ -10,9 +10,8 @@ module.exports = {
     "./node_modules/heroui-native/lib/**/*.{js,ts,jsx,tsx}",
     "../../node_modules/heroui-native/lib/**/*.{js,ts,jsx,tsx}",
   ],
+  darkMode: "class",
   presets: [require("nativewind/preset")],
-  theme: {
-    extend: {},
-  },
+  theme: {},
   plugins: [heroUINativePlugin],
 };

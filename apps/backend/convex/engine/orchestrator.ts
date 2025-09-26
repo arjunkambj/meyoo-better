@@ -205,18 +205,36 @@ async function executeShopifySync(
   ctx: GenericActionCtx<DataModel>,
   args: SyncArgs,
 ) {
-  // Import Shopify integration dynamically
-  const { shopify } = await import("../integrations/shopify");
-
   if (args.syncType === "initial") {
-    return await shopify.sync.initial(ctx, {
-      organizationId: args.organizationId,
-      dateRange: args.dateRange,
-    });
+    const result = await ctx.runAction(
+      internal.integrations.shopifySync.initial,
+      {
+        organizationId: args.organizationId,
+        dateRange: {
+          daysBack: args.dateRange?.daysBack ?? 60,
+        },
+      },
+    );
+
+    return {
+      recordsProcessed: result.recordsProcessed,
+      dataChanged: result.dataChanged,
+    };
   } else {
-    return await shopify.sync.incremental(ctx, {
-      organizationId: args.organizationId,
-    });
+    const incremental = await ctx.runAction(
+      internal.integrations.shopifySync.incremental,
+      {
+        organizationId: args.organizationId,
+        since: args.dateRange?.startDate
+          ? Date.parse(args.dateRange.startDate)
+          : undefined,
+      },
+    );
+
+    return {
+      recordsProcessed: incremental.recordsProcessed,
+      dataChanged: incremental.dataChanged,
+    };
   }
 }
 

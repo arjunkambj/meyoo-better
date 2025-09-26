@@ -38,6 +38,26 @@ export const getOnboardingStatus = query({
       hasShopifySubscription: v.boolean(),
       isProductCostSetup: v.boolean(),
       isExtraCostSetup: v.boolean(),
+      syncStatus: v.object({
+        shopify: v.optional(
+          v.object({
+            status: v.string(),
+            recordsProcessed: v.optional(v.number()),
+            startedAt: v.optional(v.number()),
+            completedAt: v.optional(v.number()),
+            lastError: v.optional(v.string()),
+          }),
+        ),
+        meta: v.optional(
+          v.object({
+            status: v.string(),
+            recordsProcessed: v.optional(v.number()),
+            startedAt: v.optional(v.number()),
+            completedAt: v.optional(v.number()),
+            lastError: v.optional(v.string()),
+          }),
+        ),
+      }),
     }),
   ),
   handler: async (ctx) => {
@@ -60,6 +80,26 @@ export const getOnboardingStatus = query({
       meta: onboarding.hasMetaConnection || false,
     };
 
+    const latestShopifySession = await ctx.db
+      .query("syncSessions")
+      .withIndex("by_org_platform_and_date", (q) =>
+        q
+          .eq("organizationId", orgId)
+          .eq("platform", "shopify"),
+      )
+      .order("desc")
+      .first();
+
+    const latestMetaSession = await ctx.db
+      .query("syncSessions")
+      .withIndex("by_org_platform_and_date", (q) =>
+        q
+          .eq("organizationId", orgId)
+          .eq("platform", "meta"),
+      )
+      .order("desc")
+      .first();
+
     return {
       completed: onboarding.isCompleted || false,
       currentStep: onboarding.onboardingStep || 1,
@@ -68,6 +108,26 @@ export const getOnboardingStatus = query({
       hasShopifySubscription: onboarding.hasShopifySubscription || false,
       isProductCostSetup: onboarding.isProductCostSetup || false,
       isExtraCostSetup: onboarding.isExtraCostSetup || false,
+      syncStatus: {
+        shopify: latestShopifySession
+          ? {
+              status: latestShopifySession.status,
+              recordsProcessed: latestShopifySession.recordsProcessed,
+              startedAt: latestShopifySession.startedAt,
+              completedAt: latestShopifySession.completedAt,
+              lastError: latestShopifySession.error,
+            }
+          : undefined,
+        meta: latestMetaSession
+          ? {
+              status: latestMetaSession.status,
+              recordsProcessed: latestMetaSession.recordsProcessed,
+              startedAt: latestMetaSession.startedAt,
+              completedAt: latestMetaSession.completedAt,
+              lastError: latestMetaSession.error,
+            }
+          : undefined,
+      },
     };
   },
 });
@@ -287,6 +347,14 @@ export const updateOnboardingState = mutation({
 /**
  * Complete onboarding and trigger initial sync
  */
+type CompleteOnboardingResult = {
+  success: boolean;
+  analyticsScheduled: boolean;
+  platformsSyncing: string[];
+  syncJobs?: { platform: string; jobId: string }[];
+  syncErrors?: { platform: string; error: string }[];
+};
+
 export const completeOnboarding = mutation({
   args: {},
   returns: v.object({
@@ -310,7 +378,7 @@ export const completeOnboarding = mutation({
       ),
     ),
   }),
-  handler: async (ctx) => {
+  handler: async (ctx): Promise<CompleteOnboardingResult> => {
     const { user } = await requireUserAndOrg(ctx);
 
     // production: avoid noisy onboarding logs
@@ -421,27 +489,47 @@ export const completeOnboarding = mutation({
           accountId = primaryAccount?.accountId;
         }
 
-        // Create the sync job
-        const jobId = await createJob(
-          ctx,
-          "sync:initial",
-          PRIORITY.HIGH,
-          {
-            organizationId: user.organizationId as Id<"organizations">,
-            platform: platform as "shopify" | "meta",
-            accountId,
-            dateRange: { daysBack: 60 },
-          },
-          {
-            onComplete: internal.engine.syncJobs.onInitialSyncComplete as unknown,
-            context: {
+        if (platform === "shopify") {
+          const ensure = (await ctx.runMutation(
+            internal.engine.syncJobs.ensureInitialSync,
+            {
               organizationId: user.organizationId as Id<"organizations">,
-              platform,
+              platform: "shopify",
+              dateRange: { daysBack: 60 },
             },
-          },
-        );
+          )) as {
+            enqueued: boolean;
+            sessionId: Id<"syncSessions">;
+            status: string;
+            jobId?: string;
+          };
 
-        syncJobs.push({ platform, jobId });
+          if (ensure.jobId) {
+            syncJobs.push({ platform, jobId: ensure.jobId });
+          }
+        } else {
+          const jobId = await createJob(
+            ctx,
+            "sync:initial",
+            PRIORITY.HIGH,
+            {
+              organizationId: user.organizationId as Id<"organizations">,
+              platform: platform as "shopify" | "meta",
+              accountId,
+              dateRange: { daysBack: 60 },
+            },
+            {
+              onComplete:
+                internal.engine.syncJobs.onInitialSyncComplete as unknown,
+              context: {
+                organizationId: user.organizationId as Id<"organizations">,
+                platform,
+              },
+            },
+          );
+
+          syncJobs.push({ platform, jobId });
+        }
       } catch (error) {
         console.error(
           `[ONBOARDING] Failed to trigger sync for ${platform}:`,

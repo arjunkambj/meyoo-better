@@ -118,10 +118,15 @@ export async function triggerInitialSync(
     try {
       const sessions = await fetchQuery(
         api.web.sync.getSyncSessions,
-        { limit: 1, platform: "shopify", status: "completed" },
+        { limit: 5, platform: "shopify", status: "completed" },
         { token },
       );
-      hasCompletedSync = Boolean(sessions && sessions.length > 0);
+      hasCompletedSync = Boolean(
+        sessions?.some(
+          (session) =>
+            session.syncType === "initial" && session.recordsProcessed > 0,
+        ),
+      );
     } catch {
       // Ignore error, proceed with sync
     }

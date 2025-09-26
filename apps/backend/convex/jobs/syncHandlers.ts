@@ -41,6 +41,7 @@ export const handleInitialSync = internalAction({
         daysBack: v.number(),
       }),
     ),
+    syncSessionId: v.optional(v.id("syncSessions")),
   },
   returns: v.object({
     success: v.boolean(),
@@ -71,15 +72,39 @@ export const handleInitialSync = internalAction({
     let sessionId: Id<"syncSessions"> | null = null;
 
     try {
-      // Create sync session
-      sessionId = await ctx.runMutation(
+      // Create or claim sync session
+      const sessionResult = await ctx.runMutation(
         internal.jobs.helpers.createSyncSession,
         {
           organizationId: args.organizationId,
           platform: args.platform,
           type: "initial",
+          sessionId: args.syncSessionId,
         },
       );
+
+      sessionId = sessionResult.sessionId;
+
+      if (sessionResult.alreadyRunning) {
+        console.log(
+          `[INITIAL_SYNC] Session ${sessionId} already running for ${args.platform} / ${args.organizationId}. Skipping duplicate job.`,
+        );
+
+        return {
+          success: true,
+          recordsProcessed: 0,
+          platform: args.platform,
+          duration: 0,
+          dataChanged: false,
+          batchStats: {
+            batchesScheduled: 0,
+            ordersQueued: 0,
+            jobIds: [],
+          },
+          productsProcessed: 0,
+          customersProcessed: 0,
+        };
+      }
 
       // Execute platform-specific initial sync
       let result: SyncResult;

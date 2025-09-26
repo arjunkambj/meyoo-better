@@ -187,9 +187,26 @@ export const scheduleInitialSync = internalMutation({
 
     // Schedule high-priority initial sync for each platform
     for (const platform of args.platforms) {
+      if (platform === "shopify") {
+        const ensure = await ctx.runMutation(
+          internal.engine.syncJobs.ensureInitialSync,
+          {
+            organizationId: args.organizationId as Id<"organizations">,
+            platform: "shopify",
+            dateRange: { daysBack: 60 },
+          },
+        );
+
+        if (ensure.jobId) {
+          jobIds.push(ensure.jobId);
+        }
+
+        continue;
+      }
+
       const syncData: SyncJobData = {
         organizationId: args.organizationId as Id<"organizations">,
-        platform: platform as "shopify" | "meta",
+        platform: "meta",
         syncType: "initial",
         dateRange: { daysBack: 60 },
       };

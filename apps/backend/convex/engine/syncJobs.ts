@@ -2,7 +2,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import type { GenericMutationCtx } from "convex/server";
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
-import type { DataModel, Id } from "../_generated/dataModel";
+import type { DataModel, Doc, Id } from "../_generated/dataModel";
 import { internalMutation, mutation } from "../_generated/server";
 
 import { createJob, PRIORITY } from "./workpool";
@@ -24,7 +24,10 @@ export const triggerInitialSync = mutation({
     success: v.boolean(),
     jobId: v.string(),
   }),
-  handler: async (ctx, args) => {
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ success: boolean; jobId: string }> => {
     const userId = await getAuthUserId(ctx);
 
     if (!userId) {
@@ -45,30 +48,19 @@ export const triggerInitialSync = mutation({
     }
 
     try {
-      // Create the sync job with onComplete callback
-      const jobId = await createJob(
-        ctx,
-        "sync:initial",
-        PRIORITY.HIGH,
+      const result = await ctx.runMutation(
+        internal.engine.syncJobs.ensureInitialSync,
         {
           organizationId: args.organizationId,
           platform: args.platform,
           dateRange: args.dateRange || { daysBack: 60 },
-        },
-        {
-          onComplete: internal.engine.syncJobs.onInitialSyncComplete as any,
-          context: {
-            organizationId: args.organizationId,
-            platform: args.platform,
-          },
+          triggeredBy: userId,
         },
       );
 
-      // production: avoid verbose sync job creation logs
-
       return {
         success: true,
-        jobId,
+        jobId: result.jobId ?? "skipped",
       };
     } catch (error) {
       console.error(
@@ -99,32 +91,24 @@ export const triggerInitialSyncInternal = internalMutation({
     success: v.boolean(),
     jobId: v.string(),
   }),
-  handler: async (ctx, args) => {
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ success: boolean; jobId: string }> => {
     try {
-      // Create the sync job with onComplete callback
-      const jobId = await createJob(
-        ctx,
-        "sync:initial",
-        PRIORITY.HIGH,
+      const result = await ctx.runMutation(
+        internal.engine.syncJobs.ensureInitialSync,
         {
           organizationId: args.organizationId,
           platform: args.platform,
           dateRange: args.dateRange || { daysBack: 60 },
-        },
-        {
-          onComplete: internal.engine.analytics.calculate as any,
-          context: {
-            organizationId: args.organizationId,
-            platform: args.platform,
-          },
+          triggeredBy: args.userId,
         },
       );
 
-      // production: avoid verbose sync job creation logs
-
       return {
         success: true,
-        jobId,
+        jobId: result.jobId ?? "skipped",
       };
     } catch (error) {
       console.error(
@@ -133,6 +117,116 @@ export const triggerInitialSyncInternal = internalMutation({
       );
       throw error;
     }
+  },
+});
+
+type EnsureInitialSyncResult = {
+  enqueued: boolean;
+  sessionId: Id<"syncSessions">;
+  status: string;
+  jobId?: string;
+};
+
+export const ensureInitialSync = internalMutation({
+  args: {
+    organizationId: v.id("organizations"),
+    platform: v.union(v.literal("shopify"), v.literal("meta")),
+    dateRange: v.optional(
+      v.object({
+        daysBack: v.number(),
+      }),
+    ),
+    triggeredBy: v.optional(v.id("users")),
+  },
+  returns: v.object({
+    enqueued: v.boolean(),
+    sessionId: v.id("syncSessions"),
+    status: v.string(),
+    jobId: v.optional(v.string()),
+  }),
+  handler: async (ctx, args): Promise<EnsureInitialSyncResult> => {
+    const activeStatuses: Array<"pending" | "syncing" | "processing"> = [
+      "pending",
+      "syncing",
+      "processing",
+    ];
+
+    let existingSession: Doc<"syncSessions"> | null = null;
+
+    for (const status of activeStatuses) {
+      const candidate = await ctx.db
+        .query("syncSessions")
+        .withIndex("by_org_platform_and_status", (q) =>
+          q
+            .eq("organizationId", args.organizationId)
+            .eq("platform", args.platform)
+            .eq("status", status),
+        )
+        .first();
+
+      if (candidate) {
+        existingSession = candidate;
+        break;
+      }
+    }
+
+    if (existingSession) {
+      return {
+        enqueued: false,
+        sessionId: existingSession._id,
+        status: existingSession.status,
+      };
+    }
+
+    const sessionId = await ctx.db.insert("syncSessions", {
+      organizationId: args.organizationId,
+      platform: args.platform,
+      type: "initial",
+      status: "pending",
+      startedAt: Date.now(),
+      metadata: {
+        isInitialSync: true,
+        totalBatches: 0,
+        completedBatches: 0,
+        filters: args.dateRange
+          ? {
+              dateFrom: undefined,
+              dateTo: undefined,
+              status: undefined,
+            }
+          : undefined,
+      },
+    });
+
+    const jobId = await createJob(
+      ctx,
+      "sync:initial",
+      PRIORITY.HIGH,
+      {
+        organizationId: args.organizationId,
+        platform: args.platform,
+        dateRange: args.dateRange || { daysBack: 60 },
+        syncSessionId: sessionId,
+        triggeredBy: args.triggeredBy
+          ? String(args.triggeredBy)
+          : undefined,
+      },
+      {
+        onComplete: internal.engine.syncJobs.onInitialSyncComplete as any,
+        context: {
+          organizationId: args.organizationId,
+          platform: args.platform,
+          sessionId,
+        },
+      },
+    );
+
+    return {
+      enqueued: true,
+      sessionId,
+      status: "pending",
+      jobId,
+    };
   },
 });
 

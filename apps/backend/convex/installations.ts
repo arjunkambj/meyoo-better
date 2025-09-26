@@ -153,17 +153,22 @@ export const createOrAttachFromShopifyOAuth = mutation({
     // After provisioning, trigger initial Shopify sync if not already synced
     try {
       // Check if there's any prior sync session for this org + platform
-      const lastSync = await ctx.db
+      const lastCompletedInitial = await ctx.db
         .query("syncSessions")
-        .withIndex("by_org_platform_and_date", (q) =>
+        .withIndex("by_org_platform_and_status", (q) =>
           q
             .eq("organizationId", organizationId as Id<"organizations">)
-            .eq("platform", "shopify"),
+            .eq("platform", "shopify")
+            .eq("status", "completed"),
         )
         .order("desc")
         .first();
 
-      const alreadySynced = Boolean(lastSync);
+      const alreadySynced =
+        Boolean(lastCompletedInitial) &&
+        (lastCompletedInitial!.type === "initial" ||
+          lastCompletedInitial!.metadata?.isInitialSync === true) &&
+        (lastCompletedInitial!.recordsProcessed ?? 0) > 0;
 
       // Also respect onboarding flag if present
       const shouldSync = !alreadySynced;

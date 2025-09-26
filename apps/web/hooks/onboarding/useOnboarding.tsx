@@ -12,6 +12,24 @@ import type { ReactNode } from "react";
 
 function useOnboardingInternal() {
   const status = useQuery(api.core.onboarding.getOnboardingStatus);
+  const syncStatus = (status as any)?.syncStatus as
+    | {
+        shopify?: {
+          status: string;
+          recordsProcessed?: number;
+          startedAt?: number;
+          completedAt?: number;
+          lastError?: string;
+        };
+        meta?: {
+          status: string;
+          recordsProcessed?: number;
+          startedAt?: number;
+          completedAt?: number;
+          lastError?: string;
+        };
+      }
+    | undefined;
   const updateStateMutation = useMutation(
     api.core.onboarding.updateOnboardingState
   );
@@ -82,6 +100,7 @@ function useOnboardingInternal() {
       shopify: false,
       meta: false,
     },
+    syncStatus,
     // New functions
     nextStep,
     updateBusinessProfile,
@@ -111,6 +130,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       value.currentStep,
       value.completedSteps,
       value.connections,
+      value.syncStatus,
       value.nextStep,
       value.updateBusinessProfile,
       value.finishOnboarding,

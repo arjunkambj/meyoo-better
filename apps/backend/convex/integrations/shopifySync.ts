@@ -191,6 +191,314 @@ type AttributedOrder = {
 
 const logger = createSimpleLogger("ShopifySync");
 
+type OrderPersistencePayload = {
+  order: ShopifyOrderInput;
+  transactions: Array<Record<string, unknown>>;
+  refunds: Array<Record<string, unknown>>;
+  fulfillments: Array<Record<string, unknown>>;
+};
+
+const toOptional = (value: unknown): string | undefined =>
+  value === null || value === undefined || value === ""
+    ? undefined
+    : typeof value === "string"
+      ? value
+      : String(value);
+
+type ShopifyOrderLineItemInput = {
+  shopifyId: string;
+  title: string;
+  name?: string;
+  quantity: number;
+  sku?: string;
+  shopifyVariantId?: string;
+  shopifyProductId?: string;
+  price: number;
+  totalDiscount: number;
+  discountedPrice?: number;
+  fulfillableQuantity: number;
+  fulfillmentStatus?: string;
+};
+
+type ShopifyOrderInput = {
+  shopifyId: string;
+  orderNumber: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  shopifyCreatedAt: number;
+  processedAt?: number;
+  updatedAt?: number;
+  closedAt?: number;
+  cancelledAt?: number;
+  totalPrice: number;
+  subtotalPrice: number;
+  totalTax: number;
+  totalDiscounts: number;
+  totalShippingPrice: number;
+  totalTip?: number;
+  currency?: string;
+  financialStatus?: string;
+  fulfillmentStatus?: string;
+  totalItems: number;
+  totalQuantity: number;
+  totalWeight?: number;
+  tags?: string[];
+  note?: string;
+  riskLevel?: string;
+  shippingAddress?: {
+    country?: string;
+    province?: string;
+    city?: string;
+    zip?: string;
+  };
+  customer?: {
+    shopifyId: string;
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+  };
+  lineItems: ShopifyOrderLineItemInput[];
+  sourceUrl?: string;
+  landingSite?: string;
+  referringSite?: string;
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  syncedAt?: number;
+};
+
+function mapOrderNodeToPersistence(
+  order: ShopifyOrderNode,
+  organizationId: Id<"organizations">,
+): OrderPersistencePayload {
+  const orderId = String(order.id).replace("gid://shopify/Order/", "");
+
+  let sourceUrl: string | undefined;
+  let landingSite: string | undefined;
+  let referringSite: string | undefined;
+  let utmSource: string | undefined;
+  let utmMedium: string | undefined;
+  let utmCampaign: string | undefined;
+
+  if (order.customerJourneySummary?.firstVisit) {
+    const journey = order.customerJourneySummary.firstVisit;
+    sourceUrl = toOptional(journey.source);
+    landingSite = toOptional(journey.landingPage);
+    referringSite = toOptional(journey.referrerUrl);
+    if (journey.utmParameters) {
+      utmSource = toOptional(journey.utmParameters.source);
+      utmMedium = toOptional(journey.utmParameters.medium);
+      utmCampaign = toOptional(journey.utmParameters.campaign);
+    }
+  }
+
+  const orderData: ShopifyOrderInput = {
+    shopifyId: orderId,
+    orderNumber: order.name?.replace("#", "") || orderId,
+    name: order.name || orderId,
+    email: toOptional(order.email),
+    phone: toOptional(order.phone),
+    shopifyCreatedAt: Date.parse(String(order.createdAt ?? Date.now())),
+    processedAt: order.processedAt ? Date.parse(String(order.processedAt)) : undefined,
+    updatedAt: order.updatedAt ? Date.parse(String(order.updatedAt)) : undefined,
+    closedAt: order.closedAt ? Date.parse(String(order.closedAt)) : undefined,
+    cancelledAt: order.cancelledAt ? Date.parse(String(order.cancelledAt)) : undefined,
+    totalPrice: parseMoney(order.currentTotalPriceSet?.shopMoney?.amount),
+    subtotalPrice: parseMoney(order.currentSubtotalPriceSet?.shopMoney?.amount),
+    totalTax: parseMoney(order.currentTotalTaxSet?.shopMoney?.amount),
+    totalDiscounts: parseMoney(order.currentTotalDiscountsSet?.shopMoney?.amount),
+    totalShippingPrice: parseMoney(order.totalShippingPriceSet?.shopMoney?.amount),
+    totalTip: order.totalTipReceivedSet
+      ? parseMoney(order.totalTipReceivedSet.shopMoney?.amount)
+      : undefined,
+    currency: toOptional(order.currentTotalPriceSet?.shopMoney?.currencyCode),
+    financialStatus: toOptional((order as any).displayFinancialStatus),
+    fulfillmentStatus: toOptional((order as any).displayFulfillmentStatus),
+    totalItems: order.lineItems?.edges?.length || 0,
+    totalQuantity:
+      order.subtotalLineItemsQuantity !== undefined
+        ? parseInt(String(order.subtotalLineItemsQuantity), 10) || 0
+        : 0,
+    totalWeight: order.totalWeight
+      ? roundMoney(parseFloat(String(order.totalWeight)))
+      : undefined,
+    tags: Array.isArray(order.tags)
+      ? order.tags.filter((tag) => Boolean(toOptional(tag)))
+      : [],
+    note: toOptional(order.note),
+    riskLevel: toOptional(order.risks?.[0]?.level),
+    shippingAddress: order.shippingAddress
+      ? {
+          country: toOptional(order.shippingAddress.country),
+          province: toOptional(order.shippingAddress.provinceCode),
+          city: toOptional(order.shippingAddress.city),
+          zip: toOptional(order.shippingAddress.zip),
+        }
+      : undefined,
+    customer: order.customer
+      ? {
+          shopifyId: String(order.customer.id).replace(
+            "gid://shopify/Customer/",
+            "",
+          ),
+          email: toOptional(order.customer.email),
+          firstName: toOptional(order.customer.firstName),
+          lastName: toOptional(order.customer.lastName),
+          phone: toOptional(order.customer.phone),
+        }
+      : undefined,
+    lineItems:
+      order.lineItems?.edges?.map((itemEdge: { node: ShopifyLineItem }) => {
+        const item = itemEdge.node;
+        const basePrice = parseMoney(item.originalUnitPriceSet?.shopMoney?.amount);
+        const discounted = item.discountedUnitPriceSet
+          ? parseMoney(item.discountedUnitPriceSet.shopMoney?.amount)
+          : undefined;
+
+        return {
+          shopifyId: String(item.id).replace("gid://shopify/LineItem/", ""),
+          title: toOptional(item.title) ?? toOptional((item as any).name) ?? "",
+          name: toOptional((item as any).name),
+          quantity: item.quantity ?? 0,
+          sku: toOptional(item.sku),
+          shopifyVariantId: item.variant?.id
+            ? String(item.variant.id).replace("gid://shopify/ProductVariant/", "")
+            : undefined,
+          shopifyProductId: (item.variant as any)?.product?.id
+            ? String((item.variant as any).product.id).replace(
+                "gid://shopify/Product/",
+                "",
+              )
+            : undefined,
+          price: basePrice,
+          totalDiscount:
+            discounted !== undefined ? Math.max(0, basePrice - discounted) : 0,
+          discountedPrice: discounted,
+          fulfillableQuantity: item.fulfillableQuantity ?? item.quantity ?? 0,
+          fulfillmentStatus: toOptional(item.fulfillmentStatus),
+        };
+      }) || [],
+    sourceUrl,
+    landingSite,
+    referringSite,
+    utmSource,
+    utmMedium,
+    utmCampaign,
+    syncedAt: Date.now(),
+  };
+
+  const transactions: Array<Record<string, unknown>> = [];
+
+  if (order.transactions && Array.isArray(order.transactions)) {
+    for (const transaction of order.transactions) {
+      transactions.push({
+        organizationId,
+        shopifyOrderId: orderId,
+        shopifyId: transaction.id.replace(
+          "gid://shopify/OrderTransaction/",
+          "",
+        ),
+        kind: transaction.kind,
+        status: transaction.status,
+        gateway: transaction.gateway,
+        amount: parseMoney(
+          String(transaction.amountSet?.shopMoney?.amount ?? "0"),
+        ),
+        fee:
+          transaction.fees && transaction.fees.length > 0
+            ? parseMoney(String(transaction.fees[0]?.amount?.amount))
+            : undefined,
+        paymentId: transaction.paymentId,
+        paymentDetails: transaction.paymentDetails
+          ? {
+              creditCardBin: transaction.paymentDetails.creditCardBin,
+              creditCardCompany: transaction.paymentDetails.creditCardCompany,
+              creditCardNumber: transaction.paymentDetails.creditCardNumber,
+            }
+          : undefined,
+        shopifyCreatedAt: Date.parse(transaction.createdAt),
+        processedAt: transaction.processedAt
+          ? Date.parse(transaction.processedAt)
+          : undefined,
+      });
+    }
+  }
+
+  const refunds: Array<Record<string, unknown>> = [];
+
+  if (order.refunds && Array.isArray(order.refunds)) {
+    for (const refund of order.refunds) {
+      refunds.push({
+        organizationId,
+        shopifyOrderId: orderId,
+        shopifyId: refund.id.replace("gid://shopify/Refund/", ""),
+        note: refund.note || undefined,
+        userId: refund.user?.id || undefined,
+        totalRefunded: parseMoney(refund.totalRefundedSet?.shopMoney?.amount),
+        refundLineItems:
+          refund.refundLineItems?.edges?.map((edge) => {
+            const item = edge.node;
+            return {
+              lineItemId: item.lineItem?.id
+                ? String(item.lineItem.id).replace("gid://shopify/LineItem/", "")
+                : "",
+              quantity: item.quantity || 0,
+              subtotal: parseMoney(item.subtotalSet?.shopMoney?.amount),
+            };
+          }) || [],
+        shopifyCreatedAt: Date.parse(
+          String(refund.createdAt || new Date().toISOString()),
+        ),
+        processedAt: refund.processedAt
+          ? Date.parse(String(refund.processedAt))
+          : undefined,
+      });
+    }
+  }
+
+  const fulfillments: Array<Record<string, unknown>> = [];
+
+  if (order.fulfillments && Array.isArray(order.fulfillments)) {
+    for (const fulfillment of order.fulfillments) {
+      fulfillments.push({
+        organizationId,
+        shopifyOrderId: orderId,
+        shopifyId: fulfillment.id.replace("gid://shopify/Fulfillment/", ""),
+        status: fulfillment.status,
+        shipmentStatus: undefined,
+        trackingCompany: fulfillment.trackingInfo?.[0]?.company || undefined,
+        trackingNumbers: fulfillment.trackingInfo?.map((t) => t.number) || [],
+        trackingUrls: fulfillment.trackingInfo?.map((t) => t.url) || [],
+        locationId: undefined,
+        service: undefined,
+        lineItems:
+          fulfillment.fulfillmentLineItems?.edges?.map((edge) => {
+            const item = edge.node;
+            return {
+              id: item.id,
+              quantity: item.quantity || 0,
+            };
+          }) || [],
+        shopifyCreatedAt: Date.parse(
+          String(fulfillment.createdAt || new Date().toISOString()),
+        ),
+        shopifyUpdatedAt: fulfillment.updatedAt
+          ? Date.parse(String(fulfillment.updatedAt))
+          : undefined,
+      });
+    }
+  }
+
+  return {
+    order: orderData,
+    transactions,
+    refunds,
+    fulfillments,
+  };
+}
+
 /**
  * Shopify Sync Functions
  * Handles initial and incremental data synchronization
@@ -295,7 +603,8 @@ export const initial = internalAction({
 
               const response: any = await client.getProducts(
                 SHOPIFY_CONFIG.QUERIES.PRODUCTS_BATCH_SIZE,
-                cursor
+                cursor,
+                undefined,
               );
 
               // Log the full response structure for debugging
@@ -753,291 +1062,24 @@ export const initial = internalAction({
               }
 
               for (const edge of pageOrders) {
-                const order = edge.node;
-                const orderId = String(order.id).replace(
-                  "gid://shopify/Order/",
-                  "",
-                );
+                const { order: mappedOrder, transactions, refunds, fulfillments } =
+                  mapOrderNodeToPersistence(
+                    edge.node,
+                    args.organizationId as Id<"organizations">,
+                  );
 
-                let _utmSource: string | undefined;
-                let _utmMedium: string | undefined;
-                let _utmCampaign: string | undefined;
-                let _sourceUrl: string | undefined;
-                let _landingSite: string | undefined;
-                let _referringSite: string | undefined;
+                ordersBatch.push(mappedOrder);
 
-                if (order.customerJourneySummary?.firstVisit) {
-                  const journey = order.customerJourneySummary.firstVisit;
-
-                  _sourceUrl = journey.source || undefined;
-                  _landingSite = journey.landingPage || undefined;
-                  _referringSite = journey.referrerUrl || undefined;
-
-                  if (journey.utmParameters) {
-                    _utmSource = journey.utmParameters.source || undefined;
-                    _utmMedium = journey.utmParameters.medium || undefined;
-                    _utmCampaign = journey.utmParameters.campaign || undefined;
-                  }
+                if (transactions.length) {
+                  transactionsBatch.push(...transactions);
                 }
 
-                const orderData = {
-                  shopifyId: orderId,
-                  orderNumber: order.name?.replace("#", "") || orderId,
-                  name: order.name || orderId,
-                  email: order.email || undefined,
-                  phone: order.phone || undefined,
-                  shopifyCreatedAt: Date.parse(String(order.createdAt)),
-                  processedAt: order.processedAt
-                    ? Date.parse(String(order.processedAt))
-                    : undefined,
-                  updatedAt: order.updatedAt
-                    ? Date.parse(String(order.updatedAt))
-                    : undefined,
-                  closedAt: order.closedAt
-                    ? Date.parse(String(order.closedAt))
-                    : undefined,
-                  cancelledAt: order.cancelledAt
-                    ? Date.parse(String(order.cancelledAt))
-                    : undefined,
-                  totalPrice: parseMoney(
-                    order.currentTotalPriceSet?.shopMoney?.amount,
-                  ),
-                  subtotalPrice: parseMoney(
-                    order.currentSubtotalPriceSet?.shopMoney?.amount,
-                  ),
-                  totalTax: parseMoney(
-                    order.currentTotalTaxSet?.shopMoney?.amount,
-                  ),
-                  totalDiscounts: parseMoney(
-                    order.currentTotalDiscountsSet?.shopMoney?.amount,
-                  ),
-                  totalShippingPrice: parseMoney(
-                    order.totalShippingPriceSet?.shopMoney?.amount,
-                  ),
-                  totalTip: order.totalTipReceivedSet
-                    ? parseMoney(order.totalTipReceivedSet.shopMoney?.amount)
-                    : undefined,
-                  currency:
-                    order.currentTotalPriceSet?.shopMoney?.currencyCode ||
-                    undefined,
-                  financialStatus:
-                    (order as any).displayFinancialStatus || undefined,
-                  fulfillmentStatus:
-                    (order as any).displayFulfillmentStatus || undefined,
-                  totalItems: order.lineItems?.edges?.length || 0,
-                  totalQuantity:
-                    parseInt(String(order.subtotalLineItemsQuantity), 10) || 0,
-                  totalWeight: order.totalWeight
-                    ? roundMoney(parseFloat(String(order.totalWeight)))
-                    : undefined,
-                  tags: order.tags || [],
-                  note: order.note || undefined,
-                  riskLevel: order.risks?.[0]?.level || undefined,
-                  shippingAddress: order.shippingAddress
-                    ? {
-                        country: order.shippingAddress.country || undefined,
-                        province: order.shippingAddress.provinceCode || undefined,
-                        city: order.shippingAddress.city || undefined,
-                        zip: order.shippingAddress.zip || undefined,
-                      }
-                    : undefined,
-                  customer: order.customer
-                    ? {
-                        shopifyId: String(order.customer.id).replace(
-                          "gid://shopify/Customer/",
-                          "",
-                        ),
-                        email: order.customer.email || undefined,
-                        firstName: order.customer.firstName || undefined,
-                        lastName: order.customer.lastName || undefined,
-                        phone: order.customer.phone || undefined,
-                      }
-                    : undefined,
-                  lineItems:
-                    order.lineItems?.edges?.map((itemEdge: { node: ShopifyLineItem }) => {
-                      const item = itemEdge.node;
-                      const basePrice = parseMoney(
-                        item.originalUnitPriceSet?.shopMoney?.amount,
-                      );
-                      const discounted = item.discountedUnitPriceSet
-                        ? parseMoney(
-                            item.discountedUnitPriceSet?.shopMoney?.amount,
-                          )
-                        : undefined;
-
-                      return {
-                        shopifyId: String(item.id).replace(
-                          "gid://shopify/LineItem/",
-                          "",
-                        ),
-                        title: item.title || item.name || "",
-                        name: item.name || undefined,
-                        quantity: item.quantity ?? 0,
-                        sku: item.sku || undefined,
-                        shopifyVariantId: item.variant?.id
-                          ? String(item.variant.id).replace(
-                              "gid://shopify/ProductVariant/",
-                              "",
-                            )
-                          : undefined,
-                        shopifyProductId: item.variant?.product?.id
-                          ? String(item.variant.product.id).replace(
-                              "gid://shopify/Product/",
-                              "",
-                            )
-                          : undefined,
-                        price: basePrice,
-                        totalDiscount:
-                          discounted !== undefined
-                            ? Math.max(0, basePrice - discounted)
-                            : 0,
-                        discountedPrice: discounted,
-                        fulfillableQuantity: item.fulfillableQuantity,
-                        fulfillmentStatus: item.fulfillmentStatus || undefined,
-                      };
-                    }) || [],
-                  sourceUrl: _sourceUrl,
-                  landingSite: _landingSite,
-                  referringSite: _referringSite,
-                  utmSource: _utmSource,
-                  utmMedium: _utmMedium,
-                  utmCampaign: _utmCampaign,
-                  syncedAt: Date.now(),
-                };
-
-                ordersBatch.push(orderData);
-
-                if (order.transactions && Array.isArray(order.transactions)) {
-                  for (const transaction of order.transactions) {
-                    transactionsBatch.push({
-                      organizationId: args.organizationId as Id<"organizations">,
-                      shopifyOrderId: orderId,
-                      shopifyId: transaction.id.replace(
-                        "gid://shopify/OrderTransaction/",
-                        "",
-                      ),
-                      kind: transaction.kind,
-                      status: transaction.status,
-                      gateway: transaction.gateway,
-                      amount: parseMoney(
-                        String(transaction.amountSet?.shopMoney?.amount ?? "0"),
-                      ),
-                      fee:
-                        transaction.fees && transaction.fees.length > 0
-                          ? parseMoney(
-                              String(transaction.fees[0]!.amount?.amount),
-                            )
-                          : undefined,
-                      paymentId: transaction.paymentId || undefined,
-                      paymentDetails: transaction.paymentDetails
-                        ? {
-                            creditCardBin:
-                              transaction.paymentDetails.creditCardBin ||
-                              undefined,
-                            creditCardCompany:
-                              transaction.paymentDetails.creditCardCompany ||
-                              undefined,
-                            creditCardNumber:
-                              transaction.paymentDetails.creditCardNumber ||
-                              undefined,
-                          }
-                        : undefined,
-                      shopifyCreatedAt: Date.parse(transaction.createdAt),
-                      processedAt: transaction.processedAt
-                        ? Date.parse(transaction.processedAt)
-                        : undefined,
-                    });
-                  }
+                if (refunds.length) {
+                  refundsBatch.push(...refunds);
                 }
 
-                if (order.refunds && Array.isArray(order.refunds)) {
-                  for (const refund of order.refunds as Array<ShopifyRefund>) {
-                    refundsBatch.push({
-                      organizationId: args.organizationId,
-                      shopifyOrderId: orderId,
-                      shopifyId: refund.id.replace(
-                        "gid://shopify/Refund/",
-                        "",
-                      ),
-                      note: refund.note || undefined,
-                      userId: refund.user?.id || undefined,
-                      totalRefunded: parseMoney(
-                        refund.totalRefundedSet?.shopMoney?.amount,
-                      ),
-                      refundLineItems:
-                        refund.refundLineItems?.edges?.map(
-                          (edge: {
-                            node: {
-                              lineItem?: { id?: string };
-                              quantity?: number;
-                              subtotalSet?: { shopMoney?: ShopifyMoney };
-                            };
-                          }) => {
-                            const item = edge.node;
-
-                            return {
-                              lineItemId: item.lineItem?.id
-                                ? String(item.lineItem.id).replace(
-                                    "gid://shopify/LineItem/",
-                                    "",
-                                  )
-                                : "",
-                              quantity: item.quantity || 0,
-                              subtotal: parseMoney(
-                                item.subtotalSet?.shopMoney?.amount,
-                              ),
-                            };
-                          },
-                        ) || [],
-                      shopifyCreatedAt: Date.parse(
-                        String(refund.createdAt || new Date().toISOString()),
-                      ),
-                      processedAt: refund.processedAt
-                        ? Date.parse(String(refund.processedAt))
-                        : undefined,
-                    });
-                  }
-                }
-
-                if (order.fulfillments && Array.isArray(order.fulfillments)) {
-                  for (const fulfillment of order.fulfillments as Array<ShopifyFulfillment>) {
-                    fulfillmentsBatch.push({
-                      organizationId: args.organizationId,
-                      shopifyOrderId: orderId,
-                      shopifyId: fulfillment.id.replace(
-                        "gid://shopify/Fulfillment/",
-                        "",
-                      ),
-                      status: fulfillment.status,
-                      shipmentStatus: undefined,
-                      trackingCompany:
-                        fulfillment.trackingInfo?.[0]?.company || undefined,
-                      trackingNumbers:
-                        fulfillment.trackingInfo?.map((t) => t.number) || [],
-                      trackingUrls:
-                        fulfillment.trackingInfo?.map((t) => t.url) || [],
-                      locationId: undefined,
-                      service: undefined,
-                      lineItems:
-                        fulfillment.fulfillmentLineItems?.edges?.map(
-                          (edge: { node: { id?: string; quantity?: number } }) => {
-                            const item = edge.node;
-                            return {
-                              id: item.id,
-                              quantity: item.quantity || 0,
-                            };
-                          },
-                        ) || [],
-                      shopifyCreatedAt: Date.parse(
-                        String(
-                          fulfillment.createdAt || new Date().toISOString(),
-                        ),
-                      ),
-                      shopifyUpdatedAt: fulfillment.updatedAt
-                        ? Date.parse(String(fulfillment.updatedAt))
-                        : undefined,
-                    });
-                  }
+                if (fulfillments.length) {
+                  fulfillmentsBatch.push(...fulfillments);
                 }
 
                 if (ordersBatch.length >= persistBatchSize) {
@@ -1214,7 +1256,22 @@ export const initial = internalAction({
         completedAt: new Date().toISOString(),
         durationMs: duration,
       });
-      
+
+      try {
+        await ctx.runMutation(
+          (internal.integrations.shopify as any).updateStoreLastSyncInternal,
+          {
+            storeId,
+            timestamp: Date.now(),
+          },
+        );
+      } catch (error) {
+        logger.warn("Failed to update store last sync timestamp", {
+          error,
+          storeId,
+        });
+      }
+
       // Validate and monitor cost data completeness
       const validationReport: any = await ctx.runQuery(
         internal.core.costs.validateCostDataCompleteness,
@@ -1266,21 +1323,129 @@ export const incremental = internalAction({
     organizationId: v.id("organizations"),
     since: v.optional(v.number()),
   },
-  handler: async (_ctx, args) => {
+  handler: async (ctx, args) => {
     logger.info("Starting incremental sync", {
       organizationId: args.organizationId,
     });
 
     try {
-      // TODO: Implement incremental sync
-      // 1. Get last sync timestamp
-      // 2. Fetch only updated records since then
-      // 3. Update database
+      const store = await ctx.runQuery(
+        internal.integrations.shopify.getActiveStoreInternal,
+        {
+          organizationId: args.organizationId,
+        },
+      );
 
-      const recordsProcessed = 0;
+      if (!store) {
+        throw new Error("No active Shopify store found");
+      }
+
+      const storeId = store._id as Id<"shopifyStores">;
+      const fallbackWindowMs = 6 * 60 * 60 * 1000; // 6 hours
+      const sinceMs = args.since ?? store.lastSyncAt ?? Date.now() - fallbackWindowMs;
+      const sinceIso = new Date(sinceMs).toISOString();
+
+      const client = new ShopifyGraphQLClient({
+        shopDomain: store.shopDomain,
+        accessToken: store.accessToken,
+        apiVersion: store.apiVersion,
+      });
+
+      const orders: ShopifyOrderInput[] = [];
+      const transactions: Array<Record<string, unknown>> = [];
+      const refunds: Array<Record<string, unknown>> = [];
+      const fulfillments: Array<Record<string, unknown>> = [];
+
+      let hasNextPage = true;
+      let cursor: string | null = null;
+
+      while (hasNextPage) {
+        const response: any = await client.getOrders(
+          SHOPIFY_CONFIG.QUERIES.ORDERS_BATCH_SIZE,
+          cursor,
+          `updated_at:>=${sinceIso}`,
+        );
+
+        if (response.errors && response.errors.length > 0) {
+          logger.warn("Incremental orders query returned errors", {
+            errors: response.errors,
+          });
+        }
+
+        const edges = (response.data?.orders?.edges ?? []) as Array<{
+          node: ShopifyOrderNode;
+        }>;
+
+        for (const edge of edges) {
+          const { order, transactions: txs, refunds: rfs, fulfillments: ffs } =
+            mapOrderNodeToPersistence(edge.node, args.organizationId as Id<"organizations">);
+
+          orders.push(order);
+
+          if (txs.length) transactions.push(...txs);
+          if (rfs.length) refunds.push(...rfs);
+          if (ffs.length) fulfillments.push(...ffs);
+        }
+
+        hasNextPage = response.data?.orders?.pageInfo?.hasNextPage || false;
+        cursor = response.data?.orders?.pageInfo?.endCursor || null;
+      }
+
+      if (orders.length > 0) {
+        await ctx.runMutation(
+          internal.integrations.shopify.storeOrdersInternal,
+          {
+            organizationId: args.organizationId,
+            storeId,
+            orders,
+          },
+        );
+      }
+
+      if (transactions.length > 0) {
+        await ctx.runMutation(
+          internal.integrations.shopify.storeTransactionsInternal,
+          {
+            organizationId: args.organizationId,
+            transactions,
+          },
+        );
+      }
+
+      if (refunds.length > 0) {
+        await ctx.runMutation(
+          internal.integrations.shopify.storeRefundsInternal,
+          {
+            organizationId: args.organizationId,
+            refunds,
+          },
+        );
+      }
+
+      if (fulfillments.length > 0) {
+        await ctx.runMutation(
+          internal.integrations.shopify.storeFulfillmentsInternal,
+          {
+            organizationId: args.organizationId,
+            fulfillments,
+          },
+        );
+      }
+
+      await ctx.runMutation(
+        (internal.integrations.shopify as any).updateStoreLastSyncInternal,
+        {
+          storeId,
+          timestamp: Date.now(),
+        },
+      );
+
+      const recordsProcessed = orders.length;
 
       logger.info("Incremental sync completed", {
+        organizationId: args.organizationId,
         recordsProcessed,
+        sinceIso,
       });
 
       return {

@@ -13,13 +13,7 @@ import {
   query,
 } from "../_generated/server";
 
-import {
-  createIntegration,
-  type DateRange,
-  IntegrationError,
-  type SyncResult,
-  SyncUtils,
-} from "./_base";
+import { createIntegration, type SyncResult } from "./_base";
 import { normalizeShopDomain } from "../utils/shop";
 import { gid, toMs } from "../utils/shopify";
 
@@ -577,250 +571,103 @@ export const shopify: any = createIntegration({
   version: "1.0.0",
   icon: "mdi:shopify",
 
-  /**
-   * Sync operations
-   */
   sync: {
-    /**
-     * Initial sync - fetch 60 days of historical data
-     */
     initial: async (
       ctx: GenericActionCtx<DataModel>,
       args: {
         organizationId: string;
-        dateRange?: DateRange;
+        dateRange?: { daysBack?: number };
         credentials?: Record<string, unknown>;
-      }
+      },
     ): Promise<SyncResult> => {
-      const dateRange = args.dateRange || SyncUtils.getInitialDateRange(60);
+      const daysBack = args.dateRange?.daysBack ?? 60;
+      const response = (await ctx.runAction(
+        internal.integrations.shopifySync.initial,
+        {
+          organizationId: args.organizationId as Id<"organizations">,
+          dateRange: { daysBack },
+        },
+      )) as {
+        success: boolean;
+        recordsProcessed: number;
+        dataChanged: boolean;
+        errors?: string[];
+        batchStats?: {
+          batchesScheduled?: number;
+          ordersQueued?: number;
+        };
+      };
 
-      try {
-        logger.info("Starting Shopify initial sync", {
-          organizationId: args.organizationId,
-          dateRange,
-        });
-
-        // Get Shopify store
-        const store = await ctx.runQuery(
-          internal.integrations.shopify.getActiveStoreInternal,
-          {
-            organizationId: args.organizationId,
-          }
-        );
-
-        if (!store) {
-          throw new IntegrationError(
-            "No active Shopify store found",
-            "STORE_NOT_FOUND",
-            "shopify"
-          );
-        }
-
-        // Initialize Shopify client
-        const client = await initializeShopifyClient(store);
-
-        let recordsProcessed = 0;
-        const errors: string[] = [];
-
-        // Sync products
-        try {
-          const products = await fetchProducts(client, dateRange);
-
-          await ctx.runMutation(
-            internal.integrations.shopify.storeProductsInternal,
-            {
-              organizationId: store.organizationId as Id<"organizations">,
-              storeId: store._id,
-              products,
-            }
-          );
-          recordsProcessed += products.length;
-        } catch (error) {
-          errors.push(
-            `Product sync failed: ${error instanceof Error ? error.message : String(error)}`
-          );
-        }
-
-        // Sync orders
-        try {
-          const orders = await fetchOrders(client, dateRange);
-
-          await ctx.runMutation(
-            internal.integrations.shopify.storeOrdersInternal,
-            {
-              organizationId: store.organizationId as Id<"organizations">,
-              storeId: store._id,
-              orders,
-            }
-          );
-          recordsProcessed += orders.length;
-        } catch (error) {
-          errors.push(
-            `Order sync failed: ${error instanceof Error ? error.message : String(error)}`
-          );
-        }
-
-        // Sync customers
-        try {
-          const customers = await fetchCustomers(client, dateRange);
-
-          await ctx.runMutation(
-            internal.integrations.shopify.storeCustomersInternal,
-            {
-              organizationId: store.organizationId as Id<"organizations">,
-              customers,
-            }
-          );
-          recordsProcessed += customers.length;
-        } catch (error) {
-          errors.push(
-            `Customer sync failed: ${error instanceof Error ? error.message : String(error)}`
-          );
-        }
-
-        return SyncUtils.formatResult(
-          errors.length === 0,
-          recordsProcessed,
-          recordsProcessed > 0,
-          errors
-        );
-      } catch (error) {
-        logger.error("Initial sync failed", error, {
-          organizationId: args.organizationId,
-        });
-
-        return SyncUtils.formatResult(false, 0, false, [
-          error instanceof Error ? error.message : String(error),
-        ]);
-      }
+      return {
+        success: response.success,
+        recordsProcessed: response.recordsProcessed,
+        dataChanged: response.dataChanged,
+        errors: response.errors,
+        metadata: {
+          batchesScheduled: response.batchStats?.batchesScheduled ?? 0,
+          ordersQueued: response.batchStats?.ordersQueued ?? 0,
+        },
+      } satisfies SyncResult;
     },
 
-    /**
-     * Incremental sync - fetch recent updates
-     */
     incremental: async (
       ctx: GenericActionCtx<DataModel>,
       args: {
         organizationId: string;
         since?: string;
         credentials?: Record<string, unknown>;
-      }
+      },
     ): Promise<SyncResult> => {
-      try {
-        logger.info("Starting Shopify incremental sync", {
-          organizationId: args.organizationId,
-          since: args.since,
-        });
+      const sinceMs = args.since ? Date.parse(args.since) : undefined;
+      const response = (await ctx.runAction(
+        internal.integrations.shopifySync.incremental,
+        {
+          organizationId: args.organizationId as Id<"organizations">,
+          since: Number.isFinite(sinceMs) ? sinceMs : undefined,
+        },
+      )) as {
+        success: boolean;
+        recordsProcessed: number;
+        dataChanged: boolean;
+        errors?: string[];
+      };
 
-        const store = await ctx.runQuery(
-          internal.integrations.shopify.getActiveStoreInternal,
-          {
-            organizationId: args.organizationId,
-          }
-        );
-
-        if (!store) {
-          throw new IntegrationError(
-            "No active Shopify store found",
-            "STORE_NOT_FOUND",
-            "shopify"
-          );
-        }
-
-        // Get last sync time
-        const lastSync =
-          args.since ||
-          (await ctx.runQuery(
-            internal.integrations.shopify.getLastSyncTimeInternal,
-            {
-              organizationId: args.organizationId as Id<"organizations">,
-            }
-          ));
-
-        const client = await initializeShopifyClient(store);
-        let recordsProcessed = 0;
-
-        // Fetch updated orders
-        logger.debug("Fetching orders since", { lastSync });
-        const orders = await fetchOrdersSince(client, lastSync);
-
-        logger.info("Orders fetched for incremental sync", {
-          count: orders.length,
-        });
-
-        if (orders.length > 0) {
-          await ctx.runMutation(
-            internal.integrations.shopify.storeOrdersInternal,
-            {
-              organizationId: args.organizationId as Id<"organizations">,
-              orders,
-            }
-          );
-          recordsProcessed += orders.length;
-          logger.info("Orders updated successfully", { count: orders.length });
-        }
-
-        // Fetch updated products
-        logger.debug("Fetching products since", { lastSync });
-        const products = await fetchProductsSince(client, lastSync);
-
-        logger.info("Products fetched for incremental sync", {
-          count: products.length,
-        });
-
-        if (products.length > 0) {
-          await ctx.runMutation(
-            internal.integrations.shopify.storeProductsInternal,
-            {
-              organizationId: args.organizationId as Id<"organizations">,
-              products,
-            }
-          );
-          recordsProcessed += products.length;
-        }
-
-        return SyncUtils.formatResult(
-          true,
-          recordsProcessed,
-          recordsProcessed > 0
-        );
-      } catch (error) {
-        return SyncUtils.formatResult(false, 0, false, [
-          error instanceof Error ? error.message : String(error),
-        ]);
-      }
+      return {
+        success: response.success,
+        recordsProcessed: response.recordsProcessed,
+        dataChanged: response.dataChanged,
+        errors: response.success
+          ? response.errors
+          : response.errors ?? ["Incremental sync failed"],
+      } satisfies SyncResult;
     },
 
-    /**
-     * Validate Shopify connection
-     */
     validate: async (
       ctx: GenericActionCtx<DataModel>,
       args: {
         organizationId: string;
         credentials?: Record<string, unknown>;
-      }
+      },
     ): Promise<boolean> => {
       try {
         const store = await ctx.runQuery(
           internal.integrations.shopify.getActiveStoreInternal,
           {
             organizationId: args.organizationId,
-          }
+          },
         );
 
-        if (!store) return false;
+        if (!store) {
+          return false;
+        }
 
         const client = await initializeShopifyClient(store);
-        // Try to fetch shop info to validate connection
-        const shop = await client.getShopInfo();
-
-        const isValid = !!shop;
+        const shopInfo = await client.getShopInfo();
+        const isValid = Boolean(shopInfo?.data?.shop);
 
         logger.info("Shopify connection validation completed", {
           organizationId: args.organizationId,
-          isValid,
-          shopName: shop?.data?.shop?.name,
+          valid: isValid,
         });
 
         return isValid;
@@ -1873,6 +1720,28 @@ export const getStoreByDomain = internalQuery({
   },
 });
 
+export const updateStoreLastSyncInternal = internalMutation({
+  args: {
+    storeId: v.id("shopifyStores"),
+    timestamp: v.number(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const store = await ctx.db.get(args.storeId);
+
+    if (!store) {
+      throw new Error(`Shopify store not found: ${args.storeId}`);
+    }
+
+    await ctx.db.patch(args.storeId, {
+      lastSyncAt: args.timestamp,
+      updatedAt: Date.now(),
+    });
+
+    return null;
+  },
+});
+
 export const getLastSyncTimeInternal = internalQuery({
   args: { organizationId: v.id("organizations") },
   returns: v.string(),
@@ -1908,306 +1777,6 @@ async function initializeShopifyClient(
     accessToken: store.accessToken,
     apiVersion: store.apiVersion,
   });
-}
-
-async function fetchProducts(
-  client: ShopifyGraphQLClient,
-  _dateRange: DateRange
-): Promise<Array<Record<string, unknown>>> {
-  const products: Array<Record<string, unknown>> = [];
-  let hasNextPage = true;
-  let cursor: string | null = null;
-
-  try {
-    while (hasNextPage) {
-      const response = await client.getProducts(250, cursor);
-
-      if (response.data?.products?.edges) {
-        for (const edge of response.data.products.edges) {
-          const product = edge.node;
-
-          // Parse product data
-          const productData = {
-            shopifyId: gid(product.id, "Product"),
-            title: toOptionalString(product.title) ?? "",
-            handle: toOptionalString(product.handle) ?? "",
-            productType: toOptionalString(product.productType),
-            vendor: toOptionalString(product.vendor),
-            status: toOptionalString(product.status) ?? "",
-            featuredImage: toOptionalString(product.featuredImage?.url),
-            tags: product.tags || [],
-            shopifyCreatedAt: toMs(product.createdAt) ?? Date.now(),
-            shopifyUpdatedAt: toMs(product.updatedAt) ?? Date.now(),
-            publishedAt: toMs(product.publishedAt) ?? null,
-            variants: [] as Array<{
-              shopifyId: string;
-              title: string;
-              sku?: string;
-              barcode?: string;
-              price: number;
-              compareAtPrice: number | null;
-              position: number;
-              inventoryQuantity: number;
-              taxable?: boolean;
-              shopifyCreatedAt: number;
-              shopifyUpdatedAt: number;
-              option1?: string;
-              option2?: string;
-              option3?: string;
-            }>,
-          };
-
-          // Parse variants
-          if (product.variants?.edges) {
-            for (const variantEdge of product.variants.edges) {
-              const variant = variantEdge.node;
-
-              productData.variants.push({
-                shopifyId: gid(variant.id, "ProductVariant"),
-                title: toOptionalString(variant.title) ?? "",
-                sku: toOptionalString(variant.sku),
-                barcode: toOptionalString(variant.barcode),
-                price: parseFloat(variant.price || "0"),
-                compareAtPrice: variant.compareAtPrice
-                  ? parseFloat(variant.compareAtPrice)
-                  : null,
-                position: variant.position || 0,
-                inventoryQuantity: variant.inventoryQuantity || 0,
-                taxable: typeof variant.taxable === "boolean" ? variant.taxable : undefined,
-                shopifyCreatedAt: toMs(variant.createdAt) ?? Date.now(),
-                shopifyUpdatedAt: toMs(variant.updatedAt) ?? Date.now(),
-                option1: toOptionalString(variant.selectedOptions?.[0]?.value),
-                option2: toOptionalString(variant.selectedOptions?.[1]?.value),
-                option3: toOptionalString(variant.selectedOptions?.[2]?.value),
-              });
-            }
-          }
-
-          products.push(productData);
-        }
-
-        hasNextPage = response.data.products.pageInfo?.hasNextPage || false;
-        cursor = response.data.products.pageInfo?.endCursor || null;
-      } else {
-        hasNextPage = false;
-      }
-    }
-  } catch (error) {
-    logger.error("Failed to fetch products from Shopify", error);
-    throw error;
-  }
-
-  return products;
-}
-
-async function fetchProductsSince(
-  client: ShopifyGraphQLClient,
-  since: string
-): Promise<Array<Record<string, unknown>>> {
-  // For incremental sync, we can add a query filter
-  // For now, using the same implementation as fetchProducts
-  return fetchProducts(client, { startDate: since });
-}
-
-async function fetchOrders(
-  client: ShopifyGraphQLClient,
-  dateRange: DateRange
-): Promise<ShopifyOrderInput[]> {
-  const orders: ShopifyOrderInput[] = [];
-  let hasNextPage = true;
-  let cursor: string | null = null;
-
-  try {
-    // Build query string for date filtering if provided
-    let query = "";
-
-    if (dateRange?.startDate) {
-      query = `created_at:>=${new Date(dateRange.startDate).toISOString()}`;
-    }
-
-    while (hasNextPage) {
-      const response = await client.getOrders(50, cursor, query);
-
-      if (response.data?.orders?.edges) {
-        for (const edge of response.data.orders.edges) {
-          const order = edge.node;
-
-          // Parse order data
-          const orderData: ShopifyOrderInput = {
-            shopifyId: order.id.replace("gid://shopify/Order/", ""),
-            orderNumber: order.name
-              ? order.name.replace("#", "")
-              : order.id.replace("gid://shopify/Order/", ""),
-            name: order.name || "",
-            email: toOptionalString((order as any).email),
-            phone: toOptionalString((order as any).phone),
-            shopifyCreatedAt: order.createdAt
-              ? new Date(order.createdAt).getTime()
-              : Date.now(),
-            updatedAt: order.updatedAt
-              ? new Date(order.updatedAt).getTime()
-              : undefined,
-            processedAt: order.processedAt
-              ? new Date(order.processedAt).getTime()
-              : undefined,
-            closedAt: order.closedAt
-              ? new Date(order.closedAt).getTime()
-              : undefined,
-            cancelledAt: order.cancelledAt
-              ? new Date(order.cancelledAt).getTime()
-              : undefined,
-            financialStatus: order.displayFinancialStatus,
-            fulfillmentStatus: order.displayFulfillmentStatus,
-            totalPrice: parseMoney(
-              (order as any).currentTotalPriceSet?.shopMoney?.amount
-            ),
-            subtotalPrice: parseMoney(
-              (order as any).currentSubtotalPriceSet?.shopMoney?.amount
-            ),
-            totalTax: parseMoney(
-              (order as any).currentTotalTaxSet?.shopMoney?.amount
-            ),
-            totalDiscounts: parseMoney(
-              (order as any).currentTotalDiscountsSet?.shopMoney?.amount
-            ),
-            totalShippingPrice: parseMoney(
-              (order as any).totalShippingPriceSet?.shopMoney?.amount
-            ),
-            totalTip: (order as any).totalTipReceivedSet
-              ? parseMoney((order as any).totalTipReceivedSet.shopMoney?.amount)
-              : undefined,
-            totalItems: order.lineItems?.edges?.length || 0,
-            totalQuantity:
-              (order as any).subtotalLineItemsQuantity !== undefined
-                ? Number((order as any).subtotalLineItemsQuantity)
-                : 0,
-            totalWeight: (order as any).totalWeight as number | undefined,
-            tags: order.tags || [],
-            note: toOptionalString(order.note),
-            riskLevel: toOptionalString((order as any).risks?.[0]?.level),
-            shippingAddress: order.shippingAddress
-              ? {
-                  country: toOptionalString(order.shippingAddress.country),
-                  province: toOptionalString(order.shippingAddress.provinceCode),
-                  city: toOptionalString(order.shippingAddress.city),
-                  zip: toOptionalString(order.shippingAddress.zip),
-                }
-              : undefined,
-            customer: order.customer
-              ? {
-                  shopifyId: gid(order.customer.id, "Customer"),
-                  email: toOptionalString(order.customer.email),
-                  firstName: toOptionalString(order.customer.firstName),
-                  lastName: toOptionalString(order.customer.lastName),
-                  phone: toOptionalString(order.customer.phone),
-                }
-              : undefined,
-            lineItems: [] as ShopifyOrderLineItemInput[],
-          };
-
-          // Parse line items
-          if (order.lineItems?.edges) {
-            for (const itemEdge of order.lineItems.edges) {
-              const item = itemEdge.node;
-
-              orderData.lineItems.push({
-                shopifyId: gid(item.id, "LineItem"),
-                title:
-                  toOptionalString(item.title) ??
-                  toOptionalString((item as any).name) ??
-                  "",
-                name: toOptionalString((item as any).name),
-                quantity: item.quantity || 0,
-                sku: toOptionalString((item as any).sku),
-                shopifyVariantId: gid(item.variant?.id, "ProductVariant"),
-                shopifyProductId: gid((item.variant as any)?.product?.id, "Product"),
-                price: parseMoney(item.originalUnitPriceSet?.shopMoney?.amount),
-                discountedPrice: (item as any).discountedUnitPriceSet
-                  ? parseMoney(
-                      (item as any).discountedUnitPriceSet.shopMoney?.amount
-                    )
-                  : undefined,
-                totalDiscount: parseMoney(
-                  item.totalDiscountSet?.shopMoney?.amount
-                ),
-                fulfillmentStatus: toOptionalString((item as any).fulfillmentStatus),
-              });
-            }
-          }
-
-          orders.push(orderData);
-        }
-
-        hasNextPage = response.data.orders.pageInfo?.hasNextPage || false;
-        cursor = response.data.orders.pageInfo?.endCursor || null;
-      } else {
-        hasNextPage = false;
-      }
-    }
-  } catch (error) {
-    logger.error("Failed to fetch orders from Shopify", error);
-    throw error;
-  }
-
-  return orders;
-}
-
-async function fetchOrdersSince(
-  client: ShopifyGraphQLClient,
-  since: string
-): Promise<ShopifyOrderInput[]> {
-  // Use date query for incremental sync
-  return fetchOrders(client, { startDate: since });
-}
-
-async function fetchCustomers(
-  client: ShopifyGraphQLClient,
-  _dateRange: DateRange
-): Promise<Array<Record<string, unknown>>> {
-  const customers: Array<Record<string, unknown>> = [];
-  let hasNextPage = true;
-  let cursor: string | null = null;
-
-  try {
-    while (hasNextPage) {
-      const response = await client.getCustomers(250, cursor);
-
-      if (response.data?.customers?.edges) {
-        for (const edge of response.data.customers.edges) {
-          const customer = edge.node;
-
-          customers.push({
-            shopifyId: customer.id.replace("gid://shopify/Customer/", ""),
-            email: toOptionalString((customer as any).email),
-            firstName: toOptionalString((customer as any).firstName),
-            lastName: toOptionalString((customer as any).lastName),
-            phone: toOptionalString((customer as any).phone),
-            acceptsMarketing: (customer as any).acceptsMarketing,
-            totalSpent: parseMoney((customer as any).totalSpentV2?.amount),
-            ordersCount: (customer as any).ordersCount || 0,
-            tags: (customer as any).tags || [],
-            note: toOptionalString((customer as any).note),
-            createdAt: customer.createdAt
-              ? new Date(customer.createdAt).getTime()
-              : Date.now(),
-            updatedAt: customer.updatedAt
-              ? new Date(customer.updatedAt).getTime()
-              : Date.now(),
-          });
-        }
-
-        hasNextPage = response.data.customers.pageInfo?.hasNextPage || false;
-        cursor = response.data.customers.pageInfo?.endCursor || null;
-      } else {
-        hasNextPage = false;
-      }
-    }
-  } catch (error) {
-    logger.error("Failed to fetch customers from Shopify", error);
-    throw error;
-  }
-
-  return customers;
 }
 
 export const storeProductsInternal = internalMutation({

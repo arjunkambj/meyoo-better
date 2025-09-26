@@ -477,10 +477,14 @@ export class ShopifyGraphQLClient {
   /**
    * Fetch products with all available fields
    */
-  async getProducts(first: number = 250, after?: string | null) {
-    const query = `
-      query GetProducts($first: Int!, $after: String) {
-        products(first: $first, after: $after) {
+  async getProducts(
+    first: number = 250,
+    after?: string | null,
+    filter?: string,
+  ) {
+    const graphqlQuery = `
+      query GetProducts($first: Int!, $after: String, $query: String) {
+        products(first: $first, after: $after, query: $query) {
           edges {
             node {
               id
@@ -573,6 +577,7 @@ export class ShopifyGraphQLClient {
     const variables = {
       first,
       after,
+      query: filter,
     };
 
     return this.makeRequest<{
@@ -580,7 +585,7 @@ export class ShopifyGraphQLClient {
         edges: Array<{ node: ShopifyProduct }>;
         pageInfo: PageInfo;
       };
-    }>(query, variables);
+    }>(graphqlQuery, variables);
   }
 
   /**

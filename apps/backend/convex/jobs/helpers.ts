@@ -10,28 +10,77 @@ export const createSyncSession = internalMutation({
     organizationId: v.id("organizations"),
     platform: v.union(v.literal("shopify"), v.literal("meta")),
     type: v.string(),
+    sessionId: v.optional(v.id("syncSessions")),
   },
+  returns: v.object({
+    sessionId: v.id("syncSessions"),
+    alreadyRunning: v.boolean(),
+  }),
   handler: async (ctx, args) => {
-    // Dedup/lock: if a sync is already running for this org+platform, reuse it
-    const existing = await ctx.db
-      .query("syncSessions")
-      .withIndex("by_org_platform_and_status", (q) =>
-        q
-          .eq("organizationId", args.organizationId)
-          .eq("platform", args.platform)
-          .eq("status", "syncing"),
-      )
-      .first();
+    if (args.sessionId) {
+      const reserved = await ctx.db.get(args.sessionId);
 
-    if (existing) return existing._id;
+      if (reserved) {
+        if (
+          reserved.status === "syncing" ||
+          reserved.status === "processing"
+        ) {
+          return { sessionId: reserved._id, alreadyRunning: true };
+        }
 
-    return await ctx.db.insert("syncSessions", {
+        if (reserved.status === "pending") {
+          await ctx.db.patch(reserved._id, {
+            status: "syncing",
+            startedAt: Date.now(),
+            type: reserved.type || args.type,
+          });
+
+          return { sessionId: reserved._id, alreadyRunning: false };
+        }
+      }
+    }
+
+    const statuses: Array<"pending" | "syncing" | "processing"> = [
+      "pending",
+      "syncing",
+      "processing",
+    ];
+
+    for (const status of statuses) {
+      const existing = await ctx.db
+        .query("syncSessions")
+        .withIndex("by_org_platform_and_status", (q) =>
+          q
+            .eq("organizationId", args.organizationId)
+            .eq("platform", args.platform)
+            .eq("status", status),
+        )
+        .first();
+
+      if (existing) {
+        if (status === "pending") {
+          await ctx.db.patch(existing._id, {
+            status: "syncing",
+            startedAt: Date.now(),
+            type: existing.type || args.type,
+          });
+
+          return { sessionId: existing._id, alreadyRunning: false };
+        }
+
+        return { sessionId: existing._id, alreadyRunning: true };
+      }
+    }
+
+    const sessionId = await ctx.db.insert("syncSessions", {
       organizationId: args.organizationId,
       platform: args.platform,
       type: args.type,
       status: "syncing",
       startedAt: Date.now(),
     });
+
+    return { sessionId, alreadyRunning: false };
   },
 });
 

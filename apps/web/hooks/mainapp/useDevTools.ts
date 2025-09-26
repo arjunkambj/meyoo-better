@@ -1,4 +1,4 @@
-import { useMutation } from "convex/react";
+import { useAction, useMutation } from "convex/react";
 import { useQuery } from "convex-helpers/react/cache/hooks";
 import { useEffect, useState } from "react";
 
@@ -27,7 +27,7 @@ export function useDevTools() {
   const currentUser = useQuery(api.core.users.getCurrentUser);
   const resetMeta = useMutation(api.meyoo.admin.resetMetaData);
   const resetShopify = useMutation(api.meyoo.admin.resetShopifyData);
-  const resetAll = useMutation(api.meyoo.admin.resetEverything);
+  const resetAll = useAction(api.meyoo.admin.resetEverything);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

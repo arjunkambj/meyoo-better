@@ -1,4 +1,5 @@
 import { Text, View } from "react-native";
+import { Button } from "heroui-native";
 
 export default function Index() {
   return (
@@ -11,6 +12,7 @@ export default function Index() {
     >
       <Text className="text-3xl">Meyoo From Meyoo</Text>
       <Text className="">Meyoo From Meyoo</Text>
+      <Button onPress={() => console.log("Pressed!")}>Get Started</Button>
     </View>
   );
 }

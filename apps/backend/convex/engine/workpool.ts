@@ -47,6 +47,14 @@ export interface SyncJobData {
   syncType?: "initial" | "incremental";
   dateRange?: { daysBack: number };
   accountId?: string;
+  storeId?: Id<"shopifyStores">;
+  syncSessionId?: Id<"syncSessions">;
+  batchNumber?: number;
+  cursor?: string;
+  orders?: any[];
+  transactions?: any[];
+  refunds?: any[];
+  fulfillments?: any[];
   // For immediate/manual syncs, who triggered it
   triggeredBy?: string;
 }

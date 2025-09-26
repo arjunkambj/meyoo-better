@@ -108,7 +108,7 @@ export const initializeSyncSessionBatches = internalMutation({
       ...(session.metadata || {}),
       totalBatches: args.totalBatches,
       completedBatches: 0,
-    };
+    } as Record<string, any>;
 
     await ctx.db.patch(args.sessionId, {
       metadata,
@@ -130,7 +130,7 @@ export const incrementSyncSessionProgress = internalMutation({
     const session = await ctx.db.get(args.sessionId);
     if (!session) return null;
 
-    const metadata = session.metadata || {};
+    const metadata = (session.metadata || {}) as Record<string, any>;
     const totalBatches = metadata.totalBatches ?? 0;
     const previousCompleted = metadata.completedBatches ?? 0;
     const nextCompletedRaw = previousCompleted + args.batchesCompletedDelta;
@@ -148,7 +148,7 @@ export const incrementSyncSessionProgress = internalMutation({
         ...metadata,
         totalBatches,
         completedBatches: nextCompleted,
-      },
+      } as Record<string, any>,
       recordsProcessed: nextRecordsProcessed,
     });
 

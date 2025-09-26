@@ -1,4 +1,4 @@
-import { Text, View, ScrollView } from "react-native";
+import { View, ScrollView } from "react-native";
 import { Button } from "heroui-native";
 
 export default function Index() {

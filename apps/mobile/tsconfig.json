@@ -5,6 +5,9 @@
     "paths": {
       "@/*": [
         "./*"
+      ],
+      "@repo/convex/*": [
+        "../backend/convex/_generated/*"
       ]
     }
   },

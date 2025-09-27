@@ -34,6 +34,14 @@ const useOnboardingData = () => {
   const prefetchRoute = useSetAtom(prefetchRouteAtom);
 
   const isLoading = user === undefined || status === undefined;
+  const isCompleted = status?.completed ?? false;
+
+  // Redirect to the dashboard once onboarding is marked complete server-side.
+  useEffect(() => {
+    if (!isLoading && isCompleted) {
+      router.replace('/overview');
+    }
+  }, [isCompleted, isLoading, router]);
 
   // Update Jotai store when data changes
   useEffect(() => {
@@ -56,7 +64,7 @@ const useOnboardingData = () => {
 
   // Prefetch next route for instant navigation
   useEffect(() => {
-    if (!isLoading && status?.currentStep) {
+    if (!isLoading && !isCompleted && status?.currentStep) {
       const nextStep = getNextStep(
         status.currentStep,
         typeof window !== "undefined" ? window.location.pathname : undefined
@@ -66,7 +74,7 @@ const useOnboardingData = () => {
         prefetchRoute(nextStep.route);
       }
     }
-  }, [status?.currentStep, isLoading, router, prefetchRoute]);
+  }, [isCompleted, isLoading, prefetchRoute, router, status?.currentStep]);
 
   return { isLoading };
 };

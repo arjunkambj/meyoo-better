@@ -63,7 +63,7 @@ export default function AgentSidebar({
       )}
       <aside
         className={cn(
-          "h-full bg-background border-l border-default-100",
+          "h-full bg-default-50 px-1 pb-2 dark:bg-default-100",
           "flex flex-col overflow-hidden transition-all duration-300 ease-in-out",
           isMobile
             ? cn(
@@ -95,9 +95,7 @@ export default function AgentSidebar({
             isAnimating ? "opacity-100" : "opacity-0"
           )}
         >
-          <div className="flex-1 overflow-hidden">
-            {children ?? <ChatUI />}
-          </div>
+          <div className="flex-1 overflow-hidden">{children ?? <ChatUI />}</div>
         </div>
       </aside>
     </>

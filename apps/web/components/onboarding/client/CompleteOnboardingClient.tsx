@@ -20,10 +20,12 @@ export default function CompleteOnboardingClient() {
     hasShopify,
     hasMeta,
     status,
-    isShopifySynced,
     hasShopifySyncError,
     shopifySyncStatus,
     shopifySyncProgress,
+    isInitialSyncComplete,
+    pendingSyncPlatforms,
+    syncStatus,
   } = useOnboarding();
 
   // (features list removed; unused)
@@ -56,20 +58,6 @@ export default function CompleteOnboardingClient() {
       return;
     }
 
-    if (!isShopifySynced) {
-      const msg = hasShopifySyncError
-        ? "We need to finish importing your Shopify data before completing setup. Please retry the sync from the Shopify step."
-        : "We\u2019re still importing your Shopify data. You\u2019ll be able to finish once the sync is complete.";
-      addToast({
-        title: "Shopify sync in progress",
-        description: msg,
-        color: "warning",
-        timeout: 3500,
-      });
-
-      return;
-    }
-
     setIsCompleting(true);
 
     try {
@@ -92,7 +80,7 @@ export default function CompleteOnboardingClient() {
         console.log("[ONBOARDING] Redirecting to dashboard");
         trackOnboardingAction("complete", "redirect_dashboard");
         router.push("/overview");
-      }, 1000);
+      }, 1200);
     } catch (error) {
       console.error("[ONBOARDING] Failed to complete setup:", error);
       setIsCompleting(false);
@@ -106,15 +94,7 @@ export default function CompleteOnboardingClient() {
         timeout: 3000,
       });
     }
-  }, [
-    hasShopify,
-    router,
-    finishOnboarding,
-    isCompleting,
-    isCompleted,
-    isShopifySynced,
-    hasShopifySyncError,
-  ]);
+  }, [hasShopify, router, finishOnboarding, isCompleting, isCompleted]);
 
   const connectionItems = [
     {
@@ -131,17 +111,40 @@ export default function CompleteOnboardingClient() {
     },
   ];
 
-  const hasRequiredConnections = hasShopify && isShopifySynced;
-  const syncStatusLabel = shopifySyncStatus
-    ? shopifySyncStatus.replace(/_/g, " ")
-    : "not started";
+  const hasRequiredConnections = hasShopify;
+  const activePlatforms = pendingSyncPlatforms.length
+    ? pendingSyncPlatforms
+    : hasShopifySyncError
+      ? ["shopify"]
+      : [];
+
+  const syncStatusLabel = isInitialSyncComplete
+    ? "completed"
+    : shopifySyncStatus
+      ? shopifySyncStatus.replace(/_/g, " ")
+      : "not started";
+  const shopifyOrdersProcessed = shopifySyncProgress.ordersProcessed;
+  const shopifyOrdersQueued = shopifySyncProgress.ordersQueued;
+  const shopifyRecordsProcessed = shopifySyncProgress.recordsProcessed;
+  const shopifyProgressText =
+    typeof shopifyOrdersProcessed === "number"
+      ? `Orders processed: ${shopifyOrdersProcessed}${
+          typeof shopifyOrdersQueued === "number" && shopifyOrdersQueued > 0
+            ? ` of ${shopifyOrdersQueued}`
+            : ""
+        }`
+      : shopifyRecordsProcessed
+        ? `Records processed: ${shopifyRecordsProcessed}`
+        : null;
   const syncingDescription = hasShopifySyncError
-    ? "The initial Shopify sync failed. Please restart the sync from the Shopify step before continuing."
-    : "We\u2019re still importing orders and products from Shopify. This can take a few minutes for larger stores.";
+    ? "The initial Shopify sync failed. You can finish setup now, but we recommend retrying the sync from the Shopify step so analytics stay accurate."
+    : activePlatforms.length > 0
+      ? `We’re still importing ${activePlatforms.join(", ")} data. This can take a few minutes for larger stores, but you can continue while we finish.`
+      : "We’re still importing orders and products from Shopify. This can take a few minutes for larger stores, but you can continue while we finish.";
 
   return (
     <>
-      {!isShopifySynced && (
+      {!isInitialSyncComplete && (
         <Card className="border-warning bg-warning-50/40 mb-8">
           <CardBody className="flex flex-col gap-3 text-default-700">
             <div className="flex items-start gap-3">
@@ -150,27 +153,55 @@ export default function CompleteOnboardingClient() {
               </div>
               <div className="space-y-1">
                 <p className="font-medium text-warning-600">
-                  Shopify sync {hasShopifySyncError ? "needs attention" : "is still running"}
+                  {activePlatforms.length > 0
+                    ? `${activePlatforms.map((platform) =>
+                        platform === "shopify"
+                          ? "Shopify"
+                          : platform === "meta"
+                            ? "Meta"
+                            : platform,
+                      ).join(", ")} sync ${hasShopifySyncError ? "needs attention" : "is still running"}`
+                    : hasShopifySyncError
+                      ? "Shopify sync needs attention"
+                      : "Sync is still running"}
                 </p>
                 <p className="text-sm leading-relaxed">
                   {syncingDescription}
                 </p>
-                <p className="text-xs uppercase tracking-wide text-warning-500">
-                  Status: {syncStatusLabel}
-                  {shopifySyncProgress.recordsProcessed
-                    ? ` • Orders processed: ${shopifySyncProgress.recordsProcessed}`
-                    : ""}
-                </p>
+                {activePlatforms.includes("shopify") && (
+                  <p className="text-xs uppercase tracking-wide text-warning-500">
+                    Status: {syncStatusLabel}
+                    {shopifyProgressText ? ` • ${shopifyProgressText}` : ""}
+                  </p>
+                )}
+                {activePlatforms.includes("meta") && syncStatus?.meta?.status && (
+                  <p className="text-xs uppercase tracking-wide text-warning-500">
+                    Meta status: {syncStatus.meta.status.replace(/_/g, " ")}
+                  </p>
+                )}
               </div>
             </div>
             {!hasShopifySyncError && (
               <div className="flex items-center gap-2 text-warning-500">
                 <Spinner size="sm" color="warning" />
                 <span className="text-xs">
-                  We&apos;ll enable completion automatically once the sync finishes.
+                  You can finish setup now. We&apos;ll continue syncing and update analytics once everything lands.
                 </span>
               </div>
             )}
+          </CardBody>
+        </Card>
+      )}
+
+      {pendingSyncPlatforms.length > 0 && (
+        <Card className="border-primary mb-8">
+          <CardBody className="flex flex-col gap-2 text-default-700">
+            <p className="font-medium text-primary">
+              We’re still syncing {pendingSyncPlatforms.join(", ")}
+            </p>
+            <p className="text-sm">
+              Feel free to explore the dashboard. Analytics will refresh automatically once the remaining imports finish.
+            </p>
           </CardBody>
         </Card>
       )}

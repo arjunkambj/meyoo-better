@@ -17,6 +17,11 @@ function useOnboardingInternal() {
         shopify?: {
           status: string;
           recordsProcessed?: number;
+          baselineRecords?: number;
+          ordersProcessed?: number;
+          ordersQueued?: number;
+          productsProcessed?: number;
+          customersProcessed?: number;
           startedAt?: number;
           completedAt?: number;
           lastError?: string;
@@ -46,7 +51,9 @@ function useOnboardingInternal() {
   const completeMutation = useMutation(api.core.onboarding.completeOnboarding);
 
   const shopifySyncStatus = syncStatus?.shopify?.status ?? null;
-  const isShopifySynced = shopifySyncStatus === "completed";
+  const isInitialSyncComplete = status?.isInitialSyncComplete || false;
+  const isShopifySynced =
+    isInitialSyncComplete || shopifySyncStatus === "completed";
   const isShopifySyncing = shopifySyncStatus
     ? ["pending", "syncing", "processing"].includes(shopifySyncStatus)
     : false;
@@ -54,6 +61,11 @@ function useOnboardingInternal() {
   const shopifySyncProgress = {
     status: shopifySyncStatus,
     recordsProcessed: syncStatus?.shopify?.recordsProcessed ?? 0,
+    baselineRecords: syncStatus?.shopify?.baselineRecords ?? null,
+    ordersProcessed: syncStatus?.shopify?.ordersProcessed ?? null,
+    ordersQueued: syncStatus?.shopify?.ordersQueued ?? null,
+    productsProcessed: syncStatus?.shopify?.productsProcessed ?? null,
+    customersProcessed: syncStatus?.shopify?.customersProcessed ?? null,
     startedAt: syncStatus?.shopify?.startedAt ?? null,
     completedAt: syncStatus?.shopify?.completedAt ?? null,
     lastError: syncStatus?.shopify?.lastError ?? null,
@@ -141,6 +153,11 @@ function useOnboardingInternal() {
     hasShopify: status?.connections?.shopify || false,
     isProductCostSetup: status?.isProductCostSetup || false,
     isExtraCostSetup: status?.isExtraCostSetup || false,
+    isInitialSyncComplete: status?.isInitialSyncComplete || false,
+    pendingSyncPlatforms: status?.pendingSyncPlatforms || [],
+    analyticsTriggeredAt: status?.analyticsTriggeredAt,
+    lastSyncCheckAt: status?.lastSyncCheckAt,
+    syncCheckAttempts: status?.syncCheckAttempts ?? 0,
     hasMeta: status?.connections?.meta || false,
     shopifySyncStatus,
     isShopifySynced,

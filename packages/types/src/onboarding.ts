@@ -37,6 +37,28 @@ export type OnboardingStepNumber = typeof ONBOARDING_STEPS[keyof typeof ONBOARDI
 export type OnboardingStepKey = typeof ONBOARDING_STEP_KEYS[OnboardingStepNumber];
 export type OnboardingRoute = typeof ONBOARDING_ROUTES[OnboardingStepKey];
 
+export interface SyncStageStatus {
+  products?: string;
+  inventory?: string;
+  customers?: string;
+  orders?: string;
+}
+
+export interface PlatformSyncStatus {
+  status: string;
+  recordsProcessed?: number;
+  baselineRecords?: number;
+  ordersProcessed?: number;
+  ordersQueued?: number;
+  productsProcessed?: number;
+  customersProcessed?: number;
+  startedAt?: number;
+  completedAt?: number;
+  lastError?: string;
+  stageStatus?: SyncStageStatus;
+  syncedEntities?: string[];
+}
+
 export interface OnboardingStatus {
   completed: boolean;
   currentStep: OnboardingStepNumber;
@@ -46,7 +68,17 @@ export interface OnboardingStatus {
     meta: boolean;
   };
   hasShopifySubscription: boolean;
-  hasSetupInitialCosts: boolean;
+  isProductCostSetup: boolean;
+  isExtraCostSetup: boolean;
+  isInitialSyncComplete: boolean;
+  syncStatus?: {
+    shopify?: PlatformSyncStatus;
+    meta?: PlatformSyncStatus;
+  };
+  pendingSyncPlatforms?: string[];
+  analyticsTriggeredAt?: number;
+  lastSyncCheckAt?: number;
+  syncCheckAttempts?: number;
 }
 
 export interface OnboardingStepMeta {

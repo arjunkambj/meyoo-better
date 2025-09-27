@@ -2434,6 +2434,161 @@ export const storeOrdersInternal = internalMutation({
   },
 });
 
+type CustomerAddress = {
+  country?: string;
+  province?: string;
+  city?: string;
+  zip?: string;
+};
+
+type NormalizedCustomer = {
+  organizationId: Id<"organizations">;
+  storeId: Id<"shopifyStores">;
+  shopifyId: string;
+  email?: string;
+  phone?: string;
+  firstName?: string;
+  lastName?: string;
+  ordersCount: number;
+  totalSpent: number;
+  state?: string;
+  verifiedEmail?: boolean;
+  acceptsMarketing?: boolean;
+  acceptsMarketingUpdatedAt?: number;
+  taxExempt?: boolean;
+  defaultAddress?: CustomerAddress;
+  tags?: string[];
+  note?: string;
+  shopifyCreatedAt: number;
+  shopifyUpdatedAt: number;
+  syncedAt: number;
+};
+
+const normalizeCustomerAddress = (value: unknown): CustomerAddress | undefined => {
+  if (!value || typeof value !== "object") return undefined;
+
+  const maybeAddress = value as Record<string, unknown>;
+  const address: CustomerAddress = {
+    country: toOptionalString(maybeAddress.country),
+    province: toOptionalString(maybeAddress.province ?? maybeAddress.provinceCode),
+    city: toOptionalString(maybeAddress.city),
+    zip: toOptionalString(maybeAddress.zip ?? maybeAddress.zipCode),
+  };
+
+  return Object.values(address).some((part) => part !== undefined) ? address : undefined;
+};
+
+const normalizeCustomerPayload = (
+  raw: Record<string, unknown>,
+  organizationId: Id<"organizations">,
+  now: number,
+): NormalizedCustomer | null => {
+  const storeId = raw.storeId as Id<"shopifyStores"> | undefined;
+  const shopifyId = toOptionalString(raw.shopifyId ?? raw.id);
+
+  if (!storeId || !shopifyId) {
+    return null;
+  }
+
+  const ordersCount = Number.isFinite(raw.ordersCount)
+    ? Number(raw.ordersCount)
+    : 0;
+  const totalSpent = Number.isFinite(raw.totalSpent)
+    ? Number(raw.totalSpent)
+    : 0;
+
+  const tags = Array.isArray(raw.tags)
+    ? (raw.tags as unknown[])
+        .map((tag) => toOptionalString(tag))
+        .filter((tag): tag is string => Boolean(tag))
+        .sort()
+    : undefined;
+
+  return {
+    organizationId,
+    storeId,
+    shopifyId,
+    email: toOptionalString(raw.email),
+    phone: toOptionalString(raw.phone),
+    firstName: toOptionalString(raw.firstName),
+    lastName: toOptionalString(raw.lastName),
+    ordersCount,
+    totalSpent,
+    state: toOptionalString(raw.state),
+    verifiedEmail:
+      typeof raw.verifiedEmail === "boolean" ? raw.verifiedEmail : undefined,
+    acceptsMarketing:
+      typeof raw.acceptsMarketing === "boolean"
+        ? raw.acceptsMarketing
+        : undefined,
+    acceptsMarketingUpdatedAt:
+      typeof raw.acceptsMarketingUpdatedAt === "number"
+        ? raw.acceptsMarketingUpdatedAt
+        : undefined,
+    taxExempt:
+      typeof raw.taxExempt === "boolean" ? raw.taxExempt : undefined,
+    defaultAddress: normalizeCustomerAddress(raw.defaultAddress),
+    tags,
+    note: toOptionalString(raw.note),
+    shopifyCreatedAt: Number.isFinite(raw.shopifyCreatedAt)
+      ? Number(raw.shopifyCreatedAt)
+      : now,
+    shopifyUpdatedAt: Number.isFinite(raw.shopifyUpdatedAt)
+      ? Number(raw.shopifyUpdatedAt)
+      : now,
+    syncedAt: raw.syncedAt && Number.isFinite(raw.syncedAt)
+      ? Number(raw.syncedAt)
+      : now,
+  };
+};
+
+const addressesEqual = (
+  a: CustomerAddress | undefined,
+  b: CustomerAddress | undefined,
+) => {
+  if (!a && !b) return true;
+  if (!a || !b) return false;
+
+  return (
+    a.country === b.country &&
+    a.province === b.province &&
+    a.city === b.city &&
+    a.zip === b.zip
+  );
+};
+
+const arraysEqual = (a: string[] | undefined, b: string[] | undefined) => {
+  if (!a && !b) return true;
+  if (!a || !b) return false;
+  if (a.length !== b.length) return false;
+
+  return a.every((value, index) => value === b[index]);
+};
+
+const hasCustomerChanges = (
+  existing: Doc<"shopifyCustomers">,
+  next: NormalizedCustomer,
+) => {
+  return (
+    existing.email !== next.email ||
+    existing.phone !== next.phone ||
+    existing.firstName !== next.firstName ||
+    existing.lastName !== next.lastName ||
+    existing.ordersCount !== next.ordersCount ||
+    existing.totalSpent !== next.totalSpent ||
+    existing.state !== next.state ||
+    existing.verifiedEmail !== next.verifiedEmail ||
+    existing.acceptsMarketing !== next.acceptsMarketing ||
+    existing.acceptsMarketingUpdatedAt !== next.acceptsMarketingUpdatedAt ||
+    existing.taxExempt !== next.taxExempt ||
+    !addressesEqual(existing.defaultAddress, next.defaultAddress) ||
+    !arraysEqual(existing.tags, next.tags) ||
+    existing.note !== next.note ||
+    existing.shopifyCreatedAt !== next.shopifyCreatedAt ||
+    existing.shopifyUpdatedAt !== next.shopifyUpdatedAt
+  );
+};
+
 export const storeCustomersInternal = internalMutation({
   args: {
     organizationId: v.id("organizations"),
@@ -2445,42 +2600,79 @@ export const storeCustomersInternal = internalMutation({
       return null;
     }
 
-    // Bulk fetch existing customers
-    const customerShopifyIds = args.customers.map((c) => c.shopifyId || c.id);
-    const existingCustomers = new Map();
+    const organizationId = args.organizationId as Id<"organizations">;
+    const now = Date.now();
 
-    // Fetch all customers that might need updating
-    const customers = await ctx.db
-      .query("shopifyCustomers")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId as Id<"organizations">)
-      )
-      .collect();
+    const customersByStore = new Map<Id<"shopifyStores">, NormalizedCustomer[]>();
 
-    for (const customer of customers) {
-      if (customerShopifyIds.includes(customer.shopifyId)) {
-        existingCustomers.set(customer.shopifyId, customer);
-      }
-    }
+    for (const raw of args.customers) {
+      const normalized = normalizeCustomerPayload(raw, organizationId, now);
 
-    // Process customers in bulk
-    for (const customer of args.customers) {
-      const shopifyId = customer.shopifyId || customer.id;
-      const existing = existingCustomers.get(shopifyId);
-
-      if (existing) {
-        await ctx.db.patch(existing._id, {
-          ...customer,
-          syncedAt: Date.now(),
+      if (!normalized) {
+        logger.warn("Skipping Shopify customer without storeId or shopifyId", {
+          organizationId: String(organizationId),
+          raw,
         });
-      } else {
-        await ctx.db.insert("shopifyCustomers", customer);
+        continue;
+      }
+
+      const list = customersByStore.get(normalized.storeId) ?? [];
+      list.push(normalized);
+      customersByStore.set(normalized.storeId, list);
+    }
+
+    let inserted = 0;
+    let updated = 0;
+
+    for (const [storeId, customers] of customersByStore.entries()) {
+      const existingByShopifyId = new Map<string, Doc<"shopifyCustomers">>();
+
+      for (const batch of chunkArray(
+        customers.map((customer) => customer.shopifyId),
+        BULK_OPS.LOOKUP_SIZE,
+      )) {
+        const results = await Promise.all(
+          batch.map((shopifyId) =>
+            ctx.db
+              .query("shopifyCustomers")
+              .withIndex("by_shopify_id_store", (q) =>
+                q.eq("shopifyId", shopifyId).eq("storeId", storeId)
+              )
+              .first(),
+          ),
+        );
+
+        results.forEach((doc, index) => {
+          if (doc) {
+            existingByShopifyId.set(batch[index]!, doc);
+          }
+        });
+      }
+
+      for (const customer of customers) {
+        const existing = existingByShopifyId.get(customer.shopifyId);
+
+        if (existing) {
+          if (hasCustomerChanges(existing, customer)) {
+            await ctx.db.patch(existing._id, {
+              ...customer,
+              syncedAt: now,
+            });
+            updated += 1;
+          }
+        } else {
+          await ctx.db.insert("shopifyCustomers", customer);
+          inserted += 1;
+        }
       }
     }
 
-    logger.info(
-      `Processed ${args.customers.length} customers with bulk operations`
-    );
+    logger.info("Processed Shopify customers", {
+      organizationId: String(organizationId),
+      received: args.customers.length,
+      inserted,
+      updated,
+    });
 
     return null;
   },

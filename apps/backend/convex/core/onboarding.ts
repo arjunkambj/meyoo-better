@@ -1,8 +1,8 @@
 import { v } from "convex/values";
 import { internal, api } from "../_generated/api";
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
-import { mutation, query } from "../_generated/server";
+import { internalMutation, mutation, query } from "../_generated/server";
 import { createJob, PRIORITY } from "../engine/workpool";
 import { normalizeShopDomain } from "../utils/shop";
 import { getUserAndOrg, requireUserAndOrg } from "../utils/auth";
@@ -17,6 +17,116 @@ import { ONBOARDING_STEPS } from "@repo/types";
 const FIRECRAWL_SEED_URL = null;
 const IS_PRODUCTION_ENVIRONMENT = process.env.NODE_ENV === "production";
 const DEV_FIRECRAWL_TEST_URL = "https://shopcelestia.in/";
+
+type SyncSessionStatus = Doc<"syncSessions">["status"];
+
+const ACTIVE_SYNC_STATUSES = new Set<SyncSessionStatus>([
+  "pending",
+  "processing",
+  "syncing",
+]);
+
+const INITIAL_STATUS_SEARCH_ORDER: SyncSessionStatus[] = [
+  "pending",
+  "processing",
+  "syncing",
+  "failed",
+  "completed",
+];
+
+const isInitialSyncSession = (session: Doc<"syncSessions">): boolean =>
+  session.type === "initial" || session.metadata?.isInitialSync === true;
+
+const hasInitialSessionWithStatus = async (
+  ctx: MutationCtx,
+  organizationId: Id<"organizations">,
+  platform: "shopify" | "meta",
+  status: SyncSessionStatus,
+): Promise<boolean> => {
+  let cursor: string | undefined;
+
+  while (true) {
+    const page = await ctx.db
+      .query("syncSessions")
+      .withIndex("by_org_platform_and_status", (q) =>
+        q
+          .eq("organizationId", organizationId)
+          .eq("platform", platform)
+          .eq("status", status),
+      )
+      .order("desc")
+      .paginate({
+        cursor: cursor ?? null,
+        numItems: 100,
+      });
+
+    for (const session of page.page) {
+      if (isInitialSyncSession(session)) {
+        return true;
+      }
+    }
+
+    if (page.isDone) {
+      return false;
+    }
+
+    if (page.continueCursor === undefined) {
+      return false;
+    }
+
+    cursor = page.continueCursor;
+  }
+};
+
+const findInitialSyncStatusFlags = async (
+  ctx: MutationCtx,
+  organizationId: Id<"organizations">,
+  platform: "shopify" | "meta",
+): Promise<
+  | {
+      hasActive: boolean;
+      hasFailed: boolean;
+      hasCompleted: boolean;
+    }
+  | null
+> => {
+  let hasActive = false;
+  let hasFailed = false;
+  let hasCompleted = false;
+
+  for (const status of INITIAL_STATUS_SEARCH_ORDER) {
+    const matchesStatus = await hasInitialSessionWithStatus(
+      ctx,
+      organizationId,
+      platform,
+      status,
+    );
+
+    if (!matchesStatus) {
+      continue;
+    }
+
+    if (ACTIVE_SYNC_STATUSES.has(status)) {
+      hasActive = true;
+      break;
+    }
+
+    if (status === "failed") {
+      hasFailed = true;
+      continue;
+    }
+
+    if (status === "completed") {
+      hasCompleted = true;
+    }
+  }
+
+  if (!hasActive && !hasFailed && !hasCompleted) {
+    return null;
+  }
+
+  return { hasActive, hasFailed, hasCompleted };
+};
 
 // ============ QUERIES ============
 
@@ -38,11 +148,21 @@ export const getOnboardingStatus = query({
       hasShopifySubscription: v.boolean(),
       isProductCostSetup: v.boolean(),
       isExtraCostSetup: v.boolean(),
+      isInitialSyncComplete: v.boolean(),
+      pendingSyncPlatforms: v.optional(v.array(v.string())),
+      analyticsTriggeredAt: v.optional(v.number()),
+      lastSyncCheckAt: v.optional(v.number()),
+      syncCheckAttempts: v.optional(v.number()),
       syncStatus: v.object({
         shopify: v.optional(
           v.object({
             status: v.string(),
             recordsProcessed: v.optional(v.number()),
+            baselineRecords: v.optional(v.number()),
+            ordersProcessed: v.optional(v.number()),
+            ordersQueued: v.optional(v.number()),
+            productsProcessed: v.optional(v.number()),
+            customersProcessed: v.optional(v.number()),
             startedAt: v.optional(v.number()),
             completedAt: v.optional(v.number()),
             lastError: v.optional(v.string()),
@@ -119,6 +239,38 @@ export const getOnboardingStatus = query({
     const shopifySyncedEntities = Array.isArray(shopifyMetadata.syncedEntities)
       ? (shopifyMetadata.syncedEntities as string[])
       : undefined;
+    const shopifyBaselineRecords =
+      typeof shopifyMetadata.baselineRecords === "number"
+        ? (shopifyMetadata.baselineRecords as number)
+        : undefined;
+    const shopifyOrdersProcessed =
+      typeof shopifyMetadata.ordersProcessed === "number"
+        ? (shopifyMetadata.ordersProcessed as number)
+        : undefined;
+    const shopifyOrdersQueued =
+      typeof shopifyMetadata.ordersQueued === "number"
+        ? (shopifyMetadata.ordersQueued as number)
+        : undefined;
+    const shopifyProductsProcessed =
+      typeof shopifyMetadata.productsProcessed === "number"
+        ? (shopifyMetadata.productsProcessed as number)
+        : undefined;
+    const shopifyCustomersProcessed =
+      typeof shopifyMetadata.customersProcessed === "number"
+        ? (shopifyMetadata.customersProcessed as number)
+        : undefined;
+
+    const normalizedOrdersProcessed =
+      shopifyOrdersProcessed !== undefined
+        ? shopifyOrdersProcessed
+        : shopifyBaselineRecords !== undefined &&
+            typeof latestShopifySession?.recordsProcessed === "number"
+          ? Math.max(
+              0,
+              (latestShopifySession.recordsProcessed || 0) -
+                shopifyBaselineRecords,
+            )
+          : undefined;
 
     return {
       completed: onboarding.isCompleted || false,
@@ -128,11 +280,23 @@ export const getOnboardingStatus = query({
       hasShopifySubscription: onboarding.hasShopifySubscription || false,
       isProductCostSetup: onboarding.isProductCostSetup || false,
       isExtraCostSetup: onboarding.isExtraCostSetup || false,
+      isInitialSyncComplete: onboarding.isInitialSyncComplete || false,
+      pendingSyncPlatforms:
+        onboarding.onboardingData?.syncPendingPlatforms || undefined,
+      analyticsTriggeredAt:
+        onboarding.onboardingData?.analyticsTriggeredAt || undefined,
+      lastSyncCheckAt: onboarding.onboardingData?.lastSyncCheckAt || undefined,
+      syncCheckAttempts: onboarding.onboardingData?.syncCheckAttempts || undefined,
       syncStatus: {
         shopify: latestShopifySession
           ? {
               status: latestShopifySession.status,
               recordsProcessed: latestShopifySession.recordsProcessed,
+              baselineRecords: shopifyBaselineRecords,
+              ordersProcessed: normalizedOrdersProcessed,
+              ordersQueued: shopifyOrdersQueued,
+              productsProcessed: shopifyProductsProcessed,
+              customersProcessed: shopifyCustomersProcessed,
               startedAt: latestShopifySession.startedAt,
               completedAt: latestShopifySession.completedAt,
               lastError: latestShopifySession.error,
@@ -423,18 +587,6 @@ export const completeOnboarding = mutation({
       throw new Error("Failed to get onboarding record");
     }
 
-    await ctx.db.patch(onboarding._id, {
-      isCompleted: true,
-      onboardingStep: ONBOARDING_STEPS.COMPLETE,
-      updatedAt: Date.now(),
-    });
-
-    // Also update user's isOnboarded flag
-    await ctx.db.patch(user._id, {
-      isOnboarded: true,
-      updatedAt: Date.now(),
-    });
-
     // Get connected platforms for response (but don't trigger syncs)
     const platforms: string[] = [];
 
@@ -465,6 +617,7 @@ export const completeOnboarding = mutation({
     const completedSyncs = [];
     const pendingSyncs = [];
     const notStartedSyncs = [];
+    let analyticsTriggeredAt: number | undefined;
 
     for (const platform of platforms) {
       // Get the latest sync session for this platform using index ordering
@@ -578,11 +731,11 @@ export const completeOnboarding = mutation({
 
     // Trigger analytics if all syncs are complete
     if (allSyncsComplete && platforms.length > 0) {
-
       await createJob(ctx, "analytics:calculate", PRIORITY.HIGH, {
         organizationId: user.organizationId as Id<"organizations">,
         syncType: "initial",
       });
+      analyticsTriggeredAt = Date.now();
     }
 
     // production: avoid PII in logs
@@ -624,12 +777,244 @@ export const completeOnboarding = mutation({
       console.warn("[ONBOARDING] Failed to upsert sync profile", e);
     }
 
+    const now = Date.now();
+    const pendingPlatformsList = Array.from(
+      new Set([...pendingSyncs, ...notStartedSyncs]),
+    );
+
+    const onboardingData: Record<string, any> = {
+      ...onboarding.onboardingData,
+      syncCheckAttempts: 0,
+      lastSyncCheckAt: now,
+    };
+
+    if (pendingPlatformsList.length > 0) {
+      onboardingData.syncPendingPlatforms = pendingPlatformsList;
+    } else {
+      delete onboardingData.syncPendingPlatforms;
+    }
+
+    if (analyticsTriggeredAt) {
+      onboardingData.analyticsTriggeredAt =
+        onboarding.onboardingData?.analyticsTriggeredAt || analyticsTriggeredAt;
+    }
+
+    await ctx.db.patch(onboarding._id, {
+      isCompleted: true,
+      onboardingStep: ONBOARDING_STEPS.COMPLETE,
+      isInitialSyncComplete: allSyncsComplete,
+      onboardingData,
+      updatedAt: now,
+    });
+
+    await ctx.db.patch(user._id, {
+      isOnboarded: true,
+      updatedAt: now,
+    });
+
     return {
       success: true,
-      analyticsScheduled: allSyncsComplete || syncJobs.length > 0,
-      platformsSyncing: platforms,
+      analyticsScheduled: Boolean(analyticsTriggeredAt),
+      platformsSyncing: pendingPlatformsList,
       syncJobs: syncJobs.length > 0 ? syncJobs : undefined,
       syncErrors: syncErrors.length > 0 ? syncErrors : undefined,
+    };
+  },
+});
+
+export const monitorInitialSyncs = internalMutation({
+  args: {
+    limit: v.optional(v.number()),
+    organizationId: v.optional(v.id("organizations")),
+  },
+  returns: v.object({
+    checked: v.number(),
+    completed: v.number(),
+    analyticsTriggered: v.number(),
+    pending: v.number(),
+  }),
+  handler: async (ctx, args) => {
+    const limitArg = args.limit ?? 25;
+    const limit = Math.min(Math.max(limitArg, 1), 100);
+
+    const candidates = await (async () => {
+      if (args.organizationId) {
+        return await ctx.db
+          .query("onboarding")
+          .withIndex("by_organization", (q) =>
+            q.eq("organizationId", args.organizationId as Id<"organizations">),
+          )
+          .take(limit);
+      }
+
+      return await ctx.db
+        .query("onboarding")
+        .withIndex("by_completed", (q) => q.eq("isCompleted", true))
+        .take(limit * 2);
+    })();
+
+    let processed = 0;
+    let completedCount = 0;
+    let analyticsCount = 0;
+    let pendingCount = 0;
+
+    for (const onboarding of candidates) {
+      if (processed >= limit) break;
+      if (!onboarding.organizationId) continue;
+      if (onboarding.isInitialSyncComplete) continue;
+
+      processed += 1;
+
+      try {
+        const orgId = onboarding.organizationId as Id<"organizations">;
+        const platforms: ("shopify" | "meta")[] = [];
+
+        if (onboarding.hasShopifyConnection) {
+          platforms.push("shopify");
+        }
+
+        if (onboarding.hasMetaConnection) {
+          const metaSession = await ctx.db
+            .query("integrationSessions")
+            .withIndex("by_org_platform_and_status", (q) =>
+              q
+                .eq("organizationId", orgId)
+                .eq("platform", "meta")
+                .eq("isActive", true),
+            )
+            .first();
+
+          if (metaSession) {
+            platforms.push("meta");
+          }
+        }
+
+        const now = Date.now();
+        const attempts =
+          (onboarding.onboardingData?.syncCheckAttempts ?? 0) + 1;
+
+        const onboardingData: Record<string, any> = {
+          ...onboarding.onboardingData,
+          syncCheckAttempts: attempts,
+          lastSyncCheckAt: now,
+        };
+
+        if (platforms.length === 0) {
+          delete onboardingData.syncPendingPlatforms;
+
+          await ctx.db.patch(onboarding._id, {
+            isInitialSyncComplete: true,
+            onboardingData,
+            updatedAt: now,
+          });
+
+          completedCount += 1;
+          continue;
+        }
+
+        const completedPlatforms = new Set<string>();
+        const pendingPlatforms = new Set<string>();
+
+        for (const platform of platforms) {
+          const sessions = await ctx.db
+            .query("syncSessions")
+            .withIndex("by_org_platform_and_date", (q) =>
+              q.eq("organizationId", orgId).eq("platform", platform),
+            )
+            .order("desc")
+            .take(10);
+
+          const initialSessions = sessions.filter(isInitialSyncSession);
+
+          let hasActive = initialSessions.some((session) =>
+            ACTIVE_SYNC_STATUSES.has(session.status),
+          );
+          let hasFailed = initialSessions.some(
+            (session) => session.status === "failed",
+          );
+          let hasCompleted = initialSessions.some(
+            (session) => session.status === "completed",
+          );
+
+          if (!hasActive && !hasFailed && !hasCompleted) {
+            const fallbackFlags = await findInitialSyncStatusFlags(
+              ctx,
+              orgId,
+              platform,
+            );
+
+            if (!fallbackFlags) {
+              pendingPlatforms.add(platform);
+              continue;
+            }
+
+            ({ hasActive, hasFailed, hasCompleted } = fallbackFlags);
+          }
+
+          if (hasActive) {
+            pendingPlatforms.add(platform);
+            continue;
+          }
+
+          if (hasFailed) {
+            pendingPlatforms.add(platform);
+            continue;
+          }
+
+          if (hasCompleted) {
+            completedPlatforms.add(platform);
+            continue;
+          }
+
+          pendingPlatforms.add(platform);
+        }
+
+        const allCompleted =
+          completedPlatforms.size === platforms.length &&
+          pendingPlatforms.size === 0;
+
+        if (pendingPlatforms.size > 0) {
+          onboardingData.syncPendingPlatforms = Array.from(pendingPlatforms);
+        } else {
+          delete onboardingData.syncPendingPlatforms;
+        }
+
+        if (allCompleted) {
+          completedCount += 1;
+
+          if (!onboarding.onboardingData?.analyticsTriggeredAt) {
+            await createJob(ctx, "analytics:calculate", PRIORITY.HIGH, {
+              organizationId: orgId,
+              syncType: "initial",
+            });
+            onboardingData.analyticsTriggeredAt = now;
+            analyticsCount += 1;
+          }
+        } else {
+          pendingCount += 1;
+        }
+
+        await ctx.db.patch(onboarding._id, {
+          isInitialSyncComplete: allCompleted,
+          onboardingData,
+          updatedAt: now,
+        });
+      } catch (error) {
+        console.error(
+          "[ONBOARDING] monitorInitialSyncs failed",
+          {
+            onboardingId: onboarding._id,
+            error,
+          },
+        );
+      }
+    }
+
+    return {
+      checked: processed,
+      completed: completedCount,
+      analyticsTriggered: analyticsCount,
+      pending: pendingCount,
     };
   },
 });

@@ -538,5 +538,6 @@ export const shopifyAnalytics = defineTable({
   dataSource: v.optional(v.string()), // shopify_analytics, inferred_orders, etc.
   syncedAt: v.number(),
 })
+  .index("by_organization", ["organizationId"])
   .index("by_organization_date", ["organizationId", "date"])
   .index("by_store_date_source", ["storeId", "date", "trafficSource"]);

@@ -393,22 +393,16 @@ export const calculateCustomerMetrics = internalMutation({
 
     if (customers.length === 0) return;
 
-    // Get all orders for this organization
-    const allOrders = await ctx.db
-      .query("shopifyOrders")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId),
-      )
-      .collect();
-
-    // Process each customer
+    // Process each customer individually to avoid large read sets
     for (const customer of customers) {
       if (!customer) continue;
 
-      // Get all orders for this customer
-      const customerOrders = allOrders.filter(
-        (order) => order.customerId === customer._id,
-      );
+      const customerOrders = await ctx.db
+        .query("shopifyOrders")
+        .withIndex("by_customer", (q) =>
+          q.eq("customerId", customer._id as Id<"shopifyCustomers">),
+        )
+        .collect();
 
       if (customerOrders.length === 0) {
         // No orders for this customer yet

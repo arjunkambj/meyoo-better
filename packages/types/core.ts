@@ -44,6 +44,10 @@ export interface OnboardingData {
   referralSource?: string;
   setupDate?: string;
   completedSteps?: string[];
+  syncPendingPlatforms?: string[];
+  syncCheckAttempts?: number;
+  lastSyncCheckAt?: number;
+  analyticsTriggeredAt?: number;
 }
 
 // Dedicated onboarding record interface
@@ -65,6 +69,8 @@ export interface Onboarding {
 
   // Setup progress
   hasSetupInitialCosts?: boolean;
+  isProductCostSetup?: boolean;
+  isExtraCostSetup?: boolean;
 
   // Onboarding metadata
   onboardingData?: OnboardingData;

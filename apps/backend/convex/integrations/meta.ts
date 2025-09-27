@@ -564,6 +564,8 @@ async function storeAdAccounts(
           ? val
           : parseFloat(val) || 0;
 
+    const now = Date.now();
+
     const accountData = {
       accountName: account.name || "Unnamed Account",
       businessId: account.business_id || account.business?.id,
@@ -578,13 +580,16 @@ async function storeAdAccounts(
       amountSpent: toNumber(account.amount_spent ?? account.amountSpent),
       status: "active" as const,
       isActive: true,
-      syncedAt: Date.now(),
-      updatedAt: Date.now(),
+      updatedAt: now,
     };
 
     if (existing) {
       // Upsert: update the one matching document only
-      await ctx.db.patch(existing._id, accountData);
+      await ctx.db.patch(existing._id, {
+        ...accountData,
+        // Preserve the last successful sync timestamp so onboarding can trigger jobs when needed.
+        syncedAt: existing.syncedAt ?? 0,
+      });
     } else {
       // Find the first integration session to use as connectionId
       const session = await ctx.db
@@ -603,6 +608,8 @@ async function storeAdAccounts(
           connectionId: session._id,
           accountId: account.id,
           ...accountData,
+          // 0 represents "never synced"; initial sync will update this timestamp.
+          syncedAt: 0,
           isPrimary: false,
         });
       }

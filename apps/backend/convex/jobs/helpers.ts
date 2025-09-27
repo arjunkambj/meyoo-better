@@ -212,6 +212,14 @@ export const initializeSyncSessionBatches = internalMutation({
     sessionId: v.id("syncSessions"),
     totalBatches: v.number(),
     initialRecordsProcessed: v.number(),
+    metrics: v.optional(
+      v.object({
+        baselineRecords: v.optional(v.number()),
+        ordersQueued: v.optional(v.number()),
+        productsProcessed: v.optional(v.number()),
+        customersProcessed: v.optional(v.number()),
+      }),
+    ),
   },
   handler: async (ctx, args) => {
     const session = await ctx.db.get(args.sessionId);
@@ -221,6 +229,12 @@ export const initializeSyncSessionBatches = internalMutation({
       ...(session.metadata || {}),
       totalBatches: args.totalBatches,
       completedBatches: 0,
+      baselineRecords:
+        args.metrics?.baselineRecords ?? args.initialRecordsProcessed,
+      ordersQueued: args.metrics?.ordersQueued,
+      productsProcessed: args.metrics?.productsProcessed,
+      customersProcessed: args.metrics?.customersProcessed,
+      ordersProcessed: 0,
     } as Record<string, any>;
 
     await ctx.db.patch(args.sessionId, {
@@ -256,11 +270,21 @@ export const incrementSyncSessionProgress = internalMutation({
         ? (session.recordsProcessed || 0) + args.recordsProcessedDelta
         : session.recordsProcessed || 0;
 
+    const baselineRecords = metadata.baselineRecords ?? 0;
+    const previousOrdersProcessed = metadata.ordersProcessed ?? 0;
+    const ordersProcessedDelta = args.recordsProcessedDelta ?? 0;
+    const nextOrdersProcessed =
+      args.recordsProcessedDelta !== undefined
+        ? previousOrdersProcessed + ordersProcessedDelta
+        : previousOrdersProcessed;
+
     await ctx.db.patch(args.sessionId, {
       metadata: {
         ...metadata,
         totalBatches,
         completedBatches: nextCompleted,
+        baselineRecords,
+        ordersProcessed: nextOrdersProcessed,
       } as Record<string, any>,
       recordsProcessed: nextRecordsProcessed,
     });
@@ -271,6 +295,8 @@ export const incrementSyncSessionProgress = internalMutation({
       completedBatches: nextCompleted,
       recordsProcessed: nextRecordsProcessed,
       startedAt: session.startedAt,
+      ordersProcessed: nextOrdersProcessed,
+      baselineRecords,
     };
   },
 });

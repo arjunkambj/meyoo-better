@@ -33,6 +33,27 @@ export interface OnboardingData {
       hasShopifySubscription?: boolean;
       isProductCostSetup?: boolean;
       isExtraCostSetup?: boolean;
+      isInitialSyncComplete?: boolean;
+      syncStatus?: {
+        shopify?: {
+          status: string;
+          recordsProcessed?: number;
+          startedAt?: number;
+          completedAt?: number;
+          lastError?: string;
+        };
+        meta?: {
+          status: string;
+          recordsProcessed?: number;
+          startedAt?: number;
+          completedAt?: number;
+          lastError?: string;
+        };
+      };
+      pendingSyncPlatforms?: string[];
+      analyticsTriggeredAt?: number;
+      lastSyncCheckAt?: number;
+      syncCheckAttempts?: number;
     } | null;
   connections: Array<{
     platform: string;

@@ -46,6 +46,16 @@ crons.interval(
 
 export default crons;
 
+// Monitor onboarding sync completion and trigger analytics once data lands
+crons.interval(
+  "monitor onboarding sync completion",
+  { minutes: 2 },
+  internal.core.onboarding.monitorInitialSyncs,
+  {
+    limit: 25,
+  },
+);
+
 // ===== Meta Batch Ticking =====
 // Fixed-interval Meta tick (default 6 minutes) with batch size controlled in handler
 crons.interval(

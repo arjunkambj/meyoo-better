@@ -36,6 +36,9 @@ export const handleInitialSync = internalAction({
     organizationId: v.id("organizations"),
     platform: v.union(v.literal("shopify"), v.literal("meta")),
     accountId: v.optional(v.string()),
+    syncType: v.optional(
+      v.union(v.literal("initial"), v.literal("incremental")),
+    ),
     dateRange: v.optional(
       v.object({
         daysBack: v.number(),
@@ -65,9 +68,10 @@ export const handleInitialSync = internalAction({
   }),
   handler: async (ctx, args): Promise<SyncResult> => {
     const startTime = Date.now();
+    const syncType = (args.syncType ?? "initial") as "initial" | "incremental";
 
     console.log(
-      `[INITIAL_SYNC] Starting ${args.platform} sync for organization ${args.organizationId} - Fetching ${args.dateRange?.daysBack || 60} days of data`,
+      `[INITIAL_SYNC] Starting ${args.platform} (${syncType}) sync for organization ${args.organizationId} - Fetching ${args.dateRange?.daysBack || 60} days of data`,
     );
 
     let sessionId: Id<"syncSessions"> | null = null;
@@ -79,7 +83,7 @@ export const handleInitialSync = internalAction({
         {
           organizationId: args.organizationId,
           platform: args.platform,
-          type: "initial",
+          type: syncType,
           sessionId: args.syncSessionId,
         },
       );
@@ -138,6 +142,12 @@ export const handleInitialSync = internalAction({
                   sessionId,
                   totalBatches: batchesScheduled,
                   initialRecordsProcessed: baseProcessed,
+                  metrics: {
+                    baselineRecords: baseProcessed,
+                    ordersQueued: result.batchStats?.ordersQueued || 0,
+                    productsProcessed: result.productsProcessed || 0,
+                    customersProcessed: result.customersProcessed || 0,
+                  },
                 },
               );
             }
@@ -203,10 +213,11 @@ export const handleInitialSync = internalAction({
       if (args.platform !== "shopify") {
         await ctx.runMutation(internal.jobs.helpers.updateSyncSession, {
           sessionId: (sessionId ?? undefined) as Id<"syncSessions"> | undefined,
-          status: "completed",
+          status: result.success ? "completed" : "failed",
           recordsProcessed: result.recordsProcessed || 0,
           completedAt: Date.now(),
           duration: Date.now() - startTime,
+          error: result.success ? undefined : result.error || result.errors?.[0],
         });
       }
 
@@ -221,6 +232,18 @@ export const handleInitialSync = internalAction({
       console.log(
         `[INITIAL_SYNC] ✅ ${completionLabel} ${args.platform} sync for organization ${args.organizationId} - Processed ${result.recordsProcessed || 0} records in ${Math.round((Date.now() - startTime) / 1000)}s`,
       );
+
+      try {
+        await ctx.runMutation(internal.core.onboarding.monitorInitialSyncs, {
+          organizationId: args.organizationId,
+          limit: 1,
+        });
+      } catch (monitorError) {
+        console.warn(
+          `[INITIAL_SYNC] monitorInitialSyncs failed for ${args.platform} ${args.organizationId}`,
+          monitorError,
+        );
+      }
 
       return result;
     } catch (error) {
@@ -237,6 +260,18 @@ export const handleInitialSync = internalAction({
         completedAt: Date.now(),
         duration: Date.now() - startTime,
       });
+
+      try {
+        await ctx.runMutation(internal.core.onboarding.monitorInitialSyncs, {
+          organizationId: args.organizationId,
+          limit: 1,
+        });
+      } catch (monitorError) {
+        console.warn(
+          `[INITIAL_SYNC] monitorInitialSyncs failed after error for ${args.platform} ${args.organizationId}`,
+          monitorError,
+        );
+      }
 
       throw error;
     }
@@ -352,6 +387,14 @@ export const handleShopifyOrdersBatch = internalAction({
               recordsProcessed: progress.recordsProcessed,
             },
           });
+
+          await ctx.runMutation(
+            internal.core.onboarding.monitorInitialSyncs,
+            {
+              organizationId: args.organizationId,
+              limit: 1,
+            },
+          );
         }
       }
 

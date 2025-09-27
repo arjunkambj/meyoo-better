@@ -1,6 +1,139 @@
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 
+type MembershipRole = Doc<"memberships">["role"];
+type MembershipSeatType = Doc<"memberships">["seatType"];
+
+type EnsureMembershipOptions = {
+  seatType?: MembershipSeatType;
+  hasAiAddOn?: boolean;
+  assignedAt?: number;
+  assignedBy?: Id<"users">;
+};
+
+function resolveMembershipRole(
+  role: Doc<"users">["role"] | null | undefined,
+): MembershipRole {
+  return role === "StoreOwner" ? "StoreOwner" : "StoreTeam";
+}
+
+async function ensureActiveMembership(
+  ctx: MutationCtx,
+  organizationId: Id<"organizations">,
+  userId: Id<"users">,
+  role: MembershipRole,
+  options: EnsureMembershipOptions = {},
+) {
+  const now = Date.now();
+  const existing = await ctx.db
+    .query("memberships")
+    .withIndex("by_org_user", (q) =>
+      q.eq("organizationId", organizationId).eq("userId", userId),
+    )
+    .first();
+
+  const seatType: MembershipSeatType = existing?.seatType
+    ?? options.seatType
+    ?? "free";
+  const hasAiAddOn = existing?.hasAiAddOn ?? options.hasAiAddOn ?? false;
+  const assignedAt = existing?.assignedAt ?? options.assignedAt ?? now;
+  const assignedBy = existing?.assignedBy ?? options.assignedBy ?? userId;
+
+  if (existing) {
+    await ctx.db.patch(existing._id, {
+      role,
+      status: "active",
+      seatType,
+      hasAiAddOn,
+      assignedAt,
+      assignedBy,
+      updatedAt: now,
+    });
+    return;
+  }
+
+  await ctx.db.insert("memberships", {
+    organizationId,
+    userId,
+    role,
+    status: "active",
+    seatType,
+    hasAiAddOn,
+    assignedAt,
+    assignedBy,
+    createdAt: now,
+    updatedAt: now,
+  });
+}
+
+async function transferMembership(
+  ctx: MutationCtx,
+  organizationId: Id<"organizations">,
+  fromUserId: Id<"users">,
+  toUserId: Id<"users">,
+  roleFallback: MembershipRole,
+) {
+  const [source, target] = await Promise.all([
+    ctx.db
+      .query("memberships")
+      .withIndex("by_org_user", (q) =>
+        q.eq("organizationId", organizationId).eq("userId", fromUserId),
+      )
+      .first(),
+    ctx.db
+      .query("memberships")
+      .withIndex("by_org_user", (q) =>
+        q.eq("organizationId", organizationId).eq("userId", toUserId),
+      )
+      .first(),
+  ]);
+
+  const now = Date.now();
+
+  if (source && target && source._id !== target._id) {
+    await ctx.db.patch(target._id, {
+      role: target.role ?? source.role ?? roleFallback,
+      status: "active",
+      seatType: target.seatType ?? source.seatType ?? "free",
+      hasAiAddOn: target.hasAiAddOn ?? source.hasAiAddOn ?? false,
+      assignedAt: target.assignedAt ?? source.assignedAt ?? now,
+      assignedBy: target.assignedBy ?? source.assignedBy ?? toUserId,
+      updatedAt: now,
+    });
+    await ctx.db.delete(source._id);
+    return target;
+  }
+
+  if (source) {
+    await ctx.db.patch(source._id, {
+      userId: toUserId,
+      role: source.role ?? roleFallback,
+      status: "active",
+      seatType: source.seatType ?? "free",
+      hasAiAddOn: source.hasAiAddOn ?? false,
+      assignedAt: source.assignedAt ?? now,
+      assignedBy: source.assignedBy ?? toUserId,
+      updatedAt: now,
+    });
+    return source;
+  }
+
+  if (target) {
+    await ctx.db.patch(target._id, {
+      role: target.role ?? roleFallback,
+      status: "active",
+      seatType: target.seatType ?? "free",
+      hasAiAddOn: target.hasAiAddOn ?? false,
+      assignedAt: target.assignedAt ?? now,
+      assignedBy: target.assignedBy ?? toUserId,
+      updatedAt: now,
+    });
+    return target;
+  }
+
+  return null;
+}
+
 export async function findExistingUser(
   ctx: MutationCtx,
   email: string | null | undefined,
@@ -92,6 +225,23 @@ export async function handleInvitedUser(
         updatedAt: Date.now(),
       });
     }
+
+    const orgId = invitedUser.organizationId as Id<"organizations">;
+    const membershipRole = resolveMembershipRole(invitedUser.role);
+    const transferred = await transferMembership(
+      ctx,
+      orgId,
+      invitedUser._id,
+      authUserId,
+      membershipRole,
+    );
+
+    await ensureActiveMembership(ctx, orgId, authUserId, membershipRole, {
+      seatType: transferred?.seatType,
+      hasAiAddOn: transferred?.hasAiAddOn,
+      assignedAt: transferred?.assignedAt,
+      assignedBy: transferred?.assignedBy,
+    });
   }
 
   // If we created a new auth user to replace a placeholder, delete the placeholder.
@@ -170,7 +320,24 @@ export async function handleExistingUser(
 
   // Update organization owner
   if (organizationId) {
-    const org = await ctx.db.get(organizationId);
+    const orgId = organizationId as Id<"organizations">;
+    const membershipRole = resolveMembershipRole(existingUser.role);
+    const transferred = await transferMembership(
+      ctx,
+      orgId,
+      existingUser._id,
+      authUserId,
+      membershipRole,
+    );
+
+    await ensureActiveMembership(ctx, orgId, authUserId, membershipRole, {
+      seatType: transferred?.seatType,
+      hasAiAddOn: transferred?.hasAiAddOn,
+      assignedAt: transferred?.assignedAt,
+      assignedBy: transferred?.assignedBy,
+    });
+
+    const org = await ctx.db.get(orgId);
 
     if (org) {
       await ctx.db.patch(org._id, {
@@ -223,6 +390,11 @@ export async function createNewUserData(
     createdAt: now,
     updatedAt: now,
     primaryCurrency: "USD",
+  });
+
+  await ensureActiveMembership(ctx, orgId, userId, "StoreOwner", {
+    assignedAt: now,
+    assignedBy: userId,
   });
 
   // Create onboarding record

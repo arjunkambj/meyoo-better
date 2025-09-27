@@ -1,6 +1,6 @@
 "use client";
 
-import { Spacer } from "@heroui/react";
+import { Card, CardBody, Spacer, Spinner } from "@heroui/react";
 import { useQuery } from "convex-helpers/react/cache/hooks";
 import { useAtomValue } from "jotai";
 import { usePathname } from "next/navigation";
@@ -128,6 +128,65 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
       change: computePercentChange(currentRoas, previousRoas),
     };
   }, [channelRevenue, overviewMetrics]);
+
+  const onboardingStatus = useQuery(api.core.onboarding.getOnboardingStatus);
+  const syncBannerVisible =
+    onboardingStatus !== undefined &&
+    onboardingStatus !== null &&
+    !onboardingStatus.isInitialSyncComplete;
+
+  const syncStatusSummaries = useMemo(() => {
+    if (!syncBannerVisible) return [] as string[];
+
+    const summaries: string[] = [];
+    const pendingPlatforms = onboardingStatus?.pendingSyncPlatforms ?? [];
+    const includePlatform = (platform: "shopify" | "meta") =>
+      pendingPlatforms.length === 0 || pendingPlatforms.includes(platform);
+
+    if (includePlatform("shopify")) {
+      const shopify = onboardingStatus?.syncStatus?.shopify;
+
+      if (shopify) {
+        const normalizedStatus = shopify.status
+          ? shopify.status.replace(/_/g, " ")
+          : "in progress";
+        const processed = (() => {
+          if (typeof shopify.ordersProcessed === "number") {
+            const queued =
+              typeof shopify.ordersQueued === "number" &&
+              shopify.ordersQueued > 0
+                ? ` of ${shopify.ordersQueued}`
+                : "";
+            return ` • Orders processed: ${shopify.ordersProcessed}${queued}`;
+          }
+
+          if (shopify.recordsProcessed) {
+            return ` • Records processed: ${shopify.recordsProcessed}`;
+          }
+
+          return "";
+        })();
+        summaries.push(`Shopify: ${normalizedStatus}${processed}`);
+      } else {
+        summaries.push("Shopify: pending");
+      }
+    }
+
+    if (includePlatform("meta")) {
+      const meta = onboardingStatus?.syncStatus?.meta;
+
+      if (meta) {
+        const normalizedStatus = meta.status
+          ? meta.status.replace(/_/g, " ")
+          : "in progress";
+        summaries.push(`Meta: ${normalizedStatus}`);
+      } else if (pendingPlatforms.includes("meta")) {
+        summaries.push("Meta: pending");
+      }
+    }
+
+    return summaries;
+  }, [onboardingStatus, syncBannerVisible]);
 
   // Combine all metrics data
   const allMetricsData = useMemo(() => {
@@ -303,6 +362,33 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
         onCustomize={() => setIsCustomizing(true)}
         exportData={prepareExportData}
       />
+
+      {syncBannerVisible && (
+        <Card className="border-warning bg-warning-50/40">
+          <CardBody className="flex flex-col gap-3 text-default-700">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex-none text-warning-500">
+                <Spinner size="sm" color="warning" />
+              </div>
+              <div className="space-y-1">
+                <p className="font-medium text-warning-600">
+                  We’re still syncing your data
+                </p>
+                <p className="text-sm leading-relaxed">
+                  Dashboards will update automatically once the initial imports finish. Feel free to keep exploring in the meantime.
+                </p>
+                {syncStatusSummaries.length > 0 && (
+                  <div className="flex flex-col gap-1 text-xs uppercase tracking-wide text-warning-500">
+                    {syncStatusSummaries.map((summary) => (
+                      <span key={summary}>{summary}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </CardBody>
+        </Card>
+      )}
 
       {/* Sync Status removed: syncs run automatically; manual disabled */}
 

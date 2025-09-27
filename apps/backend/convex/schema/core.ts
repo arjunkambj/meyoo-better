@@ -335,6 +335,11 @@ export const syncSessions = defineTable({
       ),
       totalBatches: v.optional(v.number()),
       completedBatches: v.optional(v.number()),
+      baselineRecords: v.optional(v.number()),
+      ordersProcessed: v.optional(v.number()),
+      ordersQueued: v.optional(v.number()),
+      productsProcessed: v.optional(v.number()),
+      customersProcessed: v.optional(v.number()),
       stageStatus: v.optional(
         v.object({
           products: v.optional(syncStageState),
@@ -398,6 +403,10 @@ export const onboarding = defineTable({
           startedAt: v.number(),
         }),
       ),
+      syncPendingPlatforms: v.optional(v.array(v.string())),
+      syncCheckAttempts: v.optional(v.number()),
+      lastSyncCheckAt: v.optional(v.number()),
+      analyticsTriggeredAt: v.optional(v.number()),
     }),
   ),
 

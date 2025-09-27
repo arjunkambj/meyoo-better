@@ -121,7 +121,7 @@ export function useIntegrationStatus() {
   return {
     hasShopify: onboarding?.connections?.shopify || false,
     hasMeta: onboarding?.connections?.meta || false,
-    isInitialSyncComplete: false, // This will be moved to sync status check
+    isInitialSyncComplete: onboarding?.isInitialSyncComplete || false,
     hasAnyIntegration: !!(
       onboarding?.connections?.shopify ||
       onboarding?.connections?.meta

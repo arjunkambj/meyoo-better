@@ -424,11 +424,15 @@ export const getPlatformMetrics = query({
       shopifyAbandonedCarts: v.number(),
       shopifyCheckoutRate: v.number(),
 
+      // Visitors
+      uniqueVisitors: v.number(),
+
       // Meta metrics
       metaSessions: v.number(),
       metaConversion: v.number(),
       metaImpressions: v.number(),
       metaCTR: v.number(),
+      metaCPM: v.number(),
       metaReach: v.number(),
       metaFrequency: v.number(),
       metaUniqueClicks: v.number(),
@@ -445,11 +449,10 @@ export const getPlatformMetrics = query({
       metaVideo3SecViews: v.number(),
       metaCostPerThruPlay: v.number(),
 
-      // Google metrics
-      googleSessions: v.number(),
-      googleConversion: v.number(),
-      googleClicks: v.number(),
-      googleCTR: v.number(),
+      // Blended metrics (computed from available channels; fallback to Meta-only)
+      blendedCPM: v.number(),
+      blendedCPC: v.number(),
+      blendedCTR: v.number(),
     }),
   ),
   handler: async (ctx, args) => {
@@ -485,10 +488,12 @@ export const getPlatformMetrics = query({
         shopifyConversionRate: 0,
         shopifyAbandonedCarts: 0,
         shopifyCheckoutRate: 0,
-        metaSessions: 0,
-        metaConversion: 0,
+      metaSessions: 0,
+      uniqueVisitors: 0,
+      metaConversion: 0,
         metaImpressions: 0,
         metaCTR: 0,
+        metaCPM: 0,
         metaReach: 0,
         metaFrequency: 0,
         metaUniqueClicks: 0,
@@ -504,10 +509,9 @@ export const getPlatformMetrics = query({
       metaVideoViews: 0,
       metaVideo3SecViews: 0,
       metaCostPerThruPlay: 0,
-      googleSessions: 0,
-        googleConversion: 0,
-        googleClicks: 0,
-        googleCTR: 0,
+      blendedCPM: 0,
+      blendedCPC: 0,
+      blendedCTR: 0,
       };
     }
 
@@ -642,6 +646,18 @@ export const getPlatformMetrics = query({
     }).length;
 
     // Calculate rates and percentages
+    const metaCPM =
+      metaAggregated.impressions > 0
+        ? metaAggregated.spend / metaAggregated.impressions * 1000
+        : 0;
+
+    // Blended metrics (approximate using Meta until Google data available)
+    const blendedCPM = metaCPM;
+    const totalClicks = aggregated.metaClicks || 0;
+    const blendedCPC = totalClicks > 0 ? (metaAggregated.spend) / totalClicks : 0;
+    const totalImpressions = aggregated.metaImpressions || 0;
+    const blendedCTR = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : (aggregated.metaCTR || 0);
+
     return {
       // Shopify metrics
       shopifySessions: aggregated.shopifySessions,
@@ -657,6 +673,12 @@ export const getPlatformMetrics = query({
             100
           : 0,
 
+      // Visitors
+      uniqueVisitors: filteredData.reduce(
+        (sum, d) => sum + (d.uniqueVisitors || d.shopifyVisitors || 0),
+        0,
+      ),
+
       // Meta metrics
       metaSessions: aggregated.metaClicks, // Using clicks as proxy for sessions
       metaConversion:
@@ -669,11 +691,12 @@ export const getPlatformMetrics = query({
         (aggregated.metaImpressions > 0
           ? (aggregated.metaClicks / aggregated.metaImpressions) * 100
           : 0),
+      metaCPM: metaCPM,
       metaReach: Math.round(metaAggregated.reach || 0),
       metaFrequency:
         metaAggregated.freqContrib.reach > 0
           ? metaAggregated.freqContrib.impressions /
-            metaAggregated.freqContrib.reach
+          metaAggregated.freqContrib.reach
           : 0,
       metaUniqueClicks: Math.round(metaAggregated.uniqueClicks || 0),
       metaCPC:
@@ -698,17 +721,10 @@ export const getPlatformMetrics = query({
           ? metaAggregated.spend / metaAggregated.videoThruPlay
           : 0,
 
-      // Google metrics
-      googleSessions: aggregated.googleClicks, // Using clicks as proxy for sessions
-      googleConversion:
-        aggregated.googleClicks > 0
-          ? (aggregated.googleConversions / aggregated.googleClicks) * 100
-          : 0,
-      googleClicks: aggregated.googleClicks,
-      googleCTR:
-        aggregated.googleImpressions > 0
-          ? (aggregated.googleClicks / aggregated.googleImpressions) * 100
-          : 0,
+      // Blended (approx)
+      blendedCPM,
+      blendedCPC,
+      blendedCTR,
     };
   },
 });

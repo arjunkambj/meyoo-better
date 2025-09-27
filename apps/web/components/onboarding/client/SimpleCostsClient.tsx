@@ -219,9 +219,15 @@ export default function SimpleCostsClient() {
                 </p>
                 <p className="text-xs uppercase tracking-wide text-warning-500">
                   Products: {productStageLabel} • Inventory: {inventoryStageLabel} • Orders stage: {ordersStageLabel}
-                  {shopifySyncProgress.recordsProcessed
-                    ? ` • Orders processed: ${shopifySyncProgress.recordsProcessed}`
-                    : ""}
+                  {typeof shopifySyncProgress.ordersProcessed === 'number' ?
+                    (() => {
+                      const seen = shopifySyncProgress.totalOrdersSeen as number | null;
+                      const queued = shopifySyncProgress.ordersQueued as number | null;
+                      const denom = typeof seen === 'number' ? seen : (queued && queued > 0 ? queued : undefined);
+                      const suffix = denom !== undefined ? ` of ${denom}` : '';
+                      return ` • Orders processed: ${shopifySyncProgress.ordersProcessed}${suffix}`;
+                    })()
+                    : (shopifySyncProgress.recordsProcessed ? ` • Records processed: ${shopifySyncProgress.recordsProcessed}` : '')}
                 </p>
               </div>
             </div>

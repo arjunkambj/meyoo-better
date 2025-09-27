@@ -47,6 +47,7 @@ import {
   syncProfiles,
   platformRateLimits,
   schedulerState,
+  integrationStatus,
 } from "./schema/sync";
 // Sync orchestration tables trimmed for now
 // Tickets trimmed for now
@@ -72,6 +73,7 @@ export default defineSchema({
   syncProfiles,
   platformRateLimits,
   schedulerState,
+  integrationStatus,
 
   // Analytics tables
   metricsDaily,

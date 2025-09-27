@@ -157,10 +157,19 @@ export const getOnboardingStatus = query({
         shopify: v.optional(
           v.object({
             status: v.string(),
+            overallState: v.optional(
+              v.union(
+                v.literal("unsynced"),
+                v.literal("syncing"),
+                v.literal("complete"),
+                v.literal("failed"),
+              ),
+            ),
             recordsProcessed: v.optional(v.number()),
             baselineRecords: v.optional(v.number()),
             ordersProcessed: v.optional(v.number()),
             ordersQueued: v.optional(v.number()),
+            totalOrdersSeen: v.optional(v.number()),
             productsProcessed: v.optional(v.number()),
             customersProcessed: v.optional(v.number()),
             startedAt: v.optional(v.number()),
@@ -180,6 +189,14 @@ export const getOnboardingStatus = query({
         meta: v.optional(
           v.object({
             status: v.string(),
+            overallState: v.optional(
+              v.union(
+                v.literal("unsynced"),
+                v.literal("syncing"),
+                v.literal("complete"),
+                v.literal("failed"),
+              ),
+            ),
             recordsProcessed: v.optional(v.number()),
             startedAt: v.optional(v.number()),
             completedAt: v.optional(v.number()),
@@ -209,7 +226,8 @@ export const getOnboardingStatus = query({
       meta: onboarding.hasMetaConnection || false,
     };
 
-    const latestShopifySession = await ctx.db
+    // Prefer the most recent initial sync session for progress display
+    const recentShopifySessions = await ctx.db
       .query("syncSessions")
       .withIndex("by_org_platform_and_date", (q) =>
         q
@@ -217,9 +235,13 @@ export const getOnboardingStatus = query({
           .eq("platform", "shopify"),
       )
       .order("desc")
-      .first();
+      .take(20);
+    const latestShopifyInitial = recentShopifySessions.find((s) =>
+      isInitialSyncSession(s as any),
+    );
+    const latestShopifySession = latestShopifyInitial || recentShopifySessions[0];
 
-    const latestMetaSession = await ctx.db
+    const recentMetaSessions = await ctx.db
       .query("syncSessions")
       .withIndex("by_org_platform_and_date", (q) =>
         q
@@ -227,7 +249,81 @@ export const getOnboardingStatus = query({
           .eq("platform", "meta"),
       )
       .order("desc")
-      .first();
+      .take(20);
+    const latestMetaInitial = recentMetaSessions.find((s) =>
+      isInitialSyncSession(s as any),
+    );
+    const latestMetaSession = latestMetaInitial || recentMetaSessions[0];
+
+    // Compute overallState for each platform with initial sync awareness
+    const computeOverall = async (
+      platform: "shopify" | "meta",
+    ): Promise<"unsynced" | "syncing" | "complete" | "failed"> => {
+      // Check completed initial
+      const completed = await ctx.db
+        .query("syncSessions")
+        .withIndex("by_org_platform_and_status", (q) =>
+          q
+            .eq("organizationId", orgId)
+            .eq("platform", platform)
+            .eq("status", "completed"),
+        )
+        .take(10);
+      if (completed.find((s) => s.type === "initial" || (s.metadata as any)?.isInitialSync === true)) {
+        return "complete";
+      }
+      // Check active initial
+      const actives = await ctx.db
+        .query("syncSessions")
+        .withIndex("by_org_platform_and_status", (q) =>
+          q
+            .eq("organizationId", orgId)
+            .eq("platform", platform)
+            .eq("status", "pending"),
+        )
+        .take(10);
+      const syncing = actives.find((s) => s.type === "initial")
+        ? true
+        : (await ctx.db
+            .query("syncSessions")
+            .withIndex("by_org_platform_and_status", (q) =>
+              q
+                .eq("organizationId", orgId)
+                .eq("platform", platform)
+                .eq("status", "processing"),
+            )
+            .take(10)).find((s) => s.type === "initial")
+          ? true
+          : (await ctx.db
+              .query("syncSessions")
+              .withIndex("by_org_platform_and_status", (q) =>
+                q
+                  .eq("organizationId", orgId)
+                  .eq("platform", platform)
+                  .eq("status", "syncing"),
+              )
+              .take(10)).find((s) => s.type === "initial")
+            ? true
+            : false;
+      if (syncing) return "syncing";
+      // Check failed initial
+      const failed = await ctx.db
+        .query("syncSessions")
+        .withIndex("by_org_platform_and_status", (q) =>
+          q
+            .eq("organizationId", orgId)
+            .eq("platform", platform)
+            .eq("status", "failed"),
+        )
+        .take(10);
+      if (failed.find((s) => s.type === "initial")) {
+        return "failed";
+      }
+      return "unsynced";
+    };
+
+    let shopifyOverall = await computeOverall("shopify");
+    const metaOverall = await computeOverall("meta");
 
     const shopifyMetadata = (latestShopifySession?.metadata || {}) as Record<
       string,
@@ -258,6 +354,10 @@ export const getOnboardingStatus = query({
     const shopifyCustomersProcessed =
       typeof shopifyMetadata.customersProcessed === "number"
         ? (shopifyMetadata.customersProcessed as number)
+        : undefined;
+    const shopifyTotalOrdersSeen =
+      typeof shopifyMetadata.totalOrdersSeen === "number"
+        ? (shopifyMetadata.totalOrdersSeen as number)
         : undefined;
 
     const normalizedOrdersProcessed =
@@ -291,10 +391,31 @@ export const getOnboardingStatus = query({
         shopify: latestShopifySession
           ? {
               status: latestShopifySession.status,
+              overallState: (() => {
+                // Heuristic: if orders stage is complete or processed >= queued, treat as complete
+                const stagesComplete = Boolean(
+                  shopifyStageStatus &&
+                    shopifyStageStatus.orders === "completed" &&
+                    shopifyStageStatus.products === "completed" &&
+                    shopifyStageStatus.inventory === "completed" &&
+                    shopifyStageStatus.customers === "completed",
+                );
+                const countsComplete = Boolean(
+                  typeof shopifyOrdersQueued === "number" &&
+                    typeof normalizedOrdersProcessed === "number" &&
+                    shopifyOrdersQueued >= 0 &&
+                    normalizedOrdersProcessed >= shopifyOrdersQueued,
+                );
+                if (stagesComplete || countsComplete) {
+                  shopifyOverall = "complete";
+                }
+                return shopifyOverall;
+              })(),
               recordsProcessed: latestShopifySession.recordsProcessed,
               baselineRecords: shopifyBaselineRecords,
               ordersProcessed: normalizedOrdersProcessed,
               ordersQueued: shopifyOrdersQueued,
+              totalOrdersSeen: shopifyTotalOrdersSeen,
               productsProcessed: shopifyProductsProcessed,
               customersProcessed: shopifyCustomersProcessed,
               startedAt: latestShopifySession.startedAt,
@@ -314,6 +435,7 @@ export const getOnboardingStatus = query({
         meta: latestMetaSession
           ? {
               status: latestMetaSession.status,
+              overallState: metaOverall,
               recordsProcessed: latestMetaSession.recordsProcessed,
               startedAt: latestMetaSession.startedAt,
               completedAt: latestMetaSession.completedAt,
@@ -1082,6 +1204,12 @@ export const monitorInitialSyncs = internalMutation({
             ({ hasActive, hasFailed, hasCompleted } = fallbackFlags);
           }
 
+          // Precedence: completed > active > failed
+          if (hasCompleted) {
+            completedPlatforms.add(platform);
+            continue;
+          }
+
           if (hasActive) {
             pendingPlatforms.add(platform);
             continue;
@@ -1089,11 +1217,6 @@ export const monitorInitialSyncs = internalMutation({
 
           if (hasFailed) {
             pendingPlatforms.add(platform);
-            continue;
-          }
-
-          if (hasCompleted) {
-            completedPlatforms.add(platform);
             continue;
           }
 

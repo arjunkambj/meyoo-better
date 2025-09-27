@@ -37,9 +37,12 @@ export function usePlatformMetrics(dateRange: DateRange) {
       shopifyAbandonedCarts: 0,
       shopifyCheckoutRate: 0,
       metaSessions: 0,
+      metaClicks: 0,
       metaConversion: 0,
+      metaConversionRate: 0,
       metaImpressions: 0,
       metaCTR: 0,
+      metaCPM: 0,
       metaReach: 0,
       metaFrequency: 0,
       metaUniqueClicks: 0,
@@ -55,10 +58,9 @@ export function usePlatformMetrics(dateRange: DateRange) {
       metaVideoViews: 0,
       metaVideo3SecViews: 0,
       metaCostPerThruPlay: 0,
-      googleSessions: 0,
-      googleConversion: 0,
-      googleClicks: 0,
-      googleCTR: 0,
+      blendedCPM: 0,
+      blendedCPC: 0,
+      blendedCTR: 0,
     };
   }
 
@@ -68,7 +70,8 @@ export function usePlatformMetrics(dateRange: DateRange) {
     // Rename conversion rate fields to match the expected format
     shopifyConversion: metrics?.shopifyConversionRate || 0,
     metaConversion: metrics?.metaConversion || 0,
-    googleConversion: metrics?.googleConversion || 0,
+    metaConversionRate: metrics?.metaConversion || 0,
+    metaClicks: (metrics as any)?.metaSessions || 0,
     isLoading: false,
   };
 }

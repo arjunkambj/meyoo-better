@@ -12,14 +12,17 @@ import type { ReactNode } from "react";
 
 function useOnboardingInternal() {
   const status = useQuery(api.core.onboarding.getOnboardingStatus);
+  type Overall = 'unsynced' | 'syncing' | 'complete' | 'failed';
   const syncStatus = (status as any)?.syncStatus as
     | {
         shopify?: {
           status: string;
+          overallState?: Overall;
           recordsProcessed?: number;
           baselineRecords?: number;
           ordersProcessed?: number;
           ordersQueued?: number;
+          totalOrdersSeen?: number;
           productsProcessed?: number;
           customersProcessed?: number;
           startedAt?: number;
@@ -35,6 +38,7 @@ function useOnboardingInternal() {
         };
         meta?: {
           status: string;
+          overallState?: Overall;
           recordsProcessed?: number;
           startedAt?: number;
           completedAt?: number;
@@ -50,20 +54,28 @@ function useOnboardingInternal() {
   );
   const completeMutation = useMutation(api.core.onboarding.completeOnboarding);
 
+  const shopifyOverall = syncStatus?.shopify?.overallState as Overall | undefined;
   const shopifySyncStatus = syncStatus?.shopify?.status ?? null;
   const isInitialSyncComplete = status?.isInitialSyncComplete || false;
   const isShopifySynced =
-    isInitialSyncComplete || shopifySyncStatus === "completed";
-  const isShopifySyncing = shopifySyncStatus
-    ? ["pending", "syncing", "processing"].includes(shopifySyncStatus)
-    : false;
-  const hasShopifySyncError = shopifySyncStatus === "failed";
+    shopifyOverall === 'complete' ||
+    isInitialSyncComplete ||
+    shopifySyncStatus === "completed";
+  const isShopifySyncing = shopifyOverall
+    ? shopifyOverall === 'syncing'
+    : shopifySyncStatus
+      ? ["pending", "syncing", "processing"].includes(shopifySyncStatus)
+      : false;
+  const hasShopifySyncError = shopifyOverall
+    ? shopifyOverall === 'failed'
+    : shopifySyncStatus === "failed";
   const shopifySyncProgress = {
     status: shopifySyncStatus,
     recordsProcessed: syncStatus?.shopify?.recordsProcessed ?? 0,
     baselineRecords: syncStatus?.shopify?.baselineRecords ?? null,
     ordersProcessed: syncStatus?.shopify?.ordersProcessed ?? null,
     ordersQueued: syncStatus?.shopify?.ordersQueued ?? null,
+    totalOrdersSeen: syncStatus?.shopify?.totalOrdersSeen ?? null,
     productsProcessed: syncStatus?.shopify?.productsProcessed ?? null,
     customersProcessed: syncStatus?.shopify?.customersProcessed ?? null,
     startedAt: syncStatus?.shopify?.startedAt ?? null,
@@ -159,6 +171,8 @@ function useOnboardingInternal() {
     lastSyncCheckAt: status?.lastSyncCheckAt,
     syncCheckAttempts: status?.syncCheckAttempts ?? 0,
     hasMeta: status?.connections?.meta || false,
+    // Enum-like sync state for Shopify
+    shopifySyncState: shopifyOverall,
     shopifySyncStatus,
     isShopifySynced,
     isShopifySyncing,
@@ -198,6 +212,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       value.isProductCostSetup,
       value.isExtraCostSetup,
       value.hasMeta,
+      value.shopifySyncState,
       value.shopifySyncStatus,
       value.isShopifySynced,
       value.isShopifySyncing,

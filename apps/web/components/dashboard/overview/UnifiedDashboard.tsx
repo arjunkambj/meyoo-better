@@ -130,40 +130,63 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
   }, [channelRevenue, overviewMetrics]);
 
   const onboardingStatus = useQuery(api.core.onboarding.getOnboardingStatus);
-  const syncBannerVisible =
-    onboardingStatus !== undefined &&
-    onboardingStatus !== null &&
-    !onboardingStatus.isInitialSyncComplete;
+  // Determine if any platform is actively running initial sync or failed
+  const { syncBannerVisible, bannerVariant } = useMemo(() => {
+    const activeStates = new Set(["pending", "processing", "syncing"]);
+    type Overall = 'unsynced' | 'syncing' | 'complete' | 'failed';
+    const shopifyOverall = (onboardingStatus?.syncStatus?.shopify as { overallState?: Overall } | undefined)?.overallState;
+    const metaOverall = (onboardingStatus?.syncStatus?.meta as { overallState?: Overall } | undefined)?.overallState;
+    const shopifyState = onboardingStatus?.syncStatus?.shopify?.status;
+    const metaState = onboardingStatus?.syncStatus?.meta?.status;
+    const hasActive = Boolean(
+      shopifyOverall === 'syncing' ||
+        metaOverall === 'syncing' ||
+        (shopifyState && activeStates.has(shopifyState)) ||
+        (metaState && activeStates.has(metaState)) ||
+        (onboardingStatus?.pendingSyncPlatforms || []).length > 0,
+    );
+    const hasFailed =
+      shopifyOverall === 'failed' ||
+      metaOverall === 'failed' ||
+      shopifyState === "failed" ||
+      metaState === "failed" ||
+      false;
+
+    return {
+      syncBannerVisible: hasActive || hasFailed,
+      bannerVariant: hasFailed ? ("danger" as const) : ("warning" as const),
+    };
+  }, [onboardingStatus]);
 
   const syncStatusSummaries = useMemo(() => {
     if (!syncBannerVisible) return [] as string[];
 
     const summaries: string[] = [];
-    const pendingPlatforms = onboardingStatus?.pendingSyncPlatforms ?? [];
-    const includePlatform = (platform: "shopify" | "meta") =>
-      pendingPlatforms.length === 0 || pendingPlatforms.includes(platform);
 
-    if (includePlatform("shopify")) {
+    {
       const shopify = onboardingStatus?.syncStatus?.shopify;
 
       if (shopify) {
-        const normalizedStatus = shopify.status
+        const normalizedStatus = shopify.overallState === 'complete'
+          ? 'completed'
+          : shopify.status
           ? shopify.status.replace(/_/g, " ")
           : "in progress";
         const processed = (() => {
           if (typeof shopify.ordersProcessed === "number") {
-            const queued =
-              typeof shopify.ordersQueued === "number" &&
-              shopify.ordersQueued > 0
-                ? ` of ${shopify.ordersQueued}`
-                : "";
-            return ` • Orders processed: ${shopify.ordersProcessed}${queued}`;
+            const denom =
+              typeof shopify.totalOrdersSeen === "number"
+                ? shopify.totalOrdersSeen
+                : typeof shopify.ordersQueued === "number" &&
+                    shopify.ordersQueued > 0
+                  ? shopify.ordersQueued
+                  : undefined;
+            const suffix = denom !== undefined ? ` of ${denom}` : "";
+            return ` • Orders processed: ${shopify.ordersProcessed}${suffix}`;
           }
-
           if (shopify.recordsProcessed) {
             return ` • Records processed: ${shopify.recordsProcessed}`;
           }
-
           return "";
         })();
         summaries.push(`Shopify: ${normalizedStatus}${processed}`);
@@ -172,15 +195,18 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
       }
     }
 
-    if (includePlatform("meta")) {
+    {
       const meta = onboardingStatus?.syncStatus?.meta;
 
       if (meta) {
-        const normalizedStatus = meta.status
+        type Overall = 'unsynced' | 'syncing' | 'complete' | 'failed';
+        const normalizedStatus = ((meta as { overallState?: Overall } | undefined)?.overallState === 'complete')
+          ? 'completed'
+          : meta.status
           ? meta.status.replace(/_/g, " ")
           : "in progress";
         summaries.push(`Meta: ${normalizedStatus}`);
-      } else if (pendingPlatforms.includes("meta")) {
+      } else {
         summaries.push("Meta: pending");
       }
     }
@@ -364,21 +390,47 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
       />
 
       {syncBannerVisible && (
-        <Card className="border-warning bg-warning-50/40">
+        <Card
+          className={
+            bannerVariant === "danger"
+              ? "border-danger bg-danger-50/40"
+              : "border-warning bg-warning-50/40"
+          }
+        >
           <CardBody className="flex flex-col gap-3 text-default-700">
             <div className="flex items-start gap-3">
-              <div className="mt-0.5 flex-none text-warning-500">
-                <Spinner size="sm" color="warning" />
+              <div
+                className={
+                  bannerVariant === "danger"
+                    ? "mt-0.5 flex-none text-danger-500"
+                    : "mt-0.5 flex-none text-warning-500"
+                }
+              >
+                <Spinner size="sm" color={bannerVariant} />
               </div>
               <div className="space-y-1">
-                <p className="font-medium text-warning-600">
-                  We’re still syncing your data
+                <p
+                  className={
+                    bannerVariant === "danger"
+                      ? "font-medium text-danger-600"
+                      : "font-medium text-warning-600"
+                  }
+                >
+                  {bannerVariant === "danger"
+                    ? "Sync needs attention"
+                    : "We’re still syncing your data"}
                 </p>
                 <p className="text-sm leading-relaxed">
                   Dashboards will update automatically once the initial imports finish. Feel free to keep exploring in the meantime.
                 </p>
                 {syncStatusSummaries.length > 0 && (
-                  <div className="flex flex-col gap-1 text-xs uppercase tracking-wide text-warning-500">
+                  <div
+                    className={
+                      bannerVariant === "danger"
+                        ? "flex flex-col gap-1 text-xs uppercase tracking-wide text-danger-500"
+                        : "flex flex-col gap-1 text-xs uppercase tracking-wide text-warning-500"
+                    }
+                  >
                     {syncStatusSummaries.map((summary) => (
                       <span key={summary}>{summary}</span>
                     ))}

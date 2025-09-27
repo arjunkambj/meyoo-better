@@ -26,6 +26,7 @@ export default function CompleteOnboardingClient() {
     isInitialSyncComplete,
     pendingSyncPlatforms,
     syncStatus,
+    shopifySyncState,
   } = useOnboarding();
 
   // (features list removed; unused)
@@ -112,30 +113,53 @@ export default function CompleteOnboardingClient() {
   ];
 
   const hasRequiredConnections = hasShopify;
-  const activePlatforms = pendingSyncPlatforms.length
-    ? pendingSyncPlatforms
-    : hasShopifySyncError
-      ? ["shopify"]
-      : [];
+  const shopifyOverall = shopifySyncState as
+    | 'unsynced'
+    | 'syncing'
+    | 'complete'
+    | 'failed'
+    | undefined;
+  type Overall = 'unsynced' | 'syncing' | 'complete' | 'failed';
+  const metaOverall = (syncStatus?.meta as { overallState?: Overall } | undefined)?.overallState as
+    | Overall
+    | undefined;
+  const activePlatforms = [
+    ...(shopifyOverall === 'syncing' || hasShopifySyncError ? ['shopify'] : []),
+    ...(metaOverall === 'syncing' ? ['meta'] : []),
+  ];
 
-  const syncStatusLabel = isInitialSyncComplete
-    ? "completed"
-    : shopifySyncStatus
-      ? shopifySyncStatus.replace(/_/g, " ")
-      : "not started";
+  const syncStatusLabel = (() => {
+    if (isInitialSyncComplete) return 'completed';
+    if (shopifyOverall) {
+      if (shopifyOverall === 'complete') return 'completed';
+      if (shopifyOverall === 'unsynced') return 'not started';
+      return shopifyOverall.replace(/_/g, ' ');
+    }
+    return shopifySyncStatus ? shopifySyncStatus.replace(/_/g, ' ') : 'not started';
+  })();
   const shopifyOrdersProcessed = shopifySyncProgress.ordersProcessed;
   const shopifyOrdersQueued = shopifySyncProgress.ordersQueued;
+  const shopifyTotalOrdersSeen = shopifySyncProgress.totalOrdersSeen as
+    | number
+    | null
+    | undefined;
   const shopifyRecordsProcessed = shopifySyncProgress.recordsProcessed;
-  const shopifyProgressText =
-    typeof shopifyOrdersProcessed === "number"
-      ? `Orders processed: ${shopifyOrdersProcessed}${
-          typeof shopifyOrdersQueued === "number" && shopifyOrdersQueued > 0
-            ? ` of ${shopifyOrdersQueued}`
-            : ""
-        }`
-      : shopifyRecordsProcessed
-        ? `Records processed: ${shopifyRecordsProcessed}`
-        : null;
+  const shopifyProgressText = (() => {
+    if (typeof shopifyOrdersProcessed === "number") {
+      const denom =
+        typeof shopifyTotalOrdersSeen === "number"
+          ? shopifyTotalOrdersSeen
+          : typeof shopifyOrdersQueued === "number" && shopifyOrdersQueued > 0
+            ? shopifyOrdersQueued
+            : undefined;
+      const suffix = denom !== undefined ? ` of ${denom}` : "";
+      return `Orders processed: ${shopifyOrdersProcessed}${suffix}`;
+    }
+    if (shopifyRecordsProcessed) {
+      return `Records processed: ${shopifyRecordsProcessed}`;
+    }
+    return null;
+  })();
   const syncingDescription = hasShopifySyncError
     ? "The initial Shopify sync failed. You can finish setup now, but we recommend retrying the sync from the Shopify step so analytics stay accurate."
     : activePlatforms.length > 0
@@ -144,7 +168,7 @@ export default function CompleteOnboardingClient() {
 
   return (
     <>
-      {!isInitialSyncComplete && (
+      {activePlatforms.length > 0 && (
         <Card className="border-warning bg-warning-50/40 mb-8">
           <CardBody className="flex flex-col gap-3 text-default-700">
             <div className="flex items-start gap-3">

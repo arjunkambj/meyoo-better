@@ -34,7 +34,6 @@ export const METRIC_CATEGORIES: Record<string, MetricCategory> = {
       "grossProfitMargin",
       "contributionMargin",
       "operatingMargin",
-      "shippingCharged",
       "cogs",
       "transactionFees",
       "taxesCollected",
@@ -306,15 +305,6 @@ export const METRICS: Record<string, MetricDefinition> = {
     suffix: "%",
     decimal: 1,
     description: "Operating margin",
-  },
-  shippingCharged: {
-    id: "shippingCharged",
-    label: "Shipping Revenue",
-    icon: "solar:delivery-bold-duotone",
-    category: "revenue",
-    format: "currency",
-    prefix: "$",
-    description: "Shipping fees charged to customers",
   },
 
   // Sessions & Traffic

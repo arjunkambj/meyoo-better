@@ -96,3 +96,40 @@ export const schedulerState = defineTable({
  * Presence sessions for lightweight online detection
  */
 // presenceSessions removed: presence/heartbeat was eliminated in favor of simpler scheduling
+
+/**
+ * Aggregated integration status snapshot per organization.
+ * Note: authoritative status is derived in queries; this table is for
+ * caching/snapshots and quick admin lookups.
+ */
+export const integrationStatus = defineTable({
+  organizationId: v.id("organizations"),
+
+  shopify: v.object({
+    connected: v.boolean(),
+    initialSynced: v.boolean(),
+    stages: v.object({
+      products: v.boolean(),
+      inventory: v.boolean(),
+      customers: v.boolean(),
+      orders: v.boolean(),
+    }),
+    lastInitialCompletedAt: v.optional(v.number()),
+    lastSyncAt: v.optional(v.number()),
+  }),
+
+  meta: v.object({
+    connected: v.boolean(),
+    initialSynced: v.boolean(),
+    lastInitialCompletedAt: v.optional(v.number()),
+    lastSyncAt: v.optional(v.number()),
+  }),
+
+  analytics: v.object({
+    ready: v.boolean(),
+    lastCalculatedAt: v.optional(v.number()),
+  }),
+
+  updatedAt: v.number(),
+})
+  .index("by_organization", ["organizationId"]);

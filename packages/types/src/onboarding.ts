@@ -50,6 +50,14 @@ export interface PlatformSyncStatus {
   baselineRecords?: number;
   ordersProcessed?: number;
   ordersQueued?: number;
+  /**
+   * High-level state for easier UI/logic handling
+   * - unsynced: no initial sync has started
+   * - syncing: initial sync in progress
+   * - complete: initial sync finished successfully
+   * - failed: last known initial sync failed
+   */
+  overallState?: 'unsynced' | 'syncing' | 'complete' | 'failed';
   productsProcessed?: number;
   customersProcessed?: number;
   startedAt?: number;

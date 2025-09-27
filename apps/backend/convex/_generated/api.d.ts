@@ -31,6 +31,7 @@ import type * as core_onboarding from "../core/onboarding.js";
 import type * as core_organizationLookup from "../core/organizationLookup.js";
 import type * as core_organizations from "../core/organizations.js";
 import type * as core_shopDomainHelper from "../core/shopDomainHelper.js";
+import type * as core_status from "../core/status.js";
 import type * as core_teams from "../core/teams.js";
 import type * as core_time from "../core/time.js";
 import type * as core_usage from "../core/usage.js";
@@ -136,6 +137,7 @@ declare const fullApi: ApiFromModules<{
   "core/organizationLookup": typeof core_organizationLookup;
   "core/organizations": typeof core_organizations;
   "core/shopDomainHelper": typeof core_shopDomainHelper;
+  "core/status": typeof core_status;
   "core/teams": typeof core_teams;
   "core/time": typeof core_time;
   "core/usage": typeof core_usage;

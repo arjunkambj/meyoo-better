@@ -116,6 +116,8 @@ export const integrationStatus = defineTable({
     }),
     lastInitialCompletedAt: v.optional(v.number()),
     lastSyncAt: v.optional(v.number()),
+    expectedOrders: v.optional(v.number()),
+    ordersInDb: v.optional(v.number()),
   }),
 
   meta: v.object({

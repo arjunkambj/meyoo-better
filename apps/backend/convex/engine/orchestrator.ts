@@ -1,7 +1,7 @@
 import type { GenericActionCtx } from "convex/server";
 import type { DataModel } from "../_generated/dataModel";
 import { v } from "convex/values";
-import { internal } from "../_generated/api";
+import { internal, api } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { internalAction, internalMutation } from "../_generated/server";
 
@@ -108,6 +108,15 @@ export const execute = internalAction({
           duration: Date.now() - platformStart,
         });
 
+        // Best-effort integration status snapshot refresh
+        try {
+          await ctx.runMutation(internal.core.status.refreshIntegrationStatus, {
+            organizationId: args.organizationId,
+          });
+        } catch (_error) {
+          // Snapshot refresh is best-effort; ignore failures
+        }
+
         // Update sync metrics in profiler
         await ctx.runMutation(internal.engine.profiler.updateSyncMetrics, {
           organizationId: args.organizationId,
@@ -130,6 +139,15 @@ export const execute = internalAction({
           error: error instanceof Error ? error.message : String(error),
           duration: Date.now() - platformStart,
         });
+
+        // Attempt snapshot refresh despite failure (reflects failed status)
+        try {
+          await ctx.runMutation(internal.core.status.refreshIntegrationStatus, {
+            organizationId: args.organizationId,
+          });
+        } catch (_error) {
+          // Snapshot refresh is best-effort; ignore failures
+        }
 
         // Update sync metrics
         await ctx.runMutation(internal.engine.profiler.updateSyncMetrics, {
@@ -165,14 +183,23 @@ export const execute = internalAction({
       }
     }
 
-    // Trigger analytics calculation if any data changed
+    // Trigger analytics calculation if any data changed and Shopify initial is complete (when connected)
     const hasChanges = results.some((r) => r.success);
-
     if (hasChanges) {
-      await ctx.runAction(internal.engine.analytics.calculateAnalytics, {
-        organizationId: args.organizationId,
-        dateRange: args.dateRange,
-      });
+      // Check Shopify initial sync completion; if not complete, skip analytics
+      const shopifyReady = await ctx
+        .runQuery(api.core.status.getIntegrationStatus, {})
+        .then((s: any) =>
+          s?.shopify?.connected ? Boolean(s?.shopify?.initialSynced) : true,
+        )
+        .catch(() => false);
+
+      if (shopifyReady) {
+        await ctx.runAction(internal.engine.analytics.calculateAnalytics, {
+          organizationId: args.organizationId,
+          dateRange: args.dateRange,
+        });
+      }
     }
 
     // Schedule next sync

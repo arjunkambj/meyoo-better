@@ -2,7 +2,7 @@
 
 import { addToast, Chip, Switch } from "@heroui/react";
 import { Icon } from "@iconify/react";
-import { useQuery } from "convex-helpers/react/cache/hooks";
+import { useQuery } from "convex/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { frequencies, tiers } from "@/components/home/pricing/constants";

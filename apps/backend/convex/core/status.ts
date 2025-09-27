@@ -35,6 +35,8 @@ export const getIntegrationStatus = query({
       }),
       lastInitialCompletedAt: v.optional(v.number()),
       lastSyncAt: v.optional(v.number()),
+      expectedOrders: v.optional(v.number()),
+      ordersInDb: v.optional(v.number()),
     }),
     meta: v.object({
       connected: v.boolean(),
@@ -107,9 +109,38 @@ export const getIntegrationStatus = query({
     const initialMeta = latestMeta.find(isInitialSyncSession);
 
     const stages = stageComplete((initialShopify?.metadata || {}) as any);
+
+    // Heuristic: if DB already contains the expected number of orders for the initial window, treat as complete
+    const expectedOrders =
+      (initialShopify?.metadata as any)?.totalOrdersSeen ??
+      (initialShopify?.metadata as any)?.ordersQueued ??
+      undefined;
+    let dbHasExpectedOrders = false;
+    let ordersInDb = 0;
+    if (typeof expectedOrders === "number" && expectedOrders > 0) {
+      const windowMs = 60 * 24 * 60 * 60 * 1000; // 60 days
+      const since = Date.now() - windowMs;
+      const target = Math.max(0, expectedOrders - 2); // allow small slack
+
+      // Avoid paginate() to comply with Convex query limits; take a bounded slice
+      const limit = Math.min(Math.max(target + 5, 500), 5000);
+      const slice = await ctx.db
+        .query("shopifyOrders")
+        .withIndex("by_organization_and_created", (q) =>
+          q
+            .eq("organizationId", orgId as Id<"organizations">)
+            .gte("shopifyCreatedAt", since),
+        )
+        .order("desc")
+        .take(limit);
+      ordersInDb = slice.length;
+      dbHasExpectedOrders = ordersInDb >= target;
+    }
+
     const shopifyInitialComplete = Boolean(
       initialShopify &&
         (initialShopify.status === "completed" ||
+          dbHasExpectedOrders ||
           (stages.products && stages.inventory && stages.customers && stages.orders) ||
           (typeof (initialShopify.metadata as any)?.ordersQueued === "number" &&
             typeof (initialShopify.metadata as any)?.ordersProcessed === "number" &&
@@ -129,7 +160,11 @@ export const getIntegrationStatus = query({
       .query("onboarding")
       .withIndex("by_organization", (q) => q.eq("organizationId", orgId as Id<"organizations">))
       .first();
-    const analyticsReady = Boolean(anyMetrics || onboarding?.onboardingData?.analyticsTriggeredAt);
+    const analyticsReady = Boolean(
+      (anyMetrics || onboarding?.onboardingData?.analyticsTriggeredAt) &&
+        // Only consider analytics "ready" if Shopify is initial-synced when connected
+        (shopifyStore ? shopifyInitialComplete : true),
+    );
 
     return {
       shopify: {
@@ -138,6 +173,8 @@ export const getIntegrationStatus = query({
         stages,
         lastInitialCompletedAt: initialShopify?.status === "completed" ? initialShopify.completedAt : undefined,
         lastSyncAt: latestShopify[0]?.completedAt ?? latestShopify[0]?.startedAt,
+        expectedOrders,
+        ordersInDb: ordersInDb || undefined,
       },
       meta: {
         connected: Boolean(metaSession),
@@ -185,9 +222,31 @@ export const refreshIntegrationStatus = internalMutation({
     const initialMeta = latestMeta.find(isInitialSyncSession);
 
     const stages = stageComplete((initialShopify?.metadata || {}) as any);
+    const expectedOrders =
+      (initialShopify?.metadata as any)?.totalOrdersSeen ??
+      (initialShopify?.metadata as any)?.ordersQueued ??
+      undefined;
+    let dbHasExpectedOrders = false;
+    let ordersInDb = 0;
+    if (typeof expectedOrders === "number" && expectedOrders > 0) {
+      const windowMs = 60 * 24 * 60 * 60 * 1000; // 60 days
+      const since = Date.now() - windowMs;
+      const target = Math.max(0, expectedOrders - 2);
+      const limit = Math.min(Math.max(target + 5, 500), 5000);
+      const slice = await ctx.db
+        .query("shopifyOrders")
+        .withIndex("by_organization_and_created", (q) =>
+          q.eq("organizationId", orgId).gte("shopifyCreatedAt", since),
+        )
+        .order("desc")
+        .take(limit);
+      ordersInDb = slice.length;
+      dbHasExpectedOrders = ordersInDb >= target;
+    }
     const shopifyInitialComplete = Boolean(
       initialShopify &&
         (initialShopify.status === "completed" ||
+          dbHasExpectedOrders ||
           (stages.products && stages.inventory && stages.customers && stages.orders) ||
           (typeof (initialShopify.metadata as any)?.ordersQueued === "number" &&
             typeof (initialShopify.metadata as any)?.ordersProcessed === "number" &&
@@ -216,6 +275,8 @@ export const refreshIntegrationStatus = internalMutation({
         stages,
         lastInitialCompletedAt: initialShopify?.status === "completed" ? initialShopify.completedAt : undefined,
         lastSyncAt: latestShopify[0]?.completedAt ?? latestShopify[0]?.startedAt,
+        expectedOrders,
+        ordersInDb: ordersInDb || undefined,
       },
       meta: {
         connected: Boolean(metaSession),
@@ -224,7 +285,7 @@ export const refreshIntegrationStatus = internalMutation({
         lastSyncAt: latestMeta[0]?.completedAt ?? latestMeta[0]?.startedAt,
       },
       analytics: {
-        ready: Boolean(anyMetrics),
+        ready: Boolean(anyMetrics && (shopifyStore ? shopifyInitialComplete : true)),
         lastCalculatedAt: anyMetrics?.updatedAt,
       },
       updatedAt: Date.now(),
@@ -239,4 +300,3 @@ export const refreshIntegrationStatus = internalMutation({
     return { ok: true } as const;
   },
 });
-

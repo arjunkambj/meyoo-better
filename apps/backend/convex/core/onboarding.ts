@@ -372,6 +372,24 @@ export const getOnboardingStatus = query({
             )
           : undefined;
 
+    // Heuristic DB-backed completion: if DB has >= expected orders, consider complete
+    const expectedOrders =
+      shopifyTotalOrdersSeen !== undefined
+        ? shopifyTotalOrdersSeen
+        : shopifyOrdersQueued !== undefined
+          ? shopifyOrdersQueued
+          : undefined;
+    let dbHasExpectedOrders = false;
+    if (expectedOrders !== undefined && expectedOrders > 0) {
+      const limit = Math.min(Math.max(expectedOrders - 2 + 5, 500), 5000);
+      const slice = await ctx.db
+        .query("shopifyOrders")
+        .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
+        .order("desc")
+        .take(limit);
+      dbHasExpectedOrders = slice.length >= Math.max(0, expectedOrders - 2);
+    }
+
     return {
       completed: onboarding.isCompleted || false,
       currentStep: onboarding.onboardingStep || 1,
@@ -406,7 +424,7 @@ export const getOnboardingStatus = query({
                     shopifyOrdersQueued >= 0 &&
                     normalizedOrdersProcessed >= shopifyOrdersQueued,
                 );
-                if (stagesComplete || countsComplete) {
+                if (stagesComplete || countsComplete || dbHasExpectedOrders) {
                   shopifyOverall = "complete";
                 }
                 return shopifyOverall;
@@ -929,6 +947,15 @@ export const completeOnboarding = mutation({
       updatedAt: now,
     });
 
+    // Update integration status snapshot (best-effort)
+    try {
+      await ctx.runMutation(internal.core.status.refreshIntegrationStatus, {
+        organizationId: user.organizationId as Id<"organizations">,
+      });
+    } catch (_error) {
+      // non-fatal
+    }
+
     await ctx.db.patch(user._id, {
       isOnboarded: true,
       updatedAt: now,
@@ -1253,6 +1280,15 @@ export const monitorInitialSyncs = internalMutation({
           onboardingData,
           updatedAt: now,
         });
+
+        // Best-effort snapshot refresh
+        try {
+          await ctx.runMutation(internal.core.status.refreshIntegrationStatus, {
+            organizationId: orgId,
+          });
+        } catch (_error) {
+          // Best-effort refresh; ignore failures
+        }
       } catch (error) {
         console.error(
           "[ONBOARDING] monitorInitialSyncs failed",

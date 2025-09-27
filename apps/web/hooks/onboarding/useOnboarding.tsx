@@ -1,6 +1,6 @@
 import { useMutation } from "convex/react";
 import { api } from "@/libs/convexApi";
-import { useQuery } from "convex-helpers/react/cache/hooks";
+import { useQuery } from "convex/react";
 import { createContext, useContext, useMemo } from "react";
 import type { ReactNode } from "react";
 
@@ -12,6 +12,7 @@ import type { ReactNode } from "react";
 
 function useOnboardingInternal() {
   const status = useQuery(api.core.onboarding.getOnboardingStatus);
+  const integrationStatus = useQuery(api.core.status.getIntegrationStatus);
   type Overall = 'unsynced' | 'syncing' | 'complete' | 'failed';
   const syncStatus = (status as any)?.syncStatus as
     | {
@@ -56,16 +57,23 @@ function useOnboardingInternal() {
 
   const shopifyOverall = syncStatus?.shopify?.overallState as Overall | undefined;
   const shopifySyncStatus = syncStatus?.shopify?.status ?? null;
+  const shopifyExpectedOrders =
+    integrationStatus?.shopify?.expectedOrders ??
+    (syncStatus?.shopify?.ordersQueued ?? null);
+  const shopifyOrdersInDb = integrationStatus?.shopify?.ordersInDb ?? null;
   const isInitialSyncComplete = status?.isInitialSyncComplete || false;
   const isShopifySynced =
+    integrationStatus?.shopify?.initialSynced === true ||
     shopifyOverall === 'complete' ||
     isInitialSyncComplete ||
     shopifySyncStatus === "completed";
-  const isShopifySyncing = shopifyOverall
-    ? shopifyOverall === 'syncing'
-    : shopifySyncStatus
-      ? ["pending", "syncing", "processing"].includes(shopifySyncStatus)
-      : false;
+  const isShopifySyncing = integrationStatus?.shopify?.initialSynced
+    ? false
+    : shopifyOverall
+      ? shopifyOverall === 'syncing'
+      : shopifySyncStatus
+        ? ["pending", "syncing", "processing"].includes(shopifySyncStatus)
+        : false;
   const hasShopifySyncError = shopifyOverall
     ? shopifyOverall === 'failed'
     : shopifySyncStatus === "failed";
@@ -157,6 +165,7 @@ function useOnboardingInternal() {
       meta: false,
     },
     syncStatus,
+    integrationStatus,
     // New functions
     nextStep,
     updateBusinessProfile,
@@ -184,6 +193,8 @@ function useOnboardingInternal() {
     isShopifyInventorySynced,
     isShopifyCustomersSynced,
     isShopifyOrdersSynced,
+    shopifyExpectedOrders,
+    shopifyOrdersInDb,
   };
 }
 
@@ -224,6 +235,9 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       value.isShopifyInventorySynced,
       value.isShopifyCustomersSynced,
       value.isShopifyOrdersSynced,
+      value.integrationStatus,
+      value.shopifyExpectedOrders,
+      value.shopifyOrdersInDb,
     ],
   );
 

@@ -675,7 +675,7 @@ export const getPlatformMetrics = query({
 
       // Visitors
       uniqueVisitors: filteredData.reduce(
-        (sum, d) => sum + (d.uniqueVisitors || d.shopifyVisitors || 0),
+        (sum, d) => sum + (d.uniqueVisitors ?? 0),
         0,
       ),
 

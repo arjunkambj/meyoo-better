@@ -24,9 +24,12 @@ export default function CompleteOnboardingClient() {
     shopifySyncStatus,
     shopifySyncProgress,
     isInitialSyncComplete,
-    pendingSyncPlatforms,
+    pendingSyncPlatforms: _pendingSyncPlatforms,
     syncStatus,
     shopifySyncState,
+    integrationStatus,
+    shopifyExpectedOrders,
+    shopifyOrdersInDb,
   } = useOnboarding();
 
   // (features list removed; unused)
@@ -123,12 +126,21 @@ export default function CompleteOnboardingClient() {
   const metaOverall = (syncStatus?.meta as { overallState?: Overall } | undefined)?.overallState as
     | Overall
     | undefined;
+  const shopifyInitialSynced = integrationStatus?.shopify?.initialSynced ?? false;
+  const metaInitialSynced = integrationStatus?.meta?.initialSynced ?? false;
+  const shopifyActive =
+    !shopifyInitialSynced &&
+    (shopifyOverall === 'syncing' || hasShopifySyncError || shopifySyncStatus === 'processing' || shopifySyncStatus === 'pending');
+  const metaActive =
+    !metaInitialSynced &&
+    (metaOverall === 'syncing' || syncStatus?.meta?.status === 'processing' || syncStatus?.meta?.status === 'pending');
   const activePlatforms = [
-    ...(shopifyOverall === 'syncing' || hasShopifySyncError ? ['shopify'] : []),
-    ...(metaOverall === 'syncing' ? ['meta'] : []),
+    ...(shopifyActive ? ['shopify'] : []),
+    ...(metaActive ? ['meta'] : []),
   ];
 
   const syncStatusLabel = (() => {
+    if (integrationStatus?.shopify?.initialSynced) return 'completed';
     if (isInitialSyncComplete) return 'completed';
     if (shopifyOverall) {
       if (shopifyOverall === 'complete') return 'completed';
@@ -145,19 +157,29 @@ export default function CompleteOnboardingClient() {
     | undefined;
   const shopifyRecordsProcessed = shopifySyncProgress.recordsProcessed;
   const shopifyProgressText = (() => {
-    if (typeof shopifyOrdersProcessed === "number") {
-      const denom =
-        typeof shopifyTotalOrdersSeen === "number"
+    const expected =
+      typeof shopifyExpectedOrders === 'number'
+        ? shopifyExpectedOrders
+        : typeof shopifyTotalOrdersSeen === 'number'
           ? shopifyTotalOrdersSeen
-          : typeof shopifyOrdersQueued === "number" && shopifyOrdersQueued > 0
+          : typeof shopifyOrdersQueued === 'number'
             ? shopifyOrdersQueued
             : undefined;
-      const suffix = denom !== undefined ? ` of ${denom}` : "";
-      return `Orders processed: ${shopifyOrdersProcessed}${suffix}`;
+    const processedBase = Math.max(
+      typeof shopifyOrdersProcessed === 'number' ? shopifyOrdersProcessed : 0,
+      typeof shopifyOrdersInDb === 'number' ? shopifyOrdersInDb : 0,
+      typeof shopifyRecordsProcessed === 'number' ? shopifyRecordsProcessed : 0,
+    );
+
+    if (expected !== undefined && expected > 0) {
+      const corrected = Math.min(expected, processedBase);
+      return `Orders imported: ${corrected} of ${expected}`;
     }
-    if (shopifyRecordsProcessed) {
-      return `Records processed: ${shopifyRecordsProcessed}`;
+
+    if (processedBase > 0) {
+      return `Orders imported: ${processedBase}`;
     }
+
     return null;
   })();
   const syncingDescription = hasShopifySyncError
@@ -217,18 +239,7 @@ export default function CompleteOnboardingClient() {
         </Card>
       )}
 
-      {pendingSyncPlatforms.length > 0 && (
-        <Card className="border-primary mb-8">
-          <CardBody className="flex flex-col gap-2 text-default-700">
-            <p className="font-medium text-primary">
-              We’re still syncing {pendingSyncPlatforms.join(", ")}
-            </p>
-            <p className="text-sm">
-              Feel free to explore the dashboard. Analytics will refresh automatically once the remaining imports finish.
-            </p>
-          </CardBody>
-        </Card>
-      )}
+      {/* Removed stale pendingSyncPlatforms info card; rely on activePlatforms only */}
 
       {/* Connection Summary */}
       <div>

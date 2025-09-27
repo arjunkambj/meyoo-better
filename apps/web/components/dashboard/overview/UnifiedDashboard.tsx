@@ -1,7 +1,7 @@
 "use client";
 
 import { Card, CardBody, Spacer, Spinner } from "@heroui/react";
-import { useQuery } from "convex-helpers/react/cache/hooks";
+import { useQuery } from "convex/react";
 import { useAtomValue } from "jotai";
 import { usePathname } from "next/navigation";
 import React, { useCallback, useMemo, useState } from "react";
@@ -130,6 +130,11 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
   }, [channelRevenue, overviewMetrics]);
 
   const onboardingStatus = useQuery(api.core.onboarding.getOnboardingStatus);
+  const integrationStatus = useQuery(api.core.status.getIntegrationStatus);
+  const shopifyIntegration = integrationStatus?.shopify;
+  const metaIntegration = integrationStatus?.meta;
+  // Useful for correcting progress numbers when DB already has orders
+  const kpiOrdersValue = overviewMetrics?.orders?.value || 0;
   // Determine if any platform is actively running initial sync or failed
   const { syncBannerVisible, bannerVariant } = useMemo(() => {
     const activeStates = new Set(["pending", "processing", "syncing"]);
@@ -138,25 +143,28 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
     const metaOverall = (onboardingStatus?.syncStatus?.meta as { overallState?: Overall } | undefined)?.overallState;
     const shopifyState = onboardingStatus?.syncStatus?.shopify?.status;
     const metaState = onboardingStatus?.syncStatus?.meta?.status;
-    const hasActive = Boolean(
-      shopifyOverall === 'syncing' ||
-        metaOverall === 'syncing' ||
-        (shopifyState && activeStates.has(shopifyState)) ||
-        (metaState && activeStates.has(metaState)) ||
-        (onboardingStatus?.pendingSyncPlatforms || []).length > 0,
-    );
-    const hasFailed =
-      shopifyOverall === 'failed' ||
-      metaOverall === 'failed' ||
-      shopifyState === "failed" ||
-      metaState === "failed" ||
-      false;
+    const shopifyConnected = shopifyIntegration?.connected ?? onboardingStatus?.connections?.shopify ?? false;
+    const metaConnected = metaIntegration?.connected ?? onboardingStatus?.connections?.meta ?? false;
+    const shopifyComplete = shopifyIntegration?.initialSynced ?? (shopifyOverall === 'complete');
+    const metaComplete = metaIntegration?.initialSynced ?? (metaOverall === 'complete');
+    const shopifyFailed = shopifyOverall === 'failed' || shopifyState === 'failed';
+    const metaFailed = metaOverall === 'failed' || metaState === 'failed';
+
+    const shopifySyncing =
+      shopifyConnected && !shopifyComplete && !shopifyFailed &&
+      (shopifyOverall === 'syncing' || (shopifyState && activeStates.has(shopifyState)));
+    const metaSyncing =
+      metaConnected && !metaComplete && !metaFailed &&
+      (metaOverall === 'syncing' || (metaState && activeStates.has(metaState)));
+
+    const hasActive = shopifySyncing || metaSyncing;
+    const hasFailed = shopifyFailed || metaFailed;
 
     return {
       syncBannerVisible: hasActive || hasFailed,
       bannerVariant: hasFailed ? ("danger" as const) : ("warning" as const),
     };
-  }, [onboardingStatus]);
+  }, [onboardingStatus, shopifyIntegration, metaIntegration]);
 
   const syncStatusSummaries = useMemo(() => {
     if (!syncBannerVisible) return [] as string[];
@@ -167,29 +175,40 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
       const shopify = onboardingStatus?.syncStatus?.shopify;
 
       if (shopify) {
-        const normalizedStatus = shopify.overallState === 'complete'
+        const denom =
+          shopifyIntegration?.expectedOrders ??
+          (typeof shopify.totalOrdersSeen === 'number'
+            ? shopify.totalOrdersSeen
+            : typeof shopify.ordersQueued === 'number' && shopify.ordersQueued > 0
+              ? shopify.ordersQueued
+              : undefined);
+
+        let normalizedStatus = shopifyIntegration?.initialSynced
           ? 'completed'
-          : shopify.status
-          ? shopify.status.replace(/_/g, " ")
-          : "in progress";
-        const processed = (() => {
-          if (typeof shopify.ordersProcessed === "number") {
-            const denom =
-              typeof shopify.totalOrdersSeen === "number"
-                ? shopify.totalOrdersSeen
-                : typeof shopify.ordersQueued === "number" &&
-                    shopify.ordersQueued > 0
-                  ? shopify.ordersQueued
-                  : undefined;
-            const suffix = denom !== undefined ? ` of ${denom}` : "";
-            return ` • Orders processed: ${shopify.ordersProcessed}${suffix}`;
+          : shopify.overallState === 'complete'
+            ? 'completed'
+            : shopify.status
+              ? shopify.status.replace(/_/g, ' ')
+              : 'in progress';
+
+        const ordersInDb = shopifyIntegration?.ordersInDb ?? 0;
+        const rawProcessed = typeof shopify.ordersProcessed === 'number' ? shopify.ordersProcessed : 0;
+        const processedBase = Math.max(rawProcessed, ordersInDb, kpiOrdersValue);
+
+        let processedText = '';
+        if (denom !== undefined && denom > 0) {
+          const corrected = Math.min(denom, processedBase);
+          if (corrected >= denom) {
+            normalizedStatus = 'completed';
           }
-          if (shopify.recordsProcessed) {
-            return ` • Records processed: ${shopify.recordsProcessed}`;
-          }
-          return "";
-        })();
-        summaries.push(`Shopify: ${normalizedStatus}${processed}`);
+          processedText = ` • Orders processed: ${corrected} of ${denom}`;
+        } else if (processedBase > 0) {
+          processedText = ` • Orders processed: ${processedBase}`;
+        } else if (shopify.recordsProcessed) {
+          processedText = ` • Records processed: ${shopify.recordsProcessed}`;
+        }
+
+        summaries.push(`Shopify: ${normalizedStatus}${processedText}`);
       } else {
         summaries.push("Shopify: pending");
       }
@@ -200,11 +219,13 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
 
       if (meta) {
         type Overall = 'unsynced' | 'syncing' | 'complete' | 'failed';
-        const normalizedStatus = ((meta as { overallState?: Overall } | undefined)?.overallState === 'complete')
+        const normalizedStatus = metaIntegration?.initialSynced
           ? 'completed'
-          : meta.status
-          ? meta.status.replace(/_/g, " ")
-          : "in progress";
+          : ((meta as { overallState?: Overall } | undefined)?.overallState === 'complete')
+            ? 'completed'
+            : meta.status
+              ? meta.status.replace(/_/g, " ")
+              : "in progress";
         summaries.push(`Meta: ${normalizedStatus}`);
       } else {
         summaries.push("Meta: pending");
@@ -212,7 +233,7 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
     }
 
     return summaries;
-  }, [onboardingStatus, syncBannerVisible]);
+  }, [onboardingStatus, syncBannerVisible, kpiOrdersValue, shopifyIntegration, metaIntegration]);
 
   // Combine all metrics data
   const allMetricsData = useMemo(() => {
@@ -388,6 +409,8 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
         onCustomize={() => setIsCustomizing(true)}
         exportData={prepareExportData}
       />
+
+      {/* Data Status Chips removed */}
 
       {syncBannerVisible && (
         <Card

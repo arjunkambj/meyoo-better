@@ -1,17 +1,371 @@
 import { v } from "convex/values";
 
-import type { Doc } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import { internal } from "../_generated/api";
-import { internalAction, internalMutation } from "../_generated/server";
+import { internalAction, internalMutation, internalQuery } from "../_generated/server";
 
 /**
  * Customer Metrics Calculations
  * Calculates and stores customer lifetime value, segments, and other metrics
  */
 
+const CUSTOMER_METRICS_QUEUE_BATCH_SIZE = 25;
+const MAX_QUEUE_BATCHES_PER_RUN = 10;
+
+type QueueStateDoc = Doc<"customerMetricsQueueState">;
+
+async function getQueueState(
+  ctx: { db: any },
+  organizationId: Id<"organizations">,
+): Promise<QueueStateDoc | null> {
+  return await ctx.db
+    .query("customerMetricsQueueState")
+    .withIndex("by_organization", (q: any) =>
+      q.eq("organizationId", organizationId),
+    )
+    .first();
+}
+
+async function ensureQueueStateDoc(
+  ctx: { db: any },
+  organizationId: Id<"organizations">,
+): Promise<QueueStateDoc | null> {
+  let state = await getQueueState(ctx, organizationId);
+
+  if (!state) {
+    await ctx.db.insert("customerMetricsQueueState", {
+      organizationId,
+      isProcessing: false,
+      scheduled: false,
+    });
+
+    state = await getQueueState(ctx, organizationId);
+  }
+
+  return state;
+}
+
 /**
  * Calculate and store customer metrics after orders sync
  */
+export const queueCustomerMetrics = internalMutation({
+  args: {
+    organizationId: v.id("organizations"),
+    customerIds: v.optional(v.array(v.id("shopifyCustomers"))),
+  },
+  returns: v.object({
+    queued: v.number(),
+  }),
+  handler: async (ctx, args) => {
+    let targetCustomerIds = args.customerIds ?? [];
+
+    if (targetCustomerIds.length === 0) {
+      const customers = await ctx.db
+        .query("shopifyCustomers")
+        .withIndex("by_organization", (q) =>
+          q.eq("organizationId", args.organizationId),
+        )
+        .collect();
+      targetCustomerIds = customers.map((customer) => customer._id);
+    }
+
+    if (targetCustomerIds.length === 0) {
+      // Nothing to enqueue
+      await ensureQueueStateDoc(ctx, args.organizationId);
+      return { queued: 0 };
+    }
+
+    const dedupedCustomerIds = Array.from(
+      new Set(targetCustomerIds.map((id) => id as Id<"shopifyCustomers">)),
+    );
+
+    let queued = 0;
+    const now = Date.now();
+
+    for (const customerId of dedupedCustomerIds) {
+      const existing = await ctx.db
+        .query("customerMetricsQueue")
+        .withIndex("by_org_customer", (q) =>
+          q.eq("organizationId", args.organizationId).eq("customerId", customerId),
+        )
+        .first();
+
+      if (existing) {
+        await ctx.db.patch(existing._id, {
+          enqueuedAt: now,
+        });
+      } else {
+        await ctx.db.insert("customerMetricsQueue", {
+          organizationId: args.organizationId,
+          customerId,
+          enqueuedAt: now,
+        });
+        queued += 1;
+      }
+    }
+
+    await ensureQueueStateDoc(ctx, args.organizationId);
+
+    return { queued };
+  },
+});
+
+export const ensureCustomerMetricsProcessor = internalMutation({
+  args: {
+    organizationId: v.id("organizations"),
+  },
+  handler: async (ctx, args) => {
+    const pendingEntry = await ctx.db
+      .query("customerMetricsQueue")
+      .withIndex("by_org_enqueued", (q) =>
+        q.eq("organizationId", args.organizationId),
+      )
+      .first();
+
+    if (!pendingEntry) {
+      return;
+    }
+
+    let state = await getQueueState(ctx, args.organizationId);
+
+    if (!state) {
+      await ctx.db.insert("customerMetricsQueueState", {
+        organizationId: args.organizationId,
+        isProcessing: false,
+        scheduled: false,
+      });
+      state = await getQueueState(ctx, args.organizationId);
+    }
+
+    if (!state || state.isProcessing || state.scheduled) {
+      return;
+    }
+
+    await ctx.db.patch(state._id, {
+      scheduled: true,
+      lastScheduledAt: Date.now(),
+    });
+
+    await ctx.scheduler.runAfter(
+      0,
+      internal.analytics.customerCalculations.processCustomerMetricsQueue,
+      {
+        organizationId: args.organizationId,
+      },
+    );
+  },
+});
+
+export const claimCustomerMetricsProcessor = internalMutation({
+  args: {
+    organizationId: v.id("organizations"),
+  },
+  returns: v.object({
+    claimed: v.boolean(),
+    stateId: v.id("customerMetricsQueueState"),
+  }),
+  handler: async (ctx, args) => {
+    const state = await getQueueState(ctx, args.organizationId);
+
+    if (!state) {
+      const stateId = await ctx.db.insert("customerMetricsQueueState", {
+        organizationId: args.organizationId,
+        isProcessing: true,
+        scheduled: false,
+        processingStartedAt: Date.now(),
+      });
+
+      return {
+        claimed: true,
+        stateId,
+      };
+    }
+
+    if (state.isProcessing) {
+      return {
+        claimed: false,
+        stateId: state._id,
+      };
+    }
+
+    await ctx.db.patch(state._id, {
+      isProcessing: true,
+      scheduled: false,
+      processingStartedAt: Date.now(),
+    });
+
+    return {
+      claimed: true,
+      stateId: state._id,
+    };
+  },
+});
+
+export const releaseCustomerMetricsProcessor = internalMutation({
+  args: {
+    organizationId: v.id("organizations"),
+  },
+  handler: async (ctx, args) => {
+    const state = await getQueueState(ctx, args.organizationId);
+
+    if (!state) {
+      return;
+    }
+
+    await ctx.db.patch(state._id, {
+      isProcessing: false,
+      processingStartedAt: undefined,
+    });
+  },
+});
+
+export const removeCustomerMetricsQueueEntries = internalMutation({
+  args: {
+    entries: v.array(
+      v.object({
+        entryId: v.id("customerMetricsQueue"),
+        expectedEnqueuedAt: v.number(),
+      }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    for (const entry of args.entries) {
+      const existing = await ctx.db.get(entry.entryId);
+
+      // Skip deletion if the entry has been requeued since it was claimed.
+      if (!existing || existing.enqueuedAt !== entry.expectedEnqueuedAt) {
+        continue;
+      }
+
+      await ctx.db.delete(entry.entryId);
+    }
+  },
+});
+
+export const getPendingCustomerMetricsQueue = internalQuery({
+  args: {
+    organizationId: v.id("organizations"),
+    limit: v.number(),
+  },
+  returns: v.array(v.any()),
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("customerMetricsQueue")
+      .withIndex("by_org_enqueued", (q) =>
+        q.eq("organizationId", args.organizationId),
+      )
+      .order("asc")
+      .take(args.limit);
+  },
+});
+
+export const hasPendingCustomerMetrics = internalQuery({
+  args: {
+    organizationId: v.id("organizations"),
+  },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const entry = await ctx.db
+      .query("customerMetricsQueue")
+      .withIndex("by_org_enqueued", (q) =>
+        q.eq("organizationId", args.organizationId),
+      )
+      .first();
+
+    return entry !== null;
+  },
+});
+
+export const processCustomerMetricsQueue = internalAction({
+  args: {
+    organizationId: v.id("organizations"),
+  },
+  handler: async (ctx, args) => {
+    const claim = await ctx.runMutation(
+      internal.analytics.customerCalculations.claimCustomerMetricsProcessor,
+      {
+        organizationId: args.organizationId,
+      },
+    );
+
+    if (!claim.claimed) {
+      return;
+    }
+
+    let hasRemaining = false;
+
+    try {
+      let batchesProcessed = 0;
+
+      while (batchesProcessed < MAX_QUEUE_BATCHES_PER_RUN) {
+        const entries = (await ctx.runQuery(
+          internal.analytics.customerCalculations.getPendingCustomerMetricsQueue,
+          {
+            organizationId: args.organizationId,
+            limit: CUSTOMER_METRICS_QUEUE_BATCH_SIZE,
+          },
+        )) as Doc<"customerMetricsQueue">[];
+
+        if (entries.length === 0) {
+          break;
+        }
+
+        const customerIds = entries.map((entry) => entry.customerId);
+
+        await ctx.runMutation(
+          internal.analytics.customerCalculations.calculateCustomerMetrics,
+          {
+            organizationId: args.organizationId,
+            customerIds,
+          },
+        );
+
+        await ctx.runMutation(
+          internal.analytics.customerCalculations.removeCustomerMetricsQueueEntries,
+          {
+            entries: entries.map((entry) => ({
+              entryId: entry._id,
+              expectedEnqueuedAt: entry.enqueuedAt,
+            })),
+          },
+        );
+
+        batchesProcessed += 1;
+      }
+
+      hasRemaining = await ctx.runQuery(
+        internal.analytics.customerCalculations.hasPendingCustomerMetrics,
+        {
+          organizationId: args.organizationId,
+        },
+      );
+    } catch (error) {
+      console.error("Failed to process customer metrics queue", {
+        organizationId: String(args.organizationId),
+        error,
+      });
+      hasRemaining = true;
+      throw error;
+    } finally {
+      await ctx.runMutation(
+        internal.analytics.customerCalculations.releaseCustomerMetricsProcessor,
+        {
+          organizationId: args.organizationId,
+        },
+      );
+
+      if (hasRemaining) {
+        await ctx.runMutation(
+          internal.analytics.customerCalculations.ensureCustomerMetricsProcessor,
+          {
+            organizationId: args.organizationId,
+          },
+        );
+      }
+    }
+  },
+});
+
 export const calculateCustomerMetrics = internalMutation({
   args: {
     organizationId: v.id("organizations"),
@@ -175,15 +529,22 @@ export const enqueueCustomerMetricsCalculation = internalAction({
   handler: async (ctx, args) => {
     try {
       await ctx.runMutation(
-        internal.analytics.customerCalculations.calculateCustomerMetrics,
+        internal.analytics.customerCalculations.queueCustomerMetrics,
         {
           organizationId: args.organizationId,
           customerIds: args.customerIds,
         },
       );
+
+      await ctx.runMutation(
+        internal.analytics.customerCalculations.ensureCustomerMetricsProcessor,
+        {
+          organizationId: args.organizationId,
+        },
+      );
     } catch (error) {
       console.error(
-        "Failed to calculate customer metrics in background",
+        "Failed to enqueue customer metrics calculation",
         {
           organizationId: String(args.organizationId),
           customerCount: args.customerIds?.length ?? "all",

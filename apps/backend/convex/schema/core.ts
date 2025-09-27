@@ -1,6 +1,13 @@
 import { defineTable } from "convex/server";
 import { v } from "convex/values";
 
+const syncStageState = v.union(
+  v.literal("pending"),
+  v.literal("processing"),
+  v.literal("completed"),
+  v.literal("failed"),
+);
+
 // Users table - simplified but with all necessary fields
 export const users = defineTable({
   // Basic info
@@ -314,9 +321,10 @@ export const syncSessions = defineTable({
   metadata: v.optional(
     v.object({
       syncedEntities: v.optional(v.array(v.string())),
-      lastCursor: v.optional(v.string()),
+      lastCursor: v.optional(v.union(v.string(), v.null())),
       totalPages: v.optional(v.number()),
       currentPage: v.optional(v.number()),
+      totalOrdersSeen: v.optional(v.number()),
       isInitialSync: v.optional(v.boolean()),
       filters: v.optional(
         v.object({
@@ -327,6 +335,14 @@ export const syncSessions = defineTable({
       ),
       totalBatches: v.optional(v.number()),
       completedBatches: v.optional(v.number()),
+      stageStatus: v.optional(
+        v.object({
+          products: v.optional(syncStageState),
+          inventory: v.optional(syncStageState),
+          customers: v.optional(syncStageState),
+          orders: v.optional(syncStageState),
+        }),
+      ),
     }),
   ),
 })

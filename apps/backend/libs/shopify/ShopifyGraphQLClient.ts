@@ -229,27 +229,30 @@ export interface ShopifyFulfillment {
 export interface GraphQLResponse<T> {
   data: T;
   extensions?: {
-    cost: {
-      requestedQueryCost: number;
-      actualQueryCost: number;
-      throttleStatus: {
-        maximumAvailable: number;
-        currentlyAvailable: number;
-        restoreRate: number;
+    cost?: {
+      requestedQueryCost?: number;
+      actualQueryCost?: number;
+      throttleStatus?: {
+        maximumAvailable?: number;
+        currentlyAvailable?: number;
+        restoreRate?: number;
       };
+      [key: string]: unknown;
     };
+    [key: string]: unknown;
   };
-  errors?: Array<{
+  errors?: ReadonlyArray<{
     message: string;
     extensions?: {
-      code: string;
+      code?: string;
       documentation?: string;
+      [key: string]: unknown;
     };
-    locations?: Array<{
+    locations?: ReadonlyArray<{
       line: number;
       column: number;
     }>;
-    path?: string[];
+    path?: ReadonlyArray<string | number>;
   }>;
 }
 
@@ -261,6 +264,17 @@ export class ShopifyGraphQLClient {
   private readonly RATE_LIMIT_DELAY =
     (1000 / SHOPIFY_CONFIG.API.RATE_LIMIT.GRAPHQL.RESTORE_RATE) * 20; // 400ms between requests
   private readonly MAX_REQUESTS_PER_SECOND = SHOPIFY_CONFIG.API.RATE_LIMIT.REST;
+  private readonly MAX_GRAPHQL_RETRIES =
+    SHOPIFY_CONFIG.API.RATE_LIMIT.GRAPHQL.MAX_RETRIES ?? 5;
+  private readonly BASE_THROTTLE_DELAY =
+    SHOPIFY_CONFIG.API.RATE_LIMIT.GRAPHQL.THROTTLE_BACKOFF_MS ??
+    Math.ceil(1000 / SHOPIFY_CONFIG.API.RATE_LIMIT.GRAPHQL.RESTORE_RATE) * 2;
+  private readonly BACKOFF_MULTIPLIER =
+    SHOPIFY_CONFIG.API.RATE_LIMIT.GRAPHQL.BACKOFF_MULTIPLIER ?? 2;
+  private readonly MAX_THROTTLE_DELAY =
+    SHOPIFY_CONFIG.API.RATE_LIMIT.GRAPHQL.MAX_BACKOFF_MS ?? 12000;
+  private readonly SAFETY_BUFFER =
+    SHOPIFY_CONFIG.API.RATE_LIMIT.GRAPHQL.SAFETY_BUFFER ?? 200;
 
   constructor(config: ShopifyGraphQLClientConfig) {
     this.apiVersion = config.apiVersion || SHOPIFY_CONFIG.API.VERSION;
@@ -1110,25 +1124,22 @@ export class ShopifyGraphQLClient {
    */
   private async makeRequest<T>(
     query: string,
-    variables?: Record<string, unknown>
+    variables?: Record<string, unknown>,
+    attempt = 0
   ): Promise<GraphQLResponse<T>> {
-    // Implement rate limiting
     const now = Date.now();
     const timeSinceLastRequest = now - this.lastRequestTime;
 
     if (timeSinceLastRequest < this.RATE_LIMIT_DELAY) {
       const delay = this.RATE_LIMIT_DELAY - timeSinceLastRequest;
-
-      await new Promise((resolve) => setTimeout(resolve, delay));
+      await this.delay(delay);
     }
 
-    // Track requests per second
     if (timeSinceLastRequest < 1000) {
       this.requestCount++;
       if (this.requestCount >= this.MAX_REQUESTS_PER_SECOND) {
         const delay = 1000 - timeSinceLastRequest;
-
-        await new Promise((resolve) => setTimeout(resolve, delay));
+        await this.delay(delay);
         this.requestCount = 0;
       }
     } else {
@@ -1138,32 +1149,26 @@ export class ShopifyGraphQLClient {
     this.lastRequestTime = Date.now();
 
     try {
-      const response = await this.client.request<T>(query, variables);
+      const rawResponse = await this.client.rawRequest<T>(query, variables);
+      const throttleStatus = this.extractThrottleStatus(rawResponse.extensions);
+      await this.applyThrottleBuffer(throttleStatus);
 
-      // Log successful responses for products queries during debugging
       if (query.includes("products") && query.includes("first")) {
         logger.debug("[ShopifyGraphQLClient] Products query response", {
-          hasData: !!response,
-          dataKeys: response ? Object.keys(response) : [],
+          hasData: !!rawResponse.data,
+          dataKeys: rawResponse.data ? Object.keys(rawResponse.data) : [],
           querySnippet: query.substring(0, 100),
         });
       }
 
-      return { data: response };
+      return {
+        data: rawResponse.data,
+        extensions: rawResponse.extensions as GraphQLResponse<T>["extensions"],
+        errors: rawResponse.errors as GraphQLResponse<T>["errors"],
+      };
     } catch (error) {
-      // Handle GraphQL errors
       const graphQLError = error as {
         response?: {
-          errors?: Array<{ message: string }>;
-          extensions?: unknown;
-          data?: T;
-        };
-        message?: string;
-        code?: string;
-      };
-
-      if (graphQLError.response) {
-        const { errors, extensions, data } = graphQLError.response as {
           errors?: Array<{
             message: string;
             extensions?: { code?: string };
@@ -1173,8 +1178,52 @@ export class ShopifyGraphQLClient {
           extensions?: unknown;
           data?: T;
         };
+        message?: string;
+        code?: string;
+      };
 
-        // Log GraphQL errors
+      if (graphQLError.response) {
+        const { errors, extensions, data } = graphQLError.response;
+        const throttleStatus = this.extractThrottleStatus(extensions);
+
+        const throttleError = errors?.find(
+          (err) =>
+            err.extensions?.code === "THROTTLED" ||
+            /throttled/i.test(err.message ?? ""),
+        );
+
+        const shouldRetryThrottle =
+          (throttleError ||
+            (throttleStatus &&
+              throttleStatus.currentlyAvailable !== undefined &&
+              throttleStatus.currentlyAvailable <= 0)) &&
+          attempt < this.MAX_GRAPHQL_RETRIES;
+
+        if (shouldRetryThrottle) {
+          const waitTime = this.calculateThrottleDelay(throttleStatus, attempt);
+          logger.warn(
+            `[ShopifyGraphQLClient] Throttled (attempt ${attempt + 1}/${this.MAX_GRAPHQL_RETRIES}). Waiting ${waitTime}ms before retry`,
+            {
+              code: throttleError?.extensions?.code,
+              message: throttleError?.message,
+            },
+          );
+          await this.delay(waitTime);
+          return this.makeRequest<T>(query, variables, attempt + 1);
+        }
+
+        if (throttleError) {
+          throw new ShopifyAPIError(
+            "Shopify GraphQL request throttled",
+            "THROTTLED",
+            {
+              attempts: attempt + 1,
+              errors,
+              extensions,
+            },
+          );
+        }
+
         if (errors && errors.length > 0) {
           logger.error("[ShopifyGraphQLClient] GraphQL errors", {
             errors,
@@ -1184,36 +1233,6 @@ export class ShopifyGraphQLClient {
           });
         }
 
-        // Check for rate limiting
-        const costExtensions = extensions as unknown as {
-          cost?: {
-            throttleStatus?: {
-              currentlyAvailable?: number;
-              restoreRate?: number;
-            };
-          };
-        };
-
-        if (
-          costExtensions?.cost?.throttleStatus?.currentlyAvailable !==
-            undefined &&
-          costExtensions.cost.throttleStatus.currentlyAvailable <= 0
-        ) {
-          // Calculate wait time based on restore rate
-          const restoreRate =
-            costExtensions.cost.throttleStatus.restoreRate || 50;
-          const waitTime = Math.ceil(1000 / restoreRate) * 2; // Double for safety
-
-          logger.info(
-            `[ShopifyGraphQLClient] Rate limited. Waiting ${waitTime}ms before retry...`
-          );
-          await new Promise((resolve) => setTimeout(resolve, waitTime));
-
-          // Retry the request
-          return this.makeRequest<T>(query, variables);
-        }
-
-        // Return with errors for proper handling upstream
         return {
           data: (data ?? ({} as T)) as T,
           errors: (errors as Array<{
@@ -1231,7 +1250,6 @@ export class ShopifyGraphQLClient {
         } as GraphQLResponse<T>;
       }
 
-      // Log network errors
       logger.error("[ShopifyGraphQLClient] Network/Request error", {
         message: graphQLError.message,
         code: graphQLError.code,
@@ -1239,13 +1257,103 @@ export class ShopifyGraphQLClient {
         variables,
       });
 
-      // Network or other errors
       throw new ShopifyAPIError(
         graphQLError.message || "Unknown error occurred",
         "NETWORK_ERROR",
-        graphQLError
+        graphQLError,
       );
     }
+  }
+
+  private extractThrottleStatus(
+    extensions: unknown,
+  ): {
+    currentlyAvailable?: number;
+    restoreRate?: number;
+    maximumAvailable?: number;
+  } | null {
+    if (!extensions || typeof extensions !== "object") return null;
+    const cost = (extensions as any).cost;
+    if (!cost || typeof cost !== "object") return null;
+    const throttleStatus = cost.throttleStatus;
+    if (!throttleStatus || typeof throttleStatus !== "object") return null;
+    return throttleStatus as {
+      currentlyAvailable?: number;
+      restoreRate?: number;
+      maximumAvailable?: number;
+    };
+  }
+
+  private calculateThrottleDelay(
+    throttleStatus: {
+      currentlyAvailable?: number;
+      restoreRate?: number;
+      maximumAvailable?: number;
+    } | null,
+    attempt: number,
+  ): number {
+    const multiplier = Math.max(1, this.BACKOFF_MULTIPLIER);
+    const attemptDelay = Math.min(
+      this.BASE_THROTTLE_DELAY * Math.pow(multiplier, attempt),
+      this.MAX_THROTTLE_DELAY,
+    );
+
+    if (!throttleStatus) {
+      return attemptDelay;
+    }
+
+    const restoreRate = throttleStatus.restoreRate ||
+      SHOPIFY_CONFIG.API.RATE_LIMIT.GRAPHQL.RESTORE_RATE;
+    const currentlyAvailable = throttleStatus.currentlyAvailable ?? 0;
+
+    if (!restoreRate) {
+      return attemptDelay;
+    }
+
+    const deficit = Math.max(0, this.SAFETY_BUFFER - currentlyAvailable);
+    const computedDelay = deficit > 0
+      ? Math.ceil(deficit / restoreRate) * 1000
+      : 0;
+
+    const delay = Math.max(attemptDelay, computedDelay);
+    const jitter = 0.9 + Math.random() * 0.2;
+    return Math.min(Math.round(delay * jitter), this.MAX_THROTTLE_DELAY);
+  }
+
+  private async applyThrottleBuffer(
+    throttleStatus: {
+      currentlyAvailable?: number;
+      restoreRate?: number;
+      maximumAvailable?: number;
+    } | null,
+  ): Promise<void> {
+    if (!throttleStatus) return;
+
+    const currentlyAvailable = throttleStatus.currentlyAvailable ?? 0;
+    if (currentlyAvailable >= this.SAFETY_BUFFER) return;
+
+    const restoreRate = throttleStatus.restoreRate ||
+      SHOPIFY_CONFIG.API.RATE_LIMIT.GRAPHQL.RESTORE_RATE;
+    if (!restoreRate) return;
+
+    const deficit = this.SAFETY_BUFFER - currentlyAvailable;
+    const waitTime = Math.min(
+      Math.ceil(deficit / restoreRate) * 1000,
+      this.MAX_THROTTLE_DELAY,
+    );
+
+    if (waitTime > 0) {
+      logger.debug("[ShopifyGraphQLClient] Cooling down after response", {
+        waitTime,
+        currentlyAvailable,
+      });
+      await this.delay(waitTime);
+    }
+  }
+
+  private async delay(ms: number): Promise<void> {
+    if (ms <= 0) return;
+    await new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   /**

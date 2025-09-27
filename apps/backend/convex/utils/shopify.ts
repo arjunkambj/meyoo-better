@@ -21,3 +21,23 @@ export const toNum = (x: unknown): number => {
 
 export const toMoney = (x: unknown): number => toNum(x);
 
+export const toStringArray = (value: unknown): string[] | undefined => {
+  if (!Array.isArray(value)) return undefined;
+
+  const strings = value
+    .map((entry) => {
+      if (typeof entry === 'string') {
+        const trimmed = entry.trim();
+        return trimmed.length > 0 ? trimmed : undefined;
+      }
+
+      if (typeof entry === 'number') {
+        return String(entry);
+      }
+
+      return undefined;
+    })
+    .filter((entry): entry is string => entry !== undefined);
+
+  return strings.length > 0 ? strings : [];
+};

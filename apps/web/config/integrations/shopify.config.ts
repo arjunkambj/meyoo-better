@@ -13,6 +13,11 @@ export const SHOPIFY_CONFIG = {
       GRAPHQL: {
         COST_LIMIT: 1000,
         RESTORE_RATE: 50, // points per second
+        MAX_RETRIES: 8,
+        THROTTLE_BACKOFF_MS: 1500,
+        BACKOFF_MULTIPLIER: 1.7,
+        MAX_BACKOFF_MS: 12000,
+        SAFETY_BUFFER: 200,
       },
     },
   },
@@ -21,8 +26,8 @@ export const SHOPIFY_CONFIG = {
   QUERIES: {
     PRODUCTS_BATCH_SIZE: 50,
     ORDERS_BATCH_SIZE: 100, // Safe limit tested to avoid rate limits
-    CUSTOMERS_BATCH_SIZE: 100,
-    INVENTORY_BATCH_SIZE: 25,
+    CUSTOMERS_BATCH_SIZE: 200,
+    INVENTORY_BATCH_SIZE: 150,
   },
 
   // Webhook Topics
@@ -152,7 +157,7 @@ export const SHOPIFY_CONFIG = {
     WEBHOOK_MAX_RETRIES: 3,
     INVENTORY_LOCATION_LIMIT: 10,
     INITIAL_SYNC_DAYS: 60, // Sync 60 days of data for initial sync (matching Google/Meta)
-    ORDER_BATCH_PROCESS_SIZE: 10, // Process orders in batches of 10
+    ORDER_BATCH_PROCESS_SIZE: 125, // Process orders in batches of 125
   },
 
   // Error Messages

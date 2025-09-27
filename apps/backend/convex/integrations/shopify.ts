@@ -15,6 +15,7 @@ import {
 
 import { createIntegration, type SyncResult } from "./_base";
 import { normalizeShopDomain } from "../utils/shop";
+import { toStringArray } from "../utils/shopify";
 
 const logger = createSimpleLogger("Shopify");
 
@@ -2653,18 +2654,27 @@ export const storeFulfillmentsInternal = internalMutation({
         )
         .first();
 
+      const trackingNumbers =
+        toStringArray(fulfillment.trackingNumbers) ??
+        toStringArray(existing?.trackingNumbers) ??
+        [];
+      const trackingUrls =
+        toStringArray(fulfillment.trackingUrls) ??
+        toStringArray(existing?.trackingUrls) ??
+        [];
+
       const fulfillmentData = {
         organizationId: args.organizationId as Id<"organizations">,
         orderId: order._id,
         shopifyId: fulfillment.shopifyId,
         shopifyOrderId: fulfillment.shopifyOrderId,
         status: fulfillment.status,
-        shipmentStatus: fulfillment.shipmentStatus,
-        trackingCompany: fulfillment.trackingCompany,
-        trackingNumbers: fulfillment.trackingNumbers,
-        trackingUrls: fulfillment.trackingUrls,
-        locationId: fulfillment.locationId,
-        service: fulfillment.service,
+        shipmentStatus: toOptionalString(fulfillment.shipmentStatus),
+        trackingCompany: toOptionalString(fulfillment.trackingCompany),
+        trackingNumbers,
+        trackingUrls,
+        locationId: toOptionalString(fulfillment.locationId),
+        service: toOptionalString(fulfillment.service),
         lineItems: fulfillment.lineItems,
         shopifyCreatedAt: fulfillment.shopifyCreatedAt,
         shopifyUpdatedAt: fulfillment.shopifyUpdatedAt,
@@ -2836,14 +2846,28 @@ function parseFulfillmentWebhook(
   payload: WebhookPayload
 ): Record<string, unknown> {
   // Parse Shopify fulfillment webhook payload
+  const trackingNumbers =
+    payload.tracking_numbers == null
+      ? []
+      : toStringArray(payload.tracking_numbers);
+  const trackingUrls =
+    payload.tracking_urls == null ? [] : toStringArray(payload.tracking_urls);
+  const shipmentStatus = toOptionalString(payload.shipment_status);
+  const trackingCompany = toOptionalString(payload.tracking_company);
+  const locationId = toOptionalString(payload.location_id);
+  const service = toOptionalString(payload.service);
+
   return {
     organizationId: payload.organizationId,
     shopifyId: String(payload.id),
     shopifyOrderId: String(payload.order_id),
     status: payload.status,
-    trackingCompany: payload.tracking_company,
-    trackingNumbers: payload.tracking_numbers || [],
-    trackingUrls: payload.tracking_urls || [],
+    shipmentStatus,
+    trackingCompany,
+    ...(trackingNumbers !== undefined ? { trackingNumbers } : {}),
+    ...(trackingUrls !== undefined ? { trackingUrls } : {}),
+    ...(locationId !== undefined ? { locationId } : {}),
+    ...(service !== undefined ? { service } : {}),
     lineItems: payload.line_items || [],
     shopifyCreatedAt: Date.parse(payload.created_at as string),
     shopifyUpdatedAt: payload.updated_at

@@ -1,6 +1,14 @@
 import { v } from "convex/values";
 
+import type { Id } from "../_generated/dataModel";
 import { internalMutation } from "../_generated/server";
+
+const syncStageState = v.union(
+  v.literal("pending"),
+  v.literal("processing"),
+  v.literal("completed"),
+  v.literal("failed"),
+);
 
 /**
  * Create sync session
@@ -17,6 +25,42 @@ export const createSyncSession = internalMutation({
     alreadyRunning: v.boolean(),
   }),
   handler: async (ctx, args) => {
+    const ensureShopifyStageMetadata = async (
+      sessionId: Id<"syncSessions">,
+    ) => {
+      if (args.platform !== "shopify") return;
+
+      const session = await ctx.db.get(sessionId);
+      if (!session) return;
+
+      const metadata = (session.metadata || {}) as Record<string, any>;
+      const stageStatus = (metadata.stageStatus || {}) as Record<string, any>;
+
+      if (
+        stageStatus.products &&
+        stageStatus.inventory &&
+        stageStatus.customers &&
+        stageStatus.orders
+      ) {
+        return;
+      }
+
+      await ctx.db.patch(sessionId, {
+        metadata: {
+          ...metadata,
+          stageStatus: {
+            products: stageStatus.products ?? "pending",
+            inventory: stageStatus.inventory ?? "pending",
+            customers: stageStatus.customers ?? "pending",
+            orders: stageStatus.orders ?? "pending",
+          },
+          syncedEntities: Array.isArray(metadata.syncedEntities)
+            ? metadata.syncedEntities
+            : [],
+        },
+      });
+    };
+
     if (args.sessionId) {
       const reserved = await ctx.db.get(args.sessionId);
 
@@ -34,6 +78,8 @@ export const createSyncSession = internalMutation({
             startedAt: Date.now(),
             type: reserved.type || args.type,
           });
+
+          await ensureShopifyStageMetadata(reserved._id);
 
           return { sessionId: reserved._id, alreadyRunning: false };
         }
@@ -65,6 +111,8 @@ export const createSyncSession = internalMutation({
             type: existing.type || args.type,
           });
 
+          await ensureShopifyStageMetadata(existing._id);
+
           return { sessionId: existing._id, alreadyRunning: false };
         }
 
@@ -78,7 +126,23 @@ export const createSyncSession = internalMutation({
       type: args.type,
       status: "syncing",
       startedAt: Date.now(),
+      metadata:
+        args.platform === "shopify"
+          ? {
+              stageStatus: {
+                products: "pending",
+                inventory: "pending",
+                customers: "pending",
+                orders: "pending",
+              },
+              syncedEntities: [],
+            }
+          : undefined,
     });
+
+    if (args.platform === "shopify") {
+      await ensureShopifyStageMetadata(sessionId);
+    }
 
     return { sessionId, alreadyRunning: false };
   },
@@ -208,5 +272,66 @@ export const incrementSyncSessionProgress = internalMutation({
       recordsProcessed: nextRecordsProcessed,
       startedAt: session.startedAt,
     };
+  },
+});
+
+/**
+ * Patch sync session metadata with progress markers
+ */
+export const patchSyncSessionMetadata = internalMutation({
+  args: {
+    sessionId: v.id("syncSessions"),
+    metadata: v.object({
+      lastCursor: v.optional(v.union(v.string(), v.null())),
+      currentPage: v.optional(v.number()),
+      totalOrdersSeen: v.optional(v.number()),
+      totalPages: v.optional(v.number()),
+      stageStatus: v.optional(
+        v.object({
+          products: v.optional(syncStageState),
+          inventory: v.optional(syncStageState),
+          customers: v.optional(syncStageState),
+          orders: v.optional(syncStageState),
+        }),
+      ),
+      syncedEntities: v.optional(v.array(v.string())),
+    }),
+  },
+  handler: async (ctx, args) => {
+    const session = await ctx.db.get(args.sessionId);
+    if (!session) return;
+
+    const existing = (session.metadata || {}) as Record<string, unknown>;
+    const nextMetadata: Record<string, unknown> = { ...existing };
+
+    const { stageStatus, syncedEntities, ...rest } = args.metadata;
+
+    for (const [key, value] of Object.entries(rest)) {
+      if (value !== undefined) {
+        nextMetadata[key] = value;
+      }
+    }
+
+    if (stageStatus) {
+      const existingStage = (
+        existing.stageStatus as Record<string, unknown> | undefined
+      ) || {};
+      nextMetadata.stageStatus = {
+        ...existingStage,
+        ...stageStatus,
+      };
+    }
+
+    if (syncedEntities) {
+      const current = Array.isArray(existing.syncedEntities)
+        ? (existing.syncedEntities as string[])
+        : [];
+      const merged = new Set([...current, ...syncedEntities]);
+      nextMetadata.syncedEntities = Array.from(merged);
+    }
+
+    await ctx.db.patch(args.sessionId, {
+      metadata: nextMetadata,
+    });
   },
 });

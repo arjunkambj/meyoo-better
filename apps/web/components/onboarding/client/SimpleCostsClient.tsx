@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Input, addToast } from "@heroui/react";
+import { Button, Card, CardBody, Input, Spinner, addToast } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -19,7 +19,15 @@ import { setNavigationPendingAtom } from "@/store/onboarding";
 
 export default function SimpleCostsClient() {
   const router = useRouter();
-  const { status } = useOnboarding();
+  const {
+    status,
+    isShopifySyncing,
+    hasShopifySyncError,
+    shopifySyncProgress,
+    isShopifyProductsSynced,
+    isShopifyInventorySynced,
+    shopifyStageStatus,
+  } = useOnboarding();
   const { saveInitialCosts } = useOnboardingCosts();
   const updateOnboardingState = useUpdateOnboardingState();
   const { primaryCurrency } = useUser();
@@ -38,6 +46,14 @@ export default function SimpleCostsClient() {
       router.replace("/onboarding/billing");
     }
   }, [status, router]);
+
+  const formatStage = (stage?: string | null) =>
+    stage ? stage.replace(/_/g, " ") : "pending";
+  const costDataReady =
+    (isShopifyProductsSynced ?? false) || (isShopifyInventorySynced ?? false);
+  const productStageLabel = formatStage(shopifyStageStatus?.products);
+  const inventoryStageLabel = formatStage(shopifyStageStatus?.inventory);
+  const ordersStageLabel = formatStage(shopifyStageStatus?.orders);
 
   const [form, setForm] = useState({
     operatingCosts: "",
@@ -182,6 +198,67 @@ export default function SimpleCostsClient() {
   }, [form, saveInitialCosts, updateOnboardingState, router]);
 
   // Skip option removed to simplify UX
+
+  if (!costDataReady) {
+    return (
+      <section className="mx-auto flex max-w-2xl flex-col items-center gap-4 py-16 text-center">
+        <Card className="w-full border-warning bg-warning-50/40">
+          <CardBody className="space-y-3 text-default-700">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 text-warning-500">
+                <Icon icon="solar:refresh-circle-line-duotone" width={28} />
+              </div>
+              <div className="text-start space-y-1">
+                <p className="font-semibold text-warning-600">
+                  Shopify sync {hasShopifySyncError ? "needs attention" : "is still running"}
+                </p>
+                <p className="text-sm leading-relaxed">
+                  {hasShopifySyncError
+                    ? "We couldn\u2019t finish importing your Shopify data. Please return to the Shopify step to restart the sync before configuring costs."
+                    : "We\u2019re still importing orders and products from Shopify. Once the import completes you can finish setting up costs."}
+                </p>
+                <p className="text-xs uppercase tracking-wide text-warning-500">
+                  Products: {productStageLabel} • Inventory: {inventoryStageLabel} • Orders stage: {ordersStageLabel}
+                  {shopifySyncProgress.recordsProcessed
+                    ? ` • Orders processed: ${shopifySyncProgress.recordsProcessed}`
+                    : ""}
+                </p>
+              </div>
+            </div>
+            {!hasShopifySyncError && (
+              <div className="flex items-center justify-start gap-2 text-warning-500">
+                <Spinner size="sm" color="warning" />
+                <span className="text-xs">
+                  We&apos;ll unlock this step automatically when the sync finishes.
+                </span>
+              </div>
+            )}
+          </CardBody>
+        </Card>
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <Button
+            variant="flat"
+            size="sm"
+            color="primary"
+            onPress={() => router.refresh()}
+            isDisabled={isShopifySyncing}
+          >
+            Refresh status
+          </Button>
+          {hasShopifySyncError && (
+            <Button
+              variant="solid"
+              size="sm"
+              color="warning"
+              onPress={() => router.push("/onboarding/shopify")}
+            >
+              Retry Shopify sync
+            </Button>
+          )}
+        </div>
+      </section>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">

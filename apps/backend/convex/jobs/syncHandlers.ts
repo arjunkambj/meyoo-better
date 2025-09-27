@@ -325,6 +325,14 @@ export const handleShopifyOrdersBatch = internalAction({
           progress.totalBatches > 0 &&
           progress.completedBatches >= progress.totalBatches
         ) {
+          await ctx.runMutation(internal.jobs.helpers.patchSyncSessionMetadata, {
+            sessionId: args.syncSessionId,
+            metadata: {
+              stageStatus: { orders: "completed" },
+              syncedEntities: ["orders"],
+            },
+          });
+
           await ctx.runMutation(internal.jobs.helpers.updateSyncSession, {
             sessionId: args.syncSessionId,
             status: "completed",
@@ -354,6 +362,12 @@ export const handleShopifyOrdersBatch = internalAction({
       };
     } catch (error) {
       if (args.syncSessionId) {
+        await ctx.runMutation(internal.jobs.helpers.patchSyncSessionMetadata, {
+          sessionId: args.syncSessionId,
+          metadata: {
+            stageStatus: { orders: "failed" },
+          },
+        });
         await ctx.runMutation(internal.jobs.helpers.updateSyncSession, {
           sessionId: args.syncSessionId,
           status: "failed",

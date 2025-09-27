@@ -7,6 +7,7 @@ import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { internalAction } from "../_generated/server";
 import { createJob, PRIORITY } from "../engine/workpool";
+import { toStringArray } from "../utils/shopify";
 
 // Minimal GraphQL types to avoid `any`
 type ShopifyMoney = { amount?: string; currencyCode?: string };
@@ -462,6 +463,13 @@ function mapOrderNodeToPersistence(
 
   if (order.fulfillments && Array.isArray(order.fulfillments)) {
     for (const fulfillment of order.fulfillments) {
+      const trackingNumbers = toStringArray(
+        fulfillment.trackingInfo?.map((t) => t.number),
+      );
+      const trackingUrls = toStringArray(
+        fulfillment.trackingInfo?.map((t) => t.url),
+      );
+
       fulfillments.push({
         organizationId,
         shopifyOrderId: orderId,
@@ -469,8 +477,8 @@ function mapOrderNodeToPersistence(
         status: fulfillment.status,
         shipmentStatus: undefined,
         trackingCompany: fulfillment.trackingInfo?.[0]?.company || undefined,
-        trackingNumbers: fulfillment.trackingInfo?.map((t) => t.number) || [],
-        trackingUrls: fulfillment.trackingInfo?.map((t) => t.url) || [],
+        trackingNumbers: trackingNumbers ?? [],
+        trackingUrls: trackingUrls ?? [],
         locationId: undefined,
         service: undefined,
         lineItems:
@@ -541,6 +549,29 @@ export const initial = internalAction({
     });
 
     try {
+      type StageState = "pending" | "processing" | "completed" | "failed";
+      type StageMetadataPatch = {
+        stageStatus?: Partial<
+          Record<"products" | "inventory" | "customers" | "orders", StageState>
+        >;
+        syncedEntities?: string[];
+        lastCursor?: string | null;
+        currentPage?: number;
+        totalOrdersSeen?: number;
+        totalPages?: number;
+      };
+
+      const patchSyncMetadata = async (metadata: StageMetadataPatch) => {
+        if (!args.syncSessionId) return;
+        await ctx.runMutation(
+          internal.jobs.helpers.patchSyncSessionMetadata,
+          {
+            sessionId: args.syncSessionId,
+            metadata: metadata as any,
+          },
+        );
+      };
+
       // Get store credentials from database
       const store = await ctx.runQuery(
         internal.integrations.shopify.getActiveStoreInternal,
@@ -580,8 +611,14 @@ export const initial = internalAction({
 
       // Parallel fetch products, orders, and customers
       // 1. Fetch Products
-      const productsPromise = (async () => {
+      const fetchProducts = async () => {
           try {
+            await patchSyncMetadata({
+              stageStatus: {
+                products: "processing",
+                inventory: "processing",
+              },
+            });
             logger.info("Starting products fetch", {
               timestamp: new Date().toISOString(),
               storeId: store._id,
@@ -934,22 +971,42 @@ export const initial = internalAction({
               completedAt: new Date().toISOString(),
             });
 
+            await patchSyncMetadata({
+              stageStatus: {
+                products: "completed",
+                inventory: "completed",
+              },
+              syncedEntities: ["products", "inventory"],
+            });
+
             return products.length;
           } catch (error) {
             errors.push(`Product sync failed: ${error}`);
             logger.error("Product sync failed", error);
 
+            await patchSyncMetadata({
+              stageStatus: {
+                products: "failed",
+                inventory: "failed",
+              },
+            });
+
             return 0;
           }
-        })();
+        };
 
       // 2. Fetch Orders with full details in paginated batches and enqueue persistence jobs
-      const ordersPromise = (async () => {
+      const fetchOrders = async () => {
         const startTime = Date.now();
         const persistBatchSize =
           SHOPIFY_CONFIG.SYNC?.ORDERS_PERSIST_BATCH_SIZE ?? 25;
 
         try {
+          await patchSyncMetadata({
+            stageStatus: {
+              orders: "processing",
+            },
+          });
           logger.info("Starting orders fetch", {
             timestamp: new Date().toISOString(),
             dateQuery,
@@ -1001,6 +1058,20 @@ export const initial = internalAction({
                 fulfillments: fulfillmentsPayload,
               },
             );
+
+            if (args.syncSessionId) {
+              await ctx.runMutation(
+                internal.jobs.helpers.patchSyncSessionMetadata,
+                {
+                  sessionId: args.syncSessionId,
+                  metadata: {
+                    lastCursor: cursor ?? null,
+                    currentPage: pageCount,
+                    totalOrdersSeen,
+                  },
+                },
+              );
+            }
 
             batchesScheduled += 1;
             ordersQueued += ordersPayload.length;
@@ -1096,6 +1167,20 @@ export const initial = internalAction({
 
           await flushOrderBatch();
 
+          if (args.syncSessionId) {
+            await ctx.runMutation(
+              internal.jobs.helpers.patchSyncSessionMetadata,
+              {
+                sessionId: args.syncSessionId,
+                metadata: {
+                  lastCursor: null,
+                  totalPages: pageCount,
+                  totalOrdersSeen,
+                },
+              },
+            );
+          }
+
           logger.info("✅ Orders fetch completed and batches queued", {
             batchesScheduled,
             ordersQueued,
@@ -1113,6 +1198,12 @@ export const initial = internalAction({
           errors.push(`Order sync failed: ${error}`);
           logger.error("Order sync failed", error);
 
+          await patchSyncMetadata({
+            stageStatus: {
+              orders: "failed",
+            },
+          });
+
           return {
             batchesScheduled: 0,
             ordersQueued: 0,
@@ -1120,12 +1211,17 @@ export const initial = internalAction({
             recordsProcessed: 0,
           };
         }
-      })();
+      };
 
 
       // 3. Fetch Customers with complete data
-      const customersPromise = (async () => {
+      const fetchCustomers = async () => {
           try {
+            await patchSyncMetadata({
+              stageStatus: {
+                customers: "processing",
+              },
+            });
             logger.debug("Fetching customers with complete data", {
               timestamp: new Date().toISOString(),
             });
@@ -1226,28 +1322,39 @@ export const initial = internalAction({
               completedAt: new Date().toISOString(),
             });
 
+            await patchSyncMetadata({
+              stageStatus: {
+                customers: "completed",
+              },
+              syncedEntities: ["customers"],
+            });
+
             return customers.length;
           } catch (error) {
             errors.push(`Customer sync failed: ${error}`);
             logger.error("Customer sync failed", error);
 
+            await patchSyncMetadata({
+              stageStatus: {
+                customers: "failed",
+              },
+            });
+
             return 0;
           }
-        })();
+        };
 
-      // Execute all syncs in parallel
-      logger.info("Executing parallel API calls", {
-        count: 3,
+      // Execute stages sequentially: products/inventory -> customers -> orders
+      logger.info("Executing staged Shopify sync", {
+        stages: ["products+inventory", "customers", "orders"],
       });
       const startTime = Date.now();
-      const [productsCount, orderStats, customersCount] = await Promise.all([
-        productsPromise,
-        ordersPromise,
-        customersPromise,
-      ]);
+      const productsCount = await fetchProducts();
+      const customersCount = await fetchCustomers();
+      const orderStats = await fetchOrders();
       const duration = Date.now() - startTime;
 
-      logger.info("Parallel fetch completed", { durationMs: duration });
+      logger.info("Staged fetch completed", { durationMs: duration });
       totalRecordsProcessed =
         productsCount + orderStats.recordsProcessed + customersCount;
 

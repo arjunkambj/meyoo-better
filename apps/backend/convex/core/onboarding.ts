@@ -46,6 +46,15 @@ export const getOnboardingStatus = query({
             startedAt: v.optional(v.number()),
             completedAt: v.optional(v.number()),
             lastError: v.optional(v.string()),
+            stageStatus: v.optional(
+              v.object({
+                products: v.optional(v.string()),
+                inventory: v.optional(v.string()),
+                customers: v.optional(v.string()),
+                orders: v.optional(v.string()),
+              }),
+            ),
+            syncedEntities: v.optional(v.array(v.string())),
           }),
         ),
         meta: v.optional(
@@ -100,6 +109,17 @@ export const getOnboardingStatus = query({
       .order("desc")
       .first();
 
+    const shopifyMetadata = (latestShopifySession?.metadata || {}) as Record<
+      string,
+      unknown
+    >;
+    const shopifyStageStatus = shopifyMetadata.stageStatus as
+      | Record<string, string>
+      | undefined;
+    const shopifySyncedEntities = Array.isArray(shopifyMetadata.syncedEntities)
+      ? (shopifyMetadata.syncedEntities as string[])
+      : undefined;
+
     return {
       completed: onboarding.isCompleted || false,
       currentStep: onboarding.onboardingStep || 1,
@@ -116,6 +136,15 @@ export const getOnboardingStatus = query({
               startedAt: latestShopifySession.startedAt,
               completedAt: latestShopifySession.completedAt,
               lastError: latestShopifySession.error,
+              stageStatus: shopifyStageStatus
+                ? {
+                    products: shopifyStageStatus.products,
+                    inventory: shopifyStageStatus.inventory,
+                    customers: shopifyStageStatus.customers,
+                    orders: shopifyStageStatus.orders,
+                  }
+                : undefined,
+              syncedEntities: shopifySyncedEntities,
             }
           : undefined,
         meta: latestMetaSession

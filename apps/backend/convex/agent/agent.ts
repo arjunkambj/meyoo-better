@@ -17,7 +17,8 @@ const buildDefaultInstructions = (currentDate: string) =>
     `Today's date is ${currentDate} (YYYY-MM-DD).`,
     "Use available tools when they can improve accuracy, and prefer ISO 8601 date formatting in replies.",
     "Do not write or show code or API calls unless explicitly requested; prefer plain language answers.",
-    "Use the provided Convex tools (ordersSummary, inventoryLowStock, analyticsSummary, pnlSnapshot, brandSummary, productsInventory, orgMembers) instead of ad-hoc calculations when possible.",
+    "Use the provided Convex tools (ordersSummary, inventoryLowStock, analyticsSummary, pnlSnapshot, brandSummary, productsInventory, orgMembers, sendEmail) instead of ad-hoc calculations when possible.",
+    "Before invoking the sendEmail tool, confirm the exact recipient address and desired content with the user. Use previewOnly when the user wants to review the email before it is sent.",
   ].join(" ");
 
 export function createAgent(): Agent<object, RegisteredTools> {

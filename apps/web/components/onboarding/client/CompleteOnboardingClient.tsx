@@ -1,6 +1,6 @@
 "use client";
 
-import { addToast, Button, Card, CardBody } from "@heroui/react";
+import { addToast, Button, Card, CardBody, Spinner } from "@heroui/react";
 import { cn } from "@heroui/theme";
 import { Icon } from "@iconify/react";
 import Link from "next/link";
@@ -15,8 +15,16 @@ export default function CompleteOnboardingClient() {
   const [isCompleted, setIsCompleted] = useState(false);
 
   const router = useRouter();
-  const { finishOnboarding, hasShopify, hasMeta, status } =
-    useOnboarding();
+  const {
+    finishOnboarding,
+    hasShopify,
+    hasMeta,
+    status,
+    isShopifySynced,
+    hasShopifySyncError,
+    shopifySyncStatus,
+    shopifySyncProgress,
+  } = useOnboarding();
 
   // (features list removed; unused)
 
@@ -44,6 +52,20 @@ export default function CompleteOnboardingClient() {
     if (!hasShopify) {
       console.log("[ONBOARDING] Cannot complete - Shopify not connected");
       router.push("/onboarding/shopify");
+
+      return;
+    }
+
+    if (!isShopifySynced) {
+      const msg = hasShopifySyncError
+        ? "We need to finish importing your Shopify data before completing setup. Please retry the sync from the Shopify step."
+        : "We\u2019re still importing your Shopify data. You\u2019ll be able to finish once the sync is complete.";
+      addToast({
+        title: "Shopify sync in progress",
+        description: msg,
+        color: "warning",
+        timeout: 3500,
+      });
 
       return;
     }
@@ -84,7 +106,15 @@ export default function CompleteOnboardingClient() {
         timeout: 3000,
       });
     }
-  }, [hasShopify, router, finishOnboarding, isCompleting, isCompleted]);
+  }, [
+    hasShopify,
+    router,
+    finishOnboarding,
+    isCompleting,
+    isCompleted,
+    isShopifySynced,
+    hasShopifySyncError,
+  ]);
 
   const connectionItems = [
     {
@@ -101,10 +131,50 @@ export default function CompleteOnboardingClient() {
     },
   ];
 
-  const hasRequiredConnections = hasShopify;
+  const hasRequiredConnections = hasShopify && isShopifySynced;
+  const syncStatusLabel = shopifySyncStatus
+    ? shopifySyncStatus.replace(/_/g, " ")
+    : "not started";
+  const syncingDescription = hasShopifySyncError
+    ? "The initial Shopify sync failed. Please restart the sync from the Shopify step before continuing."
+    : "We\u2019re still importing orders and products from Shopify. This can take a few minutes for larger stores.";
 
   return (
     <>
+      {!isShopifySynced && (
+        <Card className="border-warning bg-warning-50/40 mb-8">
+          <CardBody className="flex flex-col gap-3 text-default-700">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex-none text-warning-500">
+                <Icon icon="solar:refresh-circle-line-duotone" width={24} />
+              </div>
+              <div className="space-y-1">
+                <p className="font-medium text-warning-600">
+                  Shopify sync {hasShopifySyncError ? "needs attention" : "is still running"}
+                </p>
+                <p className="text-sm leading-relaxed">
+                  {syncingDescription}
+                </p>
+                <p className="text-xs uppercase tracking-wide text-warning-500">
+                  Status: {syncStatusLabel}
+                  {shopifySyncProgress.recordsProcessed
+                    ? ` • Orders processed: ${shopifySyncProgress.recordsProcessed}`
+                    : ""}
+                </p>
+              </div>
+            </div>
+            {!hasShopifySyncError && (
+              <div className="flex items-center gap-2 text-warning-500">
+                <Spinner size="sm" color="warning" />
+                <span className="text-xs">
+                  We&apos;ll enable completion automatically once the sync finishes.
+                </span>
+              </div>
+            )}
+          </CardBody>
+        </Card>
+      )}
+
       {/* Connection Summary */}
       <div>
         <h2 className="text-lg font-semibold text-default-900 mb-4">
@@ -170,8 +240,12 @@ export default function CompleteOnboardingClient() {
             ? "All Set! Redirecting..."
             : isCompleting
               ? "Finishing setup..."
-              : hasRequiredConnections
-                ? "All Set & Go to Dashboard"
+              : hasShopify
+                ? hasRequiredConnections
+                  ? "All Set & Go to Dashboard"
+                  : hasShopifySyncError
+                    ? "Resolve Shopify Sync"
+                    : "Waiting for Shopify Sync..."
                 : "Connect Shopify to Continue"}
         </Button>
 

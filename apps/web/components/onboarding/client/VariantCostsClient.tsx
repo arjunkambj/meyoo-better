@@ -2,10 +2,13 @@
 
 import {
   Button,
+  Card,
+  CardBody,
   Chip,
   Input,
   Pagination,
   Skeleton,
+  Spinner,
   Table,
   TableBody,
   TableCell,
@@ -107,10 +110,27 @@ export default function VariantCostsClient({
 
   const currency = user?.primaryCurrency || "USD";
   const currencySymbol = useMemo(() => getCurrencySymbol(currency), [currency]);
-  const { status } = useOnboarding();
+  const {
+    status,
+    isShopifySyncing,
+    hasShopifySyncError,
+    shopifySyncProgress,
+    isShopifyProductsSynced,
+    isShopifyInventorySynced,
+    shopifyStageStatus,
+  } = useOnboarding();
   const [saving, setSaving] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [groupEdits, setGroupEdits] = useState<Record<string, RowEdit>>({});
+
+  const formatStage = (stage?: string | null) =>
+    stage ? stage.replace(/_/g, " ") : "pending";
+
+  const isProductDataReady =
+    (isShopifyProductsSynced ?? false) || (isShopifyInventorySynced ?? false);
+  const productStageLabel = formatStage(shopifyStageStatus?.products);
+  const inventoryStageLabel = formatStage(shopifyStageStatus?.inventory);
+  const ordersStageLabel = formatStage(shopifyStageStatus?.orders);
 
   // Build robust column list to avoid invalid children under TableHeader
   const columns = useMemo(() => {
@@ -178,6 +198,67 @@ export default function VariantCostsClient({
     }
     return Array.from(map.values());
   }, [data]);
+
+  if (!isProductDataReady) {
+    return (
+      <div className="mx-auto flex max-w-3xl flex-col items-center gap-4 py-16 text-center">
+        <Card className="w-full border-warning bg-warning-50/40">
+          <CardBody className="space-y-3 text-default-700">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 text-warning-500">
+                <Icon icon="solar:refresh-circle-line-duotone" width={28} />
+              </div>
+              <div className="text-start space-y-1">
+                <p className="font-semibold text-warning-600">
+                  Shopify sync {hasShopifySyncError ? "needs attention" : "is still in progress"}
+                </p>
+                <p className="text-sm leading-relaxed">
+                  {hasShopifySyncError
+                    ? "We couldn\u2019t finish importing your products. Please return to the Shopify step to restart the sync."
+                    : "We\u2019re importing your products and variants from Shopify. Once the sync finishes you\u2019ll be able to set costs."}
+                </p>
+                <p className="text-xs uppercase tracking-wide text-warning-500">
+                  Products: {productStageLabel} • Inventory: {inventoryStageLabel} • Orders stage: {ordersStageLabel}
+                  {shopifySyncProgress.recordsProcessed
+                    ? ` • Orders processed: ${shopifySyncProgress.recordsProcessed}`
+                    : ""}
+                </p>
+              </div>
+            </div>
+            {!hasShopifySyncError && (
+              <div className="flex items-center justify-start gap-2 text-warning-500">
+                <Spinner size="sm" color="warning" />
+                <span className="text-xs">
+                  Feel free to grab a coffee—this only needs to finish once.
+                </span>
+              </div>
+            )}
+          </CardBody>
+        </Card>
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <Button
+            variant="flat"
+            size="sm"
+            color="primary"
+            onPress={() => router.refresh()}
+            isDisabled={isShopifySyncing}
+          >
+            Refresh status
+          </Button>
+          {hasShopifySyncError && (
+            <Button
+              variant="solid"
+              size="sm"
+              color="warning"
+              onPress={() => router.push("/onboarding/shopify")}
+            >
+              Retry Shopify sync
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   const handleSaveRow = async (variantId: string) => {
     const e = edits[variantId];

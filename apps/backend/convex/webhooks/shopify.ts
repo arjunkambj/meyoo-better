@@ -3,7 +3,12 @@ import { createSimpleLogger } from "../../libs/logging/simple";
 import { internal } from "../_generated/api";
 import { httpAction } from "../_generated/server";
 import { WebhookUtils } from "../integrations/_base";
-import { toNum, toMoney, toMs as toTs } from "../utils/shopify";
+import {
+  toNum,
+  toMoney,
+  toMs as toTs,
+  toStringArray,
+} from "../utils/shopify";
 import { optionalEnv, requireEnv } from "../utils/env";
 import type { Id } from "../_generated/dataModel";
 
@@ -474,17 +479,19 @@ async function handleTopicInline(
     case "fulfillments/update": {
       if (!organizationId) break;
       const f: any = payload;
+      const trackingNumbers = toStringArray(f.tracking_numbers) ?? [];
+      const trackingUrls = toStringArray(f.tracking_urls) ?? [];
       const fulfillments = [
         {
           shopifyId: String(f.id),
           shopifyOrderId: String(f.order_id),
           status: f.status,
-          shipmentStatus: f.shipment_status,
-          trackingCompany: f.tracking_company,
-          trackingNumbers: Array.isArray(f.tracking_numbers) ? f.tracking_numbers : [],
-          trackingUrls: Array.isArray(f.tracking_urls) ? f.tracking_urls : [],
+          shipmentStatus: toOptionalString(f.shipment_status),
+          trackingCompany: toOptionalString(f.tracking_company),
+          trackingNumbers,
+          trackingUrls,
           locationId: f.location_id ? String(f.location_id) : undefined,
-          service: f.service,
+          service: toOptionalString(f.service),
           lineItems: Array.isArray(f.line_items)
             ? f.line_items.map((li: any) => ({ id: String(li.id), quantity: toNum(li.quantity) }))
             : [],

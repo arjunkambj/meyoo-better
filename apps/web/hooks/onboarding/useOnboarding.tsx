@@ -20,6 +20,13 @@ function useOnboardingInternal() {
           startedAt?: number;
           completedAt?: number;
           lastError?: string;
+          stageStatus?: {
+            products?: string;
+            inventory?: string;
+            customers?: string;
+            orders?: string;
+          };
+          syncedEntities?: string[];
         };
         meta?: {
           status: string;
@@ -37,6 +44,31 @@ function useOnboardingInternal() {
     api.core.onboarding.updateBusinessProfile
   );
   const completeMutation = useMutation(api.core.onboarding.completeOnboarding);
+
+  const shopifySyncStatus = syncStatus?.shopify?.status ?? null;
+  const isShopifySynced = shopifySyncStatus === "completed";
+  const isShopifySyncing = shopifySyncStatus
+    ? ["pending", "syncing", "processing"].includes(shopifySyncStatus)
+    : false;
+  const hasShopifySyncError = shopifySyncStatus === "failed";
+  const shopifySyncProgress = {
+    status: shopifySyncStatus,
+    recordsProcessed: syncStatus?.shopify?.recordsProcessed ?? 0,
+    startedAt: syncStatus?.shopify?.startedAt ?? null,
+    completedAt: syncStatus?.shopify?.completedAt ?? null,
+    lastError: syncStatus?.shopify?.lastError ?? null,
+  } as const;
+
+  const shopifyStageStatus = syncStatus?.shopify?.stageStatus ?? null;
+  const isShopifyProductsSynced =
+    (shopifyStageStatus?.products ?? null) === "completed";
+  const isShopifyInventorySynced =
+    (shopifyStageStatus?.inventory ?? null) === "completed";
+  const isShopifyCustomersSynced =
+    (shopifyStageStatus?.customers ?? null) === "completed";
+  const isShopifyOrdersSynced =
+    (shopifyStageStatus?.orders ?? null) === "completed";
+  const shopifySyncedEntities = syncStatus?.shopify?.syncedEntities ?? undefined;
 
   // Next step navigation
   const nextStep = async () => {
@@ -110,6 +142,17 @@ function useOnboardingInternal() {
     isProductCostSetup: status?.isProductCostSetup || false,
     isExtraCostSetup: status?.isExtraCostSetup || false,
     hasMeta: status?.connections?.meta || false,
+    shopifySyncStatus,
+    isShopifySynced,
+    isShopifySyncing,
+    hasShopifySyncError,
+    shopifySyncProgress,
+    shopifyStageStatus,
+    shopifySyncedEntities,
+    isShopifyProductsSynced,
+    isShopifyInventorySynced,
+    isShopifyCustomersSynced,
+    isShopifyOrdersSynced,
   };
 }
 
@@ -138,6 +181,17 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       value.isProductCostSetup,
       value.isExtraCostSetup,
       value.hasMeta,
+      value.shopifySyncStatus,
+      value.isShopifySynced,
+      value.isShopifySyncing,
+      value.hasShopifySyncError,
+      value.shopifySyncProgress,
+      value.shopifyStageStatus,
+      value.shopifySyncedEntities,
+      value.isShopifyProductsSynced,
+      value.isShopifyInventorySynced,
+      value.isShopifyCustomersSynced,
+      value.isShopifyOrdersSynced,
     ],
   );
 

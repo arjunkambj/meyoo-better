@@ -858,6 +858,123 @@ export const monitorInitialSyncs = internalMutation({
     let analyticsCount = 0;
     let pendingCount = 0;
 
+    // Heal sync sessions that imported data but never flipped to "completed" so onboarding can finish.
+    const attemptFinalizeSession = async (
+      session: Doc<"syncSessions">,
+    ): Promise<
+      | {
+          finalized: true;
+          normalizedOrdersProcessed?: number;
+        }
+      | { finalized: false }
+    > => {
+      if (session.status === "completed") {
+        return { finalized: true };
+      }
+
+      const metadata = (session.metadata || {}) as Record<string, any>;
+      const totalBatches =
+        typeof metadata.totalBatches === "number"
+          ? metadata.totalBatches
+          : undefined;
+      const completedBatches =
+        typeof metadata.completedBatches === "number"
+          ? metadata.completedBatches
+          : undefined;
+      const ordersQueued =
+        typeof metadata.ordersQueued === "number"
+          ? metadata.ordersQueued
+          : undefined;
+      const ordersProcessedMeta =
+        typeof metadata.ordersProcessed === "number"
+          ? metadata.ordersProcessed
+          : undefined;
+      const baselineRecords =
+        typeof metadata.baselineRecords === "number"
+          ? metadata.baselineRecords
+          : undefined;
+      const recordsProcessed =
+        typeof session.recordsProcessed === "number"
+          ? session.recordsProcessed
+          : undefined;
+
+      const normalizedOrdersProcessed =
+        ordersProcessedMeta !== undefined
+          ? ordersProcessedMeta
+          : baselineRecords !== undefined && recordsProcessed !== undefined
+            ? Math.max(0, recordsProcessed - baselineRecords)
+            : undefined;
+
+      const stageStatus = metadata.stageStatus as
+        | Record<string, string>
+        | undefined;
+
+      const isBatchesComplete =
+        totalBatches !== undefined &&
+        completedBatches !== undefined &&
+        totalBatches > 0 &&
+        completedBatches >= totalBatches;
+      const isOrdersComplete =
+        ordersQueued !== undefined &&
+        normalizedOrdersProcessed !== undefined &&
+        ordersQueued >= 0 &&
+        normalizedOrdersProcessed >= ordersQueued;
+      const isStagesComplete = Boolean(
+        stageStatus &&
+          stageStatus.orders === "completed" &&
+          stageStatus.products === "completed" &&
+          stageStatus.inventory === "completed" &&
+          stageStatus.customers === "completed",
+      );
+
+      if (!isBatchesComplete && !isOrdersComplete && !isStagesComplete) {
+        return { finalized: false };
+      }
+
+      const nextMetadata: Record<string, any> = { ...metadata };
+
+      if (stageStatus) {
+        nextMetadata.stageStatus = {
+          ...stageStatus,
+          orders: "completed",
+        };
+      }
+
+      if (normalizedOrdersProcessed !== undefined) {
+        nextMetadata.ordersProcessed = normalizedOrdersProcessed;
+      }
+
+      if (totalBatches !== undefined) {
+        nextMetadata.totalBatches = totalBatches;
+      }
+
+      if (completedBatches !== undefined) {
+        nextMetadata.completedBatches = Math.min(
+          completedBatches,
+          totalBatches ?? completedBatches,
+        );
+      }
+
+      const syncedEntities = Array.isArray(metadata.syncedEntities)
+        ? new Set(metadata.syncedEntities as string[])
+        : new Set<string>();
+      syncedEntities.add("orders");
+      nextMetadata.syncedEntities = Array.from(syncedEntities);
+
+      await ctx.db.patch(session._id, {
+        status: "completed",
+        completedAt: session.completedAt ?? Date.now(),
+        recordsProcessed:
+          recordsProcessed ??
+          normalizedOrdersProcessed ??
+          ordersQueued ??
+          0,
+        metadata: nextMetadata,
+      });
+
+      return { finalized: true, normalizedOrdersProcessed };
+    };
+
     for (const onboarding of candidates) {
       if (processed >= limit) break;
       if (!onboarding.organizationId) continue;
@@ -935,6 +1052,20 @@ export const monitorInitialSyncs = internalMutation({
           let hasCompleted = initialSessions.some(
             (session) => session.status === "completed",
           );
+
+          if (!hasCompleted && initialSessions.length > 0) {
+            const [latestInitial] = initialSessions;
+
+            if (latestInitial) {
+              const finalizeResult = await attemptFinalizeSession(latestInitial);
+
+              if (finalizeResult.finalized) {
+                hasCompleted = true;
+                hasActive = false;
+                hasFailed = false;
+              }
+            }
+          }
 
           if (!hasActive && !hasFailed && !hasCompleted) {
             const fallbackFlags = await findInitialSyncStatusFlags(

@@ -5,15 +5,17 @@ import {Icon} from "@iconify/react";
 
 export default function NewChatButton({ onNew }: { onNew: () => void }) {
   return (
-    <Tooltip content="New chat">
+    <Tooltip content="Start new chat">
       <Button
         size="sm"
         variant="flat"
         color="primary"
-        startContent={<Icon icon="solar:chat-square-like-bold" width={16} />}
+        radius="md"
+        startContent={<Icon icon="solar:pen-new-square-bold-duotone" width={18} />}
         onPress={onNew}
+        className="hover:bg-primary/20 transition-colors"
       >
-        New
+        New chat
       </Button>
     </Tooltip>
   );

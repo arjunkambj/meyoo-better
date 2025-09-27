@@ -15,12 +15,12 @@ export default function AgentToggle() {
     <Tooltip content="AI Assistant" placement="left">
       <Button
         isIconOnly
-        className="fixed right-4 bottom-20 z-40 bg-primary text-primary-foreground border border-primary-600/30 hover:bg-primary/90 transition-colors"
+        className="fixed right-4 bottom-20 z-40 bg-primary text-primary-foreground hover:bg-primary/90 transition-all hover:scale-105"
         radius="full"
         size="lg"
         onPress={() => setIsOpen(true)}
       >
-        <Icon icon="solar:magic-stick-3-bold" width={24} />
+        <Icon icon="solar:chat-round-dots-bold-duotone" width={26} />
       </Button>
     </Tooltip>
   );

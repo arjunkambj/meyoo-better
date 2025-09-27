@@ -104,11 +104,17 @@ export const listMessages = query({
     });
 
     if (!thread) {
+      const emptyStreams = args.streamArgs
+        ? args.streamArgs.kind === "deltas"
+          ? { kind: "deltas", deltas: [] }
+          : { kind: "list", messages: [] }
+        : undefined;
+
       return {
         page: [],
         continueCursor: null,
         isDone: true,
-        streams: undefined,
+        streams: emptyStreams,
       };
     }
 

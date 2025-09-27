@@ -33,50 +33,56 @@ export default function AgentChatInput({
 
   return (
     <div className={cn("w-full", className)}>
-      <div className="flex items-end gap-1">
-        <div className="flex-1 relative">
-          <Textarea
-            aria-label="Chat message"
-            className="w-full"
-            variant="bordered"
-            size="sm"
-            minRows={4}
-            maxRows={4}
-            isDisabled={disabled}
-            isReadOnly={busy}
-            placeholder={placeholder}
-            value={message}
-            onValueChange={setMessage}
-            classNames={{
-              // Keep background stable; highlight border on hover/focus
-              inputWrapper:
-                "bg-transparent hover:bg-transparent focus-within:bg-transparent border-default hover:border-primary focus-within:border-primary",
-              input: "bg-transparent",
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                handleSend();
-              }
-            }}
-          />
+      <div className="relative">
+        <Textarea
+          aria-label="Chat message"
+          className="w-full"
+          size="sm"
+          minRows={4}
+          maxRows={4}
+          isDisabled={disabled}
+          isReadOnly={busy}
+          placeholder={placeholder}
+          value={message}
+          onValueChange={setMessage}
+          classNames={{
+            // Keep background stable across all states
+            inputWrapper: cn(
+              "bg-background rounded-2xl",
+              "hover:bg-default-100",
+              "focus-within:bg-background",
+              "data-[hover=true]:bg-background ",
+              "border-1 hover:border-2 focus-within:border-2",
+              "hover:border-primary-300",
+              "focus-within:border-primary",
+              "transition-colors duration-200",
+              "pr-12" // Add padding for the button
+            ),
+            input: cn("bg-transparent", "placeholder:text-default-500"),
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              handleSend();
+            }
+          }}
+        />
 
-          <div className="absolute right-1 bottom-1">
-            <Tooltip content={canSend ? "Send" : "Type a message"}>
-              <Button
-                isIconOnly
-                size="sm"
-                color="primary"
-                radius="lg"
-                variant="flat"
-                isDisabled={!canSend}
-                isLoading={busy}
-                onPress={handleSend}
-              >
-                <Icon icon="mdi:send" width={16} />
-              </Button>
-            </Tooltip>
-          </div>
+        <div className="absolute right-2 bottom-2 z-10">
+          <Tooltip content={canSend ? "Send" : "Type a message"}>
+            <Button
+              isIconOnly
+              size="sm"
+              color="primary"
+              radius="lg"
+              variant="solid"
+              isDisabled={!canSend}
+              isLoading={busy}
+              onPress={handleSend}
+            >
+              <Icon icon="solar:plain-2-bold-duotone" width={20} />
+            </Button>
+          </Tooltip>
         </div>
       </div>
     </div>

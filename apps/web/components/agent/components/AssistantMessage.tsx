@@ -24,26 +24,44 @@ export default function AssistantMessage({
       setCopied(true);
       setTimeout(() => setCopied(false), 1000);
     } catch (err) {
-      console.debug('copy failed', err);
+      console.debug("copy failed", err);
     }
   };
 
   return (
-    <div className="flex items-start py-1">
+    <div className="flex items-start py-2">
       <div className="max-w-[90%] group relative">
-        <div className="inline-block rounded-2xl rounded-tl-sm bg-content2 text-foreground text-sm px-3 py-2">
-          <AgentResponseFormatter content={content} onCopy={() => void handleCopyAll()} />
+        <div className="inline-block rounded-lg rounded-tl-sm bg-content2 text-foreground text-sm px-3 py-2.5">
+          <AgentResponseFormatter
+            content={content}
+            onCopy={() => void handleCopyAll()}
+          />
         </div>
         {streaming ? null : (
-          <div className="mt-1 flex items-center gap-1 text-[11px] text-default-600">
-            <Button isIconOnly size="sm" variant="light" onPress={handleCopyAll}>
-              <Icon icon="solar:copy-bold" width={13} />
+          <div className="mt-1.5 flex items-center gap-0.5 text-xs text-default-500">
+            <Button
+              isIconOnly
+              size="sm"
+              variant="light"
+              onPress={handleCopyAll}
+            >
+              <Icon icon="solar:copy-bold-duotone" width={14} />
             </Button>
-            <Button isIconOnly size="sm" variant="light" onPress={() => onVote?.("up")}>
-              <Icon icon="solar:like-bold" width={13} />
+            <Button
+              isIconOnly
+              size="sm"
+              variant="light"
+              onPress={() => onVote?.("up")}
+            >
+              <Icon icon="solar:like-bold-duotone" width={14} />
             </Button>
-            <Button isIconOnly size="sm" variant="light" onPress={() => onVote?.("down")}>
-              <Icon icon="solar:dislike-bold" width={13} />
+            <Button
+              isIconOnly
+              size="sm"
+              variant="light"
+              onPress={() => onVote?.("down")}
+            >
+              <Icon icon="solar:dislike-bold-duotone" width={14} />
             </Button>
           </div>
         )}

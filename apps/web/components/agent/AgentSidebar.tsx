@@ -65,6 +65,7 @@ export default function AgentSidebar({
         className={cn(
           "h-full bg-default-50 px-1 pb-2 dark:bg-default-100",
           "flex flex-col overflow-hidden transition-all duration-300 ease-in-out",
+          "border-l border-default-200",
           isMobile
             ? cn(
                 "fixed right-0 top-0 bottom-0 w-full max-w-md z-50 transform",
@@ -82,9 +83,11 @@ export default function AgentSidebar({
               isIconOnly
               size="sm"
               variant="light"
+              radius="md"
               onPress={() => setIsOpen(false)}
+              className="hover:bg-content2 transition-colors"
             >
-              <Icon icon="solar:close-circle-line-duotone" width={20} />
+              <Icon icon="solar:close-circle-bold-duotone" width={22} />
             </Button>
           </div>
         )}

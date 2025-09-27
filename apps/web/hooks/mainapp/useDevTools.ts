@@ -25,8 +25,8 @@ export function useDevTools() {
   }, [expanded]);
 
   const currentUser = useQuery(api.core.users.getCurrentUser);
-  const resetMeta = useMutation(api.meyoo.admin.resetMetaData);
-  const resetShopify = useMutation(api.meyoo.admin.resetShopifyData);
+  const resetMeta = useAction(api.meyoo.admin.resetMetaData);
+  const resetShopify = useAction(api.meyoo.admin.resetShopifyData);
   const resetAll = useAction(api.meyoo.admin.resetEverything);
 
   const [loading, setLoading] = useState(false);

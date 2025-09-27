@@ -192,6 +192,47 @@ export const deleteTicketsBatch = internalMutation({
   },
 });
 
+export const deleteIntegrationSessionsByPlatformBatch = internalMutation({
+  args: {
+    organizationId: v.id("organizations"),
+    platform: v.union(v.literal("shopify"), v.literal("meta")),
+    cursor: v.optional(v.string()),
+    batchSize: v.optional(v.number()),
+  },
+  returns: v.object({
+    deleted: v.number(),
+    hasMore: v.boolean(),
+    cursor: v.optional(v.string()),
+  }),
+  handler: async (ctx, args) => {
+    const batchSize = normalizeBatchSize(
+      args.batchSize,
+      RESET_DEFAULT_BATCH_SIZE,
+      RESET_MAX_BATCH_SIZE,
+    );
+
+    const page = await ctx.db
+      .query("integrationSessions")
+      .withIndex("by_org_and_platform", (q) =>
+        q.eq("organizationId", args.organizationId).eq("platform", args.platform),
+      )
+      .paginate({
+        numItems: batchSize,
+        cursor: args.cursor ?? null,
+      });
+
+    for (const session of page.page) {
+      await ctx.db.delete(session._id);
+    }
+
+    return {
+      deleted: page.page.length,
+      hasMore: !page.isDone,
+      cursor: page.isDone ? undefined : page.continueCursor,
+    };
+  },
+});
+
 export const resetMembersBatch = internalMutation({
   args: {
     organizationId: v.id("organizations"),
@@ -251,6 +292,132 @@ export const resetMembersBatch = internalMutation({
 
       await ctx.db.patch(member._id, {
         isOnboarded: false,
+        updatedAt: Date.now(),
+      });
+
+      updated++;
+    }
+
+    return {
+      updated,
+      hasMore: !page.isDone,
+      cursor: page.isDone ? undefined : page.continueCursor,
+    };
+  },
+});
+
+export const resetShopifyMembersBatch = internalMutation({
+  args: {
+    organizationId: v.id("organizations"),
+    cursor: v.optional(v.string()),
+    batchSize: v.optional(v.number()),
+  },
+  returns: v.object({
+    updated: v.number(),
+    hasMore: v.boolean(),
+    cursor: v.optional(v.string()),
+  }),
+  handler: async (ctx, args) => {
+    const batchSize = normalizeBatchSize(
+      args.batchSize,
+      RESET_MEMBER_BATCH_SIZE,
+      RESET_MAX_BATCH_SIZE,
+    );
+
+    const page = await ctx.db
+      .query("users")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", args.organizationId),
+      )
+      .paginate({
+        numItems: batchSize,
+        cursor: args.cursor ?? null,
+      });
+
+    let updated = 0;
+
+    for (const member of page.page) {
+      const onboarding = await ctx.db
+        .query("onboarding")
+        .withIndex("by_user_organization", (q) =>
+          q.eq("userId", member._id).eq("organizationId", args.organizationId),
+        )
+        .first();
+
+      if (onboarding) {
+        await ctx.db.patch(onboarding._id, {
+          hasShopifyConnection: false,
+          hasShopifySubscription: false,
+          isProductCostSetup: false,
+          isExtraCostSetup: false,
+          hasMetaConnection: false,
+          hasGoogleConnection: false,
+          updatedAt: Date.now(),
+        });
+      }
+
+      await ctx.db.patch(member._id, {
+        updatedAt: Date.now(),
+      });
+
+      updated++;
+    }
+
+    return {
+      updated,
+      hasMore: !page.isDone,
+      cursor: page.isDone ? undefined : page.continueCursor,
+    };
+  },
+});
+
+export const resetMetaMembersBatch = internalMutation({
+  args: {
+    organizationId: v.id("organizations"),
+    cursor: v.optional(v.string()),
+    batchSize: v.optional(v.number()),
+  },
+  returns: v.object({
+    updated: v.number(),
+    hasMore: v.boolean(),
+    cursor: v.optional(v.string()),
+  }),
+  handler: async (ctx, args) => {
+    const batchSize = normalizeBatchSize(
+      args.batchSize,
+      RESET_MEMBER_BATCH_SIZE,
+      RESET_MAX_BATCH_SIZE,
+    );
+
+    const page = await ctx.db
+      .query("users")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", args.organizationId),
+      )
+      .paginate({
+        numItems: batchSize,
+        cursor: args.cursor ?? null,
+      });
+
+    let updated = 0;
+
+    for (const member of page.page) {
+      const onboarding = await ctx.db
+        .query("onboarding")
+        .withIndex("by_user_organization", (q) =>
+          q.eq("userId", member._id).eq("organizationId", args.organizationId),
+        )
+        .first();
+
+      if (onboarding) {
+        await ctx.db.patch(onboarding._id, {
+          hasMetaConnection: false,
+          updatedAt: Date.now(),
+        });
+      }
+
+      await ctx.db.patch(member._id, {
+        isOnboarded: true,
         updatedAt: Date.now(),
       });
 
@@ -982,7 +1149,7 @@ export const resetTestData = mutation({
 /**
  * Reset Meta data for an organization and update user flags
  */
-export const resetMetaData = mutation({
+export const resetMetaData = action({
   args: {
     organizationId: v.id("organizations"),
   },
@@ -1005,7 +1172,9 @@ export const resetMetaData = mutation({
       throw new Error("Not authenticated");
     }
 
-    const user = await ctx.db.get(userId);
+    const user = await ctx.runQuery(internal.meyoo.admin.getUserById, {
+      userId,
+    });
 
     if (!user || !isAdmin(user)) {
       throw new Error("Admin access required");
@@ -1015,110 +1184,107 @@ export const resetMetaData = mutation({
       throw new Error("Cannot reset data in production environment");
     }
 
-    let metaAdAccounts = 0;
-    const metaCampaigns = 0;
-    const metaAds = 0;
-    let metaInsights = 0;
-    let integrationSessions = 0;
+    const counts = {
+      metaAdAccounts: 0,
+      metaCampaigns: 0,
+      metaAds: 0,
+      metaInsights: 0,
+      integrationSessions: 0,
+      usersUpdated: 0,
+    } satisfies Record<string, number>;
+
     const webhookLogs = 0;
-    let usersUpdated = 0;
 
-    // Delete Meta ad accounts
-    const accounts = await ctx.db
-      .query("metaAdAccounts")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId),
-      )
-      .collect();
+    const deleteTableWithCount = async (
+      table: OrgScopedTable,
+      key: keyof typeof counts,
+    ) => {
+      let hasMore = true;
+      let cursor: string | undefined;
 
-    for (const a of accounts) {
-      await ctx.db.delete(a._id);
-      metaAdAccounts++;
-    }
+      while (hasMore) {
+        const result = await ctx.runMutation(
+          internal.meyoo.admin.deleteOrgRecordsBatch,
+          {
+            table,
+            organizationId: args.organizationId,
+            batchSize: RESET_DEFAULT_BATCH_SIZE,
+            cursor,
+          },
+        );
 
-    // Delete Meta campaigns (table not present in schema) -> keep counter at 0
-    // Delete Meta ads (table not present in schema) -> keep counter at 0
-
-    // Delete Meta insights
-    const insights = await ctx.db
-      .query("metaInsights")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId),
-      )
-      .collect();
-
-    for (const i of insights) {
-      await ctx.db.delete(i._id);
-      metaInsights++;
-    }
-
-    // Webhook logs removed
-
-    // Remove/disable integration sessions for Meta
-    const sessions = await ctx.db
-      .query("integrationSessions")
-      .withIndex("by_org_and_platform", (q) =>
-        q.eq("organizationId", args.organizationId).eq("platform", "meta"),
-      )
-      .collect();
-
-    for (const s of sessions) {
-      await ctx.db.delete(s._id);
-      integrationSessions++;
-    }
-
-    // Update user flags in the organization
-    const members = await ctx.db
-      .query("users")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId),
-      )
-      .collect();
-
-    for (const m of members) {
-      // Update onboarding record instead of user
-      const onboarding = await ctx.db
-        .query("onboarding")
-        .withIndex("by_user_organization", (q) =>
-          q.eq("userId", m._id).eq("organizationId", args.organizationId),
-        )
-        .first();
-
-      if (onboarding) {
-        await ctx.db.patch(onboarding._id, {
-          hasMetaConnection: false,
-          updatedAt: Date.now(),
-        });
+        counts[key] += result.deleted;
+        hasMore = result.hasMore;
+        cursor = result.cursor;
       }
+    };
 
-      await ctx.db.patch(m._id, {
-        isOnboarded: true,
-        updatedAt: Date.now(),
-      });
-      usersUpdated++;
-    }
+    const deleteIntegrationSessions = async () => {
+      let hasMore = true;
+      let cursor: string | undefined;
 
-    // NOTE: NOT deleting or modifying billing record per requirements
+      while (hasMore) {
+        const result = await ctx.runMutation(
+          internal.meyoo.admin.deleteIntegrationSessionsByPlatformBatch,
+          {
+            organizationId: args.organizationId,
+            platform: "meta",
+            batchSize: RESET_DEFAULT_BATCH_SIZE,
+            cursor,
+          },
+        );
+
+        counts.integrationSessions += result.deleted;
+        hasMore = result.hasMore;
+        cursor = result.cursor;
+      }
+    };
+
+    const resetMembers = async () => {
+      let hasMore = true;
+      let cursor: string | undefined;
+
+      while (hasMore) {
+        const result = await ctx.runMutation(
+          internal.meyoo.admin.resetMetaMembersBatch,
+          {
+            organizationId: args.organizationId,
+            batchSize: RESET_MEMBER_BATCH_SIZE,
+            cursor,
+          },
+        );
+
+        counts.usersUpdated += result.updated;
+        hasMore = result.hasMore;
+        cursor = result.cursor;
+      }
+    };
+
+    await deleteTableWithCount("metaAdAccounts", "metaAdAccounts");
+    await deleteTableWithCount("metaInsights", "metaInsights");
+
+    await deleteIntegrationSessions();
+    await resetMembers();
 
     return {
       success: true,
       deletedCounts: {
-        metaAdAccounts,
-        metaCampaigns,
-        metaAds,
-      metaInsights,
-      integrationSessions,
-      webhookLogs,
-      usersUpdated,
-    },
-  };
+        metaAdAccounts: counts.metaAdAccounts,
+        metaCampaigns: counts.metaCampaigns,
+        metaAds: counts.metaAds,
+        metaInsights: counts.metaInsights,
+        integrationSessions: counts.integrationSessions,
+        webhookLogs,
+        usersUpdated: counts.usersUpdated,
+      },
+    };
   },
 });
 
 /**
  * Reset Shopify data for an organization and update user flags
  */
-export const resetShopifyData = mutation({
+export const resetShopifyData = action({
   args: {
     organizationId: v.id("organizations"),
   },
@@ -1149,7 +1315,9 @@ export const resetShopifyData = mutation({
       throw new Error("Not authenticated");
     }
 
-    const user = await ctx.db.get(userId);
+    const user = await ctx.runQuery(internal.meyoo.admin.getUserById, {
+      userId,
+    });
 
     if (!user || !isAdmin(user)) {
       throw new Error("Admin access required");
@@ -1159,239 +1327,159 @@ export const resetShopifyData = mutation({
       throw new Error("Cannot reset data in production environment");
     }
 
-    let stores = 0;
-    let orders = 0;
-    let orderItems = 0;
-    let refunds = 0;
-    let transactions = 0;
-    let fulfillments = 0;
-    let products = 0;
-    let variants = 0;
-    let inventory = 0;
-    let customers = 0;
-    const metafields = 0;
-    const webhookLogs = 0;
-    let integrationSessions = 0;
+    const counts: {
+      stores: number;
+      orders: number;
+      orderItems: number;
+      refunds: number;
+      transactions: number;
+      fulfillments: number;
+      products: number;
+      variants: number;
+      inventory: number;
+      customers: number;
+      integrationSessions: number;
+      usersUpdated: number;
+    } = {
+      stores: 0,
+      orders: 0,
+      orderItems: 0,
+      refunds: 0,
+      transactions: 0,
+      fulfillments: 0,
+      products: 0,
+      variants: 0,
+      inventory: 0,
+      customers: 0,
+      integrationSessions: 0,
+      usersUpdated: 0,
+    };
+
     let billingReset = false;
-    let usersUpdated = 0;
 
-    // Load orders by organization and delete children first
-    const orderList = await ctx.db
-      .query("shopifyOrders")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId),
-      )
-      .collect();
+    const deleteTableWithCount = async (
+      table: OrgScopedTable,
+      key: keyof typeof counts,
+    ) => {
+      let hasMore = true;
+      let cursor: string | undefined;
 
-    for (const order of orderList) {
-      // delete order items
-      const items = await ctx.db
-        .query("shopifyOrderItems")
-        .withIndex("by_order", (q) => q.eq("orderId", order._id))
-        .collect();
+      while (hasMore) {
+        const result = await ctx.runMutation(
+          internal.meyoo.admin.deleteOrgRecordsBatch,
+          {
+            table,
+            organizationId: args.organizationId,
+            batchSize: RESET_DEFAULT_BATCH_SIZE,
+            cursor,
+          },
+        );
 
-      for (const item of items) {
-        await ctx.db.delete(item._id);
-        orderItems++;
+        counts[key] += result.deleted;
+        hasMore = result.hasMore;
+        cursor = result.cursor;
       }
+    };
 
-      // delete refunds
-      const orderRefunds = await ctx.db
-        .query("shopifyRefunds")
-        .withIndex("by_order", (q) => q.eq("orderId", order._id))
-        .collect();
+    const deleteIntegrationSessions = async () => {
+      let hasMore = true;
+      let cursor: string | undefined;
 
-      for (const r of orderRefunds) {
-        await ctx.db.delete(r._id);
-        refunds++;
+      while (hasMore) {
+        const result = await ctx.runMutation(
+          internal.meyoo.admin.deleteIntegrationSessionsByPlatformBatch,
+          {
+            organizationId: args.organizationId,
+            platform: "shopify",
+            batchSize: RESET_DEFAULT_BATCH_SIZE,
+            cursor,
+          },
+        );
+
+        counts.integrationSessions += result.deleted;
+        hasMore = result.hasMore;
+        cursor = result.cursor;
       }
+    };
 
-      // delete transactions
-      const orderTxs = await ctx.db
-        .query("shopifyTransactions")
-        .withIndex("by_order", (q) => q.eq("orderId", order._id))
-        .collect();
+    const resetMembers = async () => {
+      let hasMore = true;
+      let cursor: string | undefined;
 
-      for (const t of orderTxs) {
-        await ctx.db.delete(t._id);
-        transactions++;
+      while (hasMore) {
+        const result = await ctx.runMutation(
+          internal.meyoo.admin.resetShopifyMembersBatch,
+          {
+            organizationId: args.organizationId,
+            batchSize: RESET_MEMBER_BATCH_SIZE,
+            cursor,
+          },
+        );
+
+        counts.usersUpdated += result.updated;
+        hasMore = result.hasMore;
+        cursor = result.cursor;
       }
+    };
 
-      // delete fulfillments
-      const orderFfs = await ctx.db
-        .query("shopifyFulfillments")
-        .withIndex("by_order", (q) => q.eq("orderId", order._id))
-        .collect();
+    const deleteBilling = async () => {
+      let hasMore = true;
+      let cursor: string | undefined;
 
-      for (const f of orderFfs) {
-        await ctx.db.delete(f._id);
-        fulfillments++;
-      }
+      while (hasMore) {
+        const result = await ctx.runMutation(
+          internal.meyoo.admin.deleteOrgRecordsBatch,
+          {
+            table: "billing",
+            organizationId: args.organizationId,
+            batchSize: RESET_DEFAULT_BATCH_SIZE,
+            cursor,
+          },
+        );
 
-      // delete order itself
-      await ctx.db.delete(order._id);
-      orders++;
-    }
-
-    // Delete products and variants (and variant inventory)
-    const productList = await ctx.db
-      .query("shopifyProducts")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId),
-      )
-      .collect();
-
-    for (const p of productList) {
-      const productVariants = await ctx.db
-        .query("shopifyProductVariants")
-        .withIndex("by_product", (q) => q.eq("productId", p._id))
-        .collect();
-
-      for (const v of productVariants) {
-        // delete inventory per variant
-        const inv = await ctx.db
-          .query("shopifyInventory")
-          .withIndex("by_variant", (q) => q.eq("variantId", v._id))
-          .collect();
-
-        for (const iv of inv) {
-          await ctx.db.delete(iv._id);
-          inventory++;
+        if (result.deleted > 0) {
+          billingReset = true;
         }
 
-        await ctx.db.delete(v._id);
-        variants++;
+        hasMore = result.hasMore;
+        cursor = result.cursor;
       }
+    };
 
-      await ctx.db.delete(p._id);
-      products++;
-    }
+    // Delete child tables before parent tables to avoid dangling references
+    await deleteTableWithCount("shopifyOrderItems", "orderItems");
+    await deleteTableWithCount("shopifyRefunds", "refunds");
+    await deleteTableWithCount("shopifyTransactions", "transactions");
+    await deleteTableWithCount("shopifyFulfillments", "fulfillments");
+    await deleteTableWithCount("shopifyInventory", "inventory");
+    await deleteTableWithCount("shopifyProductVariants", "variants");
+    await deleteTableWithCount("shopifyProducts", "products");
+    await deleteTableWithCount("shopifyOrders", "orders");
+    await deleteTableWithCount("shopifyCustomers", "customers");
+    await deleteTableWithCount("shopifyStores", "stores");
 
-    // Delete any remaining inventory by organization (safety)
-    const invByOrg = await ctx.db
-      .query("shopifyInventory")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId),
-      )
-      .collect();
-
-    for (const iv of invByOrg) {
-      await ctx.db.delete(iv._id);
-      inventory++;
-    }
-
-    // Delete customers
-    const customersList = await ctx.db
-      .query("shopifyCustomers")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId),
-      )
-      .collect();
-
-    for (const c of customersList) {
-      await ctx.db.delete(c._id);
-      customers++;
-    }
-
-    // Delete shopifyMetafields (table not present in schema) -> keep counter at 0
-
-    // Delete stores last
-    const storesList = await ctx.db
-      .query("shopifyStores")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId),
-      )
-      .collect();
-
-    for (const s of storesList) {
-      await ctx.db.delete(s._id);
-      stores++;
-    }
-
-    // Webhook logs removed
-
-    // Remove integration sessions for Shopify
-    const sessions = await ctx.db
-      .query("integrationSessions")
-      .withIndex("by_org_and_platform", (q) =>
-        q.eq("organizationId", args.organizationId).eq("platform", "shopify"),
-      )
-      .collect();
-
-    for (const s of sessions) {
-      await ctx.db.delete(s._id);
-      integrationSessions++;
-    }
-
-    // Update user flags in the organization
-    const members = await ctx.db
-      .query("users")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId),
-      )
-      .collect();
-
-    for (const m of members) {
-      // Update onboarding record instead of user
-      const onboarding = await ctx.db
-        .query("onboarding")
-        .withIndex("by_user_organization", (q) =>
-          q.eq("userId", m._id).eq("organizationId", args.organizationId),
-        )
-        .first();
-
-      if (onboarding) {
-        await ctx.db.patch(onboarding._id, {
-          hasShopifyConnection: false,
-          hasShopifySubscription: false,
-          isProductCostSetup: false,
-          isExtraCostSetup: false,
-          // Also mark other integrations disconnected as requested
-          hasMetaConnection: false,
-          hasGoogleConnection: false,
-          updatedAt: Date.now(),
-        });
-      }
-
-      await ctx.db.patch(m._id, {
-        updatedAt: Date.now(),
-      });
-      usersUpdated++;
-    }
-
-    // Delete billing record to require billing on reinstall/reconnect
-    const billing = await ctx.db
-      .query("billing")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId),
-      )
-      .first();
-
-    if (billing) {
-      await ctx.db.delete(billing._id);
-    }
-
-    // Do not recreate billing here; leave org without a plan so reinstall goes through billing step
-    billingReset = true;
+    await deleteIntegrationSessions();
+    await resetMembers();
+    await deleteBilling();
 
     return {
       success: true,
       deletedCounts: {
-        stores,
-        orders,
-        orderItems,
-        refunds,
-        transactions,
-        fulfillments,
-        products,
-        variants,
-        inventory,
-        customers,
-        metafields,
-        webhookLogs,
-        integrationSessions,
+        stores: counts.stores,
+        orders: counts.orders,
+        orderItems: counts.orderItems,
+        refunds: counts.refunds,
+        transactions: counts.transactions,
+        fulfillments: counts.fulfillments,
+        products: counts.products,
+        variants: counts.variants,
+        inventory: counts.inventory,
+        customers: counts.customers,
+        metafields: 0,
+        webhookLogs: 0,
+        integrationSessions: counts.integrationSessions,
         billingReset,
-        usersUpdated,
+        usersUpdated: counts.usersUpdated,
       },
     };
   },

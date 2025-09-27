@@ -2,7 +2,7 @@
 export const designSystem = {
   // Section spacing
   spacing: {
-    section: "py-20 sm:py-24 lg:py-24", // Consistent section padding
+    section: "py-20 sm:py-24 lg:py-28 2xl:py-36", // Consistent section padding
     container: "container mx-auto px-4 sm:px-6 lg:px-8", // Standard container
     gap: {
       sm: "gap-4",

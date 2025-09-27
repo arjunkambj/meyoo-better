@@ -42,13 +42,13 @@ const socialLinks = [
 const Footer = () => {
   return (
     <section
-      className={`relative ${designSystem.spacing.section} ${designSystem.background.gradient}`}
+      className={`relative py-20 sm:py-24 lg:py-24 ${designSystem.background.gradient}`}
     >
       <div className={designSystem.spacing.container}>
         <footer>
           {/* CTA Section */}
           <div
-            className={`mb-16 sm:mb-24 rounded-2xl max-w-7xl mx-auto  p-8 sm:p-10 md:p-12 lg:p-16 transition-all duration-300 ${designSystem.card.base}`}
+            className={`mb-16 sm:mb-24 rounded-2xl max-w-7xl mx-auto p-8 sm:p-10 md:p-12 lg:p-16 transition-all duration-300 ${designSystem.card.base}`}
           >
             <div className="flex flex-col items-center text-center gap-5">
               <h2 className="max-w-[700px] text-2xl leading-tight font-semibold tracking-tight text-balance sm:text-3xl lg:text-4xl text-foreground">
@@ -114,7 +114,7 @@ const Footer = () => {
           </nav>
 
           {/* Bottom Section */}
-          <div className="mx-auto mt-4 py-8">
+          <div className="mx-auto mt-4 pt-8">
             <div className="flex flex-col items-center justify-between gap-6 text-center sm:flex-row sm:text-left">
               <p className="text-sm sm:text-base text-muted-foreground">
                 © 2025 Meyoo Inc. All rights reserved.

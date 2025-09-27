@@ -202,17 +202,6 @@ export function AgentConversationsScreen() {
         </View>
       </ScrollView>
 
-      {threads && threads.length > 0 && (
-        <View className="absolute bottom-6 right-4">
-          <TouchableOpacity
-            onPress={handleNewChat}
-            className="h-14 w-14 rounded-full bg-primary items-center justify-center"
-            activeOpacity={0.8}
-          >
-            <Ionicons name="add" size={28} color="white" />
-          </TouchableOpacity>
-        </View>
-      )}
     </View>
   );
 }

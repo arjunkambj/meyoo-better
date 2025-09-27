@@ -1,13 +1,18 @@
 import { useCallback, useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { ScrollView, Text, View, RefreshControl, TouchableOpacity } from "react-native";
+import {
+  ScrollView,
+  Text,
+  View,
+  RefreshControl,
+  TouchableOpacity,
+} from "react-native";
 import { KPICard, KPIGrid } from "@/components/analytics/KPICard";
 import { DateRangePickerButton } from "@/components/shared/DateRangePicker";
-import { RevenueChart, ChannelBreakdown } from "@/components/analytics/RevenueChart";
+
 import { useOverviewAnalytics, usePlatformMetrics } from "@/hooks/useAnalytics";
 import { useUserDetails } from "@/hooks/useUserDetails";
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter } from "expo-router";
 
 export default function OverviewTab() {
   const [refreshing, setRefreshing] = useState(false);
@@ -34,7 +39,7 @@ export default function OverviewTab() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        <View className="flex-1 gap-6 px-4 py-6">
+        <View className="flex-1 gap-6 px-4 py-3">
           {/* Header with Date Picker */}
           <View className="gap-3">
             <View className="flex-row items-center justify-between">
@@ -42,7 +47,9 @@ export default function OverviewTab() {
                 <Text className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
                   Analytics
                 </Text>
-                <Text className="text-2xl font-bold text-foreground">Overview</Text>
+                <Text className="text-2xl font-bold text-foreground">
+                  Overview
+                </Text>
               </View>
               <DateRangePickerButton />
             </View>
@@ -53,7 +60,9 @@ export default function OverviewTab() {
 
           {/* Main Metrics */}
           <View className="gap-4">
-            <Text className="text-sm font-semibold text-default-600">Key Metrics</Text>
+            <Text className="text-sm font-semibold text-default-600">
+              Key Metrics
+            </Text>
             <KPIGrid>
               <KPICard
                 title="Revenue"
@@ -98,7 +107,9 @@ export default function OverviewTab() {
 
           {/* Profitability Metrics */}
           <View className="gap-4">
-            <Text className="text-sm font-semibold text-default-600">Profitability</Text>
+            <Text className="text-sm font-semibold text-default-600">
+              Profitability
+            </Text>
             <KPIGrid>
               <KPICard
                 title="Net Profit"
@@ -124,7 +135,9 @@ export default function OverviewTab() {
 
           {/* Marketing Metrics */}
           <View className="gap-4">
-            <Text className="text-sm font-semibold text-default-600">Marketing</Text>
+            <Text className="text-sm font-semibold text-default-600">
+              Marketing
+            </Text>
             <KPIGrid>
               <KPICard
                 title="Ad Spend"
@@ -148,15 +161,11 @@ export default function OverviewTab() {
             </KPIGrid>
           </View>
 
-          {/* Revenue Chart */}
-          <RevenueChart />
-
-          {/* Channel Breakdown */}
-          <ChannelBreakdown />
-
           {/* Customer Metrics */}
           <View className="gap-4">
-            <Text className="text-sm font-semibold text-default-600">Customers</Text>
+            <Text className="text-sm font-semibold text-default-600">
+              Customers
+            </Text>
             <KPIGrid>
               <KPICard
                 title="Total Customers"
@@ -182,7 +191,9 @@ export default function OverviewTab() {
           {/* Platform Performance */}
           {(shopify || meta || google) && (
             <View className="gap-4">
-              <Text className="text-sm font-semibold text-default-600">Platform Performance</Text>
+              <Text className="text-sm font-semibold text-default-600">
+                Platform Performance
+              </Text>
               <View className="gap-3">
                 {shopify && (
                   <KPICard
@@ -225,22 +236,6 @@ export default function OverviewTab() {
           )}
         </View>
       </ScrollView>
-
-      {/* Floating Action Button for Agent */}
-      <TouchableOpacity
-        onPress={() => router.push('/agent')}
-        className="absolute bottom-4 right-4 h-14 w-14 rounded-full bg-primary items-center justify-center"
-        style={{
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.2,
-          shadowRadius: 6,
-          elevation: 8,
-        }}
-        activeOpacity={0.8}
-      >
-        <Ionicons name="chatbubbles" size={24} color="white" />
-      </TouchableOpacity>
     </SafeAreaView>
   );
 }

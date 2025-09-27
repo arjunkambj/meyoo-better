@@ -1,11 +1,11 @@
-import { Platform } from 'react-native';
-import { ConvexAuthProvider } from '@convex-dev/auth/react';
-import { ConvexReactClient } from 'convex/react';
-import { Stack } from 'expo-router';
-import * as SecureStore from 'expo-secure-store';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import '@/styles/global.css';
-import { HeroUINativeProvider } from 'heroui-native';
+import { Platform } from "react-native";
+import { ConvexAuthProvider } from "@convex-dev/auth/react";
+import { ConvexReactClient } from "convex/react";
+import { Stack } from "expo-router";
+import * as SecureStore from "expo-secure-store";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import "@/styles/global.css";
+import { HeroUINativeProvider } from "heroui-native";
 
 const convex = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL!, {
   unsavedChangesWarning: false,
@@ -22,7 +22,7 @@ export default function RootLayout() {
     <ConvexAuthProvider
       client={convex}
       storage={
-        Platform.OS === 'android' || Platform.OS === 'ios'
+        Platform.OS === "android" || Platform.OS === "ios"
           ? secureStorage
           : undefined
       }
@@ -30,7 +30,7 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <HeroUINativeProvider
           config={{
-            colorScheme: 'system',
+            colorScheme: "system",
             textProps: {
               allowFontScaling: false,
             },

@@ -1,23 +1,23 @@
-import { Button, Chip } from 'heroui-native';
-import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { ScrollView, Text, View } from 'react-native';
+import { Button, Chip } from "heroui-native";
+import { useRouter } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { ScrollView, Text, View } from "react-native";
 
 const PLACEHOLDER_FEATURES = [
   {
-    title: 'Guided checklists',
+    title: "Guided checklists",
     description:
-      'Track progress for Shopify, marketing, and finance tasks without leaving the mobile dashboard.',
+      "Track progress for Shopify, marketing, and finance tasks without leaving the mobile dashboard.",
   },
   {
-    title: 'Status at a glance',
+    title: "Status at a glance",
     description:
-      'See which integrations are connected and what still needs your attention from any device.',
+      "See which integrations are connected and what still needs your attention from any device.",
   },
   {
-    title: 'Finish on desktop',
+    title: "Finish on desktop",
     description:
-      'Complete detailed setup on the web today and pick up the same flow here once it ships.',
+      "Complete detailed setup on the web today and pick up the same flow here once it ships.",
   },
 ];
 
@@ -41,7 +41,9 @@ export default function OnboardingScreen() {
                 Onboarding is landing on mobile soon
               </Text>
               <Text className="text-base leading-6 text-default-500">
-                We’re polishing the guided setup for phones. For now, keep using the web experience to connect Shopify, billing, and marketing tools.
+                We’re polishing the guided setup for phones. For now, keep using
+                the web experience to connect Shopify, billing, and marketing
+                tools.
               </Text>
             </View>
           </View>
@@ -66,14 +68,14 @@ export default function OnboardingScreen() {
             <Button
               className="h-12"
               variant="primary"
-              onPress={() => router.replace('/(tabs)/overview')}
+              onPress={() => router.replace("/(tabs)/overview")}
             >
               Jump to the dashboard
             </Button>
             <Button
               className="h-12"
               variant="secondary"
-              onPress={() => router.push('/auth')}
+              onPress={() => router.push("/auth")}
             >
               Switch account or sign in later
             </Button>

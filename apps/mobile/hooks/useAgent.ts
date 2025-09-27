@@ -128,7 +128,7 @@ export function useAgent({
       messages: resolvedMessages,
       loadMoreMessages: messageUIMessages?.loadMore,
       messagesStatus: messageUIMessages?.status,
-      isLoadingMessages: messageUIMessages?.status === 'LoadingFirstPage',
+      isLoadingMessages: threadId ? messageUIMessages?.status === 'LoadingFirstPage' : false,
       sendMessage,
       isSending,
       lastSendResult,

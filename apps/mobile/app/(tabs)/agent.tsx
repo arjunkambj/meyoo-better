@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -8,32 +8,28 @@ import {
   TouchableOpacity,
   View,
   Animated,
-} from 'react-native';
-import { Card, Skeleton, Spinner } from 'heroui-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+} from "react-native";
+import { Card, Skeleton, Spinner } from "heroui-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import { useAgent, type AgentUIMessage } from '@/hooks/useAgent';
+import { useAgent, type AgentUIMessage } from "@/hooks/useAgent";
 
 function MessageBubble({ message }: { message: AgentUIMessage }) {
-  const isUser = message.role === 'user';
+  const isUser = message.role === "user";
 
   return (
     <View
-      className={`flex-row ${isUser ? 'justify-end' : 'justify-start'} mb-3`}
+      className={`flex-row ${isUser ? "justify-end" : "justify-start"} mb-3`}
     >
       <View
         className={`max-w-[80%] px-4 py-3 rounded-2xl ${
-          isUser
-            ? 'bg-primary rounded-br-md'
-            : 'bg-surface-2 rounded-bl-md'
+          isUser ? "bg-primary rounded-br-md" : "bg-surface-2 rounded-bl-md"
         }`}
       >
         <Text
-          className={`text-sm ${
-            isUser ? 'text-white' : 'text-foreground'
-          }`}
+          className={`text-sm ${isUser ? "text-white" : "text-foreground"}`}
         >
           {message.text}
         </Text>
@@ -48,7 +44,7 @@ export default function AgentTabScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
   const inputRef = useRef<TextInput>(null);
 
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -68,7 +64,7 @@ export default function AgentTabScreen() {
     const trimmed = message.trim();
     if (!trimmed || isSending) return;
 
-    setMessage('');
+    setMessage("");
     setIsTyping(true);
 
     try {
@@ -83,7 +79,7 @@ export default function AgentTabScreen() {
         router.setParams({ threadId: result.threadId });
       }
     } catch (error) {
-      console.error('Failed to send message:', error);
+      console.error("Failed to send message:", error);
       setMessage(trimmed); // Restore message on error
     } finally {
       setIsTyping(false);
@@ -91,7 +87,7 @@ export default function AgentTabScreen() {
   }, [message, isSending, sendMessage, threadId, router]);
 
   const handleLoadMore = useCallback(() => {
-    if (messagesStatus === 'CanLoadMore') {
+    if (messagesStatus === "CanLoadMore") {
       loadMoreMessages?.(30);
     }
   }, [messagesStatus, loadMoreMessages]);
@@ -100,25 +96,30 @@ export default function AgentTabScreen() {
     scrollViewRef.current?.scrollToEnd({ animated: true });
   }, []);
 
-  const handleScroll = useCallback((event: any) => {
-    const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
-    const isNearBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - 100;
+  const handleScroll = useCallback(
+    (event: any) => {
+      const { layoutMeasurement, contentOffset, contentSize } =
+        event.nativeEvent;
+      const isNearBottom =
+        layoutMeasurement.height + contentOffset.y >= contentSize.height - 100;
 
-    if (!isNearBottom && !showScrollToBottom) {
-      setShowScrollToBottom(true);
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }).start();
-    } else if (isNearBottom && showScrollToBottom) {
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }).start(() => setShowScrollToBottom(false));
-    }
-  }, [showScrollToBottom, fadeAnim]);
+      if (!isNearBottom && !showScrollToBottom) {
+        setShowScrollToBottom(true);
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }).start();
+      } else if (isNearBottom && showScrollToBottom) {
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }).start(() => setShowScrollToBottom(false));
+      }
+    },
+    [showScrollToBottom, fadeAnim]
+  );
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -129,25 +130,23 @@ export default function AgentTabScreen() {
     }
   }, [messages?.length]);
 
-  const canLoadMore = messagesStatus === 'CanLoadMore';
-  const isLoadingMore = messagesStatus === 'LoadingMore';
+  const canLoadMore = messagesStatus === "CanLoadMore";
+  const isLoadingMore = messagesStatus === "LoadingMore";
 
   return (
-    <View className="flex-1 bg-background">
+    <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
       {/* Header */}
-      <View className="flex-row items-center px-4 py-3 border-b border-default-100">
-        <View className="flex-1">
-          <Text className="text-lg font-semibold text-foreground">
-            Meyoo Agent
-          </Text>
-          <Text className="text-xs text-default-500">
-            {threadId ? 'Conversation' : 'New Chat'}
-          </Text>
-        </View>
-
+      <View className="flex-row items-center justify-between px-4 py-3 ">
         {/* Chat History Button */}
         <TouchableOpacity
-          onPress={() => router.push('/agent/history')}
+          onPress={() => router.push("/(tabs)/overview")}
+          className="p-2 rounded-full bg-surface-1"
+        >
+          <Ionicons name="bag-check" size={24} color="#666" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => router.push("/agent/history")}
           className="p-2 rounded-full bg-surface-1"
         >
           <Ionicons name="time-outline" size={24} color="#666" />
@@ -176,7 +175,7 @@ export default function AgentTabScreen() {
               className="py-2 mb-4 items-center"
             >
               <Text className="text-sm text-primary">
-                {isLoadingMore ? 'Loading...' : 'Load earlier messages'}
+                {isLoadingMore ? "Loading..." : "Load earlier messages"}
               </Text>
             </TouchableOpacity>
           )}
@@ -187,7 +186,7 @@ export default function AgentTabScreen() {
                 <Skeleton
                   key={i}
                   className={`h-16 rounded-2xl ${
-                    i % 2 === 0 ? 'self-start w-3/4' : 'self-end w-2/3'
+                    i % 2 === 0 ? "self-start w-3/4" : "self-end w-2/3"
                   }`}
                 />
               ))}
@@ -201,7 +200,8 @@ export default function AgentTabScreen() {
                   </View>
                   <Card.Title>Start a Conversation</Card.Title>
                   <Card.Description className="text-center px-4">
-                    Ask about your Shopify data, marketing campaigns, sync status, or anything else you need help with.
+                    Ask about your Shopify data, marketing campaigns, sync
+                    status, or anything else you need help with.
                   </Card.Description>
                 </View>
               </Card.Body>
@@ -216,8 +216,14 @@ export default function AgentTabScreen() {
                   <View className="bg-surface-2 px-4 py-3 rounded-2xl rounded-bl-md">
                     <View className="flex-row gap-1">
                       <View className="w-2 h-2 bg-default-400 rounded-full animate-pulse" />
-                      <View className="w-2 h-2 bg-default-400 rounded-full animate-pulse" style={{ animationDelay: '150ms' }} />
-                      <View className="w-2 h-2 bg-default-400 rounded-full animate-pulse" style={{ animationDelay: '300ms' }} />
+                      <View
+                        className="w-2 h-2 bg-default-400 rounded-full animate-pulse"
+                        style={{ animationDelay: "150ms" }}
+                      />
+                      <View
+                        className="w-2 h-2 bg-default-400 rounded-full animate-pulse"
+                        style={{ animationDelay: "300ms" }}
+                      />
                     </View>
                   </View>
                 </View>
@@ -231,7 +237,7 @@ export default function AgentTabScreen() {
           <Animated.View
             style={{
               opacity: fadeAnim,
-              position: 'absolute',
+              position: "absolute",
               bottom: 16,
               left: 16,
             }}
@@ -240,7 +246,7 @@ export default function AgentTabScreen() {
               onPress={scrollToBottom}
               className="h-10 w-10 rounded-full bg-surface-3 items-center justify-center"
               style={{
-                shadowColor: '#000',
+                shadowColor: "#000",
                 shadowOffset: { width: 0, height: 2 },
                 shadowOpacity: 0.1,
                 shadowRadius: 4,
@@ -255,8 +261,8 @@ export default function AgentTabScreen() {
 
       {/* Input Area */}
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
       >
         <View className="px-4 py-3 border-t border-default-100">
           <View className="flex-row items-end gap-2">
@@ -277,21 +283,19 @@ export default function AgentTabScreen() {
               onPress={handleSend}
               disabled={!message.trim() || isSending}
               className={`h-11 w-11 rounded-full items-center justify-center ${
-                message.trim() && !isSending
-                  ? 'bg-primary'
-                  : 'bg-default-200'
+                message.trim() && !isSending ? "bg-primary" : "bg-default-200"
               }`}
               activeOpacity={0.7}
             >
               <Ionicons
                 name="send"
                 size={20}
-                color={message.trim() && !isSending ? 'white' : '#999'}
+                color={message.trim() && !isSending ? "white" : "#999"}
               />
             </TouchableOpacity>
           </View>
         </View>
       </KeyboardAvoidingView>
-    </View>
+    </SafeAreaView>
   );
 }

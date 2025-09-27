@@ -42,6 +42,7 @@ export const handleInitialSync = internalAction({
       }),
     ),
     syncSessionId: v.optional(v.id("syncSessions")),
+    triggeredBy: v.optional(v.string()),
   },
   returns: v.object({
     success: v.boolean(),

@@ -2,6 +2,8 @@ import { authTables } from "@convex-dev/auth/server";
 import { defineSchema } from "convex/server";
 import {
   customerMetrics,
+  customerMetricsQueue,
+  customerMetricsQueueState,
   metricsDaily,
   metricsMonthly,
   metricsWeekly,
@@ -77,6 +79,8 @@ export default defineSchema({
   metricsMonthly,
   productMetrics,
   customerMetrics,
+  customerMetricsQueue,
+  customerMetricsQueueState,
   realtimeMetrics,
 
   // Shopify tables

@@ -467,6 +467,26 @@ export const customerMetrics = defineTable({
   .index("by_cohort", ["cohort"])
   .index("by_ltv", ["lifetimeValue"]);
 
+export const customerMetricsQueue = defineTable({
+  organizationId: v.id("organizations"),
+  customerId: v.id("shopifyCustomers"),
+  enqueuedAt: v.number(),
+  lastAttemptAt: v.optional(v.number()),
+  attempts: v.optional(v.number()),
+})
+  .index("by_organization", ["organizationId"])
+  .index("by_org_customer", ["organizationId", "customerId"])
+  .index("by_org_enqueued", ["organizationId", "enqueuedAt"]);
+
+export const customerMetricsQueueState = defineTable({
+  organizationId: v.id("organizations"),
+  isProcessing: v.boolean(),
+  scheduled: v.boolean(),
+  lastScheduledAt: v.optional(v.number()),
+  processingStartedAt: v.optional(v.number()),
+})
+  .index("by_organization", ["organizationId"]);
+
 // Real-time dashboard metrics (cached)
 export const realtimeMetrics = defineTable({
   organizationId: v.id("organizations"),

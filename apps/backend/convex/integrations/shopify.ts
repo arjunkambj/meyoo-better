@@ -3,7 +3,7 @@ import type { GenericActionCtx } from "convex/server";
 import { v } from "convex/values";
 import { ShopifyGraphQLClient } from "../../libs/shopify/ShopifyGraphQLClient";
 import { createSimpleLogger } from "../../libs/logging/simple";
-import { parseMoney, roundMoney } from "../../libs/utils/money";
+import { roundMoney } from "../../libs/utils/money";
 import { internal } from "../_generated/api";
 import type { DataModel, Doc, Id } from "../_generated/dataModel";
 import {
@@ -15,7 +15,6 @@ import {
 
 import { createIntegration, type SyncResult } from "./_base";
 import { normalizeShopDomain } from "../utils/shop";
-import { gid, toMs } from "../utils/shopify";
 
 const logger = createSimpleLogger("Shopify");
 
@@ -495,71 +494,6 @@ export const deleteShopifyStoreIfEmpty = internalMutation({
     return { deleted: true, rescheduled: false };
   },
 });
-
-// Input types matching storeOrdersInternal validator (for type safety when calling)
-type ShopifyOrderLineItemInput = {
-  shopifyId: string;
-  title: string;
-  name?: string;
-  quantity: number;
-  sku?: string;
-  shopifyVariantId?: string;
-  shopifyProductId?: string;
-  price: number;
-  discountedPrice?: number;
-  totalDiscount: number;
-  fulfillableQuantity?: number;
-  fulfillmentStatus?: string;
-};
-
-type ShopifyOrderInput = {
-  shopifyId: string;
-  orderNumber: string;
-  name: string;
-  customer?: {
-    shopifyId: string;
-    email?: string;
-    firstName?: string;
-    lastName?: string;
-    phone?: string;
-  };
-  email?: string;
-  phone?: string;
-  shopifyCreatedAt: number;
-  updatedAt?: number;
-  processedAt?: number;
-  closedAt?: number;
-  cancelledAt?: number;
-  financialStatus?: string;
-  fulfillmentStatus?: string;
-  totalPrice: number;
-  subtotalPrice: number;
-  totalTax: number;
-  totalDiscounts: number;
-  totalShippingPrice: number;
-  totalTip?: number;
-  currency?: string;
-  totalItems: number;
-  totalQuantity: number;
-  totalWeight?: number;
-  tags?: string[];
-  note?: string;
-  riskLevel?: string;
-  sourceUrl?: string;
-  landingSite?: string;
-  referringSite?: string;
-  utmSource?: string;
-  utmMedium?: string;
-  utmCampaign?: string;
-  syncedAt?: number;
-  shippingAddress?: {
-    country?: string;
-    province?: string;
-    city?: string;
-    zip?: string;
-  };
-  lineItems: ShopifyOrderLineItemInput[];
-};
 
 /**
  * Shopify Integration

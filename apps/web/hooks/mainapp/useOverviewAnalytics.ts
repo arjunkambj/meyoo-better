@@ -80,7 +80,14 @@ export function useOverviewAnalytics(dateRange?: {
 
   // Prepare metrics in the format expected by AnalyticsOverview component
   const metrics = summary
-    ? {
+    ? (() => {
+        const summaryWithExtras = summary as typeof summary & {
+          blendedSessionConversionRate?: number;
+          blendedSessionConversionRateChange?: number;
+          uniqueVisitors?: number;
+        };
+
+        return {
         // Key Performance Indicators
         revenue: {
           label: "Revenue",
@@ -149,12 +156,6 @@ export function useOverviewAnalytics(dateRange?: {
         },
 
         // Revenue & Margins (from actual data)
-        grossSales: {
-          label: "Gross Sales",
-          value: summary.grossSales || 0,
-          change: summary.grossSalesChange || 0,
-          prefix: currencySymbol,
-        },
         discounts: {
           label: "Discounts",
           value: summary.discounts || 0,
@@ -196,7 +197,9 @@ export function useOverviewAnalytics(dateRange?: {
         },
         operatingMargin: {
           label: "Operating Margin",
-          value: 0, // Still calculated elsewhere
+          value: summary.revenue > 0
+            ? ((summary.revenue - summary.cogs - summary.customCosts - summary.handlingFees - summary.shippingCosts - summary.transactionFees - summary.adSpend) / summary.revenue) * 100
+            : 0,
           suffix: "%",
           decimal: 1,
         },
@@ -313,35 +316,20 @@ export function useOverviewAnalytics(dateRange?: {
           change: summary.handlingFeesChange || 0,
           prefix: currencySymbol,
         },
-        handlingFeesPercentage: {
-          label: "Handling % of Revenue",
-          value:
-            summary.revenue > 0
-              ? (summary.handlingFees / summary.revenue) * 100
-              : 0,
-          suffix: "%",
-          decimal: 1,
-        },
         customCosts: {
-          label: "Custom Costs",
+          label: "Operating Costs",
           value: summary.customCosts || 0,
           change: summary.customCostsChange || 0,
           prefix: currencySymbol,
         },
         customCostsPercentage: {
-          label: "Custom % of Revenue",
+          label: "Operating % of Revenue",
           value:
             summary.revenue > 0
               ? (summary.customCosts / summary.revenue) * 100
               : 0,
           suffix: "%",
           decimal: 1,
-        },
-        operatingCosts: {
-          label: "Operating Costs",
-          value: 0, // TODO: Get from costs data
-          change: 0,
-          prefix: currencySymbol,
         },
 
         // Customer Economics
@@ -401,6 +389,13 @@ export function useOverviewAnalytics(dateRange?: {
           suffix: "%",
           decimal: 1,
         },
+        blendedSessionConversionRate: {
+          label: "Overall Session Conversion",
+          value: summaryWithExtras.blendedSessionConversionRate || 0,
+          change: summaryWithExtras.blendedSessionConversionRateChange || 0,
+          suffix: "%",
+          decimal: 2,
+        },
 
         // Unit Economics
         unitsSold: {
@@ -446,7 +441,8 @@ export function useOverviewAnalytics(dateRange?: {
           prefix: currencySymbol,
           decimal: 2,
         },
-      }
+        };
+      })()
     : null;
 
   return {

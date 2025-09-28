@@ -48,10 +48,9 @@ export function WidgetRenderer({
         <CostBreakdownWidget
           cogs={metricsData.cogs ?? 0}
           currency={primaryCurrency}
-          customCosts={metricsData.customCosts ?? 0}
           handlingFees={metricsData.handlingFees ?? 0}
           loading={isLoading}
-          operatingCosts={metricsData.operatingCosts ?? 0}
+          operatingCosts={metricsData.customCosts ?? 0}
           shippingCosts={metricsData.shippingCosts ?? 0}
           showCostSetupWarning={showCostSetupWarning}
           taxes={metricsData.taxesCollected ?? 0}
@@ -67,14 +66,10 @@ export function WidgetRenderer({
           cacChange={overviewMetrics?.customerAcquisitionCost?.change ?? 0}
           currency={primaryCurrency}
           loading={isLoading}
-          newCustomers={metricsData.newCustomers ?? 0}
-          newCustomersChange={overviewMetrics?.newCustomers?.change ?? 0}
           repurchaseRate={metricsData.repurchaseRate ?? 0}
           repurchaseRateChange={overviewMetrics?.repeatCustomerRate?.change ?? 0}
           returnRate={metricsData.returnRate ?? 0}
           returnRateChange={overviewMetrics?.returnRate?.change ?? 0}
-          totalCustomers={metricsData.totalCustomers ?? 0}
-          totalCustomersChange={overviewMetrics?.totalCustomers?.change ?? 0}
         />
       );
     case "orderSummary":

@@ -58,7 +58,6 @@ export const metricsDaily = defineTable({
 
   // Session & Conversion Tracking
   uniqueVisitors: v.optional(v.number()), // Unique visitors
-  shopifySessions: v.optional(v.number()), // Shopify store sessions
   shopifyConversionRate: v.optional(v.number()), // Shopify session to order conversion rate
   metaClicks: v.optional(v.number()), // Meta ad clicks
   metaPurchases: v.optional(v.number()), // Meta attributed purchases
@@ -115,7 +114,6 @@ export const metricsDaily = defineTable({
 
   // 10. Customer Economics
   cacPercentageOfAOV: v.optional(v.number()),
-  cacPaybackPeriod: v.optional(v.number()),
 
   // 11. Unit Economics
   profitPerOrder: v.optional(v.number()),
@@ -245,7 +243,6 @@ export const metricsWeekly = defineTable({
 
   // Customer Economics
   cacPercentageOfAOV: v.optional(v.number()),
-  cacPaybackPeriod: v.optional(v.number()),
 
   // Unit Economics
   profitPerOrder: v.optional(v.number()),
@@ -372,7 +369,6 @@ export const metricsMonthly = defineTable({
 
   // Customer Economics
   cacPercentageOfAOV: v.optional(v.number()),
-  cacPaybackPeriod: v.optional(v.number()),
 
   // Unit Economics
   profitPerOrder: v.optional(v.number()),

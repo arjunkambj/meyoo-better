@@ -47,15 +47,10 @@ export const PnLKPICards = memo(function PnLKPICards({
 
   const formatCurrency = (value: number) => {
     const safeValue = Number.isNaN(value) ? 0 : value;
-    const absValue = Math.abs(safeValue);
-
-    if (absValue >= 1000000) {
-      return `${currencySymbol}${(safeValue / 1000000).toFixed(2)}M`;
-    } else if (absValue >= 1000) {
-      return `${currencySymbol}${(safeValue / 1000).toFixed(1)}K`;
-    }
-
-    return `${currencySymbol}${safeValue.toFixed(0)}`;
+    return `${currencySymbol}${new Intl.NumberFormat("en-US", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(safeValue)}`;
   };
 
   const formatPercentage = (value: number) => {

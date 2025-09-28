@@ -1,0 +1,7 @@
+<svg width="188" height="32" viewBox="0 0 188 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .word { font-family: 'Inter', 'Segoe UI', sans-serif; font-weight: 600; letter-spacing: 0.14em; fill: #9CA3AF; }
+  </style>
+  <path d="M12 6h4l6 10 6-10h4v20h-4V14l-6 9.8L16 14v12h-4V6Z" fill="#9CA3AF"/>
+  <text class="word" x="46" y="22">OUTDOOR VOICES</text>
+</svg>

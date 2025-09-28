@@ -29,7 +29,6 @@ const DEFAULT_METRICS = [
   "avgOrderValue",
   "blendedRoas", // ROAS
   "totalAdSpend",
-  "shopifyConversionRate",
   "repeatCustomerRate",
   "moMRevenueGrowth",
 ];

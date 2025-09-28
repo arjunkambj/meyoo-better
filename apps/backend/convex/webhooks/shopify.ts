@@ -224,6 +224,7 @@ async function handleTopicInline(
       await ctx.runAction(internal.engine.analytics.calculateAnalytics, {
         organizationId: String(organizationId),
         dateRange: { startDate: range.startDate, endDate: range.endDate },
+        syncType: "incremental",
       });
     } catch (e) {
       logger.warn("Realtime analytics recalc failed", { topic, error: String(e) });

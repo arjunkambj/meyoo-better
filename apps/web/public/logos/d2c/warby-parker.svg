@@ -1,0 +1,11 @@
+<svg width="176" height="32" viewBox="0 0 176 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .word { font-family: 'Inter', 'Segoe UI', sans-serif; font-weight: 600; letter-spacing: 0.14em; fill: #9CA3AF; }
+  </style>
+  <g fill="#9CA3AF">
+    <circle cx="17" cy="14" r="8"/>
+    <circle cx="31" cy="14" r="8"/>
+    <rect x="17" y="13" width="14" height="2" fill="#F9FAFB" opacity="0.8"/>
+  </g>
+  <text class="word" x="52" y="22">WARBY PARKER</text>
+</svg>

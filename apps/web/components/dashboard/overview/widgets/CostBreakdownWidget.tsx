@@ -69,9 +69,8 @@ interface CostBreakdownWidgetProps {
   shippingCosts: number;
   totalAdSpend: number;
   transactionFees: number;
-  customCosts: number;
+  operatingCosts: number;
   handlingFees: number;
-  operatingCosts?: number;
   taxes?: number;
   totalRevenue?: number;
   currency?: string;
@@ -84,9 +83,8 @@ export function CostBreakdownWidget({
   shippingCosts,
   totalAdSpend,
   transactionFees,
-  customCosts,
-  handlingFees,
   operatingCosts = 0,
+  handlingFees,
   taxes = 0,
   totalRevenue: _totalRevenue = 0,
   currency = "USD",
@@ -128,9 +126,9 @@ export function CostBreakdownWidget({
         icon: "solar:card-bold-duotone",
       },
       {
-        key: "custom",
-        label: "Custom",
-        value: customCosts,
+        key: "operating",
+        label: "Operating",
+        value: operatingCosts,
         icon: "solar:settings-bold-duotone",
       },
       {
@@ -138,12 +136,6 @@ export function CostBreakdownWidget({
         label: "Handling",
         value: handlingFees,
         icon: "solar:hand-money-bold-duotone",
-      },
-      {
-        key: "operating",
-        label: "Operating",
-        value: operatingCosts,
-        icon: "solar:buildings-bold-duotone",
       },
       {
         key: "taxes",
@@ -190,9 +182,8 @@ export function CostBreakdownWidget({
     shippingCosts,
     totalAdSpend,
     transactionFees,
-    customCosts,
-    handlingFees,
     operatingCosts,
+    handlingFees,
     taxes,
   ]);
 
@@ -321,10 +312,12 @@ export function CostBreakdownWidget({
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                 <div className="text-xs text-default-500">Total</div>
                 <div className="text-sm font-bold text-default-900">
-                  {formatCurrencyCompact(
-                    chartData.reduce((sum, item) => sum + item.value, 0),
-                    currency
-                  )}
+                  {(() => {
+                    const total = chartData.reduce((sum, item) => sum + item.value, 0);
+                    return Math.abs(total) >= 10000000
+                      ? formatCurrencyCompact(total, currency)
+                      : formatCurrency(total, currency);
+                  })()}
                 </div>
               </div>
             </div>
@@ -413,7 +406,7 @@ export function CostBreakdownWidget({
                       }`}
                     >
                       {item.value > 0
-                        ? Math.abs(item.value) >= 1000
+                        ? Math.abs(item.value) >= 10000000
                           ? formatCurrencyCompact(item.value, currency)
                           : formatCurrency(item.value, currency)
                         : "—"}

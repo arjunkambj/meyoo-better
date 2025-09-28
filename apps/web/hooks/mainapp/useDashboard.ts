@@ -18,7 +18,6 @@ const DEFAULT_DASHBOARD_CONFIG: DashboardConfig = {
     "avgOrderValue",
     "blendedRoas", // ROAS
     "totalAdSpend",
-    "shopifyConversionRate",
     "repeatCustomerRate",
     "moMRevenueGrowth",
   ],

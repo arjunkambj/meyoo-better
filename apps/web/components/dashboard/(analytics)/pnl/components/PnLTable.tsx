@@ -102,7 +102,7 @@ const metricConfig: Record<
     isSubItem: true,
   },
   customCosts: {
-    label: "Custom Costs",
+    label: "Operating Costs",
     icon: "solar:settings-bold-duotone",
     iconColor: "text-warning-400",
     category: "operations",

@@ -1312,6 +1312,9 @@ export const monitorInitialSyncs = internalMutation({
 /**
  * Save initial cost setup for historical data
  */
+const ONBOARDING_COST_LOOKBACK_DAYS = 60;
+const ONBOARDING_COST_LOOKBACK_MS = ONBOARDING_COST_LOOKBACK_DAYS * 24 * 60 * 60 * 1000;
+
 export const saveInitialCosts = mutation({
   args: {
     shippingCost: v.optional(v.number()),
@@ -1347,6 +1350,7 @@ export const saveInitialCosts = mutation({
 
     // Create or update cost records for analytics (idempotent during onboarding)
     const now = Date.now();
+    const retroactiveEffectiveFrom = now - ONBOARDING_COST_LOOKBACK_MS;
     let analyticsNeedsRefresh = false;
 
     // Create shipping cost record (flat per order)
@@ -1377,6 +1381,11 @@ export const saveInitialCosts = mutation({
             isActive: true,
             isDefault: true,
             updatedAt: now,
+            effectiveFrom:
+              existingPerOrder.effectiveFrom &&
+              existingPerOrder.effectiveFrom <= retroactiveEffectiveFrom
+                ? existingPerOrder.effectiveFrom
+                : retroactiveEffectiveFrom,
           } as any);
           analyticsNeedsRefresh = true;
         }
@@ -1392,7 +1401,7 @@ export const saveInitialCosts = mutation({
           frequency: "per_order",
           isActive: true,
           isDefault: true,
-          effectiveFrom: now,
+          effectiveFrom: retroactiveEffectiveFrom,
           createdAt: now,
         } as any);
         analyticsNeedsRefresh = true;
@@ -1424,6 +1433,11 @@ export const saveInitialCosts = mutation({
             isActive: true,
             isDefault: true,
             updatedAt: now,
+            effectiveFrom:
+              existingPayment.effectiveFrom &&
+              existingPayment.effectiveFrom <= retroactiveEffectiveFrom
+                ? existingPayment.effectiveFrom
+                : retroactiveEffectiveFrom,
           } as any);
           analyticsNeedsRefresh = true;
         }
@@ -1439,7 +1453,7 @@ export const saveInitialCosts = mutation({
           frequency: "percentage",
           isActive: true,
           isDefault: true,
-          effectiveFrom: now,
+          effectiveFrom: retroactiveEffectiveFrom,
           createdAt: now,
         } as any);
         analyticsNeedsRefresh = true;
@@ -1474,6 +1488,11 @@ export const saveInitialCosts = mutation({
             isActive: true,
             isDefault: true,
             updatedAt: now,
+            effectiveFrom:
+              existingOp.effectiveFrom &&
+              existingOp.effectiveFrom <= retroactiveEffectiveFrom
+                ? existingOp.effectiveFrom
+                : retroactiveEffectiveFrom,
           } as any);
           analyticsNeedsRefresh = true;
         }
@@ -1489,7 +1508,7 @@ export const saveInitialCosts = mutation({
           frequency: "monthly",
           isActive: true,
           isDefault: true,
-          effectiveFrom: now,
+          effectiveFrom: retroactiveEffectiveFrom,
           createdAt: now,
         } as any);
         analyticsNeedsRefresh = true;
@@ -1512,6 +1531,7 @@ export const saveInitialCosts = mutation({
       await ctx.scheduler.runAfter(0, internal.engine.analytics.calculateAnalytics, {
         organizationId: user.organizationId,
         dateRange: { daysBack: 90 },
+        syncType: "incremental",
       });
     }
 

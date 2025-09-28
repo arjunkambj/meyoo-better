@@ -8,6 +8,10 @@ import Image from "next/image";
 import { Marquee } from "@/components/ui/marquee";
 import { Icon } from "@iconify/react";
 
+type IntegrationLogo =
+  | { name: string; className?: string; icon: string; image?: never }
+  | { name: string; className?: string; icon?: never; image: string };
+
 const howItWorks = [
   {
     number: "01",
@@ -42,7 +46,7 @@ const howItWorks = [
 ];
 
 const Integration = () => {
-  const logos = [
+  const logos: IntegrationLogo[] = [
     { icon: "logos:shopify", name: "Shopify", className: "" },
     { icon: "logos:meta-icon", name: "Meta Ads", className: "" },
     { icon: "logos:google-ads", name: "Google Ads", className: "" },
@@ -76,21 +80,21 @@ const Integration = () => {
                 key={index}
                 className="flex items-center justify-center gap-4 rounded-full bg-muted/40 px-5 py-2 backdrop-blur-sm"
               >
-                {"icon" in logo && logo.icon ? (
+                {"image" in logo ? (
+                  <Image
+                    alt={logo.name}
+                    className={cn("size-5", logo.className)}
+                    height={20}
+                    src={logo.image as string}
+                    unoptimized
+                    width={20}
+                  />
+                ) : (
                   <Icon
                     icon={logo.icon}
                     width={20}
                     height={20}
-                    className={cn("", logo?.className)}
-                  />
-                ) : (
-                  <Image
-                    alt={logo.name}
-                    className={cn("size-5", logo?.className)}
-                    height={20}
-                    src={(logo as any).image}
-                    unoptimized
-                    width={20}
+                    className={cn(logo.className)}
                   />
                 )}
                 <p className="text-lg">{logo.name}</p>

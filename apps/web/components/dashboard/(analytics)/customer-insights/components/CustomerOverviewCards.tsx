@@ -31,25 +31,18 @@ export const CustomerOverviewCards = memo(function CustomerOverviewCards({
   const currencySymbol = getCurrencySymbol(primaryCurrency);
 
   const formatNumber = useMemo(
-    () => (value: number) => {
-      const safeValue = Number.isNaN(value) ? 0 : value;
-
-      if (safeValue >= 1000000) {
-        return `${(safeValue / 1000000).toFixed(2)}M`;
-      } else if (safeValue >= 1000) {
-        return `${(safeValue / 1000).toFixed(1)}K`;
-      }
-
-      return safeValue.toFixed(0);
-    },
+    () => (value: number) =>
+      new Intl.NumberFormat("en-US").format(Number.isNaN(value) ? 0 : value),
     [],
   );
 
   const formatCurrency = useMemo(
-    () => (value: number) => {
-      return `${currencySymbol}${formatNumber(value)}`;
-    },
-    [formatNumber, currencySymbol],
+    () => (value: number) =>
+      `${currencySymbol}${new Intl.NumberFormat("en-US", {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      }).format(Number.isNaN(value) ? 0 : value)}`,
+    [currencySymbol],
   );
 
   const formatChange = useMemo(

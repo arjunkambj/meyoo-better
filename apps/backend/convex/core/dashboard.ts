@@ -82,7 +82,6 @@ export const getDashboardLayout = query({
         "avgOrderValue",
         "blendedRoas", // ROAS
         "totalAdSpend",
-        "shopifyConversionRate",
         "repeatCustomerRate",
         "moMRevenueGrowth",
       ],

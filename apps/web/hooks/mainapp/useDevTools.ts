@@ -28,6 +28,7 @@ export function useDevTools() {
   const resetMeta = useAction(api.meyoo.admin.resetMetaData);
   const resetShopify = useAction(api.meyoo.admin.resetShopifyData);
   const resetAll = useAction(api.meyoo.admin.resetEverything);
+  const deleteMetricsAction = useAction(api.meyoo.admin.deleteAnalyticsMetrics);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -119,6 +120,40 @@ export function useDevTools() {
     }
   };
 
+  const deleteAnalyticsMetrics = async () => {
+    console.log(
+      `[DevTools] Delete analytics metrics triggered - Organization: ${currentUser?.organizationId} - Timestamp: ${new Date().toISOString()}`,
+    );
+    setLoading(true);
+    setError(null);
+    try {
+      if (!currentUser?.organizationId) {
+        throw new Error("No organization found");
+      }
+
+      const result = await deleteMetricsAction({
+        organizationId: currentUser.organizationId,
+      });
+
+      console.log(
+        `[DevTools] Delete analytics metrics completed - Organization: ${currentUser.organizationId} - Deleted: ${result.deleted} - Tables: ${JSON.stringify(result.tables)} - Timestamp: ${new Date().toISOString()}`,
+      );
+
+      return result;
+    } catch (err) {
+      const errorMsg = String(err);
+
+      console.error(
+        `[DevTools] Delete analytics metrics failed - Organization: ${currentUser?.organizationId} - Error: ${errorMsg} - Timestamp: ${new Date().toISOString()}`,
+        err,
+      );
+      setError(errorMsg);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
     enabled,
     setEnabled,
@@ -127,6 +162,7 @@ export function useDevTools() {
     resetEverything,
     disconnectShopify,
     disconnectMeta,
+    deleteAnalyticsMetrics,
     isLoading: loading,
     error,
     loading,

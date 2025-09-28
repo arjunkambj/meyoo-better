@@ -1,0 +1,7 @@
+<svg width="152" height="32" viewBox="0 0 152 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .word { font-family: 'Inter', 'Segoe UI', sans-serif; font-weight: 600; letter-spacing: 0.18em; fill: #9CA3AF; }
+  </style>
+  <path d="M12 6h16v4H16v4h10v4H16v4h12v4H12V6Z" fill="#9CA3AF"/>
+  <text class="word" x="40" y="22">EVERLANE</text>
+</svg>

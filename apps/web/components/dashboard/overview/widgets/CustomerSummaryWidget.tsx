@@ -35,7 +35,7 @@ function Metric({
 
     switch (format) {
       case "currency": {
-        return Math.abs(value) >= 1000
+        return Math.abs(value) >= 10000000
           ? formatCurrencyCompact(value, currency)
           : formatCurrency(value, currency);
       }
@@ -114,10 +114,6 @@ function Metric({
 }
 
 interface CustomerSummaryWidgetProps {
-  totalCustomers: number;
-  totalCustomersChange?: number;
-  newCustomers: number;
-  newCustomersChange?: number;
   repurchaseRate: number;
   repurchaseRateChange?: number;
   returnRate: number;
@@ -129,10 +125,6 @@ interface CustomerSummaryWidgetProps {
 }
 
 export function CustomerSummaryWidget({
-  totalCustomers,
-  totalCustomersChange,
-  newCustomers,
-  newCustomersChange,
   repurchaseRate,
   repurchaseRateChange,
   returnRate,
@@ -180,25 +172,9 @@ export function CustomerSummaryWidget({
 
       <div className="space-y-1">
         <Metric
-          change={totalCustomersChange}
-          format="number"
-          isPrimary={true}
-          label="Total Customers"
-          hint="Total unique customers in your store"
-          value={totalCustomers}
-        />
-
-        <Metric
-          change={newCustomersChange}
-          format="number"
-          label="New Customers"
-          hint="Customers placing their first order in the period"
-          value={newCustomers}
-        />
-
-        <Metric
           change={repurchaseRateChange}
           format="percentage"
+          isPrimary
           label="Repurchase Rate"
           hint="Percentage of customers who purchased again"
           value={repurchaseRate}

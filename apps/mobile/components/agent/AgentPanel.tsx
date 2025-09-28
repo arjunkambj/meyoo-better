@@ -35,6 +35,7 @@ const AGENT_TIPS: AgentTip[] = [
 const keyboardOffset = Platform.select({ ios: 96, android: 0, default: 0 });
 
 export function AgentPanel() {
+  const [viewMode, setViewMode] = useState<'chat' | 'history'>('chat');
   const [activeThreadId, setActiveThreadId] = useState<string | undefined>(undefined);
   const [inputValue, setInputValue] = useState('');
   const [localMessages, setLocalMessages] = useState<AgentUIMessage[]>([]);
@@ -85,11 +86,13 @@ export function AgentPanel() {
   const startNewThread = useCallback(() => {
     setActiveThreadId(undefined);
     setLocalMessages([]);
+    setViewMode('chat');
   }, []);
 
   const handleSelectThread = useCallback((threadId: string) => {
     setActiveThreadId(threadId);
     setLocalMessages([]);
+    setViewMode('chat');
   }, []);
 
   const handleSend = useCallback(async () => {
@@ -182,12 +185,24 @@ export function AgentPanel() {
   return (
     <View className="flex-1 gap-6">
       <View className="gap-3">
-        <Text className="text-xs font-semibold uppercase tracking-[0.2em] text-default-500">
-          Meyoo Agent
-        </Text>
-        <Text className="text-2xl font-semibold text-foreground">
-          Ask questions, review syncs, and plan next steps.
-        </Text>
+        <View className="flex-row items-center justify-between">
+          <View>
+            <Text className="text-xs font-semibold uppercase tracking-[0.2em] text-default-500">
+              Meyoo Agent
+            </Text>
+            <Text className="text-2xl font-semibold text-foreground">
+              Ask questions, review syncs, and plan next steps.
+            </Text>
+          </View>
+          <Button
+            size="sm"
+            variant="secondary"
+            className="rounded-lg"
+            onPress={() => setViewMode(viewMode === 'chat' ? 'history' : 'chat')}
+          >
+            {viewMode === 'chat' ? 'History' : 'Back'}
+          </Button>
+        </View>
         <Text className="text-sm leading-5 text-default-500">
           Threads sync with the web dashboard so you can start a conversation here and finish it on desktop.
         </Text>
@@ -195,19 +210,14 @@ export function AgentPanel() {
 
       <AgentTipCarousel tips={AGENT_TIPS} />
 
-      <View className="gap-4">
-        <View className="flex-row items-center justify-between">
-          <Text className="text-sm font-semibold text-default-600">Conversations</Text>
-          <Button
-            size="sm"
-            variant="secondary"
-            className="rounded-lg"
-            onPress={startNewThread}
-          >
-            New chat
-          </Button>
-        </View>
-        <View className="rounded-3xl border border-default-100 bg-content1 p-4 gap-3">
+      {viewMode === 'history' ? (
+        <View className="flex-1 rounded-3xl border border-default-100 bg-content1 p-4 gap-3">
+          <View className="flex-row items-center justify-between mb-1">
+            <Text className="text-sm font-semibold text-default-600">Conversations</Text>
+            <Button size="sm" variant="secondary" className="rounded-lg" onPress={startNewThread}>
+              New chat
+            </Button>
+          </View>
           <AgentThreadList
             threads={threads}
             isLoading={isLoadingThreads}
@@ -220,45 +230,45 @@ export function AgentPanel() {
             loadingMore={loadingMoreThreads}
           />
         </View>
-      </View>
-
-      <View className="flex-1 rounded-3xl border border-default-100 bg-content1">
-        <View className="flex-row items-center justify-between px-4 py-3">
-          <Text className="text-sm font-semibold text-default-600">
-            {activeThreadId ? 'Conversation' : 'New conversation'}
-          </Text>
-          <Chip size="sm" className="rounded-full">
-            {isLoadingMessages
-              ? 'Syncing'
-              : `${displayedMessages.length} message${displayedMessages.length === 1 ? '' : 's'}`}
-          </Chip>
-        </View>
-        <Divider className="opacity-60" />
-
-        <AgentMessageFeed
-          onScrollViewReady={handleScrollViewReady}
-          messages={displayedMessages}
-          showEmpty={showEmptyMessages}
-          isInitialLoading={isInitialMessagesLoading}
-          canLoadMore={canLoadMoreMessages}
-          loadingMore={loadingMoreMessages}
-          onLoadMore={canLoadMoreMessages ? handleLoadMoreMessages : undefined}
-        />
-
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={keyboardOffset}
-        >
-          <View className="px-4 pb-5">
-            <AgentChatComposer
-              value={inputValue}
-              onChange={setInputValue}
-              onSend={handleSend}
-              loading={isSending}
-            />
+      ) : (
+        <View className="flex-1 rounded-3xl border border-default-100 bg-content1">
+          <View className="flex-row items-center justify-between px-4 py-3">
+            <Text className="text-sm font-semibold text-default-600">
+              {activeThreadId ? 'Conversation' : 'New conversation'}
+            </Text>
+            <Chip size="sm" className="rounded-full">
+              {isLoadingMessages
+                ? 'Syncing'
+                : `${displayedMessages.length} message${displayedMessages.length === 1 ? '' : 's'}`}
+            </Chip>
           </View>
-        </KeyboardAvoidingView>
-      </View>
+          <Divider className="opacity-60" />
+
+          <AgentMessageFeed
+            onScrollViewReady={handleScrollViewReady}
+            messages={displayedMessages}
+            showEmpty={showEmptyMessages}
+            isInitialLoading={isInitialMessagesLoading}
+            canLoadMore={canLoadMoreMessages}
+            loadingMore={loadingMoreMessages}
+            onLoadMore={canLoadMoreMessages ? handleLoadMoreMessages : undefined}
+          />
+
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            keyboardVerticalOffset={keyboardOffset}
+          >
+            <View className="px-4 pb-5">
+              <AgentChatComposer
+                value={inputValue}
+                onChange={setInputValue}
+                onSend={handleSend}
+                loading={isSending}
+              />
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      )}
     </View>
   );
 }

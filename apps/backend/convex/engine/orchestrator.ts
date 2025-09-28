@@ -198,6 +198,7 @@ export const execute = internalAction({
         await ctx.runAction(internal.engine.analytics.calculateAnalytics, {
           organizationId: args.organizationId,
           dateRange: args.dateRange,
+          syncType: args.syncType,
         });
       }
     }

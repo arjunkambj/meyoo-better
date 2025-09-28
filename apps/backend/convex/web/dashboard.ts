@@ -100,6 +100,10 @@ export const getDashboardSummary = query({
       repeatCustomerRateChange: v.float64(),
       returnRate: v.float64(),
       returnRateChange: v.float64(),
+      blendedSessionConversionRate: v.optional(v.float64()),
+      blendedSessionConversionRateChange: v.optional(v.float64()),
+      uniqueVisitors: v.optional(v.float64()),
+      blendedSessionConversions: v.optional(v.float64()),
       // Strict calendar month-over-month growth (revenue)
       calendarMoMRevenueGrowth: v.float64(),
       period: v.object({
@@ -234,7 +238,20 @@ export const getDashboardSummary = query({
       const discountRate = grossSales > 0 ? (discounts / grossSales) * 100 : 0;
 
       // Estimate costs and margins when analytics not available
-      const cogs = grossSales * 0.5; // Estimate 50% COGS
+      // Get COGS from cost management if available
+      const costs = await ctx.db
+        .query("costs")
+        .withIndex("by_organization", (q) =>
+          q.eq("organizationId", organizationId),
+        )
+        .collect();
+
+      // Calculate COGS - use actual data if available, otherwise estimate
+      const actualCogs = costs
+        .filter(c => c.type === "product")
+        .reduce((sum, c) => sum + (c.value || 0), 0);
+      const cogs = actualCogs > 0 ? actualCogs : grossSales * 0.5; // Fallback to 50% estimate
+
       const shippingCosts = filteredOrders.reduce(
         (sum, o) => sum + (o.totalShippingPrice || 0),
         0,
@@ -250,18 +267,50 @@ export const getDashboardSummary = query({
       const avgOrderCost = avgOrderValue - avgOrderProfit;
       const adSpendPerOrder = orderCount > 0 ? adSpend / orderCount : 0;
 
-      // Count unique customers
-      const uniqueCustomers = new Set(
+      // Get actual customer data from shopifyCustomers table
+      const _customers = await ctx.db
+        .query("shopifyCustomers")
+        .withIndex("by_organization", (q) =>
+          q.eq("organizationId", organizationId),
+        )
+        .collect();
+
+      // Count unique customers who made purchases in this period
+      const customerIdsInPeriod = new Set(
         filteredOrders.map((o) => o.customerId).filter(Boolean),
       );
-      const customerCount = uniqueCustomers.size;
+      const customerCount = customerIdsInPeriod.size;
 
-      // Estimate new vs returning (30% new, 70% returning)
-      // Only calculate if there are actual customers
-      const newCustomers =
-        customerCount > 0 ? Math.round(customerCount * 0.3) : 0;
-      const returningCustomers =
-        customerCount > 0 ? customerCount - newCustomers : 0;
+      // Identify new vs returning customers based on their first order date
+      const customerFirstOrderMap = new Map<string, number>();
+      orders.forEach((order) => {
+        if (order.customerId) {
+          const customerIdStr = order.customerId as unknown as string;
+          const existing = customerFirstOrderMap.get(customerIdStr);
+          if (!existing || order.shopifyCreatedAt < existing) {
+            customerFirstOrderMap.set(customerIdStr, order.shopifyCreatedAt);
+          }
+        }
+      });
+
+      // Count new customers (first order in current period)
+      let newCustomers = 0;
+      let returningCustomers = 0;
+      customerIdsInPeriod.forEach((customerId) => {
+        if (typeof customerId !== 'string') return;
+        const firstOrderDate = customerFirstOrderMap.get(customerId);
+        if (firstOrderDate) {
+          const firstOrderDateStr = new Date(firstOrderDate)
+            .toISOString()
+            .substring(0, 10);
+          if (firstOrderDateStr >= startDateStr && firstOrderDateStr <= endDateStr) {
+            newCustomers++;
+          } else {
+            returningCustomers++;
+          }
+        }
+      });
+
       const customerAcquisitionCost =
         newCustomers > 0 ? adSpend / newCustomers : 0;
 
@@ -372,7 +421,9 @@ export const getDashboardSummary = query({
         shippingCostsChange: 0,
         handlingFees: 0,
         handlingFeesChange: 0,
-        customCosts: 0,
+        customCosts: costs
+          .filter(c => c.type === "operational")
+          .reduce((sum, c) => sum + (c.value || 0), 0),
         customCostsChange: 0,
         transactionFees,
         transactionFeesChange: 0,
@@ -443,6 +494,8 @@ export const getDashboardSummary = query({
       newCustomers: number;
       returningCustomers: number;
       returns: number;
+      uniqueVisitors: number;
+      blendedSessionConversions: number;
     };
     const createSummaryAcc = (): SummaryAcc => ({
       revenue: 0,
@@ -467,6 +520,8 @@ export const getDashboardSummary = query({
       newCustomers: 0,
       returningCustomers: 0,
       returns: 0,
+      uniqueVisitors: 0,
+      blendedSessionConversions: 0,
     });
 
     const previousSummary = previousMetrics.reduce<SummaryAcc>(
@@ -493,6 +548,12 @@ export const getDashboardSummary = query({
         acc.newCustomers += m.newCustomers || 0;
         acc.returningCustomers += m.returningCustomers || 0;
         acc.returns += m.returns || 0;
+        const visitors = m.uniqueVisitors || 0;
+        acc.uniqueVisitors += visitors;
+        const dailyConversionRate = m.blendedSessionConversionRate || 0;
+        if (visitors > 0 && dailyConversionRate !== 0) {
+          acc.blendedSessionConversions += (dailyConversionRate / 100) * visitors;
+        }
 
         return acc;
       },
@@ -533,6 +594,12 @@ export const getDashboardSummary = query({
         acc.newCustomers += m.newCustomers || 0;
         acc.returningCustomers += m.returningCustomers || 0;
         acc.returns += m.returns || 0;
+        const visitors = m.uniqueVisitors || 0;
+        acc.uniqueVisitors += visitors;
+        const dailyConversionRate = m.blendedSessionConversionRate || 0;
+        if (visitors > 0 && dailyConversionRate !== 0) {
+          acc.blendedSessionConversions += (dailyConversionRate / 100) * visitors;
+        }
 
         return acc;
       },
@@ -593,6 +660,11 @@ export const getDashboardSummary = query({
     const customerAcquisitionCost =
       summary.newCustomers > 0
         ? summary.adSpend / summary.newCustomers
+        : 0;
+    const totalVisitors = summary.uniqueVisitors;
+    const blendedSessionConversionRate =
+      totalVisitors > 0
+        ? (summary.blendedSessionConversions / totalVisitors) * 100
         : 0;
 
     // Calculate previous period derived metrics
@@ -671,6 +743,11 @@ export const getDashboardSummary = query({
     const prevCustomerAcquisitionCost =
       previousSummary.newCustomers > 0
         ? previousSummary.adSpend / previousSummary.newCustomers
+        : 0;
+    const prevTotalVisitors = previousSummary.uniqueVisitors;
+    const prevBlendedSessionConversionRate =
+      prevTotalVisitors > 0
+        ? (previousSummary.blendedSessionConversions / prevTotalVisitors) * 100
         : 0;
 
     // Compute strict calendar MoM revenue growth using endDateStr's month
@@ -834,6 +911,13 @@ export const getDashboardSummary = query({
       ),
       returnRate,
       returnRateChange: calculateChange(returnRate, prevReturnRate),
+      uniqueVisitors: summary.uniqueVisitors,
+      blendedSessionConversions: summary.blendedSessionConversions,
+      blendedSessionConversionRate,
+      blendedSessionConversionRateChange: calculateChange(
+        blendedSessionConversionRate,
+        prevBlendedSessionConversionRate,
+      ),
       calendarMoMRevenueGrowth,
 
       period: {

@@ -32,7 +32,6 @@ export function usePlatformMetrics(dateRange: DateRange) {
     return {
       isLoading: true,
       // Return zeros while loading to prevent UI issues
-      shopifySessions: 0,
       shopifyConversion: 0,
       shopifyAbandonedCarts: 0,
       shopifyCheckoutRate: 0,

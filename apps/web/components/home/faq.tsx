@@ -52,7 +52,7 @@ const Faq = () => {
           </div>
           <h2 className={designSystem.typography.sectionTitle}>Common Questions</h2>
           <p className={designSystem.typography.sectionSubtitle}>
-            We're here to help you get the most out of Meyoo.
+            We&apos;re here to help you get the most out of Meyoo.
           </p>
         </div>
         <div className="grid gap-8 md:grid-cols-2">

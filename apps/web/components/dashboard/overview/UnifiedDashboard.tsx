@@ -249,7 +249,7 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
       blendedRoas: overviewMetrics?.blendedRoas?.value || 0,
 
       // Revenue & Margins
-      grossSales: overviewMetrics?.grossSales?.value || 0,
+      grossSales: overviewMetrics?.revenue?.value ?? 0,
       discounts: overviewMetrics?.discounts?.value || 0,
       discountRate: overviewMetrics?.discountRate?.value || 0,
       grossProfit: overviewMetrics?.grossProfit?.value || 0,
@@ -287,17 +287,10 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
         overviewMetrics?.taxesPercentageOfRevenue?.value || 0,
 
       // Customers
-      totalCustomers: overviewMetrics?.totalCustomers?.value || 0,
-      newCustomers: overviewMetrics?.newCustomers?.value || 0,
       returningCustomers: overviewMetrics?.returningCustomers?.value || 0,
       repeatCustomerRate: overviewMetrics?.repeatCustomerRate?.value || 0,
       customerAcquisitionCost:
-        overviewMetrics?.customerAcquisitionCost?.value ??
-        (overviewMetrics?.newCustomers?.value &&
-        overviewMetrics?.totalAdSpend?.value
-          ? overviewMetrics.totalAdSpend.value /
-            overviewMetrics.newCustomers.value
-          : 0),
+        overviewMetrics?.customerAcquisitionCost?.value || 0,
       cacPercentageOfAOV: overviewMetrics?.cacPercentageOfAOV?.value || 0,
 
       // Units
@@ -314,7 +307,6 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
       // Additional costs for widgets
       handlingFees: overviewMetrics?.handlingFees?.value || 0,
       customCosts: overviewMetrics?.customCosts?.value || 0,
-      operatingCosts: overviewMetrics?.operatingCosts?.value || 0,
 
       // Widget-specific metrics
       poas:
@@ -326,14 +318,7 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
           : 0),
       roasUTM: utmRoas.value,
       roasUTMChange: utmRoas.change,
-      ncROAS:
-        overviewMetrics?.ncROAS?.value ??
-        (overviewMetrics?.newCustomers?.value &&
-        overviewMetrics?.totalAdSpend?.value
-          ? (overviewMetrics.newCustomers.value *
-              (overviewMetrics?.avgOrderValue?.value || 0)) /
-            overviewMetrics.totalAdSpend.value
-          : 0),
+      ncROAS: overviewMetrics?.ncROAS?.value || 0,
       repurchaseRate: overviewMetrics?.repeatCustomerRate?.value || 0,
       returnRate: overviewMetrics?.returnRate?.value || 0,
       adSpendPerOrder:

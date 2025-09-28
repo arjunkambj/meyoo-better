@@ -48,15 +48,10 @@ export const OrdersOverviewCards = memo(function OrdersOverviewCards({
   }
 
   const formatCurrency = (value: number) => {
-    const absValue = Math.abs(value);
-
-    if (absValue >= 1000000) {
-      return `${currencySymbol}${(value / 1000000).toFixed(1)}M`;
-    } else if (absValue >= 1000) {
-      return `${currencySymbol}${(value / 1000).toFixed(1)}K`;
-    }
-
-    return `${currencySymbol}${value.toFixed(0)}`;
+    return `${currencySymbol}${new Intl.NumberFormat("en-US", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(Number.isNaN(value) ? 0 : value)}`;
   };
 
   const cards = [
@@ -112,4 +107,3 @@ export const OrdersOverviewCards = memo(function OrdersOverviewCards({
     </div>
   );
 });
-

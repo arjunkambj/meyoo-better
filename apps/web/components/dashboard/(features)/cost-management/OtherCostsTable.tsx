@@ -257,14 +257,14 @@ export default function OtherCostsTable() {
 
         if (result.success) {
           addToast({
-            title: "Expense updated",
+            title: "Operating cost updated",
             color: "default",
             timeout: 3000,
           });
           onOpenChange();
         } else {
           addToast({
-            title: "Failed to update expense",
+            title: "Failed to update cost",
             description: result.error || "Please try again",
             color: "danger",
             timeout: 5000,
@@ -291,7 +291,7 @@ export default function OtherCostsTable() {
           },
         });
         addToast({
-          title: "Expense added successfully",
+          title: "Operating cost added successfully",
           color: "default",
           timeout: 3000,
         });
@@ -300,7 +300,7 @@ export default function OtherCostsTable() {
     } catch (_error) {
       logger.error("Error saving expense:", _error);
       addToast({
-        title: "Failed to save expense",
+        title: "Failed to save cost",
         description: _error instanceof Error ? _error.message : "Unknown error",
         color: "danger",
         timeout: 5000,
@@ -320,7 +320,7 @@ export default function OtherCostsTable() {
     try {
       await deleteOtherCost(itemToDelete as Id<"costs">);
       addToast({
-        title: "Expense deleted",
+        title: "Operating cost deleted",
         color: "default",
         timeout: 3000,
       });
@@ -407,14 +407,14 @@ export default function OtherCostsTable() {
   const topContent = (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Other Expenses</h2>
+        <h2 className="text-xl font-semibold">Operating Costs</h2>
         <Button
           color="primary"
           startContent={<Icon icon="solar:add-square-bold" width={16} />}
           isDisabled={isLoading}
           onPress={handleAdd}
         >
-          Add Expense
+          Add Operating Cost
         </Button>
       </div>
       {isLoading ? <Skeleton className="h-10 w-64 rounded-lg" /> : null}
@@ -438,7 +438,7 @@ export default function OtherCostsTable() {
         ) : (
           <Table
             removeWrapper
-            aria-label="Other costs table"
+            aria-label="Operating costs table"
             className={DATA_TABLE_TABLE_CLASS}
             classNames={{
               th: DATA_TABLE_HEADER_CLASS,
@@ -458,10 +458,10 @@ export default function OtherCostsTable() {
                     width={48}
                   />
                   <p className="mb-2 text-default-500">
-                    No other expenses added yet
+                    No operating costs added yet
                   </p>
                   <p className="text-small text-default-400">
-                    Add operational expenses to track business costs
+                    Add operational costs to track business performance
                   </p>
                 </div>
               }
@@ -497,7 +497,7 @@ export default function OtherCostsTable() {
             <>
               <ModalHeader className="flex flex-col gap-1 border-b border-divider pb-3">
                 <h2 className="text-lg font-semibold">
-                  {formData._id ? "Edit Expense" : "Add Expense"}
+                  {formData._id ? "Edit Operating Cost" : "Add Operating Cost"}
                 </h2>
                 <p className="text-sm text-default-500">
                   Track operational costs for better P&L visibility
@@ -507,7 +507,7 @@ export default function OtherCostsTable() {
                 <div className="grid md:grid-cols-2 gap-4">
                   <Input
                     isRequired
-                    label="Expense Name"
+                    label="Cost Name"
                     size="sm"
                     labelPlacement="outside"
                     placeholder="e.g., Office Rent, Software Subscription"
@@ -629,8 +629,8 @@ export default function OtherCostsTable() {
         iconColor="text-danger"
         isLoading={isDeleting}
         isOpen={deleteModalOpen}
-        message="Are you sure you want to delete this expense? This action cannot be undone."
-        title="Delete Expense"
+        message="Are you sure you want to delete this operating cost? This action cannot be undone."
+        title="Delete Operating Cost"
         onClose={() => {
           setDeleteModalOpen(false);
           setItemToDelete(null);

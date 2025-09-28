@@ -1,0 +1,7 @@
+<svg width="168" height="32" viewBox="0 0 168 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .word { font-family: 'Inter', 'Segoe UI', sans-serif; font-weight: 600; letter-spacing: 0.16em; fill: #9CA3AF; }
+  </style>
+  <path d="M14 6h18l-9 20-3.2-6.5H11L14 6Zm7.3 4H17l-1.5 5.4h5.1L21.3 10Z" fill="#9CA3AF"/>
+  <text class="word" x="44" y="22">GYMSHARK</text>
+</svg>

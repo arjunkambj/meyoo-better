@@ -29,6 +29,7 @@ export function DevTools() {
     resetEverything,
     disconnectShopify,
     disconnectMeta,
+    deleteAnalyticsMetrics,
     isLoading: _globalLoading,
     error,
   } = useDevTools();
@@ -36,6 +37,10 @@ export function DevTools() {
   const [isLoading, setIsLoading] = useState<Record<string, boolean>>({});
   const [recalcMessage, setRecalcMessage] = useState<string | null>(null);
   const [recalcError, setRecalcError] = useState<string | null>(null);
+  const [deleteMetricsMessage, setDeleteMetricsMessage] = useState<string | null>(
+    null,
+  );
+  const [deleteMetricsError, setDeleteMetricsError] = useState<string | null>(null);
 
   const { user } = useUser();
   const { hasShopify, hasMeta } = useIntegrationStatus();
@@ -168,6 +173,43 @@ export function DevTools() {
 
         <Button
           className="justify-start"
+          color="warning"
+          isDisabled={!isOnboarded}
+          isLoading={isLoading["delete-metrics"]}
+          size="lg"
+          startContent={
+            !isLoading["delete-metrics"] && (
+              <Icon icon="heroicons:trash-20-solid" width={20} />
+            )
+          }
+          variant="solid"
+          onPress={() =>
+            handleConfirm(
+              async () => {
+                setDeleteMetricsMessage(null);
+                setDeleteMetricsError(null);
+                try {
+                  const result = await deleteAnalyticsMetrics();
+                  setDeleteMetricsMessage(
+                    `Deleted ${result?.deleted ?? 0} analytics records across metrics tables.`,
+                  );
+                } catch (err) {
+                  const msg =
+                    err instanceof Error ? err.message : "Failed to delete analytics metrics";
+                  setDeleteMetricsError(msg);
+                }
+              },
+              "Delete Analytics Metrics",
+              "Removes all calculated analytics metrics (daily/weekly/monthly) for this organization.",
+              "delete-metrics",
+            )
+          }
+        >
+          Delete Analytics Metrics
+        </Button>
+
+        <Button
+          className="justify-start"
           color="danger"
           isDisabled={!isOnboarded}
           isLoading={isLoading["reset-all"]}
@@ -248,6 +290,12 @@ export function DevTools() {
       {recalcError && <p className="text-xs text-danger mt-2">{recalcError}</p>}
       {recalcMessage && (
         <p className="text-xs text-success mt-2">{recalcMessage}</p>
+      )}
+      {deleteMetricsError && (
+        <p className="text-xs text-danger mt-2">{deleteMetricsError}</p>
+      )}
+      {deleteMetricsMessage && (
+        <p className="text-xs text-success mt-2">{deleteMetricsMessage}</p>
       )}
 
       <ConfirmationDialog

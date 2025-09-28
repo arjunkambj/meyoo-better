@@ -15,13 +15,15 @@ export const formatCurrency = (
   const absValue = Math.abs(value);
   const symbol = getCurrencySymbol(currency);
 
-  if (absValue >= 1000000) {
+  // Only compact at 10,000,000 and above; otherwise show full value
+  if (absValue >= 10000000) {
     return `${symbol}${(value / 1000000).toFixed(1)}M`;
-  } else if (absValue >= 1000) {
-    return `${symbol}${(value / 1000).toFixed(1)}K`;
   }
 
-  return `${symbol}${value.toFixed(0)}`;
+  return `${symbol}${new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(value)}`;
 };
 
 /**
@@ -45,13 +47,15 @@ export const formatCurrencyPrecise = (
 export const formatNumber = (value: number): string => {
   const safeValue = Number.isNaN(value) ? 0 : value;
 
-  if (safeValue >= 1000000) {
-    return `${(safeValue / 1000000).toFixed(2)}M`;
-  } else if (safeValue >= 1000) {
-    return `${(safeValue / 1000).toFixed(1)}K`;
+  // Only compact at 10,000,000 and above; otherwise show full value
+  if (safeValue >= 10000000) {
+    return `${(safeValue / 1000000).toFixed(1)}M`;
   }
 
-  return safeValue.toFixed(0);
+  return new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(safeValue);
 };
 
 /**

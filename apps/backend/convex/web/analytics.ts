@@ -419,7 +419,6 @@ export const getPlatformMetrics = query({
     v.null(),
     v.object({
       // Shopify metrics
-      shopifySessions: v.number(),
       shopifyConversionRate: v.number(),
       shopifyAbandonedCarts: v.number(),
       shopifyCheckoutRate: v.number(),
@@ -484,7 +483,6 @@ export const getPlatformMetrics = query({
     if (filteredData.length === 0) {
       // Return zeros if no data
       return {
-        shopifySessions: 0,
         shopifyConversionRate: 0,
         shopifyAbandonedCarts: 0,
         shopifyCheckoutRate: 0,
@@ -530,7 +528,6 @@ export const getPlatformMetrics = query({
     const aggregated = filteredData.reduce(
       (acc, day) => {
         // Shopify metrics
-        acc.shopifySessions += day.shopifySessions || 0;
         acc.totalShopifyOrders += day.orders || 0;
 
         // Meta metrics from metricsDaily
@@ -547,7 +544,6 @@ export const getPlatformMetrics = query({
         return acc;
       },
       {
-        shopifySessions: 0,
         totalShopifyOrders: 0,
         metaClicks: 0,
         metaPurchases: 0,
@@ -658,26 +654,57 @@ export const getPlatformMetrics = query({
     const totalImpressions = aggregated.metaImpressions || 0;
     const blendedCTR = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : (aggregated.metaCTR || 0);
 
+    const totalUniqueVisitors = filteredData.reduce(
+      (sum, d) => sum + (d.uniqueVisitors ?? 0),
+      0,
+    );
+
+    const conversionRateAggregate = filteredData.reduce(
+      (
+        acc,
+        day,
+      ) => {
+        const rate = day.shopifyConversionRate ?? 0;
+        const visitors = day.uniqueVisitors ?? 0;
+
+        if (visitors > 0) {
+          acc.weightedSum += rate * visitors;
+          acc.totalVisitors += visitors;
+        } else {
+          acc.simpleSum += rate;
+          acc.simpleCount += 1;
+        }
+
+        return acc;
+      },
+      { weightedSum: 0, totalVisitors: 0, simpleSum: 0, simpleCount: 0 },
+    );
+
+    let shopifyConversionRate = 0;
+    if (conversionRateAggregate.totalVisitors > 0) {
+      shopifyConversionRate =
+        conversionRateAggregate.weightedSum /
+        conversionRateAggregate.totalVisitors;
+    } else if (conversionRateAggregate.simpleCount > 0) {
+      shopifyConversionRate =
+        conversionRateAggregate.simpleSum /
+        conversionRateAggregate.simpleCount;
+    }
+
+    const totalShopifyOrders = aggregated.totalShopifyOrders;
+    const shopifyCheckoutRate =
+      totalShopifyOrders + abandonedCount > 0
+        ? (totalShopifyOrders / (totalShopifyOrders + abandonedCount)) * 100
+        : 0;
+
     return {
       // Shopify metrics
-      shopifySessions: aggregated.shopifySessions,
-      shopifyConversionRate:
-        aggregated.shopifySessions > 0
-          ? (aggregated.totalShopifyOrders / aggregated.shopifySessions) * 100
-          : 0,
+      shopifyConversionRate,
       shopifyAbandonedCarts: abandonedCount,
-      shopifyCheckoutRate:
-        aggregated.shopifySessions > 0
-          ? ((aggregated.shopifySessions - abandonedCount) /
-              aggregated.shopifySessions) *
-            100
-          : 0,
+      shopifyCheckoutRate,
 
       // Visitors
-      uniqueVisitors: filteredData.reduce(
-        (sum, d) => sum + (d.uniqueVisitors ?? 0),
-        0,
-      ),
+      uniqueVisitors: totalUniqueVisitors,
 
       // Meta metrics
       metaSessions: aggregated.metaClicks, // Using clicks as proxy for sessions

@@ -42,6 +42,7 @@ export const calculate = internalMutation({
         {
           organizationId,
           dateRange: { daysBack: 60 },
+          syncType: "incremental",
         },
       );
 
@@ -190,6 +191,7 @@ export const recalculateAllMetrics = internalAction({
     await ctx.runAction(internal.engine.analytics.calculateAnalytics, {
       organizationId: args.organizationId,
       dateRange: args.dateRange,
+      syncType: "incremental",
     });
     return { success: true };
   },
@@ -206,6 +208,7 @@ export const gatherAnalyticsData = internalQuery({
   },
   returns: v.object({
     shopifyOrders: v.array(v.any()),
+    shopifyCustomers: v.array(v.any()),
     shopifyProducts: v.array(v.any()),
     shopifyVariants: v.array(v.any()),
     orderItems: v.array(v.any()),
@@ -213,6 +216,7 @@ export const gatherAnalyticsData = internalQuery({
     metaInsights: v.array(v.any()),
     costs: v.array(v.any()),
     shopifyAnalytics: v.array(v.any()),
+    shopifyTransactions: v.array(v.any()),
     startDate: v.string(),
     endDate: v.string(),
     organizationId: v.string(),
@@ -233,6 +237,13 @@ export const gatherAnalyticsData = internalQuery({
       )
       .collect();
 
+    const shopifyCustomers = await ctx.db
+      .query("shopifyCustomers")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", args.organizationId as Id<"organizations">),
+      )
+      .collect();
+
     const shopifyVariants = await ctx.db
       .query("shopifyProductVariants")
       .withIndex("by_organization", (q) =>
@@ -242,6 +253,13 @@ export const gatherAnalyticsData = internalQuery({
 
     const orderItems = await ctx.db
       .query("shopifyOrderItems")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", args.organizationId as Id<"organizations">),
+      )
+      .collect();
+
+    const shopifyTransactions = await ctx.db
+      .query("shopifyTransactions")
       .withIndex("by_organization", (q) =>
         q.eq("organizationId", args.organizationId as Id<"organizations">),
       )
@@ -287,6 +305,7 @@ export const gatherAnalyticsData = internalQuery({
 
     return {
       shopifyOrders,
+      shopifyCustomers,
       shopifyProducts,
       shopifyVariants,
       orderItems,
@@ -294,6 +313,7 @@ export const gatherAnalyticsData = internalQuery({
       metaInsights,
       costs,
       shopifyAnalytics: filteredAnalytics,
+      shopifyTransactions,
       startDate: args.startDate,
       endDate: args.endDate,
       organizationId: args.organizationId,
@@ -344,6 +364,12 @@ type DailyMetric = {
   handlingFees: number;
   customCosts: number;
   transactionFees: number;
+  cogsPercentageOfGross: number;
+  cogsPercentageOfNet: number;
+  shippingPercentageOfNet: number;
+  taxesPercentageOfRevenue: number;
+  handlingFeesPercentage: number;
+  customCostsPercentage: number;
   shippingCharged: number;
   taxesCollected: number;
   blendedRoas: number;
@@ -366,7 +392,8 @@ type DailyMetric = {
   returns: number;
   customerAcquisitionCost: number;
   uniqueCustomers: Set<string>;
-  shopifySessions: number;
+  newCustomerIds: Set<string>;
+  returningCustomerIds: Set<string>;
   shopifyVisitors: number;
   shopifyPageViews: number;
   shopifyConversions: number;
@@ -379,6 +406,7 @@ type DailyMetric = {
 
 type AnalyticsData = {
   shopifyOrders: Array<{
+    _id?: Id<"shopifyOrders"> | string;
     shopifyCreatedAt?: number | string;
     createdAt?: number;
     totalPrice?: number;
@@ -388,7 +416,12 @@ type AnalyticsData = {
     totalTax?: number;
     totalTip?: number;
     totalQuantity?: number;
-    customerId?: string;
+    customerId?: Id<"shopifyCustomers"> | string;
+  }>;
+  shopifyCustomers: Array<{
+    _id: Id<"shopifyCustomers"> | string;
+    shopifyCreatedAt?: number | string;
+    ordersCount?: number;
   }>;
   shopifyProducts: unknown[];
   shopifyVariants: Array<{
@@ -401,6 +434,13 @@ type AnalyticsData = {
     quantity: number;
     price: number;
     totalDiscount: number;
+  }>;
+  shopifyTransactions: Array<{
+    shopifyCreatedAt?: number;
+    processedAt?: number;
+    fee?: number;
+    kind?: string;
+    status?: string;
   }>;
   productCostComponents: Array<{
     variantId: string;
@@ -459,8 +499,32 @@ type AnalyticsData = {
   organizationId: string;
 };
 
-function calculateDailyMetrics(data: AnalyticsData): DailyMetric[] {
+function calculateDailyMetrics(
+  data: AnalyticsData,
+  options?: { skipConversionRates?: boolean },
+): DailyMetric[] {
+  const skipConversionRates = options?.skipConversionRates ?? false;
   const metricsByDate: Record<string, DailyMetric> = {};
+  const getOrderTimestamp = (
+    order: AnalyticsData["shopifyOrders"][number],
+  ): number => {
+    if (typeof order.shopifyCreatedAt === "number") {
+      return order.shopifyCreatedAt;
+    }
+    if (
+      typeof order.shopifyCreatedAt === "string" &&
+      order.shopifyCreatedAt.trim().length > 0
+    ) {
+      const parsed = Date.parse(order.shopifyCreatedAt);
+      if (!Number.isNaN(parsed)) {
+        return parsed;
+      }
+    }
+    if (typeof order.createdAt === "number") {
+      return order.createdAt;
+    }
+    return Date.now();
+  };
   // Precompute mappings for line-level cost allocation
   const itemsByOrder: Record<string, typeof data.orderItems> = {};
   for (const item of data.orderItems || []) {
@@ -480,15 +544,71 @@ function calculateDailyMetrics(data: AnalyticsData): DailyMetric[] {
   const perVariantHandlingByDate: Record<string, number> = {};
   const perVariantPaymentByDate: Record<string, number> = {};
   const perVariantPaymentRevenueCovered: Record<string, number> = {};
+  const datesWithShopifyTransactionFees = new Set<string>();
   const bounceRateByDate: Record<string, { weighted: number; sessions: number }> = {};
   const conversionRateByDate: Record<string, { weighted: number; sessions: number }> = {};
 
+  const sortedOrders = [...(data.shopifyOrders || [])].sort(
+    (a, b) => getOrderTimestamp(a) - getOrderTimestamp(b),
+  );
+  const ordersInWindowByCustomer = new Map<string, number>();
+  for (const order of sortedOrders) {
+    if (!order?.customerId) continue;
+    const key = String(order.customerId);
+    ordersInWindowByCustomer.set(
+      key,
+      (ordersInWindowByCustomer.get(key) ?? 0) + 1,
+    );
+  }
+
+  const seenCustomerIds = new Set<string>();
+  const startDateTimestamp = (() => {
+    if (!data.startDate) {
+      return undefined;
+    }
+    const parsed = Date.parse(`${data.startDate}T00:00:00.000Z`);
+    return Number.isNaN(parsed) ? undefined : parsed;
+  })();
+
+  for (const customer of data.shopifyCustomers || []) {
+    if (!customer?._id) continue;
+    const customerKey = String(customer._id);
+    const lifetimeOrders =
+      typeof customer.ordersCount === "number"
+        ? customer.ordersCount
+        : undefined;
+    const firstOrderTimestamp = (() => {
+      if (typeof customer.shopifyCreatedAt === "number") {
+        return customer.shopifyCreatedAt;
+      }
+      if (
+        typeof customer.shopifyCreatedAt === "string" &&
+        customer.shopifyCreatedAt.trim().length > 0
+      ) {
+        const parsed = Date.parse(customer.shopifyCreatedAt);
+        return Number.isNaN(parsed) ? undefined : parsed;
+      }
+      return undefined;
+    })();
+
+    const ordersInWindow = ordersInWindowByCustomer.get(customerKey) ?? 0;
+    const hasOrdersOutsideWindow =
+      lifetimeOrders !== undefined && lifetimeOrders > ordersInWindow;
+    const hadOrderBeforeWindow =
+      startDateTimestamp !== undefined &&
+      firstOrderTimestamp !== undefined &&
+      firstOrderTimestamp < startDateTimestamp;
+
+    if (hasOrdersOutsideWindow || hadOrderBeforeWindow) {
+      seenCustomerIds.add(customerKey);
+    }
+  }
+
   // Process Shopify orders
-  for (const order of data.shopifyOrders) {
+  for (const order of sortedOrders) {
     // Use shopifyCreatedAt which is the actual field name
-    const date = new Date(
-      order.shopifyCreatedAt || order.createdAt || Date.now(),
-    )
+    const orderTimestamp = getOrderTimestamp(order);
+    const date = new Date(orderTimestamp)
       .toISOString()
       .substring(0, 10);
 
@@ -497,13 +617,39 @@ function calculateDailyMetrics(data: AnalyticsData): DailyMetric[] {
     }
 
     const metrics = metricsByDate[date];
+    const customerKey = order.customerId
+      ? String(order.customerId)
+      : undefined;
+    const hasOrderedBefore =
+      customerKey !== undefined && seenCustomerIds.has(customerKey);
 
-    // Revenue metrics
-    metrics.revenue += roundMoney(order.totalPrice || 0);
-    metrics.grossSales += roundMoney(order.subtotalPrice || 0);
-    metrics.discounts += roundMoney(order.totalDiscounts || 0);
-    metrics.shippingCharged += roundMoney(order.totalShippingPrice || 0);
-    metrics.taxesCollected += roundMoney(order.totalTax || 0);
+    if (customerKey && !hasOrderedBefore) {
+      seenCustomerIds.add(customerKey);
+    }
+
+    // Revenue metrics (with fallbacks to ensure Shopify discount math is populated)
+    const totalPrice = roundMoney(order.totalPrice ?? 0);
+    const subtotalPrice = roundMoney(
+      order.subtotalPrice !== undefined && order.subtotalPrice !== null
+        ? order.subtotalPrice
+        : order.totalPrice ?? 0,
+    );
+    const shippingCharged = roundMoney(order.totalShippingPrice ?? 0);
+    const taxesCollected = roundMoney(order.totalTax ?? 0);
+
+    let discountValue = roundMoney(order.totalDiscounts ?? 0);
+    if (discountValue === 0 && subtotalPrice > 0) {
+      const implied = subtotalPrice - (totalPrice - shippingCharged - taxesCollected);
+      if (implied > 0) {
+        discountValue = roundMoney(implied);
+      }
+    }
+
+    metrics.revenue += totalPrice;
+    metrics.grossSales += subtotalPrice;
+    metrics.discounts += discountValue;
+    metrics.shippingCharged += shippingCharged;
+    metrics.taxesCollected += taxesCollected;
     // Removed tips collection per request
 
     // Order metrics
@@ -554,10 +700,41 @@ function calculateDailyMetrics(data: AnalyticsData): DailyMetric[] {
     }
 
     // Customer metrics
-    if (order.customerId) {
-      metrics.uniqueCustomers.add(order.customerId);
-      // We don't have ordersCount on the order, need to query customer
-      metrics.totalCustomers++;
+    if (customerKey) {
+      metrics.uniqueCustomers.add(customerKey);
+      if (hasOrderedBefore && !metrics.newCustomerIds.has(customerKey)) {
+        metrics.returningCustomerIds.add(customerKey);
+      } else if (!hasOrderedBefore) {
+        metrics.newCustomerIds.add(customerKey);
+      }
+    }
+  }
+
+  // Process Shopify transactions for actual fee data
+  for (const transaction of data.shopifyTransactions || []) {
+    const txTimestamp =
+      typeof transaction.processedAt === "number"
+        ? transaction.processedAt
+        : typeof transaction.shopifyCreatedAt === "number"
+          ? transaction.shopifyCreatedAt
+          : Date.now();
+
+    const date = new Date(txTimestamp).toISOString().substring(0, 10);
+
+    if (!metricsByDate[date]) {
+      metricsByDate[date] = initializeMetrics(date, data.organizationId);
+    }
+
+    const metrics = metricsByDate[date]!;
+    const fee = typeof transaction.fee === "number" ? transaction.fee : 0;
+    const roundedFee = roundMoney(fee);
+
+    if (roundedFee !== 0) {
+      metrics.transactionFees += roundedFee;
+    }
+
+    if (fee !== 0) {
+      datesWithShopifyTransactionFees.add(date);
     }
   }
 
@@ -637,7 +814,6 @@ function calculateDailyMetrics(data: AnalyticsData): DailyMetric[] {
     const visitors = analytics.visitors ?? 0;
     const pageViews = analytics.pageViews ?? 0;
 
-    metrics.shopifySessions += sessions;
     metrics.shopifyVisitors += visitors;
     metrics.shopifyPageViews += pageViews;
 
@@ -737,9 +913,40 @@ function calculateDailyMetrics(data: AnalyticsData): DailyMetric[] {
       }
 
       const metrics = metricsByDate[date]!;
+      const hasActualShopifyTransactionFees =
+        datesWithShopifyTransactionFees.has(date);
+
+      const applyFixedCostShare = (rawAmount: number) => {
+        if (!Number.isFinite(rawAmount)) return;
+        const amount = roundMoney(rawAmount);
+        if (amount === 0) return;
+
+        switch (cost.type) {
+          case "shipping":
+            metrics.shippingCosts += amount;
+            break;
+          case "payment":
+            metrics.transactionFees += amount;
+            break;
+          case "handling":
+            metrics.handlingFees += amount;
+            break;
+          case "product":
+            metrics.cogs += amount;
+            break;
+          case "marketing":
+          case "operational":
+          case "tax":
+            metrics.customCosts += amount;
+            break;
+          default:
+            metrics.customCosts += amount;
+        }
+      };
 
       // Apply cost based on calculation type
-      const frequency = (cost as any).frequency || cfg?.frequency;
+      const frequency =
+        (cost as any).frequency || cfg?.frequency || "monthly";
       if (cost.calculation === "percentage") {
         // Apply percentage-based costs
         switch (cost.type) {
@@ -752,15 +959,18 @@ function calculateDailyMetrics(data: AnalyticsData): DailyMetric[] {
             break;
           case "payment": // Transaction fees
             {
+              if (hasActualShopifyTransactionFees) {
+                break;
+              }
               const covered = perVariantPaymentRevenueCovered[date] || 0;
               const base = Math.max(0, metrics.revenue - covered);
               metrics.transactionFees += percentageOfMoney(base, cost.value);
-            }
-            // Include any fixed fee per transaction if configured
-            if (typeof cfg.fixedFee === "number" && cfg.fixedFee > 0) {
-              metrics.transactionFees += roundMoney(
-                metrics.orders * cfg.fixedFee,
-              );
+              // Include any fixed fee per transaction if configured
+              if (typeof cfg.fixedFee === "number" && cfg.fixedFee > 0) {
+                metrics.transactionFees += roundMoney(
+                  metrics.orders * cfg.fixedFee,
+                );
+              }
             }
             break;
           case "tax":
@@ -774,116 +984,34 @@ function calculateDailyMetrics(data: AnalyticsData): DailyMetric[] {
         // Apply fixed costs
         switch (frequency) {
           case "per_order":
-            if (cost.type === "shipping") {
-              metrics.shippingCosts += roundMoney(metrics.orders * cost.value);
-            } else if (cost.type === "payment") {
-              metrics.transactionFees += roundMoney(
-                metrics.orders * cost.value,
-              );
-            } else if (cost.type === "handling") {
-              metrics.handlingFees += roundMoney(metrics.orders * cost.value);
-            } else if (cost.type === "operational") {
-              // Rare case: operational per order, include in customCosts
-              metrics.customCosts += roundMoney(metrics.orders * cost.value);
-            } else if (cost.type === "tax") {
-              metrics.customCosts += roundMoney(metrics.orders * cost.value);
-            }
+            applyFixedCostShare(metrics.orders * cost.value);
             break;
           case "per_item":
-            // Per-item fixed costs multiply by units sold
-            if (cost.type === "shipping") {
-              metrics.shippingCosts += roundMoney(
-                metrics.unitsSold * cost.value,
-              );
-            } else if (cost.type === "handling") {
-              metrics.handlingFees += roundMoney(
-                metrics.unitsSold * cost.value,
-              );
-            } else if (cost.type === "payment") {
-              metrics.transactionFees += roundMoney(
-                metrics.unitsSold * cost.value,
-              );
-            } else if (
-              cost.type === "operational" || cost.type === "tax"
-            ) {
-              metrics.customCosts += roundMoney(
-                metrics.unitsSold * cost.value,
-              );
-            }
+            applyFixedCostShare(metrics.unitsSold * cost.value);
             break;
           case "monthly":
-            // Spread monthly costs across days in the month
-            if (
-              cost.type === "operational" ||
-              cost.type === "marketing" ||
-              cost.type === "tax"
-            ) {
-              const dim = daysInMonth(date);
-              metrics.customCosts += roundMoney(cost.value / dim);
-            }
+            applyFixedCostShare(cost.value / daysInMonth(date));
             break;
           case "weekly":
-            if (
-              cost.type === "operational" ||
-              cost.type === "marketing" ||
-              cost.type === "tax"
-            ) {
-              metrics.customCosts += roundMoney(cost.value / 7);
-            }
+            applyFixedCostShare(cost.value / 7);
             break;
           case "daily":
-            if (
-              cost.type === "operational" ||
-              cost.type === "marketing" ||
-              cost.type === "tax"
-            ) {
-              metrics.customCosts += roundMoney(cost.value);
-            }
+            applyFixedCostShare(cost.value);
             break;
           case "quarterly":
-            if (
-              cost.type === "operational" ||
-              cost.type === "marketing" ||
-              cost.type === "tax"
-            ) {
-              const diq = daysInQuarter(date);
-              metrics.customCosts += roundMoney(cost.value / diq);
-            }
+            applyFixedCostShare(cost.value / daysInQuarter(date));
             break;
           case "yearly":
-            if (
-              cost.type === "operational" ||
-              cost.type === "marketing" ||
-              cost.type === "tax"
-            ) {
-              const diy = daysInYear(date);
-              metrics.customCosts += roundMoney(cost.value / diy);
-            }
+            applyFixedCostShare(cost.value / daysInYear(date));
             break;
           case "one_time":
-            if (
-              (cost.type === "operational" ||
-                cost.type === "marketing" ||
-                cost.type === "tax") &&
-              date === earliestActiveDate
-            ) {
-              metrics.customCosts += roundMoney(cost.value);
+            if (date === earliestActiveDate) {
+              applyFixedCostShare(cost.value);
             }
             break;
         }
       } else if (cost.calculation === "per_unit") {
-        // Treat per-unit costs similar to per-item fixed
-        if (cost.type === "product") {
-          metrics.cogs += roundMoney(metrics.unitsSold * cost.value);
-        } else if (cost.type === "shipping") {
-          metrics.shippingCosts += roundMoney(metrics.unitsSold * cost.value);
-        } else if (cost.type === "handling") {
-          metrics.handlingFees += roundMoney(metrics.unitsSold * cost.value);
-        } else if (cost.type === "payment") {
-          metrics.transactionFees += roundMoney(metrics.unitsSold * cost.value);
-        } else if (cost.type === "operational" || cost.type === "tax") {
-          metrics.customCosts += roundMoney(metrics.unitsSold * cost.value);
-        }
+        applyFixedCostShare(metrics.unitsSold * cost.value);
       }
     }
   }
@@ -902,13 +1030,7 @@ function calculateDailyMetrics(data: AnalyticsData): DailyMetric[] {
         ? conversionBucket.weighted / conversionBucket.sessions
         : undefined;
 
-    if (metrics.shopifySessions > 0) {
-      metrics.shopifyConversionRate =
-        metrics.orders > 0
-          ? (metrics.orders / metrics.shopifySessions) * 100
-          : 0;
-      metrics.blendedSessionConversionRate = metrics.shopifyConversionRate;
-    } else if (analyticsConversionRate !== undefined) {
+    if (!skipConversionRates && analyticsConversionRate !== undefined) {
       metrics.shopifyConversionRate = analyticsConversionRate;
       metrics.blendedSessionConversionRate = analyticsConversionRate;
     } else {
@@ -935,6 +1057,25 @@ function calculateDailyMetrics(data: AnalyticsData): DailyMetric[] {
       metrics.shippingCosts +
       metrics.customCosts +
       metrics.transactionFees;
+
+    metrics.cogsPercentageOfGross =
+      metrics.grossSales > 0
+        ? (metrics.cogs / metrics.grossSales) * 100
+        : 0;
+    metrics.cogsPercentageOfNet =
+      metrics.revenue > 0 ? (metrics.cogs / metrics.revenue) * 100 : 0;
+    metrics.shippingPercentageOfNet =
+      metrics.revenue > 0
+        ? (metrics.shippingCosts / metrics.revenue) * 100
+        : 0;
+    metrics.taxesPercentageOfRevenue =
+      metrics.revenue > 0 ? (metrics.taxesCollected / metrics.revenue) * 100 : 0;
+    metrics.handlingFeesPercentage =
+      metrics.revenue > 0 ? (metrics.handlingFees / metrics.revenue) * 100 : 0;
+    metrics.customCostsPercentage =
+      metrics.revenue > 0
+        ? (metrics.customCosts / metrics.revenue) * 100
+        : 0;
 
     // Profit metrics
     metrics.grossProfit = metrics.grossSales - metrics.cogs;
@@ -979,24 +1120,14 @@ function calculateDailyMetrics(data: AnalyticsData): DailyMetric[] {
       metrics.orders > 0 ? metrics.totalAdSpend / metrics.orders : 0;
 
     // Customer metrics
-    metrics.totalCustomers = metrics.uniqueCustomers.size;
+    const uniqueCustomersSet = metrics.uniqueCustomers;
+    const newCustomerSet = metrics.newCustomerIds;
+    const returningCustomerSet = metrics.returningCustomerIds;
 
-    // For now, we'll estimate new vs returning based on simple logic
-    // In a full implementation, we'd track customer first purchase dates
-    // Estimate: 30% new, 70% returning for stores with customers
-    if (metrics.totalCustomers > 0) {
-      metrics.newCustomers = Math.max(
-        1,
-        Math.round(metrics.totalCustomers * 0.3),
-      );
-      metrics.returningCustomers =
-        metrics.totalCustomers - metrics.newCustomers;
-    } else {
-      metrics.newCustomers = 0;
-      metrics.returningCustomers = 0;
-    }
+    metrics.totalCustomers = uniqueCustomersSet.size;
+    metrics.newCustomers = newCustomerSet.size;
+    metrics.returningCustomers = returningCustomerSet.size;
 
-    // Repeat Customer Rate
     metrics.repeatCustomerRate =
       metrics.totalCustomers > 0
         ? (metrics.returningCustomers / metrics.totalCustomers) * 100
@@ -1008,8 +1139,10 @@ function calculateDailyMetrics(data: AnalyticsData): DailyMetric[] {
         ? metrics.totalAdSpend / metrics.newCustomers
         : 0;
 
-    // Convert Set to array for storage
-    (metrics as any).uniqueCustomers = Array.from(metrics.uniqueCustomers);
+    // Remove non-serializable sets before returning
+    delete (metrics as any).uniqueCustomers;
+    delete (metrics as any).newCustomerIds;
+    delete (metrics as any).returningCustomerIds;
 
     // ROAS
     metrics.blendedRoas = roundMoney(
@@ -1069,6 +1202,12 @@ function initializeMetrics(date: string, organizationId: string): DailyMetric {
     shippingCosts: 0,
     customCosts: 0,
     transactionFees: 0,
+    cogsPercentageOfGross: 0,
+    cogsPercentageOfNet: 0,
+    shippingPercentageOfNet: 0,
+    taxesPercentageOfRevenue: 0,
+    handlingFeesPercentage: 0,
+    customCostsPercentage: 0,
 
     // Order metrics
     orders: 0,
@@ -1085,7 +1224,8 @@ function initializeMetrics(date: string, organizationId: string): DailyMetric {
     repeatCustomerRate: 0,
     customerAcquisitionCost: 0,
     uniqueCustomers: new Set(),
-    shopifySessions: 0,
+    newCustomerIds: new Set(),
+    returningCustomerIds: new Set(),
     shopifyVisitors: 0,
     shopifyPageViews: 0,
     shopifyConversions: 0,
@@ -1246,7 +1386,6 @@ export const storeMetric = internalMutation({
 
       // Session & conversion tracking
       uniqueVisitors: args.metrics.uniqueVisitors,
-      shopifySessions: args.metrics.shopifySessions,
       shopifyConversionRate: args.metrics.shopifyConversionRate,
       googleClicks: args.metrics.googleClicks,
       googleConversions: args.metrics.googleConversions,
@@ -1264,7 +1403,6 @@ export const storeMetric = internalMutation({
       // Profitability & customer economics
       operatingMargin: args.metrics.operatingMargin,
       cacPercentageOfAOV: args.metrics.cacPercentageOfAOV,
-      cacPaybackPeriod: args.metrics.cacPaybackPeriod,
       profitPerOrder: args.metrics.profitPerOrder,
       profitPerUnit: args.metrics.profitPerUnit,
       fulfillmentCostPerOrder: args.metrics.fulfillmentCostPerOrder,

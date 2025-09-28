@@ -60,7 +60,6 @@ export interface Metrics {
 
   // Session & Conversion Tracking
   uniqueVisitors?: number;
-  shopifySessions?: number;
   shopifyConversionRate?: number;
   metaClicks?: number;
   metaPurchases?: number;
@@ -96,7 +95,6 @@ export interface Metrics {
 
   // Customer Economics
   cacPercentageOfAOV?: number;
-  cacPaybackPeriod?: number;
 
   // Unit Economics
   profitPerOrder?: number;

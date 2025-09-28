@@ -16,7 +16,6 @@ export const METRIC_CATEGORIES: Record<string, MetricCategory> = {
       "avgOrderValue",         // AOV
       "blendedRoas",           // ROAS (Revenue ÷ Total Ad Spend)
       "totalAdSpend",          // Total Ad Spend
-      "shopifyConversionRate", // Conversion Rate (Overall)
       "repeatCustomerRate",    // Returning Customers % (proxy for New vs Returning)
       "moMRevenueGrowth",      // MoM Revenue Growth
     ],
@@ -46,9 +45,7 @@ export const METRIC_CATEGORIES: Record<string, MetricCategory> = {
     metrics: [
       "uniqueVisitors",
       "metaClicks",
-      "shopifyConversionRate",
       "metaConversionRate",
-      "blendedSessionConversionRate",
       "shopifyAbandonedCarts",
       "shopifyCheckoutRate",
     ],
@@ -111,11 +108,8 @@ export const METRIC_CATEGORIES: Record<string, MetricCategory> = {
     name: "Customers & Retention",
     icon: "solar:users-group-rounded-bold-duotone",
     metrics: [
-      "totalCustomers",
-      "newCustomers",
       "returningCustomers",
       "repeatCustomerRate",
-      "cacPaybackPeriod",
       "ltvToCACRatio",
     ],
   },
@@ -212,15 +206,6 @@ export const METRICS: Record<string, MetricDefinition> = {
   },
 
   // Revenue & Margins
-  grossSales: {
-    id: "grossSales",
-    label: "Gross Sales",
-    icon: "solar:sale-bold-duotone",
-    category: "revenue",
-    format: "currency",
-    prefix: "$",
-    description: "Total gross sales",
-  },
   discounts: {
     id: "discounts",
     label: "Discounts",
@@ -316,15 +301,6 @@ export const METRICS: Record<string, MetricDefinition> = {
     format: "number",
     description: "Unique website visitors",
   },
-  shopifySessions: {
-    id: "shopifySessions",
-    label: "Shopify Sessions",
-    icon: "simple-icons:shopify",
-    category: "trafficConversion",
-    format: "number",
-    description: "Total store sessions from Shopify",
-    iconColor: "text-green-600",
-  },
   metaClicks: {
     id: "metaClicks",
     label: "Meta Clicks",
@@ -332,17 +308,6 @@ export const METRICS: Record<string, MetricDefinition> = {
     category: "trafficConversion",
     format: "number",
     description: "Clicks from Meta ads",
-  },
-  shopifyConversionRate: {
-    id: "shopifyConversionRate",
-    label: "Conversion Rate (Overall)",
-    icon: "simple-icons:shopify",
-    category: "trafficConversion",
-    format: "percentage",
-    suffix: "%",
-    decimal: 2,
-    description: "Orders ÷ Sessions × 100 (Shopify)",
-    iconColor: "text-green-600",
   },
   metaConversionRate: {
     id: "metaConversionRate",
@@ -738,34 +703,24 @@ export const METRICS: Record<string, MetricDefinition> = {
     prefix: "$",
     description: "Handling and fulfillment fees",
   },
-  handlingFeesPercentage: {
-    id: "handlingFeesPercentage",
-    label: "Handling % of Revenue",
-    icon: "solar:percent-bold-duotone",
-    category: "costStructure",
-    format: "percentage",
-    suffix: "%",
-    decimal: 1,
-    description: "Handling fees as percentage of revenue",
-  },
   customCosts: {
     id: "customCosts",
-    label: "Custom Costs",
+    label: "Operating Costs",
     icon: "solar:settings-bold-duotone",
     category: "costStructure",
     format: "currency",
     prefix: "$",
-    description: "Custom defined costs",
+    description: "Operational and indirect costs",
   },
   customCostsPercentage: {
     id: "customCostsPercentage",
-    label: "Custom % of Revenue",
+    label: "Operating % of Revenue",
     icon: "solar:percent-bold-duotone",
     category: "costStructure",
     format: "percentage",
     suffix: "%",
     decimal: 1,
-    description: "Custom costs as percentage of revenue",
+    description: "Operating costs as percentage of revenue",
   },
 
   // Customer Economics
@@ -822,16 +777,6 @@ export const METRICS: Record<string, MetricDefinition> = {
     suffix: "%",
     decimal: 1,
     description: "CAC as percentage of AOV",
-  },
-  cacPaybackPeriod: {
-    id: "cacPaybackPeriod",
-    label: "CAC Payback",
-    icon: "solar:calendar-bold-duotone",
-    category: "customerEconomics",
-    format: "decimal",
-    suffix: " days",
-    decimal: 0,
-    description: "Days to recover CAC",
   },
   ltvToCACRatio: {
     id: "ltvToCACRatio",
@@ -1007,16 +952,12 @@ export function formatMetricValue(
   }
 
   if (metric.format === "currency") {
-    const absValue = Math.abs(numValue);
     const currencySymbol = getCurrencySymbol(currency);
-
-    if (absValue >= 1000000) {
-      return `${currencySymbol}${(numValue / 1000000).toFixed(1)}M`;
-    } else if (absValue >= 1000) {
-      return `${currencySymbol}${(numValue / 1000).toFixed(1)}K`;
-    }
-
-    return `${currencySymbol}${numValue.toFixed(metric.decimal || 0)}`;
+    const digits = metric.decimal || 0;
+    return `${currencySymbol}${new Intl.NumberFormat("en-US", {
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+    }).format(numValue)}`;
   }
 
   if (metric.format === "percentage") {

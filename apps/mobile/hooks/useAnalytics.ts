@@ -13,84 +13,178 @@ export interface AnalyticsMetric {
 export interface OverviewMetrics {
   revenue: AnalyticsMetric;
   orders: AnalyticsMetric;
-  conversionRate: AnalyticsMetric;
   avgOrderValue: AnalyticsMetric;
   totalAdSpend: AnalyticsMetric;
-  roas: AnalyticsMetric;
-  customers: AnalyticsMetric;
-  repeatRate: AnalyticsMetric;
+  roas?: AnalyticsMetric;
+  customers?: AnalyticsMetric;
+  repeatRate?: AnalyticsMetric;
   netProfit: AnalyticsMetric;
+  grossProfit: AnalyticsMetric;
   profitMargin: AnalyticsMetric;
 }
+
+export interface CostBreakdownTotals {
+  adSpend: number;
+  cogs: number;
+  shipping: number;
+  transaction: number;
+  custom: number;
+  handling: number;
+}
+
+interface CostBreakdownResult {
+  totals: CostBreakdownTotals;
+  metaSpend: number;
+}
+
+const createEmptyCostBreakdown = (): CostBreakdownResult => ({
+  totals: {
+    adSpend: 0,
+    cogs: 0,
+    shipping: 0,
+    transaction: 0,
+    custom: 0,
+    handling: 0,
+  },
+  metaSpend: 0,
+});
 
 // Hook for overview analytics
 export function useOverviewAnalytics() {
   const { dateRange } = useDateRange();
 
-  // Fetch overview metrics - using getMetrics temporarily until we have the proper endpoint
-  const overviewData = useQuery(
-    api.web.analytics.getMetrics,
-    {
-      dateRange: {
-        startDate: dateRange.start,
-        endDate: dateRange.end,
-      },
-      metrics: ['revenue', 'orders', 'conversionRate', 'aov', 'totalAdSpend', 'blendedRoas', 'customers', 'repeatCustomerRate', 'netProfit', 'netProfitMargin'],
-    }
-  ) as any;
+  // Aggregated P&L metrics for totals and period-over-period change
+  const pnl = useQuery(api.web.pnl.getMetrics, {
+    dateRange: {
+      startDate: dateRange.start,
+      endDate: dateRange.end,
+    },
+  }) as any;
 
-  // Transform the data into mobile-friendly format
+  // Fetch orders separately and sum them to avoid averaging artifacts
+  const ordersRows = useQuery(api.web.analytics.getMetrics, {
+    dateRange: {
+      startDate: dateRange.start,
+      endDate: dateRange.end,
+    },
+    metrics: ["orders"],
+  }) as any[] | null | undefined;
+
+  // Fetch ROAS as an optional KPI (averaged across the period)
+  const roasRows = useQuery(api.web.analytics.getMetrics, {
+    dateRange: {
+      startDate: dateRange.start,
+      endDate: dateRange.end,
+    },
+    metrics: ["blendedRoas"],
+  }) as any[] | null | undefined;
+
   const metrics = useMemo<OverviewMetrics | null>(() => {
-    if (!overviewData) return null;
+    if (pnl === undefined || ordersRows === undefined || roasRows === undefined)
+      return null;
+    if (pnl === null) return null;
+
+    const ordersTotal = Array.isArray(ordersRows)
+      ? ordersRows.reduce((sum, r) => sum + (Number(r?.orders) || 0), 0)
+      : 0;
+
+    const roasAvg = Array.isArray(roasRows) && roasRows.length > 0
+      ? roasRows.reduce((sum, r) => sum + (Number(r?.blendedRoas) || 0), 0) /
+        roasRows.length
+      : 0;
+
+    const revenue = Number(pnl.revenue || 0);
+    const netProfit = Number(pnl.netProfit || 0);
+    const totalAdSpend = Number(pnl.totalAdSpend || 0);
+    const grossProfit = Number(pnl.grossProfit || 0);
+    const profitMargin = Number(pnl.netProfitMargin || 0);
+    const aov = ordersTotal > 0 ? revenue / ordersTotal : 0;
 
     return {
       revenue: {
-        value: overviewData.revenue?.value ?? 0,
-        change: overviewData.revenue?.change ?? 0,
+        value: revenue,
+        change: Number(pnl.revenueChange ?? 0),
       },
       orders: {
-        value: overviewData.orders?.value ?? 0,
-        change: overviewData.orders?.change ?? 0,
-      },
-      conversionRate: {
-        value: overviewData.conversionRate?.value ?? 0,
-        change: overviewData.conversionRate?.change ?? 0,
+        value: ordersTotal,
+        // Not currently available from P&L; omit change to hide indicator
       },
       avgOrderValue: {
-        value: overviewData.aov?.value ?? 0,
-        change: overviewData.aov?.change ?? 0,
+        value: aov,
+        // Change not computed; omit for now
       },
       totalAdSpend: {
-        value: overviewData.totalAdSpend?.value ?? 0,
-        change: overviewData.totalAdSpend?.change ?? 0,
+        value: totalAdSpend,
+        change: Number(pnl.totalAdSpendChange ?? 0),
       },
       roas: {
-        value: overviewData.blendedRoas?.value ?? 0,
-        change: overviewData.blendedRoas?.change ?? 0,
-      },
-      customers: {
-        value: overviewData.customers?.value ?? 0,
-        change: overviewData.customers?.change ?? 0,
-      },
-      repeatRate: {
-        value: overviewData.repeatCustomerRate?.value ?? 0,
-        change: overviewData.repeatCustomerRate?.change ?? 0,
+        value: roasAvg,
       },
       netProfit: {
-        value: overviewData.netProfit?.value ?? 0,
-        change: overviewData.netProfit?.change ?? 0,
+        value: netProfit,
+        change: Number(pnl.netProfitChange ?? 0),
+      },
+      grossProfit: {
+        value: grossProfit,
+        change: Number(pnl.grossProfitChange ?? 0),
       },
       profitMargin: {
-        value: overviewData.netProfitMargin?.value ?? 0,
-        change: overviewData.netProfitMargin?.change ?? 0,
+        value: profitMargin,
+        change: Number(pnl.netProfitMarginChange ?? 0),
       },
     };
-  }, [overviewData]);
+  }, [pnl, ordersRows, roasRows]);
 
   return {
     metrics,
-    isLoading: overviewData === undefined,
+    isLoading:
+      pnl === undefined || ordersRows === undefined || roasRows === undefined,
     error: null,
+  };
+}
+
+// Hook: mobile cost breakdown (6 categories like web)
+export function useCostBreakdown() {
+  const { dateRange } = useDateRange();
+
+  const costs = useQuery(
+    api.web.analytics.getMetrics,
+    {
+      dateRange: { startDate: dateRange.start, endDate: dateRange.end },
+      metrics: [
+        'totalAdSpend',
+        'cogs',
+        'shippingCosts',
+        'transactionFees',
+        'customCosts',
+        'handlingFees',
+        // channel spends for KPIs
+        'metaAdSpend',
+      ],
+    }
+  ) as any[] | null | undefined;
+
+  const { totals, metaSpend } = useMemo<CostBreakdownResult>(() => {
+    if (!Array.isArray(costs)) return createEmptyCostBreakdown();
+    const sum = (key: string) =>
+      costs.reduce((acc: number, row: any) => acc + (Number(row?.[key]) || 0), 0);
+    return {
+      totals: {
+        adSpend: sum('totalAdSpend'),
+        cogs: sum('cogs'),
+        shipping: sum('shippingCosts'),
+        transaction: sum('transactionFees'),
+        custom: sum('customCosts'),
+        handling: sum('handlingFees'),
+      } as CostBreakdownTotals,
+      metaSpend: sum('metaAdSpend'),
+    };
+  }, [costs]);
+
+  return {
+    totals,
+    metaSpend,
+    isLoading: costs === undefined,
   };
 }
 

@@ -31,7 +31,7 @@ function Metric({
 
     switch (format) {
       case "currency": {
-        return Math.abs(value) >= 1000
+        return Math.abs(value) >= 10000000
           ? formatCurrencyCompact(value, currency)
           : formatCurrency(value, currency);
       }

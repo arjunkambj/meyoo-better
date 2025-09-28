@@ -1,5 +1,5 @@
 import { ScrollView, Text, View } from 'react-native';
-import { Button, Skeleton } from 'heroui-native';
+import { Button, Skeleton, Spinner } from 'heroui-native';
 
 import type { AgentUIMessage } from '@/hooks/useAgent';
 import { AgentMessageBubble } from './AgentMessageBubble';
@@ -28,6 +28,25 @@ export function AgentMessageFeed({
   onLoadMore,
   onScrollViewReady,
 }: AgentMessageFeedProps): React.JSX.Element {
+  const inferThinkingLabel = (parts?: AgentUIMessage['parts']): string => {
+    if (!parts || parts.length === 0) return 'Thinking…';
+    try {
+      const toolPart = parts.find(
+        (p: any) => p && p.type && (p.type === 'tool' || p.type === 'step-start')
+      ) as any;
+      const rawName = toolPart ? (toolPart.toolName ?? toolPart.name ?? toolPart.tool) : undefined;
+      const name = typeof rawName === 'string' ? rawName.toLowerCase() : '';
+      if (name.includes('inventory')) return 'Reading inventory details…';
+      if (name.includes('meta') || name.includes('ads')) return 'Reading meta analytics…';
+      if (name.includes('google')) return 'Reading google analytics…';
+      if (name.includes('order')) return 'Summarizing orders…';
+      if (name.includes('brand')) return 'Fetching brand summary…';
+      return 'Thinking…';
+    } catch {
+      return 'Thinking…';
+    }
+  };
+
   return (
     <ScrollView
       ref={(node) => {
@@ -57,14 +76,27 @@ export function AgentMessageFeed({
         </Text>
       </View>
     ) : (
-      messages.map((message) => (
-        <AgentMessageBubble
-          key={message.id}
-          message={message}
-          isLocal={message.id.startsWith('local-')}
-        />
-      ))
-      )}
+      messages.map((message) => {
+        const isStreaming = message.role === 'assistant' && message.status === 'streaming';
+        const isThinking = message.text === '__thinking__' || (isStreaming && (!message.text || message.text.trim().length === 0));
+        if (isThinking) {
+          const label = inferThinkingLabel(message.parts);
+          return (
+            <View key={message.id} className="flex-row items-center gap-2 self-start">
+              <Spinner size="sm" />
+              <Text className="text-xs text-default-600">{label}</Text>
+            </View>
+          );
+        }
+        return (
+          <AgentMessageBubble
+            key={message.id}
+            message={message}
+            isLocal={message.id.startsWith('local-')}
+          />
+        );
+      })
+    )}
     </ScrollView>
   );
 }

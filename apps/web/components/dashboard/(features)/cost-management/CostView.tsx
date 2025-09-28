@@ -67,11 +67,11 @@ export default function CostView() {
           {/* Tax & Fees tab removed: manage tax per product instead */}
 
           <Tab
-            key="other"
+            key="operating"
             title={
               <div className="flex items-center gap-2">
                 <Icon icon="solar:wallet-bold" width={18} />
-                <span>Other Expenses</span>
+                <span>Operating Costs</span>
               </div>
             }
           >

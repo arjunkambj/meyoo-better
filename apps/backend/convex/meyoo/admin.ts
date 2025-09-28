@@ -233,6 +233,79 @@ export const deleteIntegrationSessionsByPlatformBatch = internalMutation({
   },
 });
 
+export const deleteAnalyticsMetrics = action({
+  args: {
+    organizationId: v.id("organizations"),
+  },
+  returns: v.object({
+    success: v.boolean(),
+    deleted: v.number(),
+    tables: v.record(v.string(), v.number()),
+  }),
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+
+    if (!userId) {
+      throw new Error("Not authenticated");
+    }
+
+    const user = await ctx.runQuery(internal.meyoo.admin.getUserById, {
+      userId,
+    });
+
+    if (!user || !isAdmin(user)) {
+      throw new Error("Admin access required");
+    }
+
+    if (CONVEX_CLOUD_URL?.includes("prod")) {
+      throw new Error("Cannot delete analytics data in production");
+    }
+
+    const tablesToClear: OrgScopedTable[] = [
+      "metricsDaily",
+      "metricsWeekly",
+      "metricsMonthly",
+      "productMetrics",
+      "customerMetrics",
+      "realtimeMetrics",
+    ];
+
+    let totalDeleted = 0;
+    const perTable: Record<string, number> = {};
+
+    for (const table of tablesToClear) {
+      let hasMore = true;
+      let cursor: string | undefined;
+      let tableDeleted = 0;
+
+      while (hasMore) {
+        const result = await ctx.runMutation(
+          internal.meyoo.admin.deleteOrgRecordsBatch,
+          {
+            table,
+            organizationId: args.organizationId,
+            batchSize: RESET_DEFAULT_BATCH_SIZE,
+            cursor,
+          },
+        );
+
+        tableDeleted += result.deleted;
+        totalDeleted += result.deleted;
+        hasMore = result.hasMore;
+        cursor = result.cursor;
+      }
+
+      perTable[table] = tableDeleted;
+    }
+
+    return {
+      success: true,
+      deleted: totalDeleted,
+      tables: perTable,
+    };
+  },
+});
+
 export const resetMembersBatch = internalMutation({
   args: {
     organizationId: v.id("organizations"),
@@ -480,6 +553,7 @@ export const recalculateAnalytics = action({
           startDate: startDate.toISOString().substring(0, 10),
           endDate: endDate.toISOString().substring(0, 10),
         },
+        syncType: "incremental",
       },
     );
 

@@ -131,12 +131,7 @@ const ORGANIZATION_TABLES = [
   "shopifyInventory",
   "metaAdAccounts",
   "metaInsights",
-  "metricsDaily",
-  "metricsWeekly",
-  "metricsMonthly",
-  "productMetrics",
-  "customerMetrics",
-  "realtimeMetrics",
+  "shopifyAnalytics",
   "costs",
   "costCategories",
   "productCostComponents",
@@ -166,12 +161,7 @@ const organizationTableValidator = v.union(
   v.literal("shopifyInventory"),
   v.literal("metaAdAccounts"),
   v.literal("metaInsights"),
-  v.literal("metricsDaily"),
-  v.literal("metricsWeekly"),
-  v.literal("metricsMonthly"),
-  v.literal("productMetrics"),
-  v.literal("customerMetrics"),
-  v.literal("realtimeMetrics"),
+  v.literal("shopifyAnalytics"),
   v.literal("costs"),
   v.literal("costCategories"),
   v.literal("productCostComponents"),
@@ -2409,24 +2399,6 @@ export const storeOrdersInternal = internalMutation({
         if (customerId) {
           uniqueCustomerIds.add(customerId);
         }
-      }
-    }
-
-    if (uniqueCustomerIds.size > 0) {
-      try {
-        await ctx.scheduler.runAfter(
-          0,
-          internal.analytics.customerCalculations.enqueueCustomerMetricsCalculation,
-          {
-            organizationId: args.organizationId,
-            customerIds: Array.from(uniqueCustomerIds),
-          },
-        );
-        logger.info(
-          `Scheduled customer metrics calculation for ${uniqueCustomerIds.size} customers`
-        );
-      } catch (error) {
-        logger.error("Failed to schedule customer metrics calculation", error);
       }
     }
 

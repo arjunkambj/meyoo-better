@@ -160,13 +160,17 @@ export const analyticsSummary = action({
   handler: async (ctx, args): Promise<{ summary: string; totals: Record<string, number>; records: any[] }> => {
     const { organizationId: _organizationId } = await validateAndGetOrgContext(ctx, args.apiKey);
 
-    const rows: any[] = await ctx.runQuery(api.web.analytics.getMetrics, {
+    const analyticsResponse = await ctx.runQuery(api.web.analytics.getMetrics, {
       dateRange: { startDate: args.startDate, endDate: args.endDate },
       granularity: args.granularity ?? "daily",
       metrics: args.metrics,
-    }) ?? [];
+    });
 
-    if (rows.length === 0) {
+    const rows = Array.isArray(analyticsResponse)
+      ? analyticsResponse
+      : (analyticsResponse?.data?.orders ?? []);
+
+    if (!rows.length) {
       return {
         summary: "No analytics available for the selected date range.",
         totals: {},

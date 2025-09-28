@@ -152,18 +152,34 @@ export const getIntegrationStatus = query({
     );
 
     // Analytics readiness: presence of computed metrics or onboarding analyticsTriggeredAt
-    const anyMetrics = await ctx.db
-      .query("metricsDaily")
-      .withIndex("by_organization", (q) => q.eq("organizationId", orgId as Id<"organizations">))
+    const recentOrder = await ctx.db
+      .query("shopifyOrders")
+      .withIndex("by_organization_and_created", (q) =>
+        q.eq("organizationId", orgId as Id<"organizations">),
+      )
+      .order("desc")
+      .first();
+
+    const recentInsight = await ctx.db
+      .query("metaInsights")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", orgId as Id<"organizations">),
+      )
+      .order("desc")
       .first();
     const onboarding = await ctx.db
       .query("onboarding")
       .withIndex("by_organization", (q) => q.eq("organizationId", orgId as Id<"organizations">))
       .first();
     const analyticsReady = Boolean(
-      (anyMetrics || onboarding?.onboardingData?.analyticsTriggeredAt) &&
-        // Only consider analytics "ready" if Shopify is initial-synced when connected
+      (recentOrder || recentInsight || onboarding?.onboardingData?.analyticsTriggeredAt) &&
         (shopifyStore ? shopifyInitialComplete : true),
+    );
+
+    const lastCalculatedAt = Math.max(
+      recentOrder?.syncedAt ?? 0,
+      recentInsight?.syncedAt ?? 0,
+      onboarding?.onboardingData?.analyticsTriggeredAt ?? 0,
     );
 
     return {
@@ -184,7 +200,7 @@ export const getIntegrationStatus = query({
       },
       analytics: {
         ready: analyticsReady,
-        lastCalculatedAt: anyMetrics?.updatedAt,
+        lastCalculatedAt: lastCalculatedAt > 0 ? lastCalculatedAt : undefined,
       },
     } as const;
   },
@@ -257,9 +273,18 @@ export const refreshIntegrationStatus = internalMutation({
       initialMeta && initialMeta.status === "completed",
     );
 
-    const anyMetrics = await ctx.db
-      .query("metricsDaily")
+    const recentOrder = await ctx.db
+      .query("shopifyOrders")
+      .withIndex("by_organization_and_created", (q) =>
+        q.eq("organizationId", orgId),
+      )
+      .order("desc")
+      .first();
+
+    const recentInsight = await ctx.db
+      .query("metaInsights")
       .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
+      .order("desc")
       .first();
 
     const existing = await ctx.db
@@ -285,8 +310,11 @@ export const refreshIntegrationStatus = internalMutation({
         lastSyncAt: latestMeta[0]?.completedAt ?? latestMeta[0]?.startedAt,
       },
       analytics: {
-        ready: Boolean(anyMetrics && (shopifyStore ? shopifyInitialComplete : true)),
-        lastCalculatedAt: anyMetrics?.updatedAt,
+        ready: Boolean(
+          (recentOrder || recentInsight) && (shopifyStore ? shopifyInitialComplete : true),
+        ),
+        lastCalculatedAt:
+          Math.max(recentOrder?.syncedAt ?? 0, recentInsight?.syncedAt ?? 0) || undefined,
       },
       updatedAt: Date.now(),
     } as const;

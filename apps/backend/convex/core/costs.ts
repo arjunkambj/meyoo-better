@@ -189,11 +189,17 @@ export const getCostSummary = query({
       }),
     ),
   },
+  returns: v.union(
+    v.null(),
+    v.object({
+      period: v.object({ startDate: v.string(), endDate: v.string() }),
+      costs: v.array(v.any()),
+    }),
+  ),
   handler: async (ctx, args) => {
     const auth = await getUserAndOrg(ctx);
     if (!auth) return null;
 
-    // Default to last 30 days
     const dateRange = args.dateRange || {
       startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
         .toISOString()
@@ -201,45 +207,6 @@ export const getCostSummary = query({
       endDate: new Date().toISOString().substring(0, 10),
     };
 
-    // Prefer metricsDaily as the source of truth
-    const start = dateRange.startDate;
-    const end = dateRange.endDate;
-
-    const daily = await ctx.db
-      .query("metricsDaily")
-      .withIndex("by_org_date", (q) =>
-        q.eq("organizationId", auth.orgId as Id<"organizations">),
-      )
-      .collect();
-
-    const filtered = daily.filter(
-      (m) => m.date >= start && m.date <= end,
-    );
-
-    if (filtered.length > 0) {
-      const sum = (k: keyof typeof filtered[number]) =>
-        filtered.reduce((acc, m: any) => acc + (m[k] || 0), 0);
-
-      const cogs = sum("cogs");
-      const shippingCosts = sum("shippingCosts");
-      const transactionFees = sum("transactionFees");
-      const customCosts = sum("customCosts");
-      const total = cogs + shippingCosts + transactionFees + customCosts;
-
-      return {
-        total,
-        byCategory: {
-          product: cogs,
-          shipping: shippingCosts,
-          payment: transactionFees,
-          operational: customCosts,
-        },
-        period: dateRange,
-        costCount: filtered.length,
-      };
-    }
-
-    // Fallback: sum active costs overlapping the range (rough)
     const costs = await ctx.db
       .query("costs")
       .withIndex("by_organization", (q) =>
@@ -252,18 +219,14 @@ export const getCostSummary = query({
 
     const filteredCosts = costs.filter((cost) => {
       const from = cost.effectiveFrom;
-      const to = cost.effectiveTo ?? Infinity;
-      // overlap if from <= end && to >= start
-      return from <= endTime && to >= startTime;
+      const to = cost.effectiveTo ?? Number.POSITIVE_INFINITY;
+      return cost.isActive && from <= endTime && to >= startTime;
     });
 
-    const summary: Record<string, number> = {};
-    let total = 0;
-    for (const cost of filteredCosts) {
-      summary[cost.type] = (summary[cost.type] ?? 0) + cost.value;
-      total += cost.value;
-    }
-    return { total, byCategory: summary, period: dateRange, costCount: filteredCosts.length };
+    return {
+      period: dateRange,
+      costs: filteredCosts,
+    } as const;
   },
 });
 

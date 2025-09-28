@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import React, { useCallback, useMemo, useState } from "react";
 import { PlanUsageAlert } from "@/components/shared/billing/PlanUsageAlert";
 import { api } from "@/libs/convexApi";
+import { computeChannelRevenue } from "@/libs/analytics/aggregations";
 import {
   useDashboard,
   useOverviewAnalytics,
@@ -76,11 +77,16 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
 
   // Get platform-specific metrics
   const platformMetrics = usePlatformMetrics(dateRange);
-  const channelRevenue = useQuery(
+  const rawChannelRevenue = useQuery(
     api.web.analytics.getChannelRevenue,
     dateRange
       ? { dateRange: { startDate: dateRange.start, endDate: dateRange.end } }
-      : {},
+      : ("skip" as const),
+  );
+
+  const channelRevenue = useMemo(
+    () => computeChannelRevenue(rawChannelRevenue ?? undefined),
+    [rawChannelRevenue],
   );
 
   const utmRoas = useMemo(() => {

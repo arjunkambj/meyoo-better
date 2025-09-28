@@ -757,8 +757,6 @@ export const completeOnboarding = mutation({
     const completedSyncs = [];
     const pendingSyncs = [];
     const notStartedSyncs = [];
-    let analyticsTriggeredAt: number | undefined;
-
     for (const platform of platforms) {
       // Get the latest sync session for this platform using index ordering
       const latestSync = await ctx.db
@@ -869,15 +867,6 @@ export const completeOnboarding = mutation({
 
     // production: avoid verbose onboarding logs
 
-    // Trigger analytics if all syncs are complete
-    if (allSyncsComplete && platforms.length > 0) {
-      await createJob(ctx, "analytics:calculate", PRIORITY.HIGH, {
-        organizationId: user.organizationId as Id<"organizations">,
-        syncType: "initial",
-      });
-      analyticsTriggeredAt = Date.now();
-    }
-
     // production: avoid PII in logs
 
     // Ensure a sync profile exists so ongoing cadence starts immediately
@@ -934,11 +923,6 @@ export const completeOnboarding = mutation({
       delete onboardingData.syncPendingPlatforms;
     }
 
-    if (analyticsTriggeredAt) {
-      onboardingData.analyticsTriggeredAt =
-        onboarding.onboardingData?.analyticsTriggeredAt || analyticsTriggeredAt;
-    }
-
     await ctx.db.patch(onboarding._id, {
       isCompleted: true,
       onboardingStep: ONBOARDING_STEPS.COMPLETE,
@@ -963,7 +947,7 @@ export const completeOnboarding = mutation({
 
     return {
       success: true,
-      analyticsScheduled: Boolean(analyticsTriggeredAt),
+      analyticsScheduled: false,
       platformsSyncing: pendingPlatformsList,
       syncJobs: syncJobs.length > 0 ? syncJobs : undefined,
       syncErrors: syncErrors.length > 0 ? syncErrors : undefined,
@@ -1004,7 +988,7 @@ export const monitorInitialSyncs = internalMutation({
 
     let processed = 0;
     let completedCount = 0;
-    let analyticsCount = 0;
+    const analyticsCount = 0;
     let pendingCount = 0;
 
     // Heal sync sessions that imported data but never flipped to "completed" so onboarding can finish.
@@ -1262,15 +1246,6 @@ export const monitorInitialSyncs = internalMutation({
 
         if (allCompleted) {
           completedCount += 1;
-
-          if (!onboarding.onboardingData?.analyticsTriggeredAt) {
-            await createJob(ctx, "analytics:calculate", PRIORITY.HIGH, {
-              organizationId: orgId,
-              syncType: "initial",
-            });
-            onboardingData.analyticsTriggeredAt = now;
-            analyticsCount += 1;
-          }
         } else {
           pendingCount += 1;
         }

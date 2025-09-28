@@ -8,6 +8,7 @@ import { getCurrencySymbol, formatNumber } from "@/libs/utils/format";
 
 export interface OrdersOverviewMetrics {
   totalOrders: number;
+  cancelledOrders?: number;
   totalRevenue: number;
   totalCosts: number;
   netProfit: number;

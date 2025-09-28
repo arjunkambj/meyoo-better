@@ -24,7 +24,7 @@ export const PnLView = memo(function PnLView() {
   });
 
   const {
-    kpiMetrics,
+    metricsData,
     tablePeriods,
     granularity,
     setGranularity,
@@ -60,10 +60,7 @@ export const PnLView = memo(function PnLView() {
         }
       />
 
-      <PnLKPICards
-        metrics={kpiMetrics}
-        isLoading={loadingStates.metrics}
-      />
+      <PnLKPICards metrics={metricsData} isLoading={loadingStates.metrics} />
 
       {/* P&L Table with integrated granularity controls */}
       <PnLTable

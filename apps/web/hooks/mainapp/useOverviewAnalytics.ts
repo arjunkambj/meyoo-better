@@ -1,8 +1,10 @@
+import { useMemo } from "react";
 import { useQuery } from "convex-helpers/react/cache/hooks";
 
 import { api } from "@/libs/convexApi";
 import { toUtcRangeStrings } from "@/libs/dateRange";
 import { getCurrencySymbol } from "@/libs/utils/format";
+import { computeOverviewMetrics } from "@/libs/analytics/aggregations";
 import {
   useIntegrationStatus,
   useUser,
@@ -34,10 +36,18 @@ export function useOverviewAnalytics(dateRange?: {
   const timeRange = dateRange ? undefined : "30d"; // Use custom range if provided
 
   // Get dashboard summary metrics with custom date range if provided
-  const summary = useQuery(api.web.dashboard.getDashboardSummary, {
+  const summaryResponse = useQuery(api.web.dashboard.getDashboardSummary, {
     timeRange, // Will be "30d" or undefined based on dateRange
     ...(dateRange && toUtcRangeStrings(dateRange, timezone)),
   });
+
+  const overviewComputation = useMemo(
+    () => computeOverviewMetrics(summaryResponse ?? undefined),
+    [summaryResponse],
+  );
+
+  const summary = overviewComputation?.summary;
+  const extras = overviewComputation?.extras;
 
   // Get analytics metrics if date range is provided
   // const _analyticsMetrics = useQuery(
@@ -51,7 +61,7 @@ export function useOverviewAnalytics(dateRange?: {
   // Get sync sessions for monitoring
   const syncSessions = useQuery(api.web.sync.getActiveSyncSessions);
 
-  const isLoading = summary === undefined;
+  const isLoading = summaryResponse === undefined;
   const isSyncing = syncSessions?.some((s) => s.status === "syncing") || false;
   const isCalculating = false;
 
@@ -81,11 +91,14 @@ export function useOverviewAnalytics(dateRange?: {
   // Prepare metrics in the format expected by AnalyticsOverview component
   const metrics = summary
     ? (() => {
-        const summaryWithExtras = summary as typeof summary & {
-          blendedSessionConversionRate?: number;
-          blendedSessionConversionRateChange?: number;
-          uniqueVisitors?: number;
-        };
+        const summaryWithExtras = {
+          ...summary,
+          blendedSessionConversionRate:
+            extras?.blendedSessionConversionRate ?? 0,
+          blendedSessionConversionRateChange:
+            extras?.blendedSessionConversionRateChange ?? 0,
+          uniqueVisitors: extras?.uniqueVisitors ?? 0,
+        } as const;
 
         return {
         // Key Performance Indicators
@@ -197,9 +210,8 @@ export function useOverviewAnalytics(dateRange?: {
         },
         operatingMargin: {
           label: "Operating Margin",
-          value: summary.revenue > 0
-            ? ((summary.revenue - summary.cogs - summary.customCosts - summary.handlingFees - summary.shippingCosts - summary.transactionFees - summary.adSpend) / summary.revenue) * 100
-            : 0,
+          value: summary.operatingMargin || 0,
+          change: summary.operatingMarginChange || 0,
           suffix: "%",
           decimal: 1,
         },
@@ -230,17 +242,15 @@ export function useOverviewAnalytics(dateRange?: {
         },
         marketingPercentageOfGross: {
           label: "Marketing % of Gross",
-          value:
-            summary.grossSales > 0
-              ? (summary.adSpend / summary.grossSales) * 100
-              : 0,
+          value: summary.marketingPercentageOfGross || 0,
+          change: summary.marketingPercentageOfGrossChange || 0,
           suffix: "%",
           decimal: 1,
         },
         marketingPercentageOfNet: {
           label: "Marketing % of Revenue",
-          value:
-            summary.revenue > 0 ? (summary.adSpend / summary.revenue) * 100 : 0,
+          value: summary.marketingPercentageOfNet || 0,
+          change: summary.marketingPercentageOfNetChange || 0,
           suffix: "%",
           decimal: 1,
         },
@@ -282,10 +292,8 @@ export function useOverviewAnalytics(dateRange?: {
         },
         shippingPercentageOfNet: {
           label: "Shipping % of Revenue",
-          value:
-            summary.revenue > 0
-              ? (summary.shippingCosts / summary.revenue) * 100
-              : 0,
+          value: summary.shippingPercentageOfNet || 0,
+          change: summary.shippingPercentageOfNetChange || 0,
           suffix: "%",
           decimal: 1,
         },
@@ -324,10 +332,8 @@ export function useOverviewAnalytics(dateRange?: {
         },
         customCostsPercentage: {
           label: "Operating % of Revenue",
-          value:
-            summary.revenue > 0
-              ? (summary.customCosts / summary.revenue) * 100
-              : 0,
+          value: summary.customCostsPercentage || 0,
+          change: summary.customCostsChange || 0,
           suffix: "%",
           decimal: 1,
         },
@@ -451,6 +457,6 @@ export function useOverviewAnalytics(dateRange?: {
     isSyncing,
     isCalculating,
     syncStatus,
-    isInitialSyncComplete: integrationStatus.isInitialSyncComplete,
+    isInitialSyncComplete: Boolean(integrationStatus?.isInitialSyncComplete),
   };
 }

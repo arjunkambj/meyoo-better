@@ -29,7 +29,7 @@ export const CustomerInsightsView = memo(function CustomerInsightsView() {
 
   const cancelRate =
     orderOverview && orderOverview.totalOrders > 0
-      ? (orderOverview.cancelledOrders / orderOverview.totalOrders) * 100
+      ? ((orderOverview.cancelledOrders ?? 0) / orderOverview.totalOrders) * 100
       : 0;
 
   const handleAnalyticsRangeChange = useCallback(

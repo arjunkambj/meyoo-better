@@ -312,22 +312,74 @@ export const ordersSummaryTool = createTool<
       ? { startDate: args.startDate, endDate: args.endDate }
       : defaultDateRange();
 
-    const overview = (await ctx.runQuery(api.web.orders.getOrdersOverview, {
+    const overviewResponse = await ctx.runQuery(api.web.orders.getOrdersOverview, {
       dateRange,
-    })) as OrdersOverview | null;
+    });
 
-    // Fallback revenue when analytics pipeline hasn't populated metrics yet
-    let revenueFallback: number | null = null;
-    if (overview && overview.totalOrders > 0 && Number(overview.totalRevenue ?? 0) === 0) {
-      try {
-        const fallback = await ctx.runQuery(api.web.orders.getRevenueSumForRange, { dateRange });
-        if (fallback.totalOrders > 0) {
-          revenueFallback = Number(fallback.totalRevenue ?? 0);
-        }
-      } catch (err) {
-        console.debug('Revenue fallback unavailable:', err);
+    const data = (overviewResponse && "data" in overviewResponse
+      ? (overviewResponse as any).data
+      : null) as Record<string, any[]> | null;
+
+    const orders = data?.orders ?? [];
+    const refunds = data?.refunds ?? [];
+
+    const statusCounts = {
+      pending: 0,
+      processing: 0,
+      completed: 0,
+      cancelled: 0,
+    };
+
+    let totalRevenue = 0;
+    let totalCosts = 0;
+    let totalNetProfit = 0;
+
+    for (const order of orders) {
+      const revenue = Number(order.totalPrice ?? 0);
+      const shipping = Number(order.totalShippingPrice ?? 0);
+      const taxes = Number(order.totalTax ?? 0);
+      const discounts = Number(order.totalDiscounts ?? 0);
+      totalRevenue += revenue;
+      const estimatedCosts = shipping + taxes + discounts;
+      totalCosts += estimatedCosts;
+      totalNetProfit += revenue - estimatedCosts;
+
+      const status = String(order.fulfillmentStatus ?? order.status ?? "").toLowerCase();
+      if (status.includes("cancel")) {
+        statusCounts.cancelled += 1;
+      } else if (status.includes("pending")) {
+        statusCounts.pending += 1;
+      } else if (status.includes("processing") || status.includes("partial")) {
+        statusCounts.processing += 1;
+      } else if (status.includes("fulfill") || status.includes("shipped") || status.includes("delivered")) {
+        statusCounts.completed += 1;
       }
     }
+
+    const totalOrders = orders.length;
+    const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+    const grossMargin = totalRevenue > 0 ? ((totalRevenue - totalCosts) / totalRevenue) * 100 : 0;
+    const refundRate = totalOrders > 0 ? (refunds.length / totalOrders) * 100 : 0;
+
+    const overview = totalOrders
+      ? {
+          totalOrders,
+          pendingOrders: statusCounts.pending,
+          processingOrders: statusCounts.processing,
+          completedOrders: statusCounts.completed,
+          cancelledOrders: statusCounts.cancelled,
+          totalRevenue,
+          totalCosts,
+          netProfit: totalNetProfit,
+          avgOrderValue,
+          grossMargin,
+          customerAcquisitionCost: 0,
+          fulfillmentRate: totalOrders > 0 ? (statusCounts.completed / totalOrders) * 100 : 0,
+          avgFulfillmentTime: 0,
+          returnRate: refundRate,
+          changes: {} as Partial<OrdersOverviewChanges>,
+        }
+      : null;
 
     const zeroState = {
       dateRange,
@@ -376,20 +428,13 @@ export const ordersSummaryTool = createTool<
     };
 
     const financials = {
-      totalRevenue: revenueFallback !== null
-        ? Number(revenueFallback)
-        : Number(overview.totalRevenue ?? 0),
+      totalRevenue: Number(overview.totalRevenue ?? 0),
       totalCosts: Number(overview.totalCosts ?? 0),
       netProfit: Number(overview.netProfit ?? 0),
       avgOrderValue: Number(overview.avgOrderValue ?? 0),
       grossMargin: Number(overview.grossMargin ?? 0),
       customerAcquisitionCost: Number(overview.customerAcquisitionCost ?? 0),
     };
-
-    // If we used a fallback revenue and AOV is zero, compute a basic AOV
-    if (revenueFallback !== null && totals.totalOrders > 0 && financials.avgOrderValue === 0) {
-      financials.avgOrderValue = Number((revenueFallback / totals.totalOrders).toFixed(2));
-    }
 
     const fulfillment = {
       fulfillmentRate: Number(overview.fulfillmentRate ?? 0),

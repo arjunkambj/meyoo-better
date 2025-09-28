@@ -85,13 +85,8 @@ export const cleanupOldData = internalAction({
     // Webhook logs removed
 
     // Delete expired cache
-    for (const cache of expiredCache) {
-      await ctx.runMutation(internal.jobs.maintenance.deleteRecord, {
-        table: "realtimeMetrics",
-        id: cache._id,
-      });
-      results.expiredCache++;
-    }
+    // No realtime cache table to prune anymore.
+    results.expiredCache += expiredCache.length;
 
     return {
       success: true,
@@ -405,22 +400,10 @@ export const getExpiredCache = internalQuery({
   },
   returns: v.array(v.any()),
   handler: async (ctx, args) => {
-    const now = Date.now();
-
-    // TODO: Need index "by_expires" on realtimeMetrics table
-    // Once index is added, replace with:
-    // const metrics = await ctx.db
-    //   .query("realtimeMetrics")
-    //   .withIndex("by_expires", (q) => q.lt("expiresAt", now))
-    //   .take(args.limit);
-
-    // Temporary: Get all realtime metrics
-    const allMetrics = await ctx.db.query("realtimeMetrics").collect();
-
-    // Filter expired entries in memory
-    return allMetrics
-      .filter((m) => (m as any).expiresAt && (m as any).expiresAt < now)
-      .slice(0, args.limit);
+    // Realtime cache table removed; nothing to report.
+    void ctx;
+    void args;
+    return [];
   },
 });
 

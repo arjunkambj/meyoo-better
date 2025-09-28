@@ -216,21 +216,6 @@ async function handleTopicInline(
 
   // basic normalization helpers are in utils/shopify
 
-  const recalcToday = async () => {
-    if (!organizationId) return;
-    try {
-      const { shopDaysBackRange } = await import("../../libs/time/range");
-      const range = await shopDaysBackRange(ctx, String(organizationId), 0);
-      await ctx.runAction(internal.engine.analytics.calculateAnalytics, {
-        organizationId: String(organizationId),
-        dateRange: { startDate: range.startDate, endDate: range.endDate },
-        syncType: "incremental",
-      });
-    } catch (e) {
-      logger.warn("Realtime analytics recalc failed", { topic, error: String(e) });
-    }
-  };
-
   switch (topic) {
     case "orders/create":
     case "orders/updated":
@@ -327,7 +312,7 @@ async function handleTopicInline(
         storeId,
         orders,
       });
-      await recalcToday();
+      // analytics recalculation handled client-side
       break;
     }
 
@@ -337,7 +322,7 @@ async function handleTopicInline(
         internal.integrations.shopify.deleteOrderByShopifyIdInternal,
         { organizationId, shopifyId: String((payload as any).id) },
       );
-      await recalcToday();
+      // analytics recalculation handled client-side
       break;
     }
 
@@ -443,7 +428,7 @@ async function handleTopicInline(
           state,
         } as any,
       );
-      await recalcToday();
+      // analytics recalculation handled client-side
       break;
     }
 
@@ -472,7 +457,7 @@ async function handleTopicInline(
         organizationId: organizationId,
         refunds,
       });
-      await recalcToday();
+      // analytics recalculation handled client-side
       break;
     }
 
@@ -504,7 +489,7 @@ async function handleTopicInline(
         organizationId: organizationId,
         fulfillments,
       });
-      await recalcToday();
+      // analytics recalculation handled client-side
       break;
     }
 
@@ -637,7 +622,7 @@ async function handleTopicInline(
         organizationId: organizationId,
         transactions: txs,
       });
-      await recalcToday();
+      // analytics recalculation handled client-side
       break;
     }
 

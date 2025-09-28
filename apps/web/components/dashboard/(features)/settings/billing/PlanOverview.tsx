@@ -70,19 +70,19 @@ export default function PlanOverview() {
     []
   );
 
-  const currentUsage = useMemo(
-    () => ({
-      orders: billingUsage?.currentUsage || dashboardSummary?.orders || 0,
+  const currentUsage = useMemo(() => {
+    const ordersCount = dashboardSummary?.data?.orders?.length ?? 0;
+    return {
+      orders: billingUsage?.currentUsage || ordersCount,
       ordersLimit: billingUsage?.limit || getPlanOrderLimit(currentPlanName),
-    }),
-    [
-      billingUsage?.currentUsage,
-      billingUsage?.limit,
-      dashboardSummary?.orders,
-      getPlanOrderLimit,
-      currentPlanName,
-    ]
-  );
+    };
+  }, [
+    billingUsage?.currentUsage,
+    billingUsage?.limit,
+    dashboardSummary?.data?.orders?.length,
+    getPlanOrderLimit,
+    currentPlanName,
+  ]);
 
   // Calculate next billing date (first day of next month)
   const getNextBillingDate = useMemo(

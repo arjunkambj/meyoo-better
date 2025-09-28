@@ -237,17 +237,6 @@ async function routeEvent(
       break;
 
     // Sync events
-    case EVENT_TYPES.SYNC_COMPLETED:
-      await workpool.enqueueAction(
-        ctx,
-        (internal.engine.analytics as any).recalculateAllMetrics,
-        {
-          organizationId,
-          syncSessionId: metadata?.sessionId,
-        },
-      );
-      break;
-
     case EVENT_TYPES.SYNC_FAILED:
       // Log failure and potentially alert
       await workpool.enqueueAction(

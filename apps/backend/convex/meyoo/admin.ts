@@ -31,12 +31,6 @@ const RESET_MEMBER_BATCH_SIZE = 25;
 const RESET_TICKET_BATCH_SIZE = 10;
 
 const ORG_SCOPED_TABLES = [
-  "metricsDaily",
-  "metricsWeekly",
-  "metricsMonthly",
-  "productMetrics",
-  "customerMetrics",
-  "realtimeMetrics",
   "shopifyOrderItems",
   "shopifyTransactions",
   "shopifyRefunds",
@@ -229,79 +223,6 @@ export const deleteIntegrationSessionsByPlatformBatch = internalMutation({
       deleted: page.page.length,
       hasMore: !page.isDone,
       cursor: page.isDone ? undefined : page.continueCursor,
-    };
-  },
-});
-
-export const deleteAnalyticsMetrics = action({
-  args: {
-    organizationId: v.id("organizations"),
-  },
-  returns: v.object({
-    success: v.boolean(),
-    deleted: v.number(),
-    tables: v.record(v.string(), v.number()),
-  }),
-  handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-
-    if (!userId) {
-      throw new Error("Not authenticated");
-    }
-
-    const user = await ctx.runQuery(internal.meyoo.admin.getUserById, {
-      userId,
-    });
-
-    if (!user || !isAdmin(user)) {
-      throw new Error("Admin access required");
-    }
-
-    if (CONVEX_CLOUD_URL?.includes("prod")) {
-      throw new Error("Cannot delete analytics data in production");
-    }
-
-    const tablesToClear: OrgScopedTable[] = [
-      "metricsDaily",
-      "metricsWeekly",
-      "metricsMonthly",
-      "productMetrics",
-      "customerMetrics",
-      "realtimeMetrics",
-    ];
-
-    let totalDeleted = 0;
-    const perTable: Record<string, number> = {};
-
-    for (const table of tablesToClear) {
-      let hasMore = true;
-      let cursor: string | undefined;
-      let tableDeleted = 0;
-
-      while (hasMore) {
-        const result = await ctx.runMutation(
-          internal.meyoo.admin.deleteOrgRecordsBatch,
-          {
-            table,
-            organizationId: args.organizationId,
-            batchSize: RESET_DEFAULT_BATCH_SIZE,
-            cursor,
-          },
-        );
-
-        tableDeleted += result.deleted;
-        totalDeleted += result.deleted;
-        hasMore = result.hasMore;
-        cursor = result.cursor;
-      }
-
-      perTable[table] = tableDeleted;
-    }
-
-    return {
-      success: true,
-      deleted: totalDeleted,
-      tables: perTable,
     };
   },
 });
@@ -501,67 +422,6 @@ export const resetMetaMembersBatch = internalMutation({
       updated,
       hasMore: !page.isDone,
       cursor: page.isDone ? undefined : page.continueCursor,
-    };
-  },
-});
-
-/**
- * Recalculate analytics for an organization
- * Admin function to trigger analytics recalculation
- */
-export const recalculateAnalytics = action({
-  args: {
-    daysBack: v.optional(v.number()), // Number of days to recalculate (default 30)
-  },
-  handler: async (
-    ctx,
-    args,
-  ): Promise<{
-    success: boolean;
-    metricsCalculated: number;
-    duration: number;
-    message: string;
-  }> => {
-    const userId = await getAuthUserId(ctx);
-
-    if (!userId) {
-      throw new Error("Not authenticated");
-    }
-
-    const user = await ctx.runQuery(internal.meyoo.admin.getUserById, {
-      userId,
-    });
-
-    if (!user || !user.organizationId) {
-      throw new Error("User not found or no organization");
-    }
-
-    // Calculate date range
-    const endDate = new Date();
-    const startDate = new Date();
-
-    startDate.setDate(startDate.getDate() - (args.daysBack || 30));
-
-    // production: avoid noisy admin logs
-
-    // Trigger analytics calculation
-    const result = await ctx.runAction(
-      internal.engine.analytics.calculateAnalytics,
-      {
-        organizationId: user.organizationId,
-        dateRange: {
-          startDate: startDate.toISOString().substring(0, 10),
-          endDate: endDate.toISOString().substring(0, 10),
-        },
-        syncType: "incremental",
-      },
-    );
-
-    return {
-      success: result.success,
-      metricsCalculated: result.metricsCalculated,
-      duration: result.duration,
-      message: `Analytics recalculated for ${result.metricsCalculated} days in ${result.duration}ms`,
     };
   },
 });
@@ -918,7 +778,7 @@ export const clearOrganizationCache = mutation({
     success: v.boolean(),
     clearedCount: v.number(),
   }),
-  handler: async (ctx, args) => {
+  handler: async (ctx, _args) => {
     const userId = await getAuthUserId(ctx);
 
     if (!userId) {
@@ -931,21 +791,9 @@ export const clearOrganizationCache = mutation({
       throw new Error("Admin access required");
     }
 
-    // Clear realtime metrics cache
-    const realtimeMetrics = await ctx.db
-      .query("realtimeMetrics")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId),
-      )
-      .collect();
-
-    for (const metric of realtimeMetrics) {
-      await ctx.db.delete(metric._id);
-    }
-
     return {
       success: true,
-      clearedCount: realtimeMetrics.length,
+      clearedCount: 0,
     };
   },
 });
@@ -1016,41 +864,14 @@ export const clearAnalyticsCache = mutation({
       throw new Error("Admin access required");
     }
 
-    let clearedCount = 0;
+    const clearedCount = 0;
     const cacheType = args.cacheType || "all";
 
-    // Clear realtime metrics cache
-    if (cacheType === "realtime" || cacheType === "all") {
-      const realtimeMetrics = args.organizationId
-        ? await ctx.db
-            .query("realtimeMetrics")
-            .withIndex("by_organization", (q) =>
-              q.eq("organizationId", args.organizationId!),
-            )
-            .collect()
-        : await ctx.db.query("realtimeMetrics").collect();
-
-      for (const metric of realtimeMetrics) {
-        await ctx.db.delete(metric._id);
-        clearedCount++;
-      }
-    }
+    // Realtime analytics cache removed; nothing to clear server-side.
 
     // Clear daily metrics cache if requested
     if (cacheType === "daily" || cacheType === "all") {
-      const dailyMetrics = args.organizationId
-        ? await ctx.db
-            .query("metricsDaily")
-            .withIndex("by_organization", (q) =>
-              q.eq("organizationId", args.organizationId!),
-            )
-            .collect()
-        : await ctx.db.query("metricsDaily").collect();
-
-      for (const metric of dailyMetrics) {
-        await ctx.db.delete(metric._id);
-        clearedCount++;
-      }
+      // No server-side cached analytics remain; client computes metrics on demand.
     }
 
     return {
@@ -1171,21 +992,14 @@ export const resetTestData = mutation({
     // Delete analytics data
     if (shouldDelete("analytics")) {
       const analyticsTables = [
-        "metricsDaily",
-        "realtimeMetrics",
-        "productMetrics",
-        "customerMetrics",
-      ];
+        "shopifyAnalytics",
+        "shopifySessions",
+        "metaInsights",
+      ] as const;
 
       for (const tableName of analyticsTables) {
         const records = await ctx.db
-          .query(
-            tableName as
-              | "metricsDaily"
-              | "realtimeMetrics"
-              | "productMetrics"
-              | "customerMetrics",
-          )
+          .query(tableName)
           .withIndex("by_organization", (q) =>
             q.eq("organizationId", args.organizationId),
           )
@@ -1682,18 +1496,6 @@ export const resetEverything = action({
     }
 
     await deleteTable("integrationSessions");
-
-    // Analytics data caches
-    for (const table of [
-      "metricsDaily",
-      "metricsWeekly",
-      "metricsMonthly",
-      "productMetrics",
-      "customerMetrics",
-      "realtimeMetrics",
-    ] satisfies OrgScopedTable[]) {
-      await deleteTable(table);
-    }
 
     // Sync and scheduling state
     for (const table of ["syncProfiles", "syncSessions"] satisfies OrgScopedTable[]) {

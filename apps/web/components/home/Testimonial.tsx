@@ -65,19 +65,13 @@ const Testimonial = () => {
       <div
         className={`relative mx-auto mt-12 grid min-h-[28rem] w-full max-w-7xl items-stretch ${designSystem.spacing.gap.md} px-4 sm:px-6 lg:px-8 md:grid-cols-2 lg:grid-cols-3`}
       >
-        {testimonials.map((testimonial, index) => (
+        {testimonials.map((testimonial) => (
           <div
             key={testimonial.id}
-            className={
-              "group relative flex h-full w-full rounded-2xl border border-primary/15 bg-primary/5 p-6 sm:p-8 transition-all duration-300 ease-out dark:border-default-200/20 dark:bg-gradient-to-br dark:from-default-100/15 dark:via-default-100/10 dark:to-default-200/5 dark:backdrop-blur " +
-              "hover:-translate-y-1 hover:shadow-xl " +
-              "odd:md:-translate-y-2 even:md:translate-y-2 " +
-              "odd:rotate-[0.25deg] even:-rotate-[0.15deg] " +
-              "before:absolute before:bg-primary/30 before:rounded-full odd:before:left-6 odd:before:top-0 odd:before:h-1 odd:before:w-16 even:before:left-0 even:before:top-6 even:before:h-16 even:before:w-1"
-            }
+            className="relative flex h-full w-full rounded-2xl border border-primary/15 bg-primary/5 p-6 sm:p-8 dark:border-default-200/20 dark:bg-gradient-to-br dark:from-default-100/15 dark:via-default-100/10 dark:to-default-200/5 dark:backdrop-blur before:absolute before:left-6 before:right-6 before:top-0 before:h-0.5 before:bg-primary/40"
           >
             <div className="relative flex h-full flex-col">
-              <div className="mb-5 inline-flex size-10 items-center justify-center rounded-full  text-primary/70 transition-all duration-300 group-hover:scale-105 group-hover:bg-primary/20 group-hover:text-primary dark:text-primary/70">
+              <div className="mb-5 inline-flex size-10 items-center justify-center rounded-full text-primary/70">
                 <Icon icon="ri:double-quotes-l" width={26} />
               </div>
 
@@ -107,7 +101,7 @@ const Testimonial = () => {
                 </div>
               </div>
             </div>
-            <div className="pointer-events-none absolute inset-0 rounded-2xl opacity-0 ring-1 ring-primary/40 transition-opacity duration-300 group-hover:opacity-100" />
+            
           </div>
         ))}
       </div>

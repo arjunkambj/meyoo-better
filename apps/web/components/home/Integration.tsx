@@ -105,15 +105,15 @@ const Integration = () => {
         {howItWorks.map((feature, index) => (
           <PinContainer
             key={index}
-            className={`${designSystem.card.base} w-full rounded-2xl p-4 transition-all duration-300`}
+            className={`${designSystem.card.base} group w-full rounded-2xl p-4 transition-all duration-300`}
           >
             <div className="flex flex-col">
-              <div className={feature.imageOrder}>
+              <div className={cn("relative overflow-hidden rounded-xl", feature.imageOrder)}>
                 <Image
                   src={feature.image}
                   height={1000}
                   width={1000}
-                  className="h-64 w-full sm:h-70 rounded-xl object-cover"
+                  className="h-64 w-full sm:h-70 object-cover transform transition-transform duration-300 ease-out group-hover:scale-[1.035]"
                   alt="thumbnail"
                 />
               </div>

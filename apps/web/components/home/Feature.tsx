@@ -95,7 +95,7 @@ const Feature = () => {
                   alt={item.title}
                   fill
                   sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                  className="pointer-events-none object-cover"
+                  className="pointer-events-none object-cover transform transition-transform duration-300 ease-out group-hover:scale-[1.035]"
                   priority={index === 0}
                 />
                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/30 via-black/5 to-transparent" />

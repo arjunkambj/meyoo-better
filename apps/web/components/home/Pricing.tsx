@@ -15,7 +15,6 @@ import {
 import { frequencies, tiers } from "./pricing/constants";
 import { type Frequency, FrequencyEnum, TiersEnum } from "./pricing/types";
 import { designSystem } from "@/libs/design-system";
-import { Icon } from "@iconify/react";
 import Link from "next/link";
 import { NumberTicker } from "@/components/ui/number-ticker";
 
@@ -75,22 +74,13 @@ const Pricing = () => {
       >
         <div className="flex flex-col items-center text-center">
           <div className={designSystem.typography.sectionChip}>
-            <Icon
-              icon="solar:tag-price-bold"
-              width={18}
-              className="text-primary/70"
-            />
             <span className="text-sm uppercase tracking-[0.15em] font-medium text-primary/70">
-              Pricing plans
+              Plans
             </span>
           </div>
-          <h2 className={designSystem.typography.sectionTitle}>
-            Choose your growth plan
-          </h2>
+          <h2 className={designSystem.typography.sectionTitle}>Simple, Transparent Pricing</h2>
           <p className={designSystem.typography.sectionSubtitle}>
-            Start with a 14-day free trial. All plans include the live profit
-            dashboard, ad integrations, AI assistant, and automated cost
-            tracking.
+            Choose the perfect plan for you to go viral. Upgrade anytime.
           </p>
         </div>
 

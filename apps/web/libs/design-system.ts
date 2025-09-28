@@ -17,11 +17,11 @@ export const designSystem = {
     sectionLabel:
       "text-center mb-4 text-xs uppercase tracking-[0.15em] font-medium text-primary/70",
     sectionChip:
-      "inline-flex items-center gap-2 mb-6 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-primary/80 backdrop-blur-sm dark:border-primary/40 dark:bg-primary/20 dark:text-primary/90",
+      "inline-flex items-center gap-2 mb-2 sm:mb-3 px-0 py-0 text-primary/80",
     sectionTitle:
-      "text-center text-3xl font-semibold tracking-tight sm:text-4xl lg:text-5xl",
+      "text-center text-2xl sm:text-3xl lg:text-5xl font-semibold tracking-tight leading-tight",
     sectionSubtitle:
-      "mt-4 max-w-2xl mx-auto text-center text-base sm:text-lg text-muted-foreground",
+      "mt-6 sm:mt-8 max-w-2xl mx-auto text-center text-base sm:text-lg text-muted-foreground",
     cardTitle: "text-xl font-semibold tracking-tight",
     cardDescription: "text-muted-foreground text-sm leading-relaxed",
   },

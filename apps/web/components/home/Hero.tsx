@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { Icon } from "@iconify/react";
 import React from "react";
 
-import { Avatar, AvatarGroup, Button, Card, CardBody } from "@heroui/react";
+import { Button, Card, CardBody } from "@heroui/react";
 import Image from "next/image";
 import Link from "next/link";
 import { designSystem } from "@/libs/design-system";
@@ -18,32 +18,52 @@ const Hero = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
           {/* Left Column - Text Content */}
           <div className="text-left flex flex-col">
-            {/* Trust Badge with Avatars */}
-            <div className="inline-flex items-center gap-3 px-4 py-1.5 mb-6 w-fit rounded-full border border-primary/20 bg-primary/5 text-primary/80 backdrop-blur-sm dark:border-primary/40 dark:bg-primary/20 dark:text-primary/90">
-              <AvatarGroup max={4} size="sm" className="-space-x-1.5">
-                <Avatar
-                  src="https://i.pravatar.cc/150?u=a042581f4e29026024d"
-                  className="h-3.5 w-3.5 rounded-full ring-1 ring-background dark:ring-default-50/60"
+            {/* Trust Badge with Avatars (Next/Image) */}
+            <div className="group inline-flex items-center gap-3 px-4 py-1.5 mb-6 w-fit rounded-full border border-primary/20 bg-primary/5 text-primary/80 backdrop-blur-sm transition-colors duration-200 hover:border-primary/30 hover:bg-primary/10 dark:border-primary/40 dark:bg-primary/20 dark:text-primary/90">
+              <div className="flex -space-x-1.5">
+                <Image
+                  src="https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=160&q=80"
+                  alt="Founder avatar 1"
+                  width={48}
+                  height={48}
+                  quality={90}
+                  sizes="24px"
+                  className="h-6 w-6 rounded-full ring-1 ring-background dark:ring-default-50/60 object-cover transition-transform duration-200 group-hover:scale-105"
                 />
-                <Avatar
-                  src="https://i.pravatar.cc/150?u=a04258a2462d826712d"
-                  className="h-3.5 w-3.5 rounded-full ring-1 ring-background dark:ring-default-50/60"
+                <Image
+                  src="https://images.unsplash.com/photo-1527980965255-d3b416303d12?auto=format&fit=crop&w=160&q=80"
+                  alt="Founder avatar 2"
+                  width={48}
+                  height={48}
+                  quality={90}
+                  sizes="24px"
+                  className="h-6 w-6 rounded-full ring-1 ring-background dark:ring-default-50/60 object-cover transition-transform duration-200 group-hover:scale-105"
                 />
-                <Avatar
-                  src="https://i.pravatar.cc/150?u=a042581f4e29026704d"
-                  className="h-3.5 w-3.5 rounded-full ring-1 ring-background dark:ring-default-50/60"
+                <Image
+                  src="https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=160&q=80"
+                  alt="Founder avatar 3"
+                  width={48}
+                  height={48}
+                  quality={90}
+                  sizes="24px"
+                  className="h-6 w-6 rounded-full ring-1 ring-background dark:ring-default-50/60 object-cover transition-transform duration-200 group-hover:scale-105"
                 />
-                <Avatar
-                  src="https://i.pravatar.cc/150?u=a04258114e29026302d"
-                  className="h-3.5 w-3.5 rounded-full ring-1 ring-background dark:ring-default-50/60"
+                <Image
+                  src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=160&q=80"
+                  alt="Founder avatar 4"
+                  width={48}
+                  height={48}
+                  quality={90}
+                  sizes="24px"
+                  className="h-6 w-6 rounded-full ring-1 ring-background dark:ring-default-50/60 object-cover transition-transform duration-200 group-hover:scale-105"
                 />
-              </AvatarGroup>
+              </div>
               <span className="text-xs uppercase tracking-[0.15em] font-medium text-primary/80 dark:text-primary/70">
                 Trusted by 1000+ founders
               </span>
               <Icon
                 icon="solar:arrow-right-linear"
-                className="text-primary"
+                className="text-primary transition-transform duration-200 group-hover:translate-x-0.5"
                 width={16}
               />
             </div>
@@ -71,14 +91,20 @@ const Hero = () => {
               <Button
                 as={Link}
                 href="/signin"
-                className="w-full sm:w-auto font-semibold px-6 sm:px-8"
+                className="w-full sm:w-auto font-semibold px-6 sm:px-8 transition-transform duration-200 will-change-transform hover:-translate-y-0.5 active:translate-y-0 focus-visible:ring-2 focus-visible:ring-primary/40"
                 color="primary"
                 endContent={<Icon icon="solar:arrow-right-linear" width={20} />}
                 size="lg"
               >
                 Start free trial
               </Button>
-              <Button as={Link} href="#pricing" variant="flat" size="lg">
+              <Button
+                as={Link}
+                href="#pricing"
+                variant="flat"
+                size="lg"
+                className="transition-transform duration-200 hover:-translate-y-0.5"
+              >
                 View pricing
               </Button>
             </div>
@@ -103,9 +129,11 @@ const Hero = () => {
             }}
             className="relative"
           >
-            <Card className="group relative h-[320px] w-full rounded-2xl bg-muted/30 p-3 backdrop-blur-sm md:h-[420px] lg:h-[480px] transition-all duration-300 ring-1 ring-white/10">
+            <Card className="group relative h-[320px] w-full rounded-2xl bg-muted/30 p-3 backdrop-blur-sm md:h-[420px] lg:h-[480px] transition-all duration-300 ring-1 ring-white/10 hover:-translate-y-1 hover:shadow-2xl">
               <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/10 via-transparent to-primary/5 opacity-60" />
-              <CardBody className="relative size-full rounded-xl bg-gradient-to-br from-background/90 via-background/80 to-muted/20">
+              <CardBody className="relative size-full rounded-xl bg-gradient-to-br from-background/90 via-background/80 to-muted/20 overflow-hidden">
+                {/* Subtle shine sweep on hover */}
+                <div className="pointer-events-none absolute -inset-x-10 -top-1/2 h-[200%] rotate-12 bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
                 <Image
                   alt="Dashboard preview"
                   className="size-full rounded-xl object-cover"

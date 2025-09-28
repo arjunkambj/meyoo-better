@@ -3,7 +3,6 @@
 import Image from "next/image";
 
 import { designSystem } from "@/libs/design-system";
-import { Icon } from "@iconify/react";
 
 type FeatureCard = {
   id: number;
@@ -73,17 +72,15 @@ const Feature = () => {
         className={`${designSystem.spacing.container} flex w-full flex-col items-center justify-center`}
       >
         <div className={designSystem.typography.sectionChip}>
-          <Icon icon="solar:star-bold" width={18} className="text-primary/70" />
           <span className="text-sm uppercase tracking-[0.15em] font-medium text-primary/70">
-            Why Meyoo
+            Features
           </span>
         </div>
         <h2 className={`relative z-20 ${designSystem.typography.sectionTitle}`}>
-          Meyoo keeps every shift controlled
+          What Makes Meyoo Special
         </h2>
         <p className={designSystem.typography.sectionSubtitle}>
-          Operators use Meyoo to bring sales, labor, and guest signals into one
-          command center—so decisions happen while service is still underway.
+          From setup to scale in three simple steps: connect your tools, unlock insights, and make better decisions to grow your brand.
         </p>
 
         <div className="mx-auto mt-12 grid w-full max-w-7xl grid-cols-1 gap-10 px-4 sm:px-6 md:grid-cols-2 lg:grid-cols-3">

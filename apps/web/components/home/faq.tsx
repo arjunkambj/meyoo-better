@@ -46,20 +46,13 @@ const Faq = () => {
       <div className={`${designSystem.spacing.container} max-w-7xl`}>
         <div className="text-center mb-12">
           <div className={designSystem.typography.sectionChip}>
-            <Icon
-              icon="solar:question-circle-bold"
-              width={18}
-              className="text-primary/70"
-            />
             <span className="text-sm uppercase tracking-[0.15em] font-medium text-primary/70">
-              Support & FAQ
+              FAQ
             </span>
           </div>
-          <h2 className={designSystem.typography.sectionTitle}>
-            Got questions? We&apos;ve got answers
-          </h2>
+          <h2 className={designSystem.typography.sectionTitle}>Common Questions</h2>
           <p className={designSystem.typography.sectionSubtitle}>
-            Our team typically responds within one business day
+            We're here to help you get the most out of Meyoo.
           </p>
         </div>
         <div className="grid gap-8 md:grid-cols-2">

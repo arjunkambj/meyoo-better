@@ -43,48 +43,13 @@ const howItWorks = [
 
 const Integration = () => {
   const logos = [
-    {
-      image:
-        "https://deifkwefumgah.cloudfront.net/shadcnblocks/block/logos/slack-icon.svg",
-      name: "Slack",
-      className: " ",
-    },
-    {
-      image:
-        "https://deifkwefumgah.cloudfront.net/shadcnblocks/block/logos/notion-icon.svg",
-      name: "Notion",
-      className: " ",
-    },
-    {
-      image:
-        "https://deifkwefumgah.cloudfront.net/shadcnblocks/block/logos/github-icon.svg",
-      name: "Github",
-      className: " ",
-    },
-    {
-      image:
-        "https://deifkwefumgah.cloudfront.net/shadcnblocks/block/logos/google-icon.svg",
-      name: "Google",
-      className: " ",
-    },
-    {
-      image:
-        "https://deifkwefumgah.cloudfront.net/shadcnblocks/block/logos/nike-icon.svg",
-      name: "Nike",
-      className: " ",
-    },
-    {
-      image:
-        "https://deifkwefumgah.cloudfront.net/shadcnblocks/block/logos/sketch-icon.svg",
-      name: "Sketch",
-      className: " ",
-    },
-    {
-      image:
-        "https://deifkwefumgah.cloudfront.net/shadcnblocks/block/logos/figma-icon.svg",
-      name: "Figma",
-      className: " ",
-    },
+    { icon: "logos:shopify", name: "Shopify", className: "" },
+    { icon: "logos:meta-icon", name: "Meta Ads", className: "" },
+    { icon: "logos:google-ads", name: "Google Ads", className: "" },
+    { icon: "logos:tiktok-icon", name: "TikTok Ads", className: "" },
+    { icon: "ri:snapchat-fill", name: "Snapchat Ads", className: "text-[#FFFC00]" },
+    { icon: "logos:twitter", name: "Twitter Ads", className: "" },
+    { icon: "logos:google-analytics", name: "Google Analytics", className: "" },
   ];
 
   return (
@@ -94,22 +59,14 @@ const Integration = () => {
       <div className={designSystem.spacing.container}>
         <div className="text-center">
           <div className={designSystem.typography.sectionChip}>
-            <Icon
-              icon="solar:diagram-up-bold"
-              width={18}
-              className="text-primary/70"
-            />
             <span className="text-sm uppercase tracking-[0.15em] font-medium text-primary/70">
-              How it works
+              Integrations
             </span>
           </div>
         </div>
-        <h2 className={designSystem.typography.sectionTitle}>
-          Get profit clarity in under 10 minutes
-        </h2>
+        <h2 className={designSystem.typography.sectionTitle}>How Meyoo Works</h2>
         <p className={designSystem.typography.sectionSubtitle}>
-          Connect the tools you already use and let Meyoo keep revenue, spend,
-          and costs tidy in the background.
+          From setup to scale in three simple steps: connect your tools, unlock insights, and make better decisions to grow your brand.
         </p>
 
         <div className="relative mt-12">
@@ -119,14 +76,23 @@ const Integration = () => {
                 key={index}
                 className="flex items-center justify-center gap-4 rounded-full bg-muted/40 px-5 py-2 backdrop-blur-sm"
               >
-                <Image
-                  alt={logo.name}
-                  className={cn("size-5", logo?.className)}
-                  height={20}
-                  src={logo.image}
-                  unoptimized
-                  width={20}
-                />
+                {"icon" in logo && logo.icon ? (
+                  <Icon
+                    icon={logo.icon}
+                    width={20}
+                    height={20}
+                    className={cn("", logo?.className)}
+                  />
+                ) : (
+                  <Image
+                    alt={logo.name}
+                    className={cn("size-5", logo?.className)}
+                    height={20}
+                    src={(logo as any).image}
+                    unoptimized
+                    width={20}
+                  />
+                )}
                 <p className="text-lg">{logo.name}</p>
               </div>
             ))}

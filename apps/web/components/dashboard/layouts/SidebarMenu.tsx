@@ -44,11 +44,11 @@ const SidebarMenu = ({ items, className }: SidebarMenuProps) => {
         key={item.key}
         aria-current={isActive(item.href || "") ? "page" : undefined}
         className={cn(
-          "flex items-center gap-3 px-4 rounded-xl transition-all duration-200 min-h-10",
-          "no-underline",
+          "flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200",
+          "no-underline group",
           isActive(item.href || "")
-            ? "bg-primary/20 text-primary font-medium"
-            : "text-default-800 hover:text-default-900 hover:bg-default-200"
+            ? "bg-primary/20 text-primary font-semibold"
+            : "text-default-600 hover:text-foreground hover:bg-default-200/70"
         )}
         href={item.href || "#"}
         prefetch={true}
@@ -57,8 +57,10 @@ const SidebarMenu = ({ items, className }: SidebarMenuProps) => {
           <Icon
             aria-hidden
             className={cn(
-              "shrink-0 transition-colors w-5 h-5",
-              isActive(item.href || "") && "text-primary"
+              "shrink-0 transition-all w-5 h-5",
+              isActive(item.href || "")
+                ? "text-primary"
+                : "text-default-500 group-hover:text-foreground"
             )}
             icon={item.icon}
           />
@@ -78,9 +80,9 @@ const SidebarMenu = ({ items, className }: SidebarMenuProps) => {
           base: "bg-transparent shadow-none border-none px-0 focus-visible:ring-0 focus:ring-0 ring-0 focus:outline-none",
           heading: "pr-0 focus-visible:ring-0 focus:ring-0 ring-0",
           trigger:
-            "px-3 py-0 min-h-9 h-9 hover:bg-transparent data-[hover=true]:bg-transparent focus-visible:ring-0 focus:ring-0 ring-0",
+            "px-3 py-0 min-h-10 h-10 rounded-lg hover:bg-default-100 data-[hover=true]:bg-default-100 focus-visible:ring-0 focus:ring-0 ring-0 transition-colors",
           content: "py-0 pl-0",
-          indicator: "text-default-500 data-[open=true]:rotate-90",
+          indicator: "text-default-600 data-[open=true]:rotate-90",
         }}
         indicator={
           <Icon
@@ -91,22 +93,22 @@ const SidebarMenu = ({ items, className }: SidebarMenuProps) => {
           />
         }
         title={
-          <div className="flex h-9 items-center gap-3">
+          <div className="flex h-10 items-center gap-2.5">
             {category.icon && (
               <Icon
                 aria-hidden
-                className="text-default-500"
+                className="text-default-600"
                 icon={category.icon}
                 width={18}
               />
             )}
-            <span className="text-xs font-bold text-default-600 uppercase tracking-wider">
+            <span className="text-xs font-bold text-default-700 uppercase tracking-wider">
               {category.title}
             </span>
           </div>
         }
       >
-        <div className="px-1 space-y-0.5 overflow-hidden">
+        <div className="px-1 space-y-1 overflow-hidden mt-1">
           {category.items?.map(renderMenuItem)}
         </div>
       </AccordionItem>

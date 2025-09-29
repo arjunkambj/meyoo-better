@@ -36,33 +36,39 @@ function CostBreakdownCard({ items, currencySymbol = '$' }: CostBreakdownCardPro
   const total = items.reduce((s, i) => s + (i.value || 0), 0);
   const data: DonutDatum[] = items
     .filter((i) => i.value > 0)
-    .map((i) => ({ name: i.label, value: i.value, color: i.color }));
+    .map((i) => ({ name: i.label, value: i.value, color: i.color }))
+    .sort((a, b) => b.value - a.value);
 
   return (
     <Card surfaceVariant="1">
       <Card.Body>
-        <View className="gap-4">
-          <Text className="text-base font-semibold text-foreground">Cost breakdown</Text>
+        <View className="gap-5">
+          <View className="flex-row items-center justify-between">
+            <Text className="text-lg font-bold text-foreground">Cost Breakdown</Text>
+            <Text className="text-xs text-default-500">{data.length} categories</Text>
+          </View>
+
           <DonutChart
             data={data}
-            size={220}
-            innerRadius={72}
-            totalLabel="Total"
+            size={240}
+            innerRadius={80}
+            totalLabel="Total Costs"
             totalValue={formatCurrency(total, currencySymbol)}
           />
-          <View className="mt-2 -mx-1 flex-row flex-wrap">
+
+          <View className="mt-1 -mx-1 flex-row flex-wrap">
             {items.slice(0, 6).map((i) => {
               const pct = total > 0 ? (i.value / total) * 100 : 0;
               return (
-                <View key={i.key} className="w-1/2 px-1 mb-2">
-                  <View className="flex-row items-center justify-between rounded-lg border border-default-100 px-3 py-2">
+                <View key={i.key} className="w-1/2 px-1 mb-2.5">
+                  <View className="flex-col gap-2 rounded-xl border border-default-100 bg-background px-3 py-2.5">
                     <View className="flex-row items-center gap-2">
-                      <View className="h-2 w-2 rounded-full" style={{ backgroundColor: i.color }} />
-                      <Text className="text-xs text-default-700" numberOfLines={1}>{i.label}</Text>
+                      <View className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: i.color }} />
+                      <Text className="text-xs font-semibold text-default-700 flex-1" numberOfLines={1}>{i.label}</Text>
                     </View>
-                    <View className="items-end">
-                      <Text className="text-xs text-default-500">{pct.toFixed(1)}%</Text>
-                      <Text className="text-sm font-semibold text-foreground">{formatCurrency(i.value, currencySymbol)}</Text>
+                    <View className="flex-row items-center justify-between">
+                      <Text className="text-xs font-medium text-default-500">{pct > 0 ? pct.toFixed(1) : '0'}%</Text>
+                      <Text className="text-sm font-bold text-foreground">{i.value > 0 ? formatCurrency(i.value, currencySymbol) : '—'}</Text>
                     </View>
                   </View>
                 </View>

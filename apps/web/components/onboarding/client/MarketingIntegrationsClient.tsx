@@ -10,11 +10,9 @@ import StepLoadingState from "@/components/onboarding/StepLoadingState";
 import { useCurrentUser, useIntegration, useOnboarding } from "@/hooks";
 import { trackOnboardingAction, trackOnboardingView } from "@/libs/analytics";
 
-// Utility helpers for URL params
-// Utility function to sanitize URL parameters to prevent XSS
+// Utility function to sanitize URL parameters to prevent XSS (defined outside component)
 const sanitizeParam = (param: string | null): string => {
   if (!param) return "";
-
   // Remove HTML tags and limit length
   return param.replace(/<[^>]*>/g, "").substring(0, 500);
 };

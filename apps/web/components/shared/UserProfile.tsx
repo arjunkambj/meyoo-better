@@ -79,25 +79,43 @@ const UserProfile = React.memo(() => {
   // Memoize dropdown menu items
   const dropdownContent = useMemo(
     () => (
-      <DropdownMenu aria-label="Profile Actions" variant="flat">
+      <DropdownMenu
+        aria-label="Profile Actions"
+        variant="flat"
+        classNames={{
+          base: "p-1",
+        }}
+      >
         <DropdownSection showDivider>
           <DropdownItem
             key="profile"
-            className="h-14 gap-2"
+            className="h-16 gap-2 cursor-default hover:bg-transparent"
             textValue="Profile"
+            isReadOnly
           >
-            <p className="font-semibold">{userData.name}</p>
-            <p className="text-xs text-default-500">{userData.email}</p>
+            <div className="flex items-center gap-3">
+              <Avatar
+                size="sm"
+                name={userData.name}
+                src={userData.image || undefined}
+                className="flex-shrink-0"
+              />
+              <div className="flex flex-col">
+                <p className="font-semibold text-small">{userData.name}</p>
+                <p className="text-tiny text-default-400">{userData.email}</p>
+              </div>
+            </div>
           </DropdownItem>
         </DropdownSection>
         <DropdownSection showDivider>
           <DropdownItem
             key="theme"
-            className="flex items-center gap-2"
+            className="gap-2 py-2"
             startContent={
               <Icon
-                icon="solar:pallete-2-linear"
-                width={18}
+                icon={theme === "dark" ? "solar:moon-stars-bold" : "solar:sun-bold"}
+                width={20}
+                className="text-default-500"
               />
             }
             endContent={
@@ -108,14 +126,21 @@ const UserProfile = React.memo(() => {
                   onValueChange={handleThemeChange}
                   aria-label="Toggle theme"
                   classNames={{
-                    wrapper: "bg-default-300/60 dark:bg-default-200/60",
+                    wrapper: "group-data-[selected=true]:bg-primary",
                   }}
+                  thumbIcon={({ isSelected }) =>
+                    isSelected ? (
+                      <Icon icon="solar:moon-bold" width={12} />
+                    ) : (
+                      <Icon icon="solar:sun-bold" width={12} />
+                    )
+                  }
                 />
               )
             }
             isReadOnly
           >
-            Theme
+            <span className="text-small font-medium">Appearance</span>
           </DropdownItem>
         </DropdownSection>
         <DropdownSection showDivider>
@@ -123,22 +148,33 @@ const UserProfile = React.memo(() => {
             <DropdownItem
               key={item.key}
               as={Link}
-              className="data-[hover=true]:bg-default-200"
+              className="data-[hover=true]:bg-default-100 py-2"
               href={item.href}
-              startContent={<Icon icon={item.icon} width={18} />}
+              startContent={
+                <Icon
+                  icon={item.icon}
+                  width={20}
+                  className="text-default-500"
+                />
+              }
             >
-              {item.label}
+              <span className="text-small font-medium">{item.label}</span>
             </DropdownItem>
           ))}
         </DropdownSection>
         <DropdownSection>
           <DropdownItem
             key="logout"
-            className="text-danger-500 data-[hover=true]:bg-danger-500 data-[hover=true]:text-default-100"
-            startContent={<Icon icon="solar:logout-2-linear" width={18} />}
+            className="text-danger data-[hover=true]:bg-danger-50 data-[hover=true]:text-danger py-2"
+            startContent={
+              <Icon
+                icon="solar:logout-2-bold"
+                width={20}
+              />
+            }
             onPress={handleLogout}
           >
-            Log Out
+            <span className="text-small font-semibold">Log Out</span>
           </DropdownItem>
         </DropdownSection>
       </DropdownMenu>
@@ -147,12 +183,17 @@ const UserProfile = React.memo(() => {
   );
 
   return (
-    <Dropdown placement="bottom-end" className="border border-default-200">
+    <Dropdown
+      placement="bottom-end"
+      classNames={{
+        content: "min-w-[260px]",
+      }}
+    >
       <DropdownTrigger>
         <Avatar
           isBordered
           as="button"
-          className="transition-transform"
+          className="transition-transform hover:scale-105"
           color="primary"
           name={userData.name}
           size="sm"

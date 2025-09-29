@@ -35,24 +35,29 @@ const SimpleIntegrationCard = React.memo(function SimpleIntegrationCard({
   return (
     <Card
         className={cn(
-          "bg-content1 border border-divider/50 rounded-2xl transition-all",
-          isConnected ? "border-success" : "hover:border-primary  "
+          "bg-default-50 border rounded-2xl transition-all duration-200",
+          isConnected
+            ? "border-success-300 bg-success-50/30"
+            : "border-default-200 hover:border-primary/50 hover:bg-default-100"
         )}
       >
-        <CardBody className="p-4 sm:p-5 md:p-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+        <CardBody className="p-5 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-6">
             {/* Left side - Logo and info */}
-            <div className="flex items-center gap-3 sm:gap-4 flex-1">
-              <div className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-xl flex items-center justify-center overflow-hidden bg-content2 shrink-0 ring-1 ring-default-200">
-                <Icon className="text-foreground" icon={icon} width={28} />
+            <div className="flex items-center gap-4 flex-1">
+              <div className={cn(
+                "relative w-14 h-14 sm:w-16 sm:h-16 rounded-xl flex items-center justify-center shrink-0 transition-colors",
+                isConnected ? "bg-success-100" : "bg-background"
+              )}>
+                <Icon className="text-foreground" icon={icon} width={32} />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1 flex-wrap">
-                  <h3 className="font-semibold text-base text-default-900">
+                <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                  <h3 className="font-bold text-base text-default-900">
                     {name}
                   </h3>
                   {required && (
-                    <Chip color="danger" size="sm">
+                    <Chip color="danger" size="sm" variant="flat">
                       Required
                     </Chip>
                   )}
@@ -62,7 +67,7 @@ const SimpleIntegrationCard = React.memo(function SimpleIntegrationCard({
                     </Chip>
                   )}
                 </div>
-                <p className="text-xs sm:text-sm text-default-600 line-clamp-1 sm:line-clamp-2">
+                <p className="text-sm text-default-600 line-clamp-2">
                   {description}
                 </p>
               </div>
@@ -71,18 +76,19 @@ const SimpleIntegrationCard = React.memo(function SimpleIntegrationCard({
             {/* Right side - Status/Action */}
             <div className="shrink-0 w-full sm:w-auto">
               {isLoading ? (
-                <div className="flex items-center justify-center sm:justify-start gap-2 text-default-600 bg-default-100 px-3 sm:px-4 py-2 rounded-lg">
-                  <Spinner color="primary" />
-                  <span className="text-xs sm:text-sm font-medium">
+                <div className="flex items-center justify-center sm:justify-start gap-2.5 text-default-600 bg-default-100 px-4 py-2.5 rounded-lg">
+                  <Spinner color="primary" size="sm" />
+                  <span className="text-sm font-medium">
                     Connecting...
                   </span>
                 </div>
               ) : isConnected ? (
-                <div className="flex items-center gap-2 sm:gap-3">
+                <div className="flex items-center gap-3">
                   <Button
                     color="success"
+                    variant="flat"
                     startContent={
-                      <Icon icon="solar:check-circle-bold" width={18} />
+                      <Icon icon="solar:check-circle-bold-duotone" width={18} />
                     }
                   >
                     Connected
@@ -90,8 +96,9 @@ const SimpleIntegrationCard = React.memo(function SimpleIntegrationCard({
                   {showDisconnect && onDisconnect && (
                     <Button
                       color="danger"
+                      variant="flat"
                       startContent={
-                        <Icon icon="solar:unlink-outline" width={16} />
+                        <Icon icon="solar:unlink-bold-duotone" width={16} />
                       }
                       onPress={onDisconnect}
                     >
@@ -111,10 +118,10 @@ const SimpleIntegrationCard = React.memo(function SimpleIntegrationCard({
               ) : (
                 <div className="flex flex-col items-stretch sm:items-end">
                   <Button
-                    className="w-full sm:w-auto"
+                    className="w-full sm:w-auto font-semibold"
                     color="primary"
                     endContent={
-                      <Icon icon="solar:arrow-right-outline" width={16} />
+                      <Icon icon="solar:arrow-right-bold-duotone" width={18} />
                     }
                     onPress={onConnect}
                   >

@@ -83,9 +83,9 @@ export default function SimpleCostsClient() {
     if (hasPrefilled.current) return;
     if (opLoading || shipLoading || payLoading) return;
 
-    let anySet = false;
     setForm((prev) => {
       let next = prev;
+      let anySet = false;
 
       if (!prev.operatingCosts) {
         const op = ((operationalCosts as CostRow[] | undefined) || [])
@@ -129,13 +129,14 @@ export default function SimpleCostsClient() {
         }
       }
 
+      // Mark as prefilled if any value was set
+      if (anySet) {
+        hasPrefilled.current = true;
+      }
+
       // Avoid triggering a re-render if nothing changed
       return anySet ? next : prev;
     });
-
-    if (anySet) {
-      hasPrefilled.current = true;
-    }
   }, [
     opLoading,
     shipLoading,
@@ -267,32 +268,35 @@ export default function SimpleCostsClient() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto space-y-8">
       {/* Header */}
-      <div className="mb-2">
-        <div className="flex items-center gap-2 mb-1">
+      <div className="mb-4">
+        <div className="flex items-center gap-3 mb-2">
           <Icon
             className="text-primary"
             icon="solar:settings-minimalistic-bold-duotone"
+            width={28}
           />
-          <h1 className="text-xl lg:text-2xl font-bold text-default-900">
+          <h1 className="text-2xl lg:text-3xl font-bold text-default-900">
             Fees & Shipping
           </h1>
         </div>
-        <p className="text-default-600 text-sm">
+        <p className="text-default-600 text-base">
           Set global costs here. Product-specific costs (COGS, tax, handling)
           are configured in the next step. You can refine all costs later in Cost Management.
         </p>
       </div>
 
       {/* Form */}
-      <div className="grid grid-cols-1 gap-6 mt-6">
+      <div className="grid grid-cols-1 gap-8 mt-8">
         <Input
-          className="md:w-120"
+          className="max-w-md"
+          size="lg"
           label="Fixed Monthly Operating Cost"
           labelPlacement="outside"
+          description="Your monthly fixed expenses (rent, salaries, software, etc.)"
           startContent={
-            <span className="text-default-400 text-small">
+            <span className="text-default-400 text-base font-medium">
               {currencySymbol}
             </span>
           }
@@ -304,13 +308,15 @@ export default function SimpleCostsClient() {
           value={form.operatingCosts}
           onValueChange={onChange("operatingCosts")}
         />
-        {/* Global Tax removed; set per product in Products step */}
+
         <Input
-          className="md:w-120"
+          className="max-w-md"
+          size="lg"
           label="Payment Gateway Fee %"
           labelPlacement="outside"
-          endContent={<span className="text-default-400 text-small">%</span>}
-          placeholder="e.g. 2"
+          description="Percentage fee charged by your payment processor"
+          endContent={<span className="text-default-400 text-base font-medium">%</span>}
+          placeholder="e.g. 2.9"
           type="number"
           inputMode="decimal"
           min={0}
@@ -321,32 +327,34 @@ export default function SimpleCostsClient() {
         />
 
         <Input
-          className="mt-1 md:w-120"
+          className="max-w-md"
+          size="lg"
+          label="Average Shipping Cost (per order)"
+          labelPlacement="outside"
+          description="Average shipping cost per order"
           startContent={
-            <span className="text-default-400 text-small">
+            <span className="text-default-400 text-base font-medium">
               {currencySymbol}
             </span>
           }
           placeholder="e.g. 25"
           type="number"
-          label="Average Shipping (per order)"
-          labelPlacement="outside"
           inputMode="decimal"
           min={0}
           step="0.01"
           value={form.shippingCost}
           onValueChange={onChange("shippingCost")}
         />
-
-        {/* Handling removed from onboarding; set in Product Costs */}
       </div>
 
       {/* Actions */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between pt-4 border-t border-divider">
         <Button
-          startContent={<Icon icon="solar:alt-arrow-left-linear" />}
-          variant="light"
+          startContent={<Icon icon="solar:arrow-left-bold-duotone" width={18} />}
+          variant="flat"
+          size="lg"
           isDisabled={saving}
+          className="font-semibold"
           onPress={() => {
             setNavigationPending(true);
             try {
@@ -358,16 +366,16 @@ export default function SimpleCostsClient() {
         >
           Back
         </Button>
-        <div className="flex items-center gap-3">
-          <Button
-            color="primary"
-            isLoading={saving}
-            onPress={handleSave}
-            endContent={<Icon icon="solar:alt-arrow-right-linear" />}
-          >
-            Save & Continue
-          </Button>
-        </div>
+        <Button
+          color="primary"
+          size="lg"
+          isLoading={saving}
+          className="font-bold min-w-40"
+          onPress={handleSave}
+          endContent={!saving && <Icon icon="solar:arrow-right-bold-duotone" width={20} />}
+        >
+          Save & Continue
+        </Button>
       </div>
     </div>
   );

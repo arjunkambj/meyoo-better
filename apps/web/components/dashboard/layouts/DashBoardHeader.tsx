@@ -66,19 +66,21 @@ export default function DashBoardHeader({ className }: { className?: string }) {
 
   return (
     <header
-      className={`flex bg-content2 dark:bg-content1 px-6 py-4 rounded-2xl justify-between items-center w-full h-[68px] ${className || ""}`}
+      className={`flex bg-content2 dark:bg-content1 px-6 py-3.5 rounded-2xl justify-between items-center w-full min-h-[68px] ${className || ""}`}
     >
       {/* Left side - Sidebar toggle and page title */}
       <div className="flex items-center gap-4 min-w-0">
         <SidebarToggle />
-        <div aria-hidden className="h-8 w-px bg-divider" />
-        <h1 className="text-xl font-semibold text-default-900">{pageTitle}</h1>
+        <div aria-hidden className="h-6 w-px bg-default-200" />
+        <h1 className="text-xl font-bold text-default-900 tracking-tight">
+          {pageTitle}
+        </h1>
       </div>
 
       {/* Right side - Actions */}
-      <div className="flex items-center gap-1 min-w-0">
+      <div className="flex items-center gap-2 min-w-0">
         {/* Plan Usage Indicator (minimal) */}
-        <div className="mr-2">
+        <div className="mr-1">
           <PlanUsageAlert variant="minimal" />
         </div>
 
@@ -86,20 +88,25 @@ export default function DashBoardHeader({ className }: { className?: string }) {
         <Tooltip
           content={isAgentOpen ? "Close AI Assistant" : "Open AI Assistant"}
           placement="bottom"
+          delay={300}
         >
           <Button
             isIconOnly
             variant="light"
             size="sm"
             onPress={() => setIsAgentOpen(!isAgentOpen)}
-            className="text-default-600 hover:text-primary"
+            className={`transition-colors ${
+              isAgentOpen
+                ? "text-primary"
+                : "text-default-600 hover:text-primary"
+            }`}
           >
-            <Icon icon="solar:magic-stick-3-bold" width={20} />
+            <Icon icon="solar:atom-bold-duotone" width={20} />
           </Button>
         </Tooltip>
 
         {/* Divider */}
-        <div aria-hidden className="h-8 mx-3 w-px bg-divider" />
+        <div aria-hidden className="h-6 mx-2 w-px bg-default-200" />
 
         {/* User Profile */}
         <UserProfile />

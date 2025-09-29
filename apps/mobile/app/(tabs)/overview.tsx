@@ -33,42 +33,45 @@ export default function OverviewTab() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        <View className="flex-1 gap-6 px-4 py-3">
+        <View className="flex-1 gap-8 px-5 py-4">
           {/* Header with Date Picker */}
           <View className="gap-3">
             <View className="flex-row items-center justify-between">
               <View className="flex-1">
-                <Text className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
+                <Text className="text-xs font-bold uppercase tracking-[0.2em] text-primary">
                   Analytics
                 </Text>
-                <Text className="text-2xl font-bold text-foreground">
+                <Text className="text-3xl font-bold text-foreground">
                   Overview
                 </Text>
               </View>
               <DateRangePickerButton />
             </View>
-            <Text className="text-sm text-default-500">
-              Track your store performance and marketing metrics
+            <Text className="text-sm text-default-600">
+              Track your store performance and key metrics
             </Text>
           </View>
 
-          {/* Main Metrics (layout: 1 full → 2-in → 2-in) */}
-          <View className="gap-4">
-            <Text className="text-sm font-semibold text-default-600">Key Metrics</Text>
-            {/* 1) Full-width KPI */}
-            <View className="mb-4">
-              <KPICard
-                title="Revenue"
-                value={metrics?.revenue.value ?? 0}
-                change={metrics?.revenue.change}
-                format="currency"
-                currencySymbol={currencySymbol}
-                icon="cash-outline"
-                iconColor="#10b981"
-                loading={isLoading}
-              />
+          {/* Key Performance Section */}
+          <View className="gap-5">
+            <View className="flex-row items-center gap-2">
+              <Text className="text-base font-bold text-foreground">Key Performance</Text>
             </View>
-            {/* 2) Two-in row: Net Profit + Meta Cost */}
+
+            {/* Revenue - Full width primary */}
+            <KPICard
+              title="Revenue (Net)"
+              value={metrics?.revenue.value ?? 0}
+              change={metrics?.revenue.change}
+              format="currency"
+              currencySymbol={currencySymbol}
+              icon="cash-outline"
+              iconColor="#10b981"
+              loading={isLoading}
+              isPrimary
+            />
+
+            {/* Net Profit + Profit Margin */}
             <View className="flex-row -mx-2">
               <View className="w-1/2 px-2">
                 <KPICard
@@ -84,9 +87,69 @@ export default function OverviewTab() {
               </View>
               <View className="w-1/2 px-2">
                 <KPICard
-                  title="Meta Cost"
+                  title="Profit Margin"
+                  value={metrics?.profitMargin.value ?? 0}
+                  change={metrics?.profitMargin.change}
+                  format="percent"
+                  icon="analytics-outline"
+                  iconColor="#6366f1"
+                  loading={isLoading}
+                />
+              </View>
+            </View>
+          </View>
+
+          {/* Sales Metrics Section */}
+          <View className="gap-5">
+            <View className="flex-row items-center gap-2">
+              <Text className="text-base font-bold text-foreground">Sales Metrics</Text>
+            </View>
+
+            {/* Orders + AOV */}
+            <View className="flex-row -mx-2">
+              <View className="w-1/2 px-2">
+                <KPICard
+                  title="Total Orders"
+                  value={metrics?.orders.value ?? 0}
+                  change={metrics?.orders.change}
+                  format="number"
+                  icon="cart-outline"
+                  iconColor="#3b82f6"
+                  loading={isLoading}
+                />
+              </View>
+              <View className="w-1/2 px-2">
+                <KPICard
+                  title="Avg Order Value"
+                  value={metrics?.avgOrderValue.value ?? 0}
+                  change={metrics?.avgOrderValue.change}
+                  format="currency"
+                  currencySymbol={currencySymbol}
+                  icon="pricetags-outline"
+                  iconColor="#14b8a6"
+                  loading={isLoading}
+                />
+              </View>
+            </View>
+
+            {/* Gross Profit */}
+            <View className="flex-row -mx-2">
+              <View className="w-1/2 px-2">
+                <KPICard
+                  title="Gross Profit"
+                  value={metrics?.grossProfit.value ?? 0}
+                  change={metrics?.grossProfit.change}
+                  format="currency"
+                  currencySymbol={currencySymbol}
+                  icon="trending-up-outline"
+                  iconColor="#8b5cf6"
+                  loading={isLoading}
+                />
+              </View>
+              <View className="w-1/2 px-2">
+                <KPICard
+                  title="Meta Ad Spend"
                   value={metaSpend || 0}
-                  change={0}
                   format="currency"
                   currencySymbol={currencySymbol}
                   icon="logo-facebook"
@@ -95,63 +158,13 @@ export default function OverviewTab() {
                 />
               </View>
             </View>
-          {/* 3) Two-in row: Orders + Profit Margin */}
-          <View className="flex-row -mx-2">
-            <View className="w-1/2 px-2">
-              <KPICard
-                title="Total Orders"
-                value={metrics?.orders.value ?? 0}
-                // change intentionally omitted until implemented
-                format="number"
-                icon="cart-outline"
-                iconColor="#3b82f6"
-                loading={isLoading}
-              />
-            </View>
-            <View className="w-1/2 px-2">
-              <KPICard
-                title="Profit Margin"
-                value={metrics?.profitMargin.value ?? 0}
-                change={metrics?.profitMargin.change}
-                format="percent"
-                icon="analytics-outline"
-                iconColor="#6366f1"
-                loading={isLoading}
-              />
-            </View>
           </View>
 
-          {/* 4) Two-in row: AOV + Gross Profit */}
-          <View className="flex-row -mx-2">
-            <View className="w-1/2 px-2">
-              <KPICard
-                title="Average Order Value"
-                value={metrics?.avgOrderValue.value ?? 0}
-                format="currency"
-                currencySymbol={currencySymbol}
-                icon="pricetags-outline"
-                iconColor="#14b8a6"
-                loading={isLoading}
-              />
+          {/* Cost Analysis Section */}
+          <View className="gap-5">
+            <View className="flex-row items-center gap-2">
+              <Text className="text-base font-bold text-foreground">Cost Analysis</Text>
             </View>
-            <View className="w-1/2 px-2">
-              <KPICard
-                title="Gross Profit"
-                value={metrics?.grossProfit.value ?? 0}
-                change={metrics?.grossProfit.change}
-                format="currency"
-                currencySymbol={currencySymbol}
-                icon="bar-chart-outline"
-                iconColor="#8b5cf6"
-                loading={isLoading}
-              />
-            </View>
-          </View>
-          </View>
-
-          {/* Donut cost breakdown */}
-          <View className="gap-4">
-            <Text className="text-sm font-semibold text-default-600">Costs</Text>
             <CostBreakdownCard
               items={[
                 { key: 'ad', label: 'Ad Spend', value: costTotals?.adSpend || 0, color: '#2563EB' },

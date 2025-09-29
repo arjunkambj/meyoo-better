@@ -142,26 +142,28 @@ export const OnboardingLayoutClient = memo(function OnboardingLayoutClient({
     <div className="relative flex min-h-dvh w-full bg-background overflow-x-hidden">
       <main className="flex flex-col flex-1 min-w-0 min-h-0">
         {/* Minimal Header */}
-        <header className="sticky top-0 z-20 bg-background border-b border-divider">
+        <header className="sticky top-0 z-20 bg-background/80 backdrop-blur-md border-b border-divider">
           {/* Progress Bar at top */}
-          <MinimalProgressBar 
+          <MinimalProgressBar
             currentStep={currentStep}
             totalSteps={TOTAL_STEPS}
           />
           {/* Logo and step indicator */}
-          <div className="px-4 sm:px-6 py-3">
+          <div className="px-4 sm:px-6 py-4">
             <div className="max-w-7xl mx-auto flex items-center justify-between">
               <Logo size="sm" />
-              <span className="text-xs text-default-400">
-                Step {currentStep} of {TOTAL_STEPS}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-default-500">
+                  Step {currentStep} of {TOTAL_STEPS}
+                </span>
+              </div>
             </div>
           </div>
         </header>
 
         {/* Content Area */}
         <div className="flex-1 min-h-0 overflow-y-auto">
-          <div className={`min-h-[600px] px-4 sm:px-6 py-6 sm:py-8 md:py-10 ${navigationPending ? "pointer-events-none" : ""}`} aria-busy={navigationPending}>
+          <div className={`min-h-[600px] px-4 sm:px-6 py-8 sm:py-10 md:py-12 ${navigationPending ? "pointer-events-none opacity-60" : ""}`} aria-busy={navigationPending}>
             <div className={`${containerWidthClass} mx-auto w-full`}>
               {children}
             </div>

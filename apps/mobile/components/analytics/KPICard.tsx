@@ -13,6 +13,7 @@ export interface KPICardProps {
   loading?: boolean;
   format?: 'currency' | 'number' | 'percent';
   currencySymbol?: string;
+  isPrimary?: boolean;
 }
 
 export function KPICard({
@@ -25,12 +26,25 @@ export function KPICard({
   loading = false,
   format = 'number',
   currencySymbol = '$',
+  isPrimary = false,
 }: KPICardProps) {
   const formatValue = (val: string | number): string => {
     if (typeof val === 'string') return val;
 
     switch (format) {
       case 'currency':
+        // Compact format for large numbers
+        if (Math.abs(val) >= 10000000) {
+          const abs = Math.abs(val);
+          const units = ['', 'k', 'M', 'B'] as const;
+          let u = 0;
+          let v = abs;
+          while (v >= 1000 && u < units.length - 1) {
+            v /= 1000;
+            u++;
+          }
+          return `${val < 0 ? '-' : ''}${currencySymbol}${v.toFixed(1)}${units[u]}`;
+        }
         return `${currencySymbol}${val.toLocaleString('en-US', {
           minimumFractionDigits: 0,
           maximumFractionDigits: 0,
@@ -60,20 +74,20 @@ export function KPICard({
 
   const getChangeIcon = () => {
     if (!change) return null;
-    return change >= 0 ? 'trending-up' : 'trending-down';
+    return change >= 0 ? 'arrow-up' : 'arrow-down';
   };
 
   if (loading) {
     return (
-      <Card surfaceVariant="1">
+      <Card surfaceVariant="1" className={isPrimary ? "border border-primary/20" : ""}>
         <Card.Body>
-          <View className="gap-2">
+          <View className="gap-3">
             <View className="flex-row items-center justify-between">
-              <Skeleton className="h-4 w-20 rounded-md" />
-              <Skeleton className="h-5 w-5 rounded-full" />
+              <Skeleton className="h-4 w-24 rounded-md" />
+              <Skeleton className="h-6 w-6 rounded-full" />
             </View>
-            <Skeleton className="h-8 w-28 rounded-md" />
-            <Skeleton className="h-3 w-16 rounded-md" />
+            <Skeleton className={`${isPrimary ? 'h-10' : 'h-9'} w-32 rounded-md`} />
+            <Skeleton className="h-4 w-20 rounded-md" />
           </View>
         </Card.Body>
       </Card>
@@ -81,36 +95,36 @@ export function KPICard({
   }
 
   return (
-    <Card surfaceVariant="1">
+    <Card surfaceVariant="1" className={isPrimary ? "border border-primary/20" : ""}>
       <Card.Body>
-        <View className="gap-2">
+        <View className="gap-3">
           {/* Header with title and icon */}
           <View className="flex-row items-center justify-between">
-            <Text className="text-xs font-medium text-default-600 flex-1" numberOfLines={1}>
+            <Text className="text-xs font-semibold text-default-600 flex-1" numberOfLines={1}>
               {title}
             </Text>
             {icon && (
-              <Ionicons name={icon} size={18} color={iconColor} />
+              <Ionicons name={icon} size={24} color={iconColor} />
             )}
           </View>
 
           {/* Value */}
-          <Text className="text-2xl font-bold text-foreground">
+          <Text className={`${isPrimary ? 'text-3xl' : 'text-2xl'} font-bold text-foreground`}>
             {formatValue(value)}
           </Text>
 
           {/* Change indicator */}
           {change !== undefined && (
-            <View className="flex-row items-center gap-1">
+            <View className="flex-row items-center gap-1.5">
               {getChangeIcon() && (
                 <Ionicons
                   name={getChangeIcon() as keyof typeof Ionicons.glyphMap}
-                  size={14}
+                  size={16}
                   color={getChangeColor()}
                 />
               )}
               <Text
-                className="text-xs font-medium"
+                className="text-sm font-semibold"
                 style={{ color: getChangeColor() }}
               >
                 {change >= 0 ? '+' : ''}{change.toFixed(1)}%

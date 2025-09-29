@@ -32,7 +32,7 @@ export function ScrollbarController() {
     };
 
     window.addEventListener("pointermove", handlePointerMove);
-    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("scroll", handleScroll, { passive: true, capture: true });
 
     revealScrollbar();
 
@@ -41,7 +41,7 @@ export function ScrollbarController() {
         window.clearTimeout(hideTimer);
       }
       window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("scroll", handleScroll, true);
       root.classList.remove("scrollbar-visible");
     };
   }, []);

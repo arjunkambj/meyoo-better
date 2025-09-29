@@ -24,20 +24,20 @@ export default function SidebarToggle() {
   const iconContent = useMemo(
     () => (
       <Icon
-        className={`transition-transform duration-200 ${isOpen ? "rotate-180" : "rotate-0"}`}
-        icon="solar:hamburger-menu-linear"
-        width={24}
+        className={`transition-transform duration-300 ${isOpen ? "rotate-180" : "rotate-0"}`}
+        icon="solar:sidebar-minimalistic-bold-duotone"
+        width={22}
       />
     ),
     [isOpen]
   );
 
   return (
-    <Tooltip closeDelay={0} content={tooltipContent} placement="bottom">
+    <Tooltip closeDelay={0} content={tooltipContent} placement="bottom" delay={300}>
       <Button
         isIconOnly
         aria-label="Toggle sidebar"
-        className="text-default-600"
+        className="text-default-600 hover:text-foreground transition-colors"
         size="sm"
         variant="light"
         onPress={handleToggle}

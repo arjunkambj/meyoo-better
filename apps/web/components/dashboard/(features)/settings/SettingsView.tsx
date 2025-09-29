@@ -26,7 +26,7 @@ export default function SettingsView() {
             tab: "max-w-fit px-6 h-12 rounded-none border-b-2 border-transparent data-[selected=true]:border-primary data-[selected=true]:text-primary font-medium text-default-600 hover:text-default-900 transition-colors",
             tabContent: "group-data-[selected=true]:text-primary",
             cursor: "w-full bg-transparent",
-            panel: "pt-6 px-0",
+            panel: "pt-6 px-0 overflow-y-auto",
           }}
           variant="underlined"
         >

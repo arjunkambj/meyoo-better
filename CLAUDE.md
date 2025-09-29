@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Rules
 
--Donnt add Shadow and border for card, button, while making ui,
+- Don't add shadow and border for card, button, while making UI
 
 ## Project Overview
 
@@ -15,7 +15,7 @@ This is a Turborepo monorepo using Bun as the package manager. The project appea
 ### Apps
 
 - **web** (port 3000): Customer-facing Next.js app for storefront dashboard
-- **meyoo** (port 3001): Internal admin backoffice Next.js app
+- **admin** (port 3001): Internal admin backoffice Next.js app
 - **mobile**: Expo Router + React Native client using NativeWind and HeroUI Native
 - **backend**: Convex serverless backend with real-time database
 
@@ -38,8 +38,9 @@ bun run dev
 
 # Run specific app
 bun run dev --filter=web
+bun run dev --filter=admin
 bun run dev --filter=backend
-bun run dev --filter=meyoo
+bun run dev --filter=mobile
 
 # Build all apps
 bun run build
@@ -68,6 +69,9 @@ The Convex backend is organized as follows:
 - **schema/**: Table definitions split by domain (analytics, core, costs, meta, shopify, etc.)
 - **web/**: Public APIs for storefront dashboard (customer-facing)
 - **meyoo/**: Admin APIs for backoffice
+- **agent/**: AI agent functionality and MCP server integration
+- **billing/**: Billing and payment processing
+- **utils/**: Shared utility functions
 - **webhooks/**: HTTP handlers for Shopify + GDPR webhooks
 - **sync/**: HTTP endpoints for sync triggers
 
@@ -131,25 +135,50 @@ Currently no test framework is configured. Use these commands for code quality:
 
 See `rules_convex.md` for detailed Convex patterns and best practices specific to this codebase.
 
-## avaible heroui native componetns
+## Available HeroUI Native Components
 
-Accordion
-Avatar
-Button
-Card
-Checkbox
-Chip
-Dialog
-Divider
-Drop Shadow View
-Error View
-Form Field
-Radio
-Radio Group
-Scroll Shadow
-Skeleton
-Skeleton Group
-Spinner
-Surface
-Switch
-Text Field
+The mobile app uses HeroUI Native components (v1.0.0-alpha.13):
+
+- Accordion
+- Avatar
+- Button
+- Card
+- Checkbox
+- Chip
+- Dialog
+- Divider
+- Drop Shadow View
+- Error View
+- Form Field
+- Radio
+- Radio Group
+- Scroll Shadow
+- Skeleton
+- Skeleton Group
+- Spinner
+- Surface
+- Switch
+- Text Field
+
+## Mobile Development
+
+The mobile app (`apps/mobile`) uses:
+
+- **Expo Router** for file-based routing
+- **NativeWind v4** for Tailwind CSS styling
+- **HeroUI Native** for UI components
+- **React Native 0.81.4** with React 19.1.0
+- **Convex** for real-time data sync
+
+### Mobile Commands
+
+```bash
+# Start Expo dev server
+bun run dev --filter=mobile
+
+# Run on specific platform
+cd apps/mobile
+bun run android
+bun run ios
+bun run web
+```

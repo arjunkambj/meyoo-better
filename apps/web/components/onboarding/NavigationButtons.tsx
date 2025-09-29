@@ -188,18 +188,18 @@ const NavigationButtons = memo(function NavigationButtons({
   return (
     <div className={
       isFloating
-        ? `${containerBase} fixed bottom-4 right-4 md:bottom-6 md:right-6 z-40 pointer-events-none ${className}`
-        : `${containerBase} ${className}`
+        ? `${containerBase} fixed bottom-6 right-6 md:bottom-8 md:right-8 z-40 pointer-events-none ${className}`
+        : `${containerBase} mt-8 ${className}`
     }>
       {/* Previous Button */}
       <div className={isFloating ? "pointer-events-auto" : ""}>
         {showPrevious && previousRoute ? (
           <Button
-            variant="bordered"
+            variant="flat"
             onPress={handlePrevious}
             isDisabled={internalLoading || isNextLoading}
-            startContent={<Icon icon="solar:arrow-left-linear" width={16} />}
-            className="font-medium"
+            startContent={<Icon icon="solar:arrow-left-bold-duotone" width={18} />}
+            className="font-semibold"
           >
             {previousLabel}
           </Button>
@@ -214,7 +214,7 @@ const NavigationButtons = memo(function NavigationButtons({
           <Button
             variant="flat"
             onPress={onSkip}
-            className="font-medium"
+            className="font-semibold"
           >
             Skip for now
           </Button>
@@ -224,22 +224,23 @@ const NavigationButtons = memo(function NavigationButtons({
         {nextRoute && (
           <Button
             color="primary"
+            size="lg"
             onPress={handleNext}
             isDisabled={isNextDisabled || internalLoading || isNextLoading}
             isLoading={isNextLoading || internalLoading}
             endContent={
-              !isNextLoading && (
+              !isNextLoading && !internalLoading && (
                 <Icon
                   icon={
                     isLastStep
-                      ? "solar:check-circle-bold"
-                      : "solar:arrow-right-linear"
+                      ? "solar:check-circle-bold-duotone"
+                      : "solar:arrow-right-bold-duotone"
                   }
-                  width={16}
+                  width={20}
                 />
               )
             }
-            className="font-medium min-w-32 shadow-medium"
+            className="font-bold min-w-40"
           >
             {computedNextLabel}
           </Button>

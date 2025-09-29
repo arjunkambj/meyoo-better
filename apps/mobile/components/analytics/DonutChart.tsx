@@ -16,7 +16,7 @@ interface DonutChartProps {
   totalValue?: string;
 }
 
-function DonutChart({ data, size = 220, innerRadius = 70, totalLabel, totalValue }: DonutChartProps) {
+function DonutChart({ data, size = 240, innerRadius = 80, totalLabel, totalValue }: DonutChartProps) {
   const chartData = data.map((d, i) => ({
     name: d.name,
     population: Math.max(0, d.value),
@@ -59,13 +59,16 @@ function DonutChart({ data, size = 220, innerRadius = 70, totalLabel, totalValue
             borderRadius: innerRadius,
             backgroundColor: 'white',
           }}
-          className="dark:bg-background bg-background items-center justify-center"
+          className="dark:bg-background bg-background items-center justify-center gap-1"
         >
           {totalLabel && (
-            <Text className="text-xs text-default-600">{totalLabel}</Text>
+            <Text className="text-xs font-semibold uppercase tracking-wider text-default-500">{totalLabel}</Text>
           )}
           {totalValue && (
-            <Text className="text-xl font-bold text-foreground">{totalValue}</Text>
+            <Text className="text-2xl font-bold text-foreground">{totalValue}</Text>
+          )}
+          {data.length > 0 && (
+            <Text className="text-xs text-default-400">{data.length} {data.length === 1 ? 'category' : 'categories'}</Text>
           )}
         </View>
       </View>

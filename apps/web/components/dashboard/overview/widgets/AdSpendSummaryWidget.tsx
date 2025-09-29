@@ -60,46 +60,46 @@ function Metric({
 
   // Match Customer metric container styles
   const containerClasses = isPrimary
-    ? "py-2 px-3 bg-background border border-default-50 rounded-xl"
-    : "py-2.5 px-3 border-b border-default-200 last:border-0";
+    ? "py-2 px-3 bg-background border border-default-100 rounded-xl hover:bg-default-50 transition-colors"
+    : "py-2.5 px-3 border-b border-default-200 last:border-0 hover:bg-default-50 transition-colors";
 
   return (
     <div className={containerClasses} aria-label={`${label} metric`}>
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-2">
           <span
-            className={`${isPrimary ? "text-sm font-medium" : "text-xs"} text-default-900`}
+            className={`${isPrimary ? "text-sm font-semibold" : "text-xs font-medium"} text-default-900`}
           >
             {label}
           </span>
           {hint && (
             <Tooltip content={hint} placement="top" delay={200} closeDelay={50}>
-              <span className="text-default-400 cursor-help">
-                <Icon icon="solar:info-circle-linear" width={14} />
+              <span className="text-default-500 cursor-help hover:text-default-700 transition-colors">
+                <Icon icon="solar:info-circle-bold-duotone" width={16} />
               </span>
             </Tooltip>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <span
-            className={`${isPrimary ? "text-xl font-bold" : "text-sm font-semibold"} text-default-800`}
+            className={`${isPrimary ? "text-xl font-bold" : "text-sm font-bold"} text-default-900`}
           >
             {formatValue()}
           </span>
           {change !== undefined && (
             <div
               aria-label={`Change ${change >= 0 ? "up" : "down"} ${Math.abs(change).toFixed(0)} percent`}
-              className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-md ${changeBadgeClasses}`}
+              className={`flex items-center gap-0.5 px-2 py-1 rounded-lg ${changeBadgeClasses}`}
             >
               <Icon
                 icon={
                   change >= 0
-                    ? "solar:arrow-up-linear"
-                    : "solar:arrow-down-linear"
+                    ? "solar:arrow-up-bold"
+                    : "solar:arrow-down-bold"
                 }
-                width={12}
+                width={14}
               />
-              <span className="text-xs font-medium">
+              <span className="text-xs font-semibold">
                 {Math.abs(change).toFixed(0)}%
               </span>
             </div>
@@ -162,14 +162,14 @@ export function AdSpendSummaryWidget({
       className="p-5 bg-default-100 dark:bg-content1 border border-default-50 rounded-2xl h-full"
       shadow="none"
     >
-      <div className="mb-3.5 pb-3.5 border-b border-divider">
-        <div className="flex items-center gap-2">
+      <div className="mb-4 pb-4 border-b border-divider">
+        <div className="flex items-center gap-2.5">
           <Icon
             icon="solar:chart-square-bold-duotone"
-            width={20}
+            width={24}
             className="text-primary"
           />
-          <h3 className="text-lg font-medium text-default-900">
+          <h3 className="text-lg font-semibold text-default-900">
             Ad Spend Summary
           </h3>
         </div>

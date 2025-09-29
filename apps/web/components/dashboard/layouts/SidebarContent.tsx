@@ -47,18 +47,19 @@ const SidebarContent = React.memo(({ onClose }: SidebarContentProps) => {
 
   const logoSection = useMemo(
     () => (
-      <div className="flex items-center justify-between px-3 py-2">
+      <div className="flex items-center justify-between px-3 py-3">
         <Logo />
         {/* Close button - only visible on mobile */}
         <Button
           isIconOnly
           aria-label="Close sidebar"
-          className="sm:hidden absolute right-2 top-2"
+          className="sm:hidden absolute right-2 top-2 hover:bg-default-200"
           size="sm"
-          variant="light"
+          variant="flat"
+          radius="lg"
           onPress={handleCloseClick}
         >
-          <Icon icon="solar:close-circle-bold" width={20} />
+          <Icon icon="solar:close-circle-bold-duotone" width={20} />
         </Button>
       </div>
     ),
@@ -70,11 +71,11 @@ const SidebarContent = React.memo(({ onClose }: SidebarContentProps) => {
       <Link
         aria-current={pathname === "/overview" ? "page" : undefined}
         className={cn(
-          "flex items-center gap-3 px-4 rounded-xl transition-all duration-200 min-h-10",
-          "no-underline w-full mb-2",
+          "flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200",
+          "no-underline w-full group",
           pathname === "/overview"
-            ? "bg-primary/20 text-primary font-medium"
-            : "text-default-900 hover:text-default-900 hover:bg-default-200"
+            ? "bg-primary/20 text-primary font-semibold"
+            : "text-default-600 hover:text-foreground hover:bg-default-200/70"
         )}
         href="/overview"
         prefetch={true}
@@ -82,10 +83,12 @@ const SidebarContent = React.memo(({ onClose }: SidebarContentProps) => {
         <Icon
           aria-hidden
           className={cn(
-            "shrink-0 transition-colors w-5 h-5",
-            pathname === "/overview" && "text-primary"
+            "shrink-0 transition-all w-5 h-5",
+            pathname === "/overview"
+              ? "text-primary"
+              : "text-default-500 group-hover:text-foreground"
           )}
-          icon="solar:home-2-linear"
+          icon="solar:home-2-bold-duotone"
         />
         <span className="text-sm font-medium truncate">Overview</span>
       </Link>
@@ -116,10 +119,10 @@ const SidebarContent = React.memo(({ onClose }: SidebarContentProps) => {
   return (
     <div className={containerClasses}>
       {/* Logo and Close Button */}
-      <div className="mb-4">{logoSection}</div>
+      <div className="mb-5">{logoSection}</div>
 
       {/* Overview Item */}
-      <div className="mb-2 px-1">{overviewItem}</div>
+      <div className="mb-3 px-1">{overviewItem}</div>
 
       {/* Main Navigation */}
       <div className="flex-1 min-h-0">
@@ -129,7 +132,9 @@ const SidebarContent = React.memo(({ onClose }: SidebarContentProps) => {
       </div>
 
       {/* Footer Items */}
-      <div className="mt-auto pt-4 px-1">{footerItemsContent}</div>
+      <div className="mt-auto pt-5 px-1 border-t border-default-200">
+        {footerItemsContent}
+      </div>
     </div>
   );
 });

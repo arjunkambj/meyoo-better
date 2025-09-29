@@ -6,12 +6,12 @@ export default function MarketingIntegrationsPage() {
   return (
     <>
       {/* Header */}
-      <div className="mb-12 text-center lg:text-left">
-        <h1 className="text-3xl lg:text-4xl font-bold text-default-900 mb-3">
+      <div className="mb-8 text-center lg:text-left">
+        <h1 className="text-2xl lg:text-3xl font-bold text-default-900 mb-3">
           Connect Your Marketing Channels
         </h1>
-        <p className="text-lg text-default-600">
-          Optional: Connect your advertising platforms
+        <p className="text-base text-default-600">
+          Connect your advertising platforms to track ROAS and campaign performance
         </p>
       </div>
 

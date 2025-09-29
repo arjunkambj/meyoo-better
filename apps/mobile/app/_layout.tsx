@@ -5,7 +5,7 @@ import { Stack } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import "@/styles/global.css";
-import { HeroUINativeProvider } from "heroui-native";
+import { AppThemeProvider } from "@/contexts/theme-context";
 
 const convex = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL!, {
   unsavedChangesWarning: false,
@@ -28,21 +28,13 @@ export default function RootLayout() {
       }
     >
       <SafeAreaProvider>
-        <HeroUINativeProvider
-          config={{
-            colorScheme: "system",
-            textProps: {
-              allowFontScaling: false,
-            },
-          }}
-        >
+        <AppThemeProvider>
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="index" />
             <Stack.Screen name="onboarding" />
-            <Stack.Screen name="auth" />
             <Stack.Screen name="(tabs)" />
           </Stack>
-        </HeroUINativeProvider>
+        </AppThemeProvider>
       </SafeAreaProvider>
     </ConvexAuthProvider>
   );

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
-import { Button, Chip, Divider } from 'heroui-native';
+import { Button, useTheme } from 'heroui-native';
+import { Ionicons } from '@expo/vector-icons';
 
 import {
   type AgentThread,
@@ -12,25 +13,6 @@ import {
 import { AgentChatComposer } from './AgentChatComposer';
 import { AgentMessageFeed } from './AgentMessageFeed';
 import { AgentThreadList } from './AgentThreadList';
-import { AgentTipCarousel, type AgentTip } from './AgentTipCarousel';
-
-const AGENT_TIPS: AgentTip[] = [
-  {
-    title: 'Meyoo Agent knows your workspace',
-    description:
-      'Ask about Shopify imports, marketing syncs, and data issues. Threads persist across devices.',
-  },
-  {
-    title: 'Use threads to keep topics tidy',
-    description:
-      'Start a new chat for each workflow so you can revisit previous answers without losing context.',
-  },
-  {
-    title: 'Coming soon: on-device actions',
-    description:
-      'Mobile will soon support retrying syncs and scheduling follow-ups directly from the assistant.',
-  },
-];
 
 const keyboardOffset = Platform.select({ ios: 96, android: 0, default: 0 });
 
@@ -39,6 +21,7 @@ export function AgentPanel() {
   const [activeThreadId, setActiveThreadId] = useState<string | undefined>(undefined);
   const [inputValue, setInputValue] = useState('');
   const [localMessages, setLocalMessages] = useState<AgentUIMessage[]>([]);
+  const { colors } = useTheme();
 
   const {
     threads,
@@ -67,6 +50,11 @@ export function AgentPanel() {
     }
     return localMessages;
   }, [messages, localMessages]);
+
+  const activeThread = useMemo(() => {
+    if (!activeThreadId || !threads) return null;
+    return threads.find(t => t.threadId === activeThreadId);
+  }, [activeThreadId, threads]);
 
   useEffect(() => {
     if (localMessages.length > 0 && (messages?.length ?? 0) > 0) {
@@ -183,41 +171,37 @@ export function AgentPanel() {
   }, [loadMoreMessages]);
 
   return (
-    <View className="flex-1 gap-6">
-      <View className="gap-3">
-        <View className="flex-row items-center justify-between">
-          <View>
-            <Text className="text-xs font-semibold uppercase tracking-[0.2em] text-default-500">
-              Meyoo Agent
-            </Text>
-            <Text className="text-2xl font-semibold text-foreground">
-              Ask questions, review syncs, and plan next steps.
-            </Text>
-          </View>
-          <Button
-            size="sm"
-            variant="secondary"
-            className="rounded-lg"
-            onPress={() => setViewMode(viewMode === 'chat' ? 'history' : 'chat')}
-          >
-            {viewMode === 'chat' ? 'History' : 'Back'}
-          </Button>
-        </View>
-        <Text className="text-sm leading-5 text-default-500">
-          Threads sync with the web dashboard so you can start a conversation here and finish it on desktop.
-        </Text>
-      </View>
-
-      <AgentTipCarousel tips={AGENT_TIPS} />
-
+    <View className="flex-1 bg-background">
       {viewMode === 'history' ? (
-        <View className="flex-1 rounded-3xl border border-default-100 bg-content1 p-4 gap-3">
-          <View className="flex-row items-center justify-between mb-1">
-            <Text className="text-sm font-semibold text-default-600">Conversations</Text>
-            <Button size="sm" variant="secondary" className="rounded-lg" onPress={startNewThread}>
-              New chat
+        <View className="flex-1">
+          {/* History Header */}
+          <View className="flex-row items-center justify-between px-4 py-3 border-b border-border/40 bg-surface-2">
+            <View className="flex-row items-center gap-3">
+              <Button
+                size="sm"
+                variant="ghost"
+                isIconOnly
+                onPress={() => setViewMode('chat')}
+                className="h-9 w-9"
+              >
+                <Ionicons name="arrow-back" size={20} color={colors.foreground} />
+              </Button>
+              <Text className="text-lg font-semibold text-foreground">Conversations</Text>
+            </View>
+            <Button
+              size="sm"
+              variant="primary"
+              className="rounded-full h-9"
+              onPress={startNewThread}
+            >
+              <Button.StartContent>
+                <Ionicons name="add" size={18} color={colors.accentForeground} />
+              </Button.StartContent>
+              <Button.LabelContent>New</Button.LabelContent>
             </Button>
           </View>
+
+          {/* Thread List */}
           <AgentThreadList
             threads={threads}
             isLoading={isLoadingThreads}
@@ -231,19 +215,44 @@ export function AgentPanel() {
           />
         </View>
       ) : (
-        <View className="flex-1 rounded-3xl border border-default-100 bg-content1">
-          <View className="flex-row items-center justify-between px-4 py-3">
-            <Text className="text-sm font-semibold text-default-600">
-              {activeThreadId ? 'Conversation' : 'New conversation'}
-            </Text>
-            <Chip size="sm" className="rounded-full">
-              {isLoadingMessages
-                ? 'Syncing'
-                : `${displayedMessages.length} message${displayedMessages.length === 1 ? '' : 's'}`}
-            </Chip>
+        <View className="flex-1">
+          {/* Chat Header */}
+          <View className="flex-row items-center justify-between px-4 py-3 border-b border-border/40 bg-surface-2">
+            <View className="flex-1">
+              <Text className="text-base font-semibold text-foreground" numberOfLines={1}>
+                {activeThread?.title || 'New Chat'}
+              </Text>
+              {displayedMessages.length > 0 && (
+                <Text className="text-xs text-default-500">
+                  {displayedMessages.length} {displayedMessages.length === 1 ? 'message' : 'messages'}
+                </Text>
+              )}
+            </View>
+            <View className="flex-row gap-2">
+              {activeThreadId && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  isIconOnly
+                  onPress={startNewThread}
+                  className="h-9 w-9"
+                >
+                  <Ionicons name="create-outline" size={20} color={colors.foreground} />
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="ghost"
+                isIconOnly
+                onPress={() => setViewMode('history')}
+                className="h-9 w-9"
+              >
+                <Ionicons name="time-outline" size={20} color={colors.foreground} />
+              </Button>
+            </View>
           </View>
-          <Divider className="opacity-60" />
 
+          {/* Messages */}
           <AgentMessageFeed
             onScrollViewReady={handleScrollViewReady}
             messages={displayedMessages}
@@ -254,11 +263,12 @@ export function AgentPanel() {
             onLoadMore={canLoadMoreMessages ? handleLoadMoreMessages : undefined}
           />
 
+          {/* Input */}
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             keyboardVerticalOffset={keyboardOffset}
           >
-            <View className="px-4 pb-5">
+            <View className="px-4 pb-4 pt-3 border-t border-border/40 bg-surface-2">
               <AgentChatComposer
                 value={inputValue}
                 onChange={setInputValue}

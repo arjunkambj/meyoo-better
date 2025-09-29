@@ -8,11 +8,7 @@ import {
   responseValidator,
   type AnalyticsResponse,
 } from "./analyticsShared";
-import {
-  type AnalyticsSourceKey,
-  type DateRange,
-  validateDateRange,
-} from "../utils/analyticsSource";
+import { type AnalyticsSourceKey, validateDateRange } from "../utils/analyticsSource";
 import { getUserAndOrg } from "../utils/auth";
 import { computeOrdersAnalytics } from "../utils/analyticsAggregations";
 import type { OrdersAnalyticsResult } from "@repo/types";

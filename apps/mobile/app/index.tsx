@@ -1,38 +1,37 @@
-import { View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { Button } from "heroui-native";
 import { useRouter } from "expo-router";
+import { Button } from "heroui-native";
+import { View } from "react-native";
+
+import { AuthLayout } from "@/components/auth/AuthLayout";
+import { AuthForm } from "@/components/auth/AuthForm";
 
 export default function Index() {
   const router = useRouter();
 
   return (
-    <SafeAreaView className="flex-1 bg-background">
-      <View className="flex-1 items-center justify-center bg-background px-6">
-        <View className="w-full max-w-sm gap-4">
-          <Button
-            className="h-12"
-            variant="primary"
-            onPress={() => router.push("/(tabs)/overview")}
-          >
-            Go to Dashboard
-          </Button>
-          <Button
-            className="h-12"
-            variant="secondary"
-            onPress={() => router.push("/auth")}
-          >
-            Go to Auth
-          </Button>
+    <AuthLayout
+      title="Welcome to Meyoo"
+      subtitle="Manage your store, marketing, and insights from one clean workspace."
+      footer={
+        <View className="gap-3">
           <Button
             className="h-12"
             variant="secondary"
             onPress={() => router.push("/onboarding")}
           >
-            Go to Onboarding
+            Go to onboarding
+          </Button>
+          <Button
+            className="h-12"
+            variant="secondary"
+            onPress={() => router.push("/(tabs)/overview")}
+          >
+            Explore dashboard first
           </Button>
         </View>
-      </View>
-    </SafeAreaView>
+      }
+    >
+      <AuthForm onSuccess={() => router.replace("/(tabs)/overview")} />
+    </AuthLayout>
   );
 }

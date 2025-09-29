@@ -1,87 +1,129 @@
-import { Button, Chip } from "heroui-native";
+import { Button, Card, Chip, useTheme } from "heroui-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { ScrollView, Text, View } from "react-native";
+import { View, Text } from "react-native";
+import Animated, { FadeInDown, FadeIn, ZoomIn } from "react-native-reanimated";
+import { Ionicons } from "@expo/vector-icons";
 
-const PLACEHOLDER_FEATURES = [
-  {
-    title: "Guided checklists",
-    description:
-      "Track progress for Shopify, marketing, and finance tasks without leaving the mobile dashboard.",
-  },
-  {
-    title: "Status at a glance",
-    description:
-      "See which integrations are connected and what still needs your attention from any device.",
-  },
-  {
-    title: "Finish on desktop",
-    description:
-      "Complete detailed setup on the web today and pick up the same flow here once it ships.",
-  },
+const FEATURES = [
+  { icon: "flash-outline", label: "Fast insights" },
+  { icon: "sync-outline", label: "Real-time sync" },
+  { icon: "phone-portrait-outline", label: "Mobile optimized" },
 ];
 
 export default function OnboardingScreen() {
   const router = useRouter();
+  const { colors } = useTheme();
 
   return (
     <SafeAreaView className="flex-1 bg-background">
-      <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
-        <View className="flex-1 gap-8 px-6 py-12">
-          <View className="gap-4 rounded-3xl border border-primary/20 bg-primary-500/10 p-6">
+      {/* Gradient Background Effect */}
+      <View className="absolute inset-0">
+        <View
+          className="h-80 rounded-b-[80px]"
+          style={{
+            backgroundColor: colors.accentSoft || colors.accent,
+            opacity: 0.08
+          }}
+        />
+      </View>
+
+      <View className="flex-1 px-6 py-12 justify-center">
+        <Animated.View
+          entering={FadeIn.duration(600)}
+          className="gap-8"
+        >
+          {/* Top Badge */}
+          <Animated.View
+            entering={FadeInDown.duration(400).delay(100)}
+            className="items-center"
+          >
             <Chip
-              className="self-start rounded-full border border-primary/30 bg-primary-500/10 text-primary"
-              color="accent"
               size="sm"
+              className="bg-accent/10 border border-accent/20"
             >
-              Mobile preview
+              <Text className="text-xs font-semibold text-accent">Mobile Experience</Text>
             </Chip>
-            <View className="gap-2">
-              <Text className="text-3xl font-bold text-foreground leading-tight">
-                Onboarding is landing on mobile soon
-              </Text>
-              <Text className="text-base leading-6 text-default-500">
-                We’re polishing the guided setup for phones. For now, keep using
-                the web experience to connect Shopify, billing, and marketing
-                tools.
-              </Text>
-            </View>
-          </View>
+          </Animated.View>
 
-          <View className="gap-4">
-            {PLACEHOLDER_FEATURES.map((feature) => (
-              <View
-                key={feature.title}
-                className="gap-2 rounded-2xl border border-default-100/70 bg-default-100/40 p-5"
-              >
-                <Text className="text-lg font-semibold text-foreground">
-                  {feature.title}
-                </Text>
-                <Text className="text-sm leading-6 text-default-500">
-                  {feature.description}
-                </Text>
+          {/* Main Card */}
+          <Animated.View entering={FadeInDown.duration(500).delay(200)}>
+            <Card surfaceVariant="2" className="rounded-3xl border border-border/50">
+              <View className="gap-6 items-center p-6">
+                {/* Icon with Gradient Border */}
+                <Animated.View
+                  entering={ZoomIn.duration(600).delay(400)}
+                  className="relative"
+                >
+                  <View className="absolute inset-0 rounded-full bg-accent/5 blur-xl" />
+                  <View className="w-20 h-20 rounded-full bg-gradient-to-br from-accent/20 to-accent/10 items-center justify-center border-2 border-accent/30">
+                    <Ionicons
+                      name="desktop-outline"
+                      size={40}
+                      color={colors.accent}
+                    />
+                  </View>
+                </Animated.View>
+
+                {/* Text Content */}
+                <Animated.View
+                  entering={FadeInDown.duration(500).delay(500)}
+                  className="gap-3 items-center"
+                >
+                  <Card.Title className="text-3xl text-center font-semibold">
+                    Complete setup on web
+                  </Card.Title>
+                  <Card.Description className="text-base text-center max-w-xs leading-6">
+                    Full onboarding experience available on desktop
+                  </Card.Description>
+                </Animated.View>
               </View>
-            ))}
-          </View>
+            </Card>
+          </Animated.View>
 
-          <View className="mt-auto gap-4">
+          {/* Feature Pills */}
+          <Animated.View
+            entering={FadeInDown.duration(500).delay(600)}
+            className="flex-row justify-center gap-3 flex-wrap"
+          >
+            {FEATURES.map((feature, index) => (
+              <Animated.View
+                key={feature.label}
+                entering={FadeInDown.duration(400).delay(700 + index * 100)}
+              >
+                <View className="flex-row items-center gap-2 px-4 py-2 rounded-full bg-surface-2 border border-border/30">
+                  <Ionicons name={feature.icon as any} size={16} color={colors.accent} />
+                  <Text className="text-xs font-medium text-default-500">{feature.label}</Text>
+                </View>
+              </Animated.View>
+            ))}
+          </Animated.View>
+
+          {/* Action Buttons */}
+          <Animated.View
+            entering={FadeInDown.duration(500).delay(800)}
+            className="gap-3"
+          >
             <Button
               className="h-12"
               variant="primary"
               onPress={() => router.replace("/(tabs)/overview")}
             >
-              Jump to the dashboard
+              <Button.LabelContent>Jump to dashboard</Button.LabelContent>
+              <Button.EndContent>
+                <Ionicons name="arrow-forward" size={18} color={colors.accentForeground} />
+              </Button.EndContent>
             </Button>
             <Button
               className="h-12"
-              variant="secondary"
-              onPress={() => router.push("/auth")}
+              variant="ghost"
+              onPress={() => router.push("/")}
             >
-              Switch account or sign in later
+              Back to sign in
             </Button>
-          </View>
-        </View>
-      </ScrollView>
+          </Animated.View>
+        </Animated.View>
+      </View>
     </SafeAreaView>
   );
 }

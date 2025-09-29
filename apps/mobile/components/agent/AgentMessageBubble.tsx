@@ -1,17 +1,13 @@
 import { memo, type JSX } from 'react';
 import { Text, View } from 'react-native';
+import { useTheme } from 'heroui-native';
+import { Ionicons } from '@expo/vector-icons';
 
 import type { AgentUIMessage } from '@/hooks/useAgent';
 
 type AgentMessageBubbleProps = {
   message: AgentUIMessage;
   isLocal?: boolean;
-};
-
-const roleStyles: Record<AgentUIMessage['role'], string> = {
-  user: 'bg-primary-500 text-white self-end',
-  assistant: 'bg-default-100 text-default-800 self-start',
-  system: 'bg-warning-100 text-warning-900 self-start',
 };
 
 const messagePartsToText = (message: AgentUIMessage): string => {
@@ -51,13 +47,46 @@ const messagePartsToText = (message: AgentUIMessage): string => {
 };
 
 function AgentMessageBubbleComponent({ message, isLocal = false }: AgentMessageBubbleProps) {
+  const { colors } = useTheme();
   const isThinking = message.text === '__thinking__';
-  const bubbleClasses = roleStyles[message.role] ?? roleStyles.assistant;
   const content = isThinking ? 'Thinking...' : messagePartsToText(message) || '...';
+  const isUser = message.role === 'user';
 
   return (
-    <View className={`max-w-[85%] rounded-3xl px-4 py-3 ${bubbleClasses}`}>
-      <Text className={`text-sm leading-5 ${isLocal ? 'opacity-90' : ''}`}>{content}</Text>
+    <View className={`flex-row ${isUser ? 'justify-end' : 'justify-start'} mb-3`}>
+      {!isUser && (
+        <View className="h-8 w-8 rounded-full bg-accent/10 items-center justify-center mr-2 mt-0.5">
+          <Ionicons name="sparkles" size={14} color={colors.accent} />
+        </View>
+      )}
+      <View
+        className={`max-w-[75%] rounded-2xl px-4 py-3 ${
+          isUser
+            ? 'bg-accent rounded-tr-sm'
+            : 'bg-surface-3 rounded-tl-sm'
+        }`}
+        style={isLocal ? { opacity: 0.85 } : undefined}
+      >
+        {isThinking ? (
+          <View className="flex-row items-center gap-2">
+            <Ionicons name="ellipsis-horizontal" size={16} color={colors.defaultForeground} />
+            <Text className="text-sm text-default-500">Thinking...</Text>
+          </View>
+        ) : (
+          <Text
+            className={`text-sm leading-6 ${
+              isUser ? 'text-accent-foreground' : 'text-foreground'
+            }`}
+          >
+            {content}
+          </Text>
+        )}
+      </View>
+      {isUser && (
+        <View className="h-8 w-8 rounded-full bg-accent/20 items-center justify-center ml-2 mt-0.5">
+          <Ionicons name="person" size={14} color={colors.accent} />
+        </View>
+      )}
     </View>
   );
 }

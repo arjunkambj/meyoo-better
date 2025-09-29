@@ -1,229 +1,218 @@
-import { Button, Card, Chip, FormField, Skeleton, Switch } from 'heroui-native';
+import {
+  Button,
+  Card,
+  Chip,
+  Divider,
+  Skeleton,
+  useTheme,
+} from 'heroui-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ScrollView, Text, View } from 'react-native';
-import { useMemo, useState, useCallback } from 'react';
+import { ScrollView, Text, View, Alert, Pressable, Platform } from 'react-native';
+import { useCallback, useMemo } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthActions } from '@convex-dev/auth/react';
 import { useRouter } from 'expo-router';
+import Animated, { FadeOut, ZoomIn } from 'react-native-reanimated';
+import { BlurView } from 'expo-blur';
 
 import { useUserDetails } from '@/hooks/useUserDetails';
 
 export default function SettingsTab() {
-  const { billing, billingUsage, isLoading } = useUserDetails();
+  const { billing, billingUsage, isLoading, user } = useUserDetails();
   const { signOut } = useAuthActions();
   const router = useRouter();
-  const [darkModeEnabled, setDarkModeEnabled] = useState(false);
+  const { colors, theme, toggleTheme } = useTheme();
 
   const plan = billingUsage?.plan ?? billing?.plan ?? 'free';
-  const billingCopy = useMemo(() => {
-    if (!billing) {
-      return 'You are on the default free plan.';
+
+  const planLabel = useMemo(() => {
+    if (!plan) return 'Free Plan';
+    const normalized = plan.charAt(0).toUpperCase() + plan.slice(1);
+    return normalized.replace(/-/g, ' ');
+  }, [plan]);
+
+  const typedUser = user as
+    | {
+        name?: string | null;
+        email?: string | null;
+        storeName?: string | null;
+      }
+    | null;
+
+  const displayName = useMemo(() => {
+    if (!typedUser) return 'Meyoo Merchant';
+    if (typedUser.name && typedUser.name.trim().length > 0) {
+      return typedUser.name;
     }
-
-    const cycle = billing.billingCycle ? `${billing.billingCycle} billing` : null;
-    const status = billing.status ? `Status: ${billing.status}` : null;
-    return [cycle, status].filter(Boolean).join(' · ');
-  }, [billing]);
-
-  const usageDetails = useMemo(() => {
-    if (!billingUsage) {
-      return null;
-    }
-
-    const safePercentage = Math.round(billingUsage.percentage);
-    const boundedPercentage = Number.isFinite(safePercentage)
-      ? Math.max(0, Math.min(100, safePercentage))
-      : 0;
-
-    const barColor =
-      boundedPercentage >= 95
-        ? 'bg-danger-500'
-        : boundedPercentage >= 80
-          ? 'bg-warning-500'
-          : 'bg-primary-500';
-
-    return {
-      percentage: boundedPercentage,
-      labelPercentage: `${boundedPercentage}%`,
-      currentUsage: billingUsage.currentUsage,
-      limit: billingUsage.limit,
-      requiresUpgrade: billingUsage.requiresUpgrade,
-      barColor,
-      isOnTrial: billingUsage.isOnTrial,
-      daysLeftInTrial: billingUsage.daysLeftInTrial,
-    };
-  }, [billingUsage]);
-
-  const formatUsageValue = useCallback((value: number) => {
-    return Number.isFinite(value) ? value.toLocaleString() : '0';
-  }, []);
+    return typedUser.email ?? 'Meyoo Merchant';
+  }, [typedUser]);
 
   const handleSignOut = useCallback(async () => {
-    await signOut();
-    router.replace('/auth');
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Sign Out',
+          style: 'destructive',
+          onPress: async () => {
+            await signOut();
+            router.replace('/');
+          },
+        },
+      ]
+    );
   }, [signOut, router]);
 
   return (
     <SafeAreaView className="flex-1 bg-background">
-      <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
-        <View className="flex-1 gap-6 px-4 py-6">
-          <View className="gap-2 px-2">
-            <Text className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
+      <BlurView
+        intensity={Platform.OS === 'ios' ? 80 : 100}
+        tint={theme === 'dark' ? 'dark' : 'light'}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 10,
+        }}
+      >
+        <View className="flex-row items-center justify-between px-6 pb-4 pt-2">
+          <View className="flex-1 gap-1">
+            <Text className="text-2xl font-semibold text-foreground">
               Settings
             </Text>
-            <Text className="text-2xl font-bold text-foreground">
-              Account & Preferences
-            </Text>
-            <Text className="text-sm text-default-500">
-              Manage your account settings and app preferences
+            <Text className="text-xs text-default-500">
+              Manage your account and preferences
             </Text>
           </View>
+          <Pressable onPress={toggleTheme} className="px-2">
+            {theme === 'light' ? (
+              <Animated.View key="moon" entering={ZoomIn} exiting={FadeOut}>
+                <Ionicons name="moon" color={colors.foreground} size={24} />
+              </Animated.View>
+            ) : (
+              <Animated.View key="sun" entering={ZoomIn} exiting={FadeOut}>
+                <Ionicons name="sunny" color={colors.foreground} size={24} />
+              </Animated.View>
+            )}
+          </Pressable>
+        </View>
+      </BlurView>
+
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: 32 }}
+        showsVerticalScrollIndicator={false}
+      >
+        <View className="gap-6 px-6 pt-24">
 
           {isLoading ? (
             <View className="gap-4">
-              <Skeleton className="h-32 rounded-3xl" />
               <Skeleton className="h-28 rounded-3xl" />
               <Skeleton className="h-40 rounded-3xl" />
+              <Skeleton className="h-52 rounded-3xl" />
             </View>
           ) : (
-            <View className="gap-4">
-              {/* Subscription Card */}
-              <Card surfaceVariant="2">
-                <Card.Header>
-                  <View className="flex-row items-center gap-2">
-                    <Ionicons name="card-outline" size={20} color="#666" />
-                    <Text className="text-sm font-semibold uppercase text-default-600">
-                      Subscription
-                    </Text>
-                  </View>
-                </Card.Header>
-                <Card.Body>
-                  <View className="gap-4">
-                    <View className="flex-row items-center justify-between">
-                      <View className="flex-row items-center gap-2">
-                        <Chip
-                          size="md"
-                          color={plan === 'free' ? 'default' : 'accent'}
-                          className="rounded-full"
-                        >
-                          <Text className="text-xs font-bold uppercase tracking-wider">
-                            {plan === 'free' ? 'Free Plan' : plan}
-                          </Text>
-                        </Chip>
-                        {plan !== 'free' && (
-                          <Ionicons name="checkmark-circle" size={18} color="#10b981" />
-                        )}
-                      </View>
+            <View className="gap-4 pb-10">
+              {/* User Profile Card */}
+              <Card surfaceVariant="2" className="rounded-3xl border border-border/40">
+                <Card.Body className="p-4">
+                  <View className="flex-row items-center gap-3">
+                    <View className="h-12 w-12 items-center justify-center rounded-full bg-accent/10">
+                      <Ionicons
+                        name="person"
+                        size={22}
+                        color={colors.accent}
+                      />
                     </View>
-
-                    {plan === 'free' ? (
-                      <View className="gap-2">
-                        <Text className="text-sm font-medium text-foreground">
-                          You&apos;re on the free plan
+                    <View className="flex-1 gap-1">
+                      <Text className="text-lg font-semibold text-foreground">
+                        {displayName}
+                      </Text>
+                      <Text className="text-sm text-default-500">
+                        {typedUser?.email ?? 'No email'}
+                      </Text>
+                      {typedUser?.storeName ? (
+                        <Text className="text-xs text-default-400">
+                          {typedUser.storeName}
                         </Text>
-                        <Text className="text-xs text-default-500">
-                          Upgrade to unlock advanced features and analytics
-                        </Text>
-                      </View>
-                    ) : (
-                      <View className="gap-2">
-                        <Text className="text-sm font-medium text-foreground">
-                          {billingCopy}
-                        </Text>
-                      </View>
-                    )}
-
-                    {usageDetails && (
-                      <View className="gap-2">
-                        <View className="flex-row items-center justify-between">
-                          <Text className="text-xs font-medium text-default-500">
-                            Monthly usage
-                          </Text>
-                          <Text className="text-xs font-semibold text-foreground">
-                            {formatUsageValue(usageDetails.currentUsage)} /{' '}
-                            {formatUsageValue(usageDetails.limit)} orders
-                          </Text>
-                        </View>
-                        <View className="h-2 rounded-full bg-default-100 overflow-hidden">
-                          <View
-                            className={`h-full rounded-full ${usageDetails.barColor}`}
-                            style={{ width: `${usageDetails.percentage}%` }}
-                          />
-                        </View>
-                        <View className="flex-row items-center justify-between">
-                          <Text className="text-xs text-default-500">
-                            {usageDetails.labelPercentage} of plan
-                          </Text>
-                          {usageDetails.isOnTrial && usageDetails.daysLeftInTrial > 0 ? (
-                            <Text className="text-xs font-medium text-warning-500">
-                              Trial ends in {usageDetails.daysLeftInTrial} days
-                            </Text>
-                          ) : null}
-                        </View>
-                        {usageDetails.requiresUpgrade ? (
-                          <Text className="text-xs font-medium text-warning-500">
-                            {"You're nearing your plan limit. Upgrade to avoid service interruptions."}
-                          </Text>
-                        ) : null}
-                      </View>
-                    )}
+                      ) : null}
+                    </View>
                   </View>
                 </Card.Body>
-                <Card.Footer className="gap-2">
-                  {plan === 'free' ? (
-                    <Button variant="primary" size="sm" className="flex-1">
-                      <Button.StartContent>
-                        <Ionicons name="rocket-outline" size={16} color="white" />
-                      </Button.StartContent>
-                      <Button.LabelContent>Upgrade Plan</Button.LabelContent>
-                    </Button>
-                  ) : (
-                    <Button variant="secondary" size="sm" className="flex-1">
-                      <Button.StartContent>
-                        <Ionicons name="settings-outline" size={16} />
-                      </Button.StartContent>
-                      <Button.LabelContent>Manage Subscription</Button.LabelContent>
-                    </Button>
-                  )}
-                </Card.Footer>
               </Card>
 
-              {/* Preferences Card */}
-              <Card surfaceVariant="1">
-                <Card.Header>
-                  <View className="flex-row items-center gap-2">
-                    <Ionicons name="settings-outline" size={20} color="#666" />
-                    <Text className="text-sm font-semibold uppercase text-default-600">
-                      Preferences
-                    </Text>
+              {/* Plan Card */}
+              <Card surfaceVariant="2" className="rounded-3xl border border-border/40">
+                <Card.Body className="gap-4 p-4">
+                  <View className="flex-row items-center gap-3">
+                    <View className="h-12 w-12 items-center justify-center rounded-full bg-accent/10">
+                      <Ionicons
+                        name="star"
+                        size={20}
+                        color={colors.accent}
+                      />
+                    </View>
+                    <View className="flex-1 gap-1">
+                      <Text className="text-xs font-semibold uppercase tracking-wider text-default-500">
+                        Current Plan
+                      </Text>
+                      <Text className="text-xl font-semibold text-foreground">
+                        {planLabel}
+                      </Text>
+                    </View>
+                    <Chip
+                      size="sm"
+                      color={plan === 'free' ? 'default' : 'accent'}
+                      className="rounded-full"
+                    >
+                      <Text className="text-xs font-semibold uppercase">
+                        {plan === 'free' ? 'Free' : 'Pro'}
+                      </Text>
+                    </Chip>
                   </View>
-                </Card.Header>
-                <Card.Body>
-                  <FormField isSelected={darkModeEnabled} onSelectedChange={setDarkModeEnabled}>
-                    <FormField.Content>
-                      <FormField.Title>Dark Mode</FormField.Title>
-                      <FormField.Description>
-                        Use dark theme (follows system setting)
-                      </FormField.Description>
-                    </FormField.Content>
-                    <FormField.Indicator>
-                      <Switch isSelected={darkModeEnabled} onSelectedChange={setDarkModeEnabled}>
-                        <Switch.Thumb />
-                      </Switch>
-                    </FormField.Indicator>
-                  </FormField>
+
+                  {billingUsage && (
+                    <>
+                      <Divider className="bg-divider/60" />
+                      <View className="gap-2">
+                        <View className="flex-row items-center justify-between">
+                          <Text className="text-xs text-default-500">
+                            Monthly usage
+                          </Text>
+                          <Text className="text-sm font-medium text-foreground">
+                            {billingUsage.currentUsage?.toLocaleString() ?? 0} / {billingUsage.limit?.toLocaleString() ?? 0}
+                          </Text>
+                        </View>
+                        <View className="h-2 overflow-hidden rounded-full bg-surface-3">
+                          <View
+                            className="h-full rounded-full bg-accent"
+                            style={{
+                              width: `${Math.min(100, billingUsage.percentage ?? 0)}%`,
+                            }}
+                          />
+                        </View>
+                      </View>
+                    </>
+                  )}
                 </Card.Body>
               </Card>
 
               {/* Sign Out Button */}
-              <View className="mt-6 mb-4">
-                <Button variant="danger" size="lg" onPress={handleSignOut} className="h-12">
-                  <Button.StartContent>
-                    <Ionicons name="log-out-outline" size={20} color="white" />
-                  </Button.StartContent>
-                  <Button.LabelContent>Sign Out</Button.LabelContent>
-                </Button>
-              </View>
+              <Button
+                variant="danger"
+                size="lg"
+                onPress={handleSignOut}
+                className="h-14 rounded-2xl"
+              >
+                <Button.StartContent>
+                  <Ionicons name="log-out" size={22} color={colors.dangerForeground} />
+                </Button.StartContent>
+                <Button.LabelContent classNames={{ text: 'font-semibold' }}>
+                  Sign Out
+                </Button.LabelContent>
+              </Button>
             </View>
           )}
         </View>

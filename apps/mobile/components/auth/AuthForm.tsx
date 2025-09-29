@@ -1,5 +1,5 @@
 import { useAuthActions } from '@convex-dev/auth/react';
-import { Button, ErrorView, TextField } from 'heroui-native';
+import { Button, ErrorView, TextField, useTheme } from 'heroui-native';
 import { useState } from 'react';
 import { View, Text, KeyboardAvoidingView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,6 +13,7 @@ interface AuthFormProps {
 
 export function AuthForm({ onSuccess }: AuthFormProps) {
   const { signIn } = useAuthActions();
+  const { colors } = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -69,46 +70,51 @@ export function AuthForm({ onSuccess }: AuthFormProps) {
     }
   };
 
+  const iconColor = colors.defaultForeground ?? colors.default ?? '#999999';
+  const accentTint = colors.accent ?? '#6366f1';
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       className="flex-1"
     >
-      <View className="gap-6">
-        {/* Social Auth Buttons */}
+      <View className="gap-7">
         <View className="gap-3">
-          <GoogleAuthButton onSuccess={onSuccess} />
-          <AppleAuthButton onSuccess={onSuccess} />
+          <Text className="text-[11px] font-semibold uppercase tracking-[0.25em] text-default-500">
+            Quick start
+          </Text>
+          <View className="gap-3">
+            <GoogleAuthButton onSuccess={onSuccess} />
+            <AppleAuthButton onSuccess={onSuccess} />
+          </View>
         </View>
 
-        {/* Divider */}
         <AuthDivider />
 
-        {/* Email/Password Form */}
         <View className="gap-4">
-          <Text className="text-sm uppercase tracking-wide text-default-500">
-            {isNewUser ? 'Create account with email' : 'Sign in with email'}
+          <Text className="text-[11px] font-semibold uppercase tracking-[0.25em] text-default-500">
+            {isNewUser ? 'Create account' : 'Email & password'}
           </Text>
 
-          {isNewUser && (
+          {isNewUser ? (
             <TextField isRequired>
-              <TextField.Label>Name</TextField.Label>
+              <TextField.Label>Full name</TextField.Label>
               <TextField.Input
                 autoCapitalize="words"
                 onChangeText={setName}
-                placeholder="John Doe"
+                placeholder="Jordan Meyers"
                 returnKeyType="next"
                 value={name}
               >
                 <TextField.InputStartContent>
-                  <Ionicons name="person-outline" size={16} color="#999" />
+                  <Ionicons name="person-outline" size={18} color={iconColor} />
                 </TextField.InputStartContent>
               </TextField.Input>
             </TextField>
-          )}
+          ) : null}
 
           <TextField isRequired>
-            <TextField.Label>Email</TextField.Label>
+            <TextField.Label>Email address</TextField.Label>
             <TextField.Input
               autoCapitalize="none"
               autoComplete="email"
@@ -119,7 +125,7 @@ export function AuthForm({ onSuccess }: AuthFormProps) {
               value={email}
             >
               <TextField.InputStartContent>
-                <Ionicons name="mail-outline" size={16} color="#999" />
+                <Ionicons name="mail-outline" size={18} color={iconColor} />
               </TextField.InputStartContent>
             </TextField.Input>
           </TextField>
@@ -129,13 +135,13 @@ export function AuthForm({ onSuccess }: AuthFormProps) {
             <TextField.Input
               autoCapitalize="none"
               onChangeText={setPassword}
-              placeholder={isNewUser ? "Create a password" : "Enter password"}
+              placeholder={isNewUser ? 'Create a password' : 'Enter password'}
               returnKeyType="done"
               secureTextEntry={!showPassword}
               value={password}
             >
               <TextField.InputStartContent>
-                <Ionicons name="lock-closed-outline" size={16} color="#999" />
+                <Ionicons name="lock-closed-outline" size={18} color={iconColor} />
               </TextField.InputStartContent>
               <TextField.InputEndContent>
                 <Button
@@ -145,23 +151,22 @@ export function AuthForm({ onSuccess }: AuthFormProps) {
                   onPress={() => setShowPassword(!showPassword)}
                 >
                   <Ionicons
-                    name={showPassword ? "eye-off-outline" : "eye-outline"}
-                    size={16}
-                    color="#999"
+                    name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                    size={18}
+                    color={accentTint}
                   />
                 </Button>
               </TextField.InputEndContent>
             </TextField.Input>
-            {isNewUser && (
+            {isNewUser ? (
               <TextField.Description>
-                Must be at least 8 characters long
+                Use at least 8 characters with a number or symbol.
               </TextField.Description>
-            )}
+            ) : null}
           </TextField>
         </View>
 
-        {/* Submit Button */}
-        <View className="gap-3">
+        <View className="gap-3 mt-1">
           <Button
             className="h-12"
             variant="primary"
@@ -169,11 +174,14 @@ export function AuthForm({ onSuccess }: AuthFormProps) {
             onPress={handleSubmit}
           >
             {isSubmitting
-              ? (isNewUser ? 'Creating account...' : 'Signing in...')
-              : (isNewUser ? 'Create Account' : 'Sign In')}
+              ? isNewUser
+                ? 'Creating account...'
+                : 'Signing in...'
+              : isNewUser
+                ? 'Create account'
+                : 'Sign in'}
           </Button>
 
-          {/* Toggle between signin/signup */}
           <Button
             variant="ghost"
             size="sm"
@@ -184,18 +192,17 @@ export function AuthForm({ onSuccess }: AuthFormProps) {
           >
             {isNewUser
               ? 'Already have an account? Sign in'
-              : "Don't have an account? Create one"}
+              : "Need an account? Create one"}
           </Button>
 
-          <Text className="text-xs text-default-400 text-center">
+          <Text className="text-xs text-center text-default-400 mt-1">
             By continuing you agree to the Terms of Service and Privacy Policy.
           </Text>
         </View>
 
-        {/* Error Display */}
-        <ErrorView isInvalid={Boolean(errorMessage)}>
-          {errorMessage ?? ''}
-        </ErrorView>
+        {errorMessage ? (
+          <ErrorView isInvalid={true}>{errorMessage}</ErrorView>
+        ) : null}
       </View>
     </KeyboardAvoidingView>
   );

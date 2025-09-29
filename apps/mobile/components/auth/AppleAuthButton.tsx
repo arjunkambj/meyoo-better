@@ -1,6 +1,6 @@
 import { useAuthActions } from '@convex-dev/auth/react';
 import * as AppleAuthentication from 'expo-apple-authentication';
-import { Button } from 'heroui-native';
+import { Button, useTheme } from 'heroui-native';
 import { useState } from 'react';
 import { Alert, Platform, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,6 +15,7 @@ export function AppleAuthButton({
   text = 'Continue with Apple'
 }: AppleAuthButtonProps) {
   const { signIn } = useAuthActions();
+  const { colors } = useTheme();
   const [isLoading, setIsLoading] = useState(false);
 
   // Check if Apple Auth is available (iOS only)
@@ -71,14 +72,16 @@ export function AppleAuthButton({
       size="lg"
       isDisabled={isLoading}
       onPress={handleAppleSignIn}
-      className="h-12"
+      className="h-12 bg-foreground border border-foreground"
     >
       <Button.StartContent>
         <View className="w-5 h-5 items-center justify-center">
-          <Ionicons name="logo-apple" size={18} />
+          <Ionicons name="logo-apple" size={20} color={colors.background} />
         </View>
       </Button.StartContent>
-      <Button.LabelContent>{text}</Button.LabelContent>
+      <Button.LabelContent classNames={{ text: 'text-background' }}>
+        {text}
+      </Button.LabelContent>
     </Button>
   );
 }

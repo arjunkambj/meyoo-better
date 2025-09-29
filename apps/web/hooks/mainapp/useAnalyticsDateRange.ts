@@ -37,9 +37,17 @@ export function useAnalyticsDateRange(key: string, options?: AnalyticsDateRangeO
   const defaultPreset =
     options?.defaultPreset ?? DEFAULT_DATE_RANGE_PRESET_KEYS[0] ?? 'last_30_days';
 
-  const fallbackRange = useMemo(() => presetToAnalyticsRange(defaultPreset), [defaultPreset]);
+  const fallbackRange = useMemo(
+    () => presetToAnalyticsRange(defaultPreset),
+    [defaultPreset],
+  );
   const storedRange = ranges[key];
-  const activeRange = storedRange ? normalizeRange(storedRange) : fallbackRange;
+  const activeRange = useMemo<AnalyticsDateRange>(() => {
+    if (storedRange) {
+      return normalizeRange(storedRange);
+    }
+    return fallbackRange;
+  }, [storedRange, fallbackRange]);
 
   const calendarRange = useMemo<CalendarDateRange>(() => {
     try {

@@ -284,31 +284,22 @@ export const getCustomerOverview = query({
     let orders: Doc<"shopifyOrders">[] = [];
     let filteredOrders: Doc<"shopifyOrders">[] = [];
 
-    if (args.dateRange) {
-      const startDate = new Date(args.dateRange.startDate).getTime();
-      const endDate = new Date(`${args.dateRange.endDate}T23:59:59`).getTime();
-
-      // Use index for date range filtering
-      orders = await ctx.db
+    if (periodRange) {
+      filteredOrders = await ctx.db
         .query("shopifyOrders")
         .withIndex("by_organization_and_created", (q) =>
           q
             .eq("organizationId", orgId)
-            .gte("shopifyCreatedAt", startDate)
-            .lte("shopifyCreatedAt", endDate),
+            .gte("shopifyCreatedAt", periodRange.start)
+            .lte("shopifyCreatedAt", periodRange.end),
         )
         .collect();
 
-      filteredOrders = orders;
-
       // Also get all orders for lifetime calculations
-      const allOrders = await ctx.db
+      orders = await ctx.db
         .query("shopifyOrders")
         .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
         .collect();
-
-      // Use allOrders for lifetime metrics
-      orders = allOrders;
     } else {
       // Get all orders for the organization
       orders = await ctx.db
@@ -332,10 +323,10 @@ export const getCustomerOverview = query({
     }
 
     // Calculate metrics from actual data
+    const filteredOrderIds = new Set(filteredOrders.map((o) => o._id));
+
     const customerMetrics = customers.map((customer) => {
       const customerOrders = customerOrdersMap.get(customer._id) || [];
-      // Find orders in period using ID comparison instead of filter
-      const filteredOrderIds = new Set(filteredOrders.map((o) => o._id));
       const ordersInPeriod = customerOrders.filter((o) =>
         filteredOrderIds.has(o._id),
       );
@@ -352,21 +343,40 @@ export const getCustomerOverview = query({
       const sortedOrders = [...customerOrders].sort(
         (a, b) => a.shopifyCreatedAt - b.shopifyCreatedAt,
       );
-      const firstOrderDate = sortedOrders[0]?.shopifyCreatedAt;
-      const lastOrderDate =
-        sortedOrders[sortedOrders.length - 1]?.shopifyCreatedAt;
+      const firstOrderTimestamp =
+        sortedOrders.length > 0 ? sortedOrders[0]!.shopifyCreatedAt : null;
+      const lastOrderTimestamp =
+        sortedOrders.length > 0
+          ? sortedOrders[sortedOrders.length - 1]!.shopifyCreatedAt
+          : null;
+
+      const periodSortedOrders = ordersInPeriod
+        .slice()
+        .sort((a, b) => a.shopifyCreatedAt - b.shopifyCreatedAt);
+      const periodFirstOrderTimestamp =
+        periodSortedOrders.length > 0
+          ? periodSortedOrders[0]!.shopifyCreatedAt
+          : null;
+      const periodLastOrderTimestamp =
+        periodSortedOrders.length > 0
+          ? periodSortedOrders[periodSortedOrders.length - 1]!.shopifyCreatedAt
+          : null;
 
       return {
         ...customer,
         lifetimeValue,
         lifetimeOrders,
         avgOrderValue,
-        firstOrderDate: firstOrderDate
-          ? new Date(firstOrderDate).toISOString().split("T")[0]
+        firstOrderDate: firstOrderTimestamp
+          ? new Date(firstOrderTimestamp).toISOString().split("T")[0]
           : "",
-        lastOrderDate: lastOrderDate
-          ? new Date(lastOrderDate).toISOString().split("T")[0]
+        lastOrderDate: lastOrderTimestamp
+          ? new Date(lastOrderTimestamp).toISOString().split("T")[0]
           : "",
+        firstOrderTimestamp,
+        lastOrderTimestamp,
+        periodFirstOrderTimestamp,
+        periodLastOrderTimestamp,
         ordersInPeriod: ordersInPeriod.length,
         revenueInPeriod: ordersInPeriod.reduce(
           (sum, o) => sum + (o.totalPrice || 0),
@@ -375,67 +385,96 @@ export const getCustomerOverview = query({
       };
     });
 
-    // Get customers who had activity in the period if date range provided
-    let filteredCustomers = customerMetrics;
+    const customersWithOrders = customerMetrics.filter(
+      (c) => c.lifetimeOrders > 0,
+    );
 
-    if (args.dateRange) {
-      // Only include customers with orders in the period
-      filteredCustomers = customerMetrics.filter((c) => c.ordersInPeriod > 0);
-    }
+    const customersWithOrdersInPeriod = hasPeriod
+      ? customerMetrics.filter((c) => c.ordersInPeriod > 0)
+      : customersWithOrders;
 
-    // Calculate metrics
-    const totalCustomers = customers.length; // Total customers in system
-    // Calculate customer segments
-    const customersWithOrders: typeof customerMetrics = [];
-    let newCustomers = 0;
-    let returningCustomers = 0;
+    const relevantCustomers = hasPeriod
+      ? customersWithOrdersInPeriod
+      : customersWithOrders;
 
-    for (const c of customerMetrics) {
-      if (c.lifetimeOrders > 0) {
-        customersWithOrders.push(c);
-        if (c.lifetimeOrders === 1) {
-          newCustomers++;
-        } else {
-          returningCustomers++;
-        }
-      }
-    }
+    const totalCustomersAllTime = customersWithOrders.length;
 
-    // Calculate active and churned customers
-    const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
-    const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
-    let activeCustomers = 0;
-    let churnedCustomers = 0;
+    const lifetimeNewCustomers = customersWithOrders.filter(
+      (c) => c.lifetimeOrders === 1,
+    ).length;
+    const lifetimeReturningCustomers = customersWithOrders.filter(
+      (c) => c.lifetimeOrders > 1,
+    ).length;
 
-    for (const c of customersWithOrders) {
-      const lastOrderTimestamp = c.lastOrderDate
-        ? new Date(c.lastOrderDate).getTime()
-        : 0;
+    const newCustomersInPeriod =
+      hasPeriod && periodRange
+        ? customersWithOrdersInPeriod.filter((c) => {
+            const firstOrderTimestamp = c.firstOrderTimestamp;
+            return (
+              firstOrderTimestamp != null &&
+              isTimestampInRange(firstOrderTimestamp, periodRange)
+            );
+          }).length
+        : lifetimeNewCustomers;
 
-      if (lastOrderTimestamp >= thirtyDaysAgo) {
-        activeCustomers++;
-      } else if (lastOrderTimestamp < ninetyDaysAgo && lastOrderTimestamp > 0) {
-        churnedCustomers++;
-      }
-    }
+    const returningCustomersInPeriod = hasPeriod
+      ? Math.max(customersWithOrdersInPeriod.length - newCustomersInPeriod, 0)
+      : lifetimeReturningCustomers;
 
-    // Calculate averages from customers with orders
-    const totalLTV = customersWithOrders.reduce(
-      (sum, c) => sum + (c.lifetimeValue || 0),
+    const newCustomersMetric = hasPeriod
+      ? newCustomersInPeriod
+      : lifetimeNewCustomers;
+
+    const returningCustomersMetric = hasPeriod
+      ? returningCustomersInPeriod
+      : lifetimeReturningCustomers;
+
+    const referenceEnd = hasPeriod && periodRange ? periodRange.end : Date.now();
+    const activeThreshold =
+      referenceEnd - 30 * 24 * 60 * 60 * 1000; // 30 days before end
+    const churnThreshold =
+      referenceEnd - 90 * 24 * 60 * 60 * 1000; // 90 days before end
+
+    const activeCustomers = relevantCustomers.filter((c) => {
+      const lastOrderTimestamp = hasPeriod
+        ? c.periodLastOrderTimestamp ?? c.lastOrderTimestamp
+        : c.lastOrderTimestamp;
+
+      return (
+        lastOrderTimestamp != null &&
+        lastOrderTimestamp >= activeThreshold &&
+        lastOrderTimestamp <= referenceEnd
+      );
+    }).length;
+
+    const churnedCustomers = relevantCustomers.filter((c) => {
+      const lastOrderTimestamp = hasPeriod
+        ? c.periodLastOrderTimestamp ?? c.lastOrderTimestamp
+        : c.lastOrderTimestamp;
+
+      return lastOrderTimestamp != null && lastOrderTimestamp < churnThreshold;
+    }).length;
+
+    const totalValue = relevantCustomers.reduce(
+      (sum, c) =>
+        sum + (hasPeriod ? c.revenueInPeriod || 0 : c.lifetimeValue || 0),
       0,
     );
-    const totalOrders = customersWithOrders.reduce(
-      (sum, c) => sum + (c.lifetimeOrders || 0),
+    const totalOrders = relevantCustomers.reduce(
+      (sum, c) =>
+        sum + (hasPeriod ? c.ordersInPeriod || 0 : c.lifetimeOrders || 0),
       0,
     );
+
     const avgLifetimeValue =
-      customersWithOrders.length > 0
-        ? totalLTV / customersWithOrders.length
+      relevantCustomers.length > 0
+        ? totalValue / relevantCustomers.length
         : 0;
-    const avgOrderValue = totalOrders > 0 ? totalLTV / totalOrders : 0;
+    const avgOrderValue =
+      totalOrders > 0 ? totalValue / totalOrders : 0;
     const avgOrdersPerCustomer =
-      customersWithOrders.length > 0
-        ? totalOrders / customersWithOrders.length
+      relevantCustomers.length > 0
+        ? totalOrders / relevantCustomers.length
         : 0;
 
     // Calculate Customer Acquisition Cost (simplified for now)
@@ -444,17 +483,18 @@ export const getCustomerOverview = query({
 
     // Calculate rates
     const churnRate =
-      customersWithOrders.length > 0
-        ? (churnedCustomers / customersWithOrders.length) * 100
-        : 0;
-    const repeatPurchaseRate =
-      customersWithOrders.length > 0
-        ? (returningCustomers / customersWithOrders.length) * 100
+      relevantCustomers.length > 0
+        ? (churnedCustomers / relevantCustomers.length) * 100
         : 0;
 
-    const customersWithOrdersInPeriod = hasPeriod
-      ? customerMetrics.filter((c) => c.ordersInPeriod > 0)
-      : customersWithOrders;
+    const repeatPurchaseRate =
+      relevantCustomers.length > 0
+        ? ((hasPeriod
+            ? returningCustomersInPeriod
+            : lifetimeReturningCustomers) /
+            relevantCustomers.length) *
+          100
+        : 0;
 
     const repeatCustomersInPeriod = hasPeriod
       ? customersWithOrdersInPeriod.filter((c) => c.ordersInPeriod >= 2)
@@ -462,21 +502,22 @@ export const getCustomerOverview = query({
 
     const periodCustomerCount = customersWithOrdersInPeriod.length;
 
-    const customersCreatedInPeriod = hasPeriod
-      ? customerMetrics.filter((c) => {
-          const createdAt =
-            typeof c.shopifyCreatedAt === "number" ? c.shopifyCreatedAt : null;
-
-          return (
-            createdAt != null &&
-            isTimestampInRange(createdAt, periodRange as TimestampRange)
-          );
-        })
-      : customerMetrics;
-
     const abandonedCartCustomers = hasPeriod
-      ? customersCreatedInPeriod.filter((c) => c.ordersInPeriod === 0).length
-      : totalCustomers - customersWithOrders.length;
+      ? customerMetrics.filter((c) => {
+          if (c.ordersInPeriod > 0) {
+            return false;
+          }
+
+          const lastOrderTimestamp =
+            c.periodLastOrderTimestamp ?? c.lastOrderTimestamp;
+
+          if (lastOrderTimestamp == null) {
+            return true;
+          }
+
+          return periodRange != null && lastOrderTimestamp < periodRange.start;
+        }).length
+      : customers.length - customersWithOrders.length;
 
     const prepaidOrdersCount = filteredOrders.filter((order) => {
       const status = order.financialStatus?.toLowerCase();
@@ -501,76 +542,110 @@ export const getCustomerOverview = query({
       lifetimeValue: 0,
     };
 
-    // If we have a date range, calculate changes from previous period
-    if (args.dateRange) {
-      const currentStart = new Date(args.dateRange.startDate).getTime();
-      const currentEnd = new Date(args.dateRange.endDate).getTime();
-      const periodLength = currentEnd - currentStart;
+    if (periodRange) {
+      const currentStart = periodRange.start;
+      const currentEnd = periodRange.end;
+      const periodLength = currentEnd - currentStart + 1;
+      const previousStart = currentStart - periodLength;
+      const previousEnd = currentEnd - periodLength;
 
-      // Get previous period orders using index
       const previousOrders = await ctx.db
         .query("shopifyOrders")
         .withIndex("by_organization_and_created", (q) =>
           q
             .eq("organizationId", auth.orgId as Id<"organizations">)
-            .gte("shopifyCreatedAt", currentStart - periodLength)
-            .lt("shopifyCreatedAt", currentStart),
+            .gte("shopifyCreatedAt", previousStart)
+            .lte("shopifyCreatedAt", previousEnd),
         )
         .collect();
 
-      // Calculate previous period metrics
-      const prevCustomersWithOrders = new Set(
-        previousOrders.map((o) => o.customerId).filter(Boolean),
-      ).size;
+      const previousCustomerIds = new Set(
+        previousOrders
+          .map((o) => o.customerId)
+          .filter((id): id is Id<"shopifyCustomers"> => id != null),
+      );
 
-      const prevNewCustomers = previousOrders.filter((o) => {
-        if (!o.customerId) return false;
-        const customerOrders = customerOrdersMap.get(o.customerId);
+      const prevCustomersWithOrders = previousCustomerIds.size;
+
+      const prevNewCustomers = Array.from(previousCustomerIds).reduce(
+        (count, customerId) => {
+          const ordersForCustomer = customerOrdersMap.get(customerId) ?? [];
+          const firstOrder = ordersForCustomer.reduce<number | null>(
+            (acc, order) =>
+              acc == null || order.shopifyCreatedAt < acc
+                ? order.shopifyCreatedAt
+                : acc,
+            null,
+          );
+
+          if (
+            firstOrder != null &&
+            firstOrder >= previousStart &&
+            firstOrder <= previousEnd
+          ) {
+            return count + 1;
+          }
+
+          return count;
+        },
+        0,
+      );
+
+      const previousRevenueTotal = previousOrders.reduce(
+        (sum, order) => sum + (order.totalPrice || 0),
+        0,
+      );
+
+      const prevAvgLTV =
+        prevCustomersWithOrders > 0
+          ? previousRevenueTotal / prevCustomersWithOrders
+          : 0;
+
+      const prevTotalCustomersAllTime = customersWithOrders.filter((c) => {
+        const firstOrderTimestamp = c.firstOrderTimestamp;
 
         return (
-          customerOrders &&
-          customerOrders.filter((co) => co.shopifyCreatedAt < currentStart)
-            .length === 1
+          firstOrderTimestamp != null &&
+          firstOrderTimestamp <= previousEnd
         );
       }).length;
 
-      const prevLTV =
-        previousOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0) /
-        (prevCustomersWithOrders || 1);
-
-      // Calculate percentage changes
       changes.totalCustomers =
-        prevCustomersWithOrders > 0
-          ? ((filteredCustomers.length - prevCustomersWithOrders) /
-              prevCustomersWithOrders) *
+        prevTotalCustomersAllTime > 0
+          ? ((totalCustomersAllTime - prevTotalCustomersAllTime) /
+              prevTotalCustomersAllTime) *
             100
           : 0;
+
       changes.newCustomers =
         prevNewCustomers > 0
-          ? ((newCustomers - prevNewCustomers) / prevNewCustomers) * 100
+          ? ((newCustomersInPeriod - prevNewCustomers) / prevNewCustomers) * 100
           : 0;
+
       changes.lifetimeValue =
-        prevLTV > 0 ? ((avgLifetimeValue - prevLTV) / prevLTV) * 100 : 0;
+        prevAvgLTV > 0
+          ? ((avgLifetimeValue - prevAvgLTV) / prevAvgLTV) * 100
+          : 0;
     }
 
     return {
-      totalCustomers,
-      newCustomers,
-      returningCustomers,
+      totalCustomers: totalCustomersAllTime,
+      newCustomers: newCustomersMetric,
+      returningCustomers: returningCustomersMetric,
       activeCustomers,
       churnedCustomers,
       avgLifetimeValue,
       avgOrderValue,
-        avgOrdersPerCustomer,
-        customerAcquisitionCost: avgCAC,
-        churnRate,
-        repeatPurchaseRate,
-        periodCustomerCount,
-        prepaidRate,
-        periodRepeatRate,
-        abandonedCartCustomers,
-        changes,
-      };
+      avgOrdersPerCustomer,
+      customerAcquisitionCost: avgCAC,
+      churnRate,
+      repeatPurchaseRate,
+      periodCustomerCount,
+      prepaidRate,
+      periodRepeatRate,
+      abandonedCartCustomers,
+      changes,
+    };
   },
 });
 
@@ -1503,6 +1578,10 @@ async function handleLegacyCustomerList(
   });
 
   let filteredData = mergedData;
+
+  if (dateRange) {
+    filteredData = filteredData.filter((c) => c.orders > 0);
+  }
 
   if (searchTerm) {
     filteredData = filteredData.filter((c) => {

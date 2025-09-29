@@ -1,13 +1,18 @@
 "use client";
 import { Button, Chip } from "@heroui/react";
 import { Icon } from "@iconify/react";
-import { useState } from "react";
 
 import { useInvoices } from "@/hooks";
 export default function InvoicesList() {
-  const [offset, setOffset] = useState(0);
-  const limit = 5;
-  const { invoices, totalCount, loading, hasMore } = useInvoices(limit, offset);
+  const pageSize = 5;
+  const {
+    invoices,
+    totalCount,
+    loading,
+    hasMore,
+    loadMore,
+    loadingMore,
+  } = useInvoices(pageSize);
 
   // Format amount for display
   const formatAmount = (amount: number, currency: string = "USD") => {
@@ -39,7 +44,10 @@ export default function InvoicesList() {
             Billing History
           </h3>
           <span className="text-xs text-default-500">
-            {totalCount > 0 && `${totalCount} transaction${totalCount !== 1 ? "s" : ""}`}
+            {totalCount > 0 &&
+              `${totalCount}${hasMore ? "+" : ""} transaction${
+                totalCount !== 1 ? "s" : ""
+              }`}
           </span>
         </div>
       </div>
@@ -161,9 +169,11 @@ export default function InvoicesList() {
             size="sm"
             variant="flat"
             className="w-full h-7 text-xs"
-            onPress={() => setOffset(offset + limit)}
+            isDisabled={loadingMore}
+            isLoading={loadingMore}
+            onPress={() => loadMore()}
           >
-            Load More ({totalCount - invoices.length} remaining)
+            {loadingMore ? "Loading" : "Load More"}
           </Button>
         </div>
       )}

@@ -20,6 +20,100 @@ import type {
 
 type AnyRecord = Record<string, unknown>;
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function parseDateBoundary(value: string | undefined, end = false): number {
+  if (!value) {
+    const now = new Date();
+    if (end) {
+      now.setUTCHours(23, 59, 59, 999);
+    } else {
+      now.setUTCHours(0, 0, 0, 0);
+    }
+    return now.getTime();
+  }
+
+  const suffix = end ? "T23:59:59.999Z" : "T00:00:00.000Z";
+  const normalized = value.includes("T") ? value : `${value}${suffix}`;
+  const parsed = Date.parse(normalized);
+  if (Number.isNaN(parsed)) {
+    const fallback = new Date();
+    if (end) {
+      fallback.setUTCHours(23, 59, 59, 999);
+    } else {
+      fallback.setUTCHours(0, 0, 0, 0);
+    }
+    return fallback.getTime();
+  }
+  return parsed;
+}
+
+function getFrequencyDurationMs(cost: AnyRecord): number | null {
+  const rawFrequency = String(
+    cost.frequency ?? cost.recurrence ?? cost.intervalUnit ?? cost.interval ?? "",
+  ).toLowerCase();
+
+  switch (rawFrequency) {
+    case "day":
+    case "daily":
+      return DAY_MS;
+    case "week":
+    case "weekly":
+      return 7 * DAY_MS;
+    case "biweekly":
+    case "fortnight":
+    case "fortnightly":
+      return 14 * DAY_MS;
+    case "month":
+    case "monthly":
+      return 30 * DAY_MS;
+    case "bimonthly":
+      return 60 * DAY_MS;
+    case "quarter":
+    case "quarterly":
+      return 91 * DAY_MS;
+    case "semiannual":
+    case "semiannually":
+    case "biannual":
+      return 182 * DAY_MS;
+    case "year":
+    case "yearly":
+    case "annual":
+    case "annually":
+      return 365 * DAY_MS;
+    default:
+      return null;
+  }
+}
+
+function computeCostOverlap(
+  cost: AnyRecord,
+  rangeStartMs: number,
+  rangeEndMs: number,
+): { overlapMs: number; windowMs: number | null } {
+  const rawFrom = cost.effectiveFrom;
+  const rawTo = cost.effectiveTo;
+
+  const hasExplicitFrom = rawFrom !== undefined && rawFrom !== null;
+  const hasExplicitEnd = rawTo !== undefined && rawTo !== null;
+
+  const startCandidate = hasExplicitFrom ? safeNumber(rawFrom) : rangeStartMs;
+  const endCandidate = hasExplicitEnd ? safeNumber(rawTo) : rangeEndMs;
+
+  const start = Number.isFinite(startCandidate) ? startCandidate : rangeStartMs;
+  const end = Number.isFinite(endCandidate) ? endCandidate : rangeEndMs;
+
+  const overlapStart = Math.max(rangeStartMs, start);
+  const overlapEnd = Math.min(rangeEndMs, end);
+  const overlapMs = overlapEnd > overlapStart ? overlapEnd - overlapStart : 0;
+
+  if (hasExplicitFrom && hasExplicitEnd && end > start) {
+    return { overlapMs, windowMs: end - start };
+  }
+
+  return { overlapMs, windowMs: null };
+}
+
 function safeNumber(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
@@ -186,8 +280,8 @@ export function computeOverviewMetrics(
   const revenue = sumBy(orders, (order) => safeNumber(order.totalPrice));
   const grossSales = sumBy(orders, (order) => safeNumber(order.subtotalPrice ?? order.totalPrice));
   const discounts = sumBy(orders, (order) => safeNumber(order.totalDiscounts));
-  const shippingCosts = sumBy(orders, (order) => safeNumber(order.totalShippingPrice));
-  const taxesCollected = sumBy(orders, (order) => safeNumber(order.totalTax));
+  let shippingCosts = sumBy(orders, (order) => safeNumber(order.totalShippingPrice));
+  let taxesCollected = sumBy(orders, (order) => safeNumber(order.totalTax));
   const refundsAmountFromDocs = refunds.length
     ? sumBy(refunds, (refund) => safeNumber(refund.totalRefunded ?? refund.amount))
     : 0;
@@ -246,10 +340,12 @@ export function computeOverviewMetrics(
   }
 
   let handlingFromComponents = 0;
+  let shippingFromComponents = 0;
   for (const [variantId, quantity] of variantQuantities.entries()) {
     const component = componentMap.get(variantId);
     if (!component) continue;
     handlingFromComponents += safeNumber(component?.handlingPerUnit) * quantity;
+    shippingFromComponents += safeNumber(component?.shippingPerUnit) * quantity;
   }
 
   const customersById = new Map<string, AnyRecord>();
@@ -282,13 +378,15 @@ export function computeOverviewMetrics(
   }
 
   const marketingCosts = costs.filter((cost) => cost.type === "marketing");
+  const shippingCostEntries = costs.filter((cost) => cost.type === "shipping");
   const handlingCostEntries = costs.filter((cost) => cost.type === "handling");
   const operationalCosts = costs.filter((cost) => cost.type === "operational" || cost.type === "custom");
   const paymentCostEntries = costs.filter((cost) => cost.type === "payment");
   const productCostEntries = costs.filter((cost) => cost.type === "product");
+  const taxCostEntries = costs.filter((cost) => cost.type === "tax");
 
-  const rangeStart = Date.parse(response.dateRange.startDate ?? new Date().toISOString());
-  const rangeEnd = Date.parse(response.dateRange.endDate ?? new Date().toISOString());
+  const rangeStart = parseDateBoundary(response.dateRange.startDate);
+  const rangeEnd = parseDateBoundary(response.dateRange.endDate, true);
 
   const toCostMode = (cost: AnyRecord): string => {
     const raw = String(cost.mode ?? cost.calculation ?? cost.frequency ?? "fixed");
@@ -312,41 +410,60 @@ export function computeOverviewMetrics(
   };
 
   const computeCostAmount = (cost: AnyRecord): number => {
-    const mode = toCostMode(cost);
     const amount = safeNumber(cost.amount ?? cost.value ?? cost.total ?? 0);
+    if (amount === 0) {
+      return 0;
+    }
+
+    const mode = toCostMode(cost);
+    const { overlapMs, windowMs } = computeCostOverlap(cost, rangeStart, rangeEnd);
+    if (overlapMs <= 0) {
+      return 0;
+    }
+
+    const frequencyDuration = getFrequencyDurationMs(cost);
+
     switch (mode) {
       case "perOrder":
         return amount * orders.length;
       case "perUnit":
         return amount * unitsSold;
       case "percentageRevenue":
-        return (amount / 100) * revenue;
+        return revenue > 0 ? (amount / 100) * revenue : 0;
       case "timeBound": {
-        const from = safeNumber(cost.effectiveFrom ?? rangeStart);
-        const to = safeNumber(cost.effectiveTo ?? rangeEnd);
-        const overlapStart = Math.max(from, rangeStart);
-        const overlapEnd = Math.min(to, rangeEnd);
-        if (overlapEnd < overlapStart) return 0;
-        const overlapMs = overlapEnd - overlapStart;
-        const perMs = amount / Math.max(1, to - from);
-        return perMs * Math.max(0, overlapMs);
+        if (windowMs && windowMs > 0) {
+          return amount * (overlapMs / windowMs);
+        }
+        if (frequencyDuration) {
+          return amount * (overlapMs / frequencyDuration);
+        }
+        return amount;
       }
       default:
+        if (frequencyDuration) {
+          return amount * (overlapMs / frequencyDuration);
+        }
         return amount;
     }
   };
 
   const marketingCostTotal = sumBy(marketingCosts, computeCostAmount);
+  shippingCosts += shippingFromComponents;
+  shippingCosts += sumBy(shippingCostEntries, computeCostAmount);
   const handlingCostTotal = sumBy(handlingCostEntries, computeCostAmount) + handlingFromComponents;
   const customCostTotal = sumBy(operationalCosts, computeCostAmount);
   const paymentCostTotal = sumBy(paymentCostEntries, computeCostAmount);
   const productCostTotal = sumBy(productCostEntries, computeCostAmount);
+  taxesCollected += sumBy(taxCostEntries, computeCostAmount);
   if (productCostTotal > 0) {
     cogs += productCostTotal;
   }
 
-  const transactionFeesFromTransactions = sumBy(transactions, (tx) => safeNumber(tx.fee));
-  const transactionFees = transactionFeesFromTransactions > 0 ? transactionFeesFromTransactions : paymentCostTotal;
+  const transactionFeesFromTransactions = sumBy(
+    transactions,
+    (tx) => Math.abs(safeNumber(tx.fee ?? tx.applicationFee ?? tx.totalFees ?? 0)),
+  );
+  const transactionFees = transactionFeesFromTransactions + paymentCostTotal;
 
   const metaAdSpend = sumBy(metaInsights, (insight) => safeNumber(insight.spend));
   const metaConversionValue = sumBy(metaInsights, (insight) => safeNumber(insight.conversionValue));
@@ -1213,6 +1330,13 @@ function computeCostAmountForRange(cost: AnyRecord, ctx: CostComputationContext)
   if (amount === 0) return 0;
 
   const mode = toCostMode(cost);
+  const { overlapMs, windowMs } = computeCostOverlap(cost, ctx.rangeStartMs, ctx.rangeEndMs);
+  if (overlapMs <= 0) {
+    return 0;
+  }
+
+  const frequencyDuration = getFrequencyDurationMs(cost);
+
   switch (mode) {
     case "perOrder":
       return amount * ctx.ordersCount;
@@ -1221,25 +1345,19 @@ function computeCostAmountForRange(cost: AnyRecord, ctx: CostComputationContext)
     case "percentageRevenue":
       return ctx.revenue > 0 ? (amount / 100) * ctx.revenue : 0;
     case "timeBound": {
-      const rangeStart = Number.isFinite(ctx.rangeStartMs) ? ctx.rangeStartMs : 0;
-      const rangeEnd = Number.isFinite(ctx.rangeEndMs) ? ctx.rangeEndMs : rangeStart;
-      const from = safeNumber(cost.effectiveFrom ?? rangeStart);
-      const rawTo = cost.effectiveTo ?? rangeEnd;
-      const to = safeNumber(rawTo) || rangeEnd;
-      if (!Number.isFinite(from) || !Number.isFinite(to)) return 0;
-      if (to <= from) return 0;
-
-      const overlapStart = Math.max(from, rangeStart);
-      const overlapEnd = Math.min(to, rangeEnd);
-      if (overlapEnd <= overlapStart) return 0;
-
-      const overlapMs = overlapEnd - overlapStart;
-      const totalWindow = Math.max(1, to - from);
-      const proportion = overlapMs / totalWindow;
-      return amount * proportion;
+      if (windowMs && windowMs > 0) {
+        return amount * (overlapMs / windowMs);
+      }
+      if (frequencyDuration) {
+        return amount * (overlapMs / frequencyDuration);
+      }
+      return amount;
     }
     case "fixed":
     default:
+      if (frequencyDuration) {
+        return amount * (overlapMs / frequencyDuration);
+      }
       return amount;
   }
 }

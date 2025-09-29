@@ -1,7 +1,8 @@
 import { v } from "convex/values";
 
 import type { Id } from "../_generated/dataModel";
-import { query, type QueryCtx } from "../_generated/server";
+import { action, query, type ActionCtx, type QueryCtx } from "../_generated/server";
+import { api } from "../_generated/api";
 import {
   datasetValidator,
   defaultDateRange,
@@ -16,9 +17,11 @@ import {
 } from "../utils/analyticsSource";
 import { computeOverviewMetrics, computePlatformMetrics, computeChannelRevenue } from "../utils/analyticsAggregations";
 import type { OverviewComputation, ChannelRevenueBreakdown, PlatformMetrics } from "@repo/types";
+import { DEFAULT_DASHBOARD_CONFIG } from "@repo/types";
 import { getUserAndOrg } from "../utils/auth";
 import { resolveDashboardConfig } from "../utils/dashboardConfig";
 import { computeIntegrationStatus, integrationStatusValidator } from "../utils/integrationStatus";
+import { loadAnalyticsWithChunks } from "../utils/analyticsLoader";
 
 type IntegrationStatus = Awaited<ReturnType<typeof computeIntegrationStatus>>;
 
@@ -26,13 +29,40 @@ const responseOrNull = v.union(v.null(), responseValidator);
 
 type DateRangeArg = { startDate: string; endDate: string };
 
+type OverviewPayload = {
+  dateRange: DateRange;
+  organizationId: string;
+  overview: OverviewComputation | null;
+  platformMetrics: PlatformMetrics | null | undefined;
+  channelRevenue: ChannelRevenueBreakdown | null | undefined;
+  primaryCurrency?: string;
+  dashboardConfig: { kpis: string[]; widgets: string[] };
+  integrationStatus: IntegrationStatus;
+  meta?: Record<string, unknown> | undefined;
+};
+
+type OverviewArgs = {
+  timeRange?: string;
+  startDate?: string;
+  endDate?: string;
+};
+
 const DASHBOARD_SUMMARY_DATASETS = [
   "orders",
+  "orderItems",
+  "transactions",
+  "refunds",
+  "variants",
+  "productCostComponents",
   "customers",
   "costs",
   "metaInsights",
   "analytics",
 ] as const satisfies readonly AnalyticsSourceKey[];
+
+function isTooManyReadsError(error: unknown): boolean {
+  return error instanceof Error && error.message.includes("Too many reads");
+}
 
 async function loadDashboardAnalytics(
   ctx: QueryCtx,
@@ -93,7 +123,94 @@ export const getOverviewData = query({
       meta: v.optional(v.any()),
     }),
   ),
-  handler: async (ctx, args) => {
+  handler: async (ctx: QueryCtx, args: OverviewArgs): Promise<OverviewPayload | null> => {
+    const auth = await getUserAndOrg(ctx);
+    if (!auth) return null;
+
+    const range = args.startDate && args.endDate
+      ? validateDateRange({ startDate: args.startDate, endDate: args.endDate })
+      : defaultDateRange(parseTimeRange(args.timeRange));
+    let analyticsResponse: AnalyticsResponse | null = null;
+    let fallbackMeta: Record<string, unknown> | undefined;
+
+    try {
+      analyticsResponse = await loadDashboardAnalytics(
+        ctx,
+        auth.orgId as Id<"organizations">,
+        range,
+      );
+    } catch (error) {
+      if (isTooManyReadsError(error)) {
+        fallbackMeta = { needsActionLoad: true, reason: "too_many_reads" };
+      } else {
+        throw error;
+      }
+    }
+
+    const dashboardConfig = await resolveDashboardConfig(
+      ctx,
+      auth.user._id,
+      auth.orgId,
+    );
+    const integrationStatus = await computeIntegrationStatus(ctx, auth.orgId);
+
+    if (!analyticsResponse) {
+      return {
+        dateRange: range,
+        organizationId: auth.orgId,
+        overview: null,
+        platformMetrics: null,
+        channelRevenue: null,
+        primaryCurrency: auth.user.primaryCurrency ?? "USD",
+        dashboardConfig,
+        integrationStatus,
+        meta: {
+          ...(fallbackMeta ?? {}),
+        },
+      } satisfies OverviewPayload;
+    }
+
+    const overview = computeOverviewMetrics(analyticsResponse);
+    const platformMetrics = computePlatformMetrics(analyticsResponse);
+    const channelRevenue = computeChannelRevenue(analyticsResponse);
+    return {
+      dateRange: analyticsResponse.dateRange,
+      organizationId: analyticsResponse.organizationId,
+      overview,
+      platformMetrics,
+      channelRevenue,
+      primaryCurrency: auth.user.primaryCurrency ?? "USD",
+      dashboardConfig,
+      integrationStatus,
+      meta: analyticsResponse.meta,
+    } satisfies OverviewPayload;
+  },
+});
+
+const getOverviewDataActionDefinition = {
+  args: {
+    timeRange: v.optional(v.string()),
+    startDate: v.optional(v.string()),
+    endDate: v.optional(v.string()),
+  },
+  returns: v.union(
+    v.null(),
+    v.object({
+      dateRange: v.object({ startDate: v.string(), endDate: v.string() }),
+      organizationId: v.string(),
+      overview: v.optional(v.any()),
+      platformMetrics: v.optional(v.any()),
+      channelRevenue: v.optional(v.any()),
+      primaryCurrency: v.optional(v.string()),
+      dashboardConfig: v.object({
+        kpis: v.array(v.string()),
+        widgets: v.array(v.string()),
+      }),
+      integrationStatus: integrationStatusValidator,
+      meta: v.optional(v.any()),
+    }),
+  ),
+  handler: async (ctx: ActionCtx, args: OverviewArgs): Promise<OverviewPayload | null> => {
     const auth = await getUserAndOrg(ctx);
     if (!auth) return null;
 
@@ -101,44 +218,44 @@ export const getOverviewData = query({
       ? validateDateRange({ startDate: args.startDate, endDate: args.endDate })
       : defaultDateRange(parseTimeRange(args.timeRange));
 
-    const response = await loadDashboardAnalytics(
+    const { data, meta } = await loadAnalyticsWithChunks(
       ctx,
       auth.orgId as Id<"organizations">,
       range,
+      {
+        datasets: DASHBOARD_SUMMARY_DATASETS,
+      },
     );
 
-    const overview = computeOverviewMetrics(response);
-    const platformMetrics = computePlatformMetrics(response);
-    const channelRevenue = computeChannelRevenue(response);
-    const dashboardConfig = await resolveDashboardConfig(
-      ctx,
-      auth.user._id,
-      auth.orgId,
-    );
-    const integrationStatus = await computeIntegrationStatus(ctx, auth.orgId);
+    const analyticsResponse: AnalyticsResponse = {
+      dateRange: range,
+      organizationId: auth.orgId,
+      data,
+      ...(meta ? { meta } : {}),
+    };
+
+    const dashboardLayout = await ctx.runQuery(api.core.dashboard.getDashboardLayout, {});
+    const integrationStatus = await ctx.runQuery(api.core.status.getIntegrationStatus, {});
+
+    const overview = computeOverviewMetrics(analyticsResponse);
+    const platformMetrics = computePlatformMetrics(analyticsResponse);
+    const channelRevenue = computeChannelRevenue(analyticsResponse);
+
     return {
-      dateRange: response.dateRange,
-      organizationId: response.organizationId,
+      dateRange: analyticsResponse.dateRange,
+      organizationId: analyticsResponse.organizationId,
       overview,
       platformMetrics,
       channelRevenue,
       primaryCurrency: auth.user.primaryCurrency ?? "USD",
-      dashboardConfig,
+      dashboardConfig: dashboardLayout ?? DEFAULT_DASHBOARD_CONFIG,
       integrationStatus,
-      meta: response.meta,
-    } satisfies {
-      dateRange: DateRange;
-      organizationId: string;
-      overview: OverviewComputation | null;
-      platformMetrics: PlatformMetrics | null | undefined;
-      channelRevenue: ChannelRevenueBreakdown | null | undefined;
-      primaryCurrency?: string;
-      dashboardConfig: { kpis: string[]; widgets: string[] };
-      integrationStatus: IntegrationStatus;
-      meta?: Record<string, unknown> | undefined;
-    };
+      meta: analyticsResponse.meta,
+    } satisfies OverviewPayload;
   },
-});
+};
+
+export const getOverviewDataAction = action(getOverviewDataActionDefinition);
 
 export const getDashboardSummary = query({
   args: {

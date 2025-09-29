@@ -84,6 +84,8 @@ export const KPISkeleton = React.memo(function KPISkeleton({
   showSparkline = false,
   showChangeIndicator = true,
 }: KPISkeletonProps) {
+  const renderSparkline = showSparkline && size !== "small";
+
   return (
     <Card
       className={cn(
@@ -94,20 +96,20 @@ export const KPISkeleton = React.memo(function KPISkeleton({
       )}
       shadow="none"
     >
-      <div className="flex h-full min-w-0 flex-col justify-between">
+      <div className="flex h-full min-w-0 flex-col">
         <div className="mb-2.5 flex items-start justify-between gap-2">
-          <Skeleton className="h-4 w-28 rounded-lg" />
+          <Skeleton className="h-3.5 w-28 rounded-md" />
           {showIcon && (
             <Skeleton
               className={cn(
-                "shrink-0 rounded-full",
+                "shrink-0 rounded-md",
                 KPI_ICON_SKELETON_SIZES[size]
               )}
             />
           )}
         </div>
 
-        <div className="flex-1 space-y-3">
+        <div className="flex-1 min-w-0">
           <Skeleton
             className={cn(
               "rounded-lg",
@@ -116,30 +118,29 @@ export const KPISkeleton = React.memo(function KPISkeleton({
             )}
           />
 
-          {showSparkline && size !== "small" && (
+          {renderSparkline && (
             <Skeleton
               className={cn(
-                "w-full rounded-lg",
+                "mt-3 w-full rounded-lg",
                 KPI_SPARKLINE_SKELETON_HEIGHTS[size]
               )}
             />
           )}
         </div>
 
+        <Divider className="mt-3.5 mb-1.5 bg-default-200" />
+
         {showChangeIndicator && (
-          <div className="mt-3.5">
-            <Divider className="mb-1.5 bg-default-200" />
-            <div className="mt-1 flex items-center justify-between">
-              <Skeleton
-                className={cn("h-3 rounded-lg", KPI_CHANGE_PRIMARY_WIDTH[size])}
-              />
-              <Skeleton
-                className={cn(
-                  "h-3 rounded-lg",
-                  KPI_CHANGE_SECONDARY_WIDTH[size]
-                )}
-              />
-            </div>
+          <div className="flex items-center justify-between">
+            <Skeleton
+              className={cn("h-3 rounded-md", KPI_CHANGE_PRIMARY_WIDTH[size])}
+            />
+            <Skeleton
+              className={cn(
+                "h-3 rounded-md",
+                KPI_CHANGE_SECONDARY_WIDTH[size]
+              )}
+            />
           </div>
         )}
       </div>
@@ -226,8 +227,9 @@ const KPI = React.memo(function KPI({
         KPI_SIZE_CLASSES[size],
         className
       )}
+      shadow="none"
     >
-      <div className="flex flex-col h-full  min-w-0 justify-between">
+      <div className="flex h-full min-w-0 flex-col justify-between">
         {/* Header with title and icon */}
         <div className="flex items-start justify-between mb-2.5 gap-2">
           <span className="text-sm font-medium text-default-800 font-medium truncate flex-1">

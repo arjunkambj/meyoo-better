@@ -1,25 +1,39 @@
-import { useMemo } from "react";
-import { useQuery } from "convex-helpers/react/cache/hooks";
+import { useCallback, useMemo } from "react";
+import { usePaginatedQuery } from "convex/react";
 
 import { api } from "@/libs/convexApi";
 
 /**
  * Invoice Management Hook
- * Provides invoice data for billing and payment history
+ * Uses Convex pagination for efficient billing history fetching.
  */
-export function useInvoices(limit: number = 10, offset: number = 0) {
-  const args = useMemo(() => ({ limit, offset }), [limit, offset]);
-  const result = useQuery(api.core.organizations.getInvoices, args);
+export function useInvoices(pageSize: number = 10) {
+  const paginationArgs = useMemo(() => ({}), []);
+  const { results, status, loadMore, isLoading } = usePaginatedQuery(
+    api.core.organizations.getInvoices,
+    paginationArgs,
+    {
+      initialNumItems: pageSize,
+    },
+  );
 
-  const loading = result === undefined;
-  const invoices = result?.invoices || [];
-  const totalCount = result?.totalCount || 0;
+  const loading = results.length === 0 && isLoading;
+  const loadingMore = status === "LoadingMore";
+  const hasMore = status === "CanLoadMore" || loadingMore;
+
+  const handleLoadMore = useCallback(() => {
+    if (status !== "CanLoadMore") return;
+
+    loadMore(pageSize);
+  }, [loadMore, pageSize, status]);
 
   return {
-    invoices,
-    totalCount,
+    invoices: results,
+    totalCount: results.length,
     loading,
-    hasMore: totalCount > offset + limit,
+    hasMore,
+    loadMore: handleLoadMore,
+    loadingMore,
+    status,
   };
 }
-

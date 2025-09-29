@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { useQuery } from 'convex/react';
+import { useEffect, useMemo, useState } from 'react';
+import { useAction, useQuery } from 'convex/react';
 
 import { api } from '@/libs/convexApi';
 import { useDateRange } from '@/store/dateRangeStore';
@@ -9,6 +9,20 @@ import type {
   PnLAnalyticsResult,
   ChannelRevenueBreakdown,
 } from '@repo/types';
+
+type OverviewResponse = (
+  | {
+      overview?: OverviewComputation | null;
+      platformMetrics?: PlatformMetricsResult | null;
+      channelRevenue?: ChannelRevenueBreakdown | null;
+      meta?: Record<string, unknown>;
+      [key: string]: unknown;
+    }
+  | null
+);
+
+const overviewActionCache = new Map<string, OverviewResponse>();
+const overviewActionPending = new Map<string, Promise<OverviewResponse>>();
 
 // ----- Metric types -----
 
@@ -63,18 +77,125 @@ const createMetric = (value: number, change?: number, previousValue?: number): A
   previousValue,
 });
 
+function useDashboardOverviewData() {
+  const { dateRange } = useDateRange();
+
+  const queryArgs = useMemo(
+    () => ({
+      startDate: dateRange.start,
+      endDate: dateRange.end,
+    }),
+    [dateRange.end, dateRange.start],
+  );
+
+  const response = useQuery(api.web.dashboard.getOverviewData, queryArgs) as OverviewResponse | undefined;
+  const fetchOverviewAction = useAction(api.web.dashboard.getOverviewDataAction);
+  const [state, setState] = useState<{
+    key: string | null;
+    loading: boolean;
+    data: OverviewResponse;
+  }>({
+    key: null,
+    loading: false,
+    data: null,
+  });
+
+  const currentKey = `${queryArgs.startDate}:${queryArgs.endDate}`;
+  const needsActionLoad = Boolean(
+    response !== undefined &&
+      response &&
+      (response.meta as Record<string, unknown> | undefined)?.needsActionLoad,
+  );
+
+  useEffect(() => {
+    if (!needsActionLoad) {
+      if (state.key !== null || state.loading || state.data !== null) {
+        setState({ key: null, loading: false, data: null });
+      }
+      return;
+    }
+
+    if (state.key === currentKey && (state.loading || state.data !== null)) {
+      return;
+    }
+
+    if (overviewActionCache.has(currentKey)) {
+      setState({
+        key: currentKey,
+        loading: false,
+        data: overviewActionCache.get(currentKey) ?? null,
+      });
+      return;
+    }
+
+    let cancelled = false;
+    setState({ key: currentKey, loading: true, data: null });
+
+    let promise = overviewActionPending.get(currentKey);
+    if (!promise) {
+      promise = fetchOverviewAction({
+        startDate: queryArgs.startDate,
+        endDate: queryArgs.endDate,
+      })
+        .then((result) => {
+          const normalized = result ?? null;
+          overviewActionCache.set(currentKey, normalized);
+          return normalized;
+        })
+        .catch((error) => {
+          console.error('Failed to load dashboard overview via action:', error);
+          overviewActionCache.delete(currentKey);
+          throw error;
+        })
+        .finally(() => {
+          overviewActionPending.delete(currentKey);
+        });
+      overviewActionPending.set(currentKey, promise);
+    }
+
+    promise
+      .then((result) => {
+        if (cancelled) return;
+        setState({ key: currentKey, loading: false, data: result });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setState({ key: currentKey, loading: false, data: null });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    needsActionLoad,
+    currentKey,
+    fetchOverviewAction,
+    queryArgs.endDate,
+    queryArgs.startDate,
+    state.key,
+    state.loading,
+    state.data,
+  ]);
+
+  const fallbackLoading = needsActionLoad && (state.loading || state.key !== currentKey);
+  const data = needsActionLoad && state.key === currentKey
+    ? state.data
+    : (response ?? null);
+  const isLoading = response === undefined || fallbackLoading;
+
+  return {
+    data,
+    isLoading,
+  } as const;
+}
+
 // ----- Overview analytics -----
 
 export function useOverviewAnalytics() {
-  const { dateRange } = useDateRange();
-
-  const overviewData = useQuery(api.web.dashboard.getOverviewData, {
-    startDate: dateRange.start,
-    endDate: dateRange.end,
-  }) as { overview?: OverviewComputation | null } | null | undefined;
+  const { data: overviewData, isLoading } = useDashboardOverviewData();
 
   const metrics = useMemo<OverviewMetrics | null>(() => {
-    if (overviewData === undefined) return null;
+    if (isLoading) return null;
     const overviewSummary = overviewData?.overview?.summary;
     if (!overviewSummary) return null;
 
@@ -105,11 +226,11 @@ export function useOverviewAnalytics() {
         overviewSummary.profitMarginChange,
       ),
     } satisfies OverviewMetrics;
-  }, [overviewData]);
+  }, [overviewData, isLoading]);
 
   return {
     metrics,
-    isLoading: overviewData === undefined,
+    isLoading,
     error: null,
   };
 }
@@ -117,15 +238,10 @@ export function useOverviewAnalytics() {
 // ----- Cost breakdown -----
 
 export function useCostBreakdown() {
-  const { dateRange } = useDateRange();
-
-  const overviewData = useQuery(api.web.dashboard.getOverviewData, {
-    startDate: dateRange.start,
-    endDate: dateRange.end,
-  }) as { overview?: OverviewComputation | null } | null | undefined;
+  const { data: overviewData, isLoading } = useDashboardOverviewData();
 
   const breakdown = useMemo<CostBreakdownResult>(() => {
-    if (overviewData === undefined) return EMPTY_COST_BREAKDOWN;
+    if (isLoading) return EMPTY_COST_BREAKDOWN;
     const overviewSummary = overviewData?.overview?.summary;
     if (!overviewSummary) return EMPTY_COST_BREAKDOWN;
 
@@ -140,40 +256,30 @@ export function useCostBreakdown() {
       },
       metaSpend: overviewSummary.metaAdSpend,
     } satisfies CostBreakdownResult;
-  }, [overviewData]);
+  }, [overviewData, isLoading]);
 
   return {
     totals: breakdown.totals,
     metaSpend: breakdown.metaSpend,
-    isLoading: overviewData === undefined,
+    isLoading,
   };
 }
 
 // ----- Platform metrics -----
 
 export function usePlatformMetrics() {
-  const { dateRange } = useDateRange();
-
-  const overviewData = useQuery(api.web.dashboard.getOverviewData, {
-    startDate: dateRange.start,
-    endDate: dateRange.end,
-  }) as { platformMetrics?: PlatformMetricsResult | null } | null | undefined;
+  const { data: overviewData, isLoading } = useDashboardOverviewData();
 
   return {
     metrics: overviewData?.platformMetrics ?? null,
-    isLoading: overviewData === undefined,
+    isLoading,
   };
 }
 
 // ----- Channel revenue -----
 
 export function useChannelRevenue() {
-  const { dateRange } = useDateRange();
-
-  const overviewData = useQuery(api.web.dashboard.getOverviewData, {
-    startDate: dateRange.start,
-    endDate: dateRange.end,
-  }) as { channelRevenue?: ChannelRevenueBreakdown | null } | null | undefined;
+  const { data: overviewData, isLoading } = useDashboardOverviewData();
 
   const channels = useMemo(() => {
     const breakdown = overviewData?.channelRevenue?.channels ?? [];
@@ -193,7 +299,7 @@ export function useChannelRevenue() {
   return {
     channels,
     totalRevenue,
-    isLoading: overviewData === undefined,
+    isLoading,
   };
 }
 

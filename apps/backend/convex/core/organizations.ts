@@ -1,4 +1,5 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 
 import {
@@ -645,11 +646,10 @@ export function getPlanPrice(
  */
 export const getInvoices = query({
   args: {
-    limit: v.optional(v.number()),
-    offset: v.optional(v.number()),
+    paginationOpts: paginationOptsValidator,
   },
   returns: v.object({
-    invoices: v.array(
+    page: v.array(
       v.object({
         id: v.string(),
         invoiceNumber: v.string(),
@@ -666,34 +666,35 @@ export const getInvoices = query({
         metadata: v.optional(v.any()),
       }),
     ),
-    totalCount: v.number(),
+    continueCursor: v.string(),
+    isDone: v.boolean(),
   }),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
 
-    if (!userId) return { invoices: [], totalCount: 0 };
+    if (!userId)
+      return { page: [], continueCursor: "", isDone: true };
 
     const user = await ctx.db.get(userId);
 
-    if (!user?.organizationId) return { invoices: [], totalCount: 0 };
+    if (!user?.organizationId)
+      return { page: [], continueCursor: "", isDone: true };
 
-    // Get all invoices for this organization
+    // Query invoices for this organization using the index for pagination
     const { organizationId } = user;
-    const allInvoices = await ctx.db
+    const pagination = await ctx.db
       .query("invoices")
       .withIndex("by_organization", (q) =>
         q.eq("organizationId", organizationId),
       )
       .order("desc")
-      .collect();
-
-    // Apply pagination
-    const limit = args.limit || 10;
-    const offset = args.offset || 0;
-    const paginatedInvoices = allInvoices.slice(offset, offset + limit);
+      .paginate({
+        cursor: args.paginationOpts.cursor ?? null,
+        numItems: args.paginationOpts.numItems,
+      });
 
     // Format invoices for response
-    const formattedInvoices = paginatedInvoices.map((invoice) => ({
+    const formattedInvoices = pagination.page.map((invoice) => ({
       id: invoice._id,
       invoiceNumber: invoice.invoiceNumber,
       amount: invoice.amount,
@@ -710,8 +711,9 @@ export const getInvoices = query({
     }));
 
     return {
-      invoices: formattedInvoices,
-      totalCount: allInvoices.length,
+      page: formattedInvoices,
+      continueCursor: pagination.continueCursor ?? "",
+      isDone: pagination.isDone,
     };
   },
 });

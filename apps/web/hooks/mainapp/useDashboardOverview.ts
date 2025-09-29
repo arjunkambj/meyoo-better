@@ -1,5 +1,5 @@
-import { useCallback, useMemo } from "react";
-import { useMutation } from "convex/react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useAction, useMutation } from "convex/react";
 import { useQuery } from "convex-helpers/react/cache/hooks";
 
 import { api } from "@/libs/convexApi";
@@ -432,10 +432,75 @@ export function useDashboardOverview(dateRange: DateRangeArgs) {
   }), [dateRange.endDate, dateRange.startDate]);
 
   const response = useQuery(api.web.dashboard.getOverviewData, queryArgs);
+  const fetchOverviewAction = useAction(api.web.dashboard.getOverviewDataAction);
   const updateLayout = useMutation(api.core.dashboard.updateDashboardLayout);
 
-  const isLoading = response === undefined;
-  const data: OverviewResponse = response ?? null;
+  const [actionState, setActionState] = useState<{
+    key: string | null;
+    loading: boolean;
+    data: OverviewResponse;
+  }>({
+    key: null,
+    loading: false,
+    data: null,
+  });
+
+  const currentKey = `${queryArgs.startDate}:${queryArgs.endDate}`;
+  const queryReady = response !== undefined;
+  const needsActionLoad = Boolean(
+    queryReady && response && (response.meta as Record<string, unknown> | undefined)?.needsActionLoad,
+  );
+
+  useEffect(() => {
+    if (!needsActionLoad) {
+      if (actionState.key !== null || actionState.loading || actionState.data !== null) {
+        setActionState({ key: null, loading: false, data: null });
+      }
+      return;
+    }
+
+    if (actionState.key === currentKey && (actionState.loading || actionState.data !== null)) {
+      return;
+    }
+
+    let cancelled = false;
+    setActionState({ key: currentKey, loading: true, data: null });
+
+    fetchOverviewAction({
+      startDate: queryArgs.startDate,
+      endDate: queryArgs.endDate,
+    })
+      .then((result) => {
+        if (cancelled) return;
+        setActionState({ key: currentKey, loading: false, data: result ?? null });
+      })
+      .catch((error) => {
+        console.error("Failed to load dashboard overview via action:", error);
+        if (cancelled) return;
+        setActionState({ key: currentKey, loading: false, data: null });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    needsActionLoad,
+    currentKey,
+    fetchOverviewAction,
+    queryArgs.endDate,
+    queryArgs.startDate,
+    actionState.key,
+    actionState.loading,
+    actionState.data,
+  ]);
+
+  const fallbackLoading = needsActionLoad && (actionState.loading || actionState.key !== currentKey);
+  const baseData = needsActionLoad && actionState.key === currentKey
+    ? actionState.data
+    : (response ?? null);
+
+  const isLoading = response === undefined || fallbackLoading;
+  const data: OverviewResponse = baseData;
 
   const primaryCurrency = data?.primaryCurrency ?? "USD";
   const currencySymbol = getCurrencySymbol(primaryCurrency);

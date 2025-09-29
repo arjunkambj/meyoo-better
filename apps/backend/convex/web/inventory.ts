@@ -92,6 +92,35 @@ const normalizeDateRange = (
   return { start: safeStart, end: safeEnd };
 };
 
+const ORDER_ITEMS_BATCH_SIZE = 10;
+
+const fetchOrderItemsForOrders = async (
+  ctx: QueryCtx,
+  orderIds: Array<Id<"shopifyOrders">>,
+): Promise<Array<Doc<"shopifyOrderItems">>> => {
+  const items: Array<Doc<"shopifyOrderItems">> = [];
+
+  for (let i = 0; i < orderIds.length; i += ORDER_ITEMS_BATCH_SIZE) {
+    const batch = orderIds.slice(i, i + ORDER_ITEMS_BATCH_SIZE);
+    const batchResults = await Promise.all(
+      batch.map((orderId) =>
+        ctx.db
+          .query("shopifyOrderItems")
+          .withIndex("by_order", (q) => q.eq("orderId", orderId))
+          .collect(),
+      ),
+    );
+
+    for (const batchItems of batchResults) {
+      if (batchItems.length > 0) {
+        items.push(...batchItems);
+      }
+    }
+  }
+
+  return items;
+};
+
 const fetchOrdersWithItems = async (
   ctx: QueryCtx,
   orgId: Id<"organizations">,
@@ -130,16 +159,12 @@ const fetchOrdersWithItems = async (
     return { orders, orderItems: [] };
   }
 
-  const orderIdSet = new Set(orders.map((order) => order._id));
+  const orderItems = await fetchOrderItemsForOrders(
+    ctx,
+    orders.map((order) => order._id),
+  );
 
-  const orderItems = await ctx.db
-    .query("shopifyOrderItems")
-    .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
-    .collect();
-
-  const filteredItems = orderItems.filter((item) => orderIdSet.has(item.orderId));
-
-  return { orders, orderItems: filteredItems };
+  return { orders, orderItems };
 };
 
 const getVariantCost = (variant: Doc<"shopifyProductVariants">): number => {
@@ -250,6 +275,26 @@ const buildProductSalesMap = (
   });
 
   return productSales;
+};
+
+const groupVariantsByProduct = (
+  variants: Array<Doc<"shopifyProductVariants">>,
+): Map<Id<"shopifyProducts">, Array<Doc<"shopifyProductVariants">>> => {
+  const grouped = new Map<
+    Id<"shopifyProducts">,
+    Array<Doc<"shopifyProductVariants">>
+  >();
+
+  variants.forEach((variant) => {
+    const existing = grouped.get(variant.productId);
+    if (existing) {
+      existing.push(variant);
+    } else {
+      grouped.set(variant.productId, [variant]);
+    }
+  });
+
+  return grouped;
 };
 
 type SalesTotals = {
@@ -440,9 +485,13 @@ export const getInventoryOverview = query({
     const totalProducts = products.length;
     const totalSKUs = variants.length;
 
-    // Calculate total inventory value and COGS
+    // Calculate total inventory value, COGS, and stock distribution
     let totalValue = 0;
     let totalCOGS = 0;
+    let lowStockItems = 0;
+    let outOfStockItems = 0;
+    let healthyItems = 0;
+    let totalUnitsInStock = 0;
 
     variants.forEach((variant) => {
       const totals = inventoryTotals.get(variant._id);
@@ -452,16 +501,7 @@ export const getInventoryOverview = query({
 
       totalValue += available * price;
       totalCOGS += available * cost;
-    });
-
-    // Count stock levels
-    let lowStockItems = 0;
-    let outOfStockItems = 0;
-    let healthyItems = 0;
-
-    variants.forEach((variant) => {
-      const totals = inventoryTotals.get(variant._id);
-      const available = totals?.available ?? 0;
+      totalUnitsInStock += available;
 
       if (available === 0) {
         outOfStockItems++;
@@ -490,19 +530,17 @@ export const getInventoryOverview = query({
       )
       .collect();
 
-    const allOrderItems = await ctx.db
-      .query("shopifyOrderItems")
-      .withIndex("by_organization", (q) => q.eq("organizationId", _orgId))
-      .collect();
+    const recentOrderIds = recentOrdersInRange.map((order) => order._id);
+    const recentOrderItems =
+      recentOrderIds.length > 0
+        ? await fetchOrderItemsForOrders(ctx, recentOrderIds)
+        : [];
 
-    const soldVariantIds = new Set<string>();
-
-    recentOrdersInRange.forEach((order) => {
-      const items = allOrderItems.filter((item) => item.orderId === order._id);
-
-      items.forEach((item) => {
-        if (item.variantId) soldVariantIds.add(item.variantId);
-      });
+    const soldVariantIds = new Set<Id<"shopifyProductVariants">>();
+    recentOrderItems.forEach((item) => {
+      if (item.variantId) {
+        soldVariantIds.add(item.variantId);
+      }
     });
 
     // Count variants that haven't been sold and have stock
@@ -540,11 +578,6 @@ export const getInventoryOverview = query({
     const totalProfit = totalSales - totalCOGSSold;
 
     const avgDailyUnitsSold = unitsSold / analysisDays;
-
-    const totalUnitsInStock = variants.reduce((sum, variant) => {
-      const totals = inventoryTotals.get(variant._id);
-      return sum + (totals?.available ?? 0);
-    }, 0);
 
     const annualizationFactor = 365 / analysisDays;
     const avgTurnoverRate =
@@ -749,43 +782,43 @@ export const getProductsList = query({
       variantMap.set(variant._id, variant);
     });
 
+    const variantsByProduct = groupVariantsByProduct(variants);
+
     const variantSales = buildVariantSalesMap(orderItems, orders, variantMap);
     const productSales = buildProductSalesMap(variantSales, variants);
     const abcCategories = assignABCCategories(products, productSales);
 
     const productsWithInventory = products.map((product) => {
-      const productVariants = variants.filter(
-        (variant) => variant.productId === product._id,
-      );
+      const productVariants = variantsByProduct.get(product._id) ?? [];
+      let totalAvailable = 0;
+      let totalReserved = 0;
+      let weightedCostSum = 0;
+      let weightedCostWeight = 0;
 
       const variantInventory = productVariants.map((variant) => {
         const totals = inventoryTotals.get(variant._id);
         const available = totals?.available ?? 0;
         const committed = totals?.committed ?? 0;
+        const stock = available + committed;
+        const weight = available > 0 ? available : 1;
+
+        totalAvailable += available;
+        totalReserved += committed;
+        weightedCostSum += getVariantCost(variant) * weight;
+        weightedCostWeight += weight;
 
         return {
           id: variant._id,
           sku: variant.sku || "N/A",
           title: variant.title || "Default",
           price: variant.price || 0,
-          stock: available + committed,
+          stock,
           reserved: committed,
           available,
         };
       });
 
-      const totalAvailable = variantInventory.reduce(
-        (sum, entry) => sum + entry.available,
-        0,
-      );
-      const totalReserved = variantInventory.reduce(
-        (sum, entry) => sum + entry.reserved,
-        0,
-      );
-      const totalStock = variantInventory.reduce(
-        (sum, entry) => sum + entry.stock,
-        0,
-      );
+      const totalStock = totalAvailable + totalReserved;
 
       const salesStats = productSales.get(product._id);
       const unitsSold = salesStats?.units ?? 0;
@@ -817,24 +850,12 @@ export const getProductsList = query({
 
       const defaultVariant = productVariants[0];
       const price = defaultVariant?.price ?? 0;
-
-      const weightedCostTotals = productVariants.reduce(
-        (acc, variant) => {
-          const totals = inventoryTotals.get(variant._id);
-          const available = totals?.available ?? 0;
-          const weight = available > 0 ? available : 1;
-
-          acc.sum += getVariantCost(variant) * weight;
-          acc.weight += weight;
-          return acc;
-        },
-        { sum: 0, weight: 0 },
-      );
-
       const cost =
-        weightedCostTotals.weight > 0
-          ? weightedCostTotals.sum / weightedCostTotals.weight
-          : 0;
+        weightedCostWeight > 0
+          ? weightedCostSum / weightedCostWeight
+          : defaultVariant
+            ? getVariantCost(defaultVariant)
+            : 0;
       const margin = price > 0 ? ((price - cost) / price) * 100 : 0;
 
       const annualizationFactor = 365 / analysisDays;
@@ -854,7 +875,7 @@ export const getProductsList = query({
       return {
         id: product._id,
         name: product.title,
-        sku: productVariants[0]?.sku || product.handle || "N/A",
+        sku: defaultVariant?.sku || product.handle || "N/A",
         image: product.featuredImage,
         category: product.productType || "Uncategorized",
         vendor: product.vendor || "Unknown",

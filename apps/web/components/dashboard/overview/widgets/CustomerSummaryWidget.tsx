@@ -114,24 +114,30 @@ function Metric({
 }
 
 interface CustomerSummaryWidgetProps {
+  totalCustomers: number;
+  totalCustomersChange?: number;
+  returningCustomers: number;
+  returningCustomersChange?: number;
+  newCustomers: number;
+  newCustomersChange?: number;
   repurchaseRate: number;
   repurchaseRateChange?: number;
   returnRate: number;
   returnRateChange?: number;
-  cac: number;
-  cacChange?: number;
-  currency?: string;
   loading?: boolean;
 }
 
 export function CustomerSummaryWidget({
+  totalCustomers,
+  totalCustomersChange,
+  returningCustomers,
+  returningCustomersChange,
+  newCustomers,
+  newCustomersChange,
   repurchaseRate,
   repurchaseRateChange,
   returnRate,
   returnRateChange,
-  cac,
-  cacChange,
-  currency = "USD",
   loading = false,
 }: CustomerSummaryWidgetProps) {
   if (loading) {
@@ -172,12 +178,36 @@ export function CustomerSummaryWidget({
 
       <div className="space-y-1">
         <Metric
+          change={totalCustomersChange}
+          format="number"
+          isPrimary
+          label="Total Customers"
+          hint="Unique customers in the selected period"
+          value={totalCustomers}
+        />
+
+        <Metric
           change={repurchaseRateChange}
           format="percentage"
-          isPrimary
           label="Repurchase Rate"
           hint="Percentage of customers who purchased again"
           value={repurchaseRate}
+        />
+
+        <Metric
+          change={returningCustomersChange}
+          format="number"
+          label="Returning Customers"
+          hint="Customers who purchased more than once"
+          value={returningCustomers}
+        />
+
+        <Metric
+          change={newCustomersChange}
+          format="number"
+          label="New Customers"
+          hint="First-time customers acquired"
+          value={newCustomers}
         />
 
         <Metric
@@ -187,16 +217,6 @@ export function CustomerSummaryWidget({
           hint="Percentage of orders that were returned"
           goodWhenLower
           value={returnRate}
-        />
-
-        <Metric
-          change={cacChange}
-          currency={currency}
-          format="currency"
-          label="CAC"
-          hint="Customer Acquisition Cost per new customer"
-          goodWhenLower
-          value={cac}
         />
       </div>
     </Card>

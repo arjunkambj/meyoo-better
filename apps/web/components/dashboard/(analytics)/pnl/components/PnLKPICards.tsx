@@ -39,18 +39,6 @@ export const PnLKPICards = memo(function PnLKPICards({
 
   const kpiData = [
     {
-      title: "Gross Sales",
-      value: formatCurrency(metrics?.grossSales ?? 0),
-      change: metrics?.changes?.grossSales,
-      changeType:
-        (metrics?.changes?.grossSales ?? 0) >= 0
-          ? "positive"
-          : ("negative" as const),
-      icon: "solar:money-bag-bold-duotone",
-      // Use primary for top-line sales
-      iconColor: "text-primary",
-    },
-    {
       title: "Net Revenue",
       value: formatCurrency(metrics?.netRevenue ?? 0),
       subtitle: "after returns",
@@ -62,6 +50,17 @@ export const PnLKPICards = memo(function PnLKPICards({
       icon: "solar:card-receive-bold-duotone",
       // Revenue tends to read as success
       iconColor: "text-success",
+    },
+    {
+      title: "Gross Profit",
+      value: formatCurrency(metrics?.grossProfit ?? 0),
+      change: metrics?.changes?.grossProfit,
+      changeType:
+        (metrics?.changes?.grossProfit ?? 0) >= 0
+          ? "positive"
+          : ("negative" as const),
+      icon: "solar:chart-2-bold-duotone",
+      iconColor: "text-primary",
     },
     {
       title: "Net Profit",

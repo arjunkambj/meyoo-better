@@ -1,5 +1,6 @@
 import { useAction, useMutation, usePaginatedQuery } from "convex/react";
 import { useUIMessages } from "@convex-dev/agent/react";
+import { useAuthToken } from "@convex-dev/auth/react";
 import { useCallback, useMemo, useState } from "react";
 import { api } from "@/libs/convexApi";
 
@@ -46,9 +47,12 @@ export function useAgent({
   threadPageSize?: number;
   messagePageSize?: number;
 } = {}) {
+  const authToken = useAuthToken();
+  const isAuthenticated = authToken !== null;
+
   const threadPagination = usePaginatedQuery(
     api.agent.chat.listThreads,
-    {},
+    isAuthenticated ? {} : "skip",
     {
       initialNumItems: threadPageSize,
     },
@@ -56,7 +60,7 @@ export function useAgent({
 
   const messageUIMsgs = useUIMessages(
     api.agent.chat.listMessages as any,
-    threadId ? { threadId } : ("skip" as any),
+    threadId && isAuthenticated ? { threadId } : ("skip" as any),
     { initialNumItems: messagePageSize, stream: true },
   );
 

@@ -21,7 +21,7 @@ const emailAddress = z
 const memberRoleEnum = z.enum(["StoreOwner", "StoreTeam"]);
 const memberStatusEnum = z.enum(["active", "suspended", "removed"]);
 
-const DEFAULT_FROM_EMAIL = "Meyoo <noreply@mail.meyoo.io>";
+const DEFAULT_FROM_EMAIL = "Meyoo <noreply@meyoo.io>";
 
 const toIsoString = (timestamp?: number | null) =>
   typeof timestamp === "number" && Number.isFinite(timestamp)

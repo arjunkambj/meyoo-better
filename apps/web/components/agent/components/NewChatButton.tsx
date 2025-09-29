@@ -1,17 +1,17 @@
 "use client";
 
-import {Button, Tooltip} from "@heroui/react";
-import {Icon} from "@iconify/react";
+import { Button, Tooltip } from "@heroui/react";
+import { Icon } from "@iconify/react";
 
 export default function NewChatButton({ onNew }: { onNew: () => void }) {
   return (
     <Tooltip content="Start new chat">
       <Button
         size="sm"
-        variant="flat"
         color="primary"
-        radius="md"
-        startContent={<Icon icon="solar:pen-new-square-bold-duotone" width={18} />}
+        startContent={
+          <Icon icon="solar:pen-new-square-bold-duotone" width={18} />
+        }
         onPress={onNew}
         className="hover:bg-primary/20 transition-colors"
       >
@@ -20,4 +20,3 @@ export default function NewChatButton({ onNew }: { onNew: () => void }) {
     </Tooltip>
   );
 }
-

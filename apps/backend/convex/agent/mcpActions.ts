@@ -621,19 +621,31 @@ export const pnlSnapshot = action({
     }
 
     const revenue = Number(totals.revenue ?? 0);
-    const grossProfit = Number(totals.grossProfit ?? 0);
+    const grossProfit = Number(metrics.grossProfit ?? totals.grossProfit ?? 0);
     const netProfit = Number(totals.netProfit ?? 0);
-    const grossMargin = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
+    const currentNetRevenue = Number(metrics.netRevenue ?? revenue);
+    const grossMargin = currentNetRevenue > 0 ? (grossProfit / currentNetRevenue) * 100 : 0;
     const netMargin = Number(metrics.netMargin ?? 0);
     const operatingExpenses = Number(metrics.operatingExpenses ?? 0);
     const adSpend = Number(metrics.marketingCost ?? totals.totalAdSpend ?? 0);
     const marketingROI = Number(metrics.marketingROI ?? 0);
     const ebitda = Number(metrics.ebitda ?? 0);
 
+    const grossProfitChange = Number(metrics.changes?.grossProfit ?? 0);
+    const netRevenueChange = Number(metrics.changes?.netRevenue ?? 0);
+    const previousNetRevenue = currentNetRevenue - netRevenueChange;
+    const previousGrossProfit = grossProfit - grossProfitChange;
+    const previousGrossMargin = previousNetRevenue > 0
+      ? (previousGrossProfit / previousNetRevenue) * 100
+      : null;
+    const grossMarginChange = previousGrossMargin !== null && Number.isFinite(previousGrossMargin)
+      ? grossMargin - previousGrossMargin
+      : 0;
+
     const changes = {
       revenue: Number(metrics.changes?.grossSales ?? 0),
       netProfit: Number(metrics.changes?.netProfit ?? 0),
-      grossMargin: Number(metrics.changes?.grossProfit ?? 0),
+      grossMargin: grossMarginChange,
       netMargin: Number(metrics.changes?.netMargin ?? 0),
       marketingROI: Number(metrics.changes?.marketingROI ?? 0),
     };

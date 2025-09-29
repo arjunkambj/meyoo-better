@@ -117,19 +117,20 @@ export default function ChatUI() {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="px-3 py-2.5 flex items-center bg-content1 border-b border-default-200">
+      <div className="px-1 py-2.5 flex items-center border-b border-default-200/80">
         <Button
           size="sm"
-          variant="flat"
+          variant="light"
+          isIconOnly
           radius="md"
           startContent={
             <Icon
               icon={
                 viewMode === "chat"
-                  ? "solar:history-bold"
+                  ? "solar:hamburger-menu-bold"
                   : "solar:alt-arrow-left-line-duotone"
               }
-              width={18}
+              width={20}
             />
           }
           aria-label={
@@ -137,9 +138,9 @@ export default function ChatUI() {
           }
           title={viewMode === "chat" ? "View History" : "Back to Chat"}
           onPress={() => setViewMode(viewMode === "chat" ? "history" : "chat")}
-          className="hover:bg-content2 transition-colors text-default-600"
+          className="hover:bg-content3 transition-colors text-default-600"
         >
-          {viewMode === "chat" ? "History" : "Back"}
+          {viewMode === "chat" ? "" : ""}
         </Button>
 
         <div className="flex-1" />

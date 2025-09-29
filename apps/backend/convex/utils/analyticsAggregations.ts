@@ -1092,30 +1092,62 @@ export function computeOrdersAnalytics(
 }
 
 function getPeriodKey(date: Date, granularity: PnLGranularity) {
+  const base = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+
   switch (granularity) {
     case "weekly": {
-      const current = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+      const current = new Date(base.getTime());
       const day = current.getUTCDay() || 7;
       if (day !== 1) {
         current.setUTCDate(current.getUTCDate() - day + 1);
       }
-      const start = current.toISOString().slice(0, 10);
-      const end = new Date(current.getTime());
-      end.setUTCDate(end.getUTCDate() + 6);
-      const endIso = end.toISOString().slice(0, 10);
-      const label = `${start} – ${endIso}`;
-      return { key: `${start}_${endIso}`, label, date: start };
+
+      const endLabelDate = new Date(current.getTime());
+      endLabelDate.setUTCDate(endLabelDate.getUTCDate() + 6);
+
+      const endRange = new Date(endLabelDate.getTime());
+      endRange.setUTCHours(23, 59, 59, 999);
+
+      const startIso = current.toISOString().slice(0, 10);
+      const endIso = endLabelDate.toISOString().slice(0, 10);
+
+      return {
+        key: `${startIso}_${endIso}`,
+        label: `${startIso} – ${endIso}`,
+        date: startIso,
+        rangeStartMs: current.getTime(),
+        rangeEndMs: endRange.getTime(),
+      };
     }
     case "monthly": {
-      const year = date.getUTCFullYear();
-      const month = date.getUTCMonth() + 1;
-      const key = `${year}-${String(month).padStart(2, "0")}`;
-      return { key, label: key, date: `${key}-01` };
+      const year = base.getUTCFullYear();
+      const monthIndex = base.getUTCMonth();
+      const key = `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
+
+      const start = new Date(Date.UTC(year, monthIndex, 1));
+      const end = new Date(Date.UTC(year, monthIndex + 1, 0, 23, 59, 59, 999));
+
+      return {
+        key,
+        label: key,
+        date: `${key}-01`,
+        rangeStartMs: start.getTime(),
+        rangeEndMs: end.getTime(),
+      };
     }
     case "daily":
     default: {
-      const iso = date.toISOString().slice(0, 10);
-      return { key: iso, label: iso, date: iso };
+      const start = new Date(base.getTime());
+      const end = new Date(base.getTime());
+      end.setUTCHours(23, 59, 59, 999);
+      const iso = start.toISOString().slice(0, 10);
+      return {
+        key: iso,
+        label: iso,
+        date: iso,
+        rangeStartMs: start.getTime(),
+        rangeEndMs: end.getTime(),
+      };
     }
   }
 }
@@ -1147,8 +1179,185 @@ function finalisePnLMetrics(metrics: PnLMetrics): PnLMetrics {
   };
 }
 
+type CostComputationContext = {
+  ordersCount: number;
+  unitsSold: number;
+  revenue: number;
+  rangeStartMs: number;
+  rangeEndMs: number;
+};
+
+function toCostMode(cost: AnyRecord): "fixed" | "perOrder" | "perUnit" | "percentageRevenue" | "timeBound" {
+  const raw = String(cost.mode ?? cost.calculation ?? cost.frequency ?? "fixed");
+  switch (raw) {
+    case "per_order":
+    case "perOrder":
+      return "perOrder";
+    case "per_unit":
+    case "per_item":
+    case "perUnit":
+      return "perUnit";
+    case "percentage":
+    case "percentageRevenue":
+      return "percentageRevenue";
+    case "timeBound":
+    case "time_bound":
+      return "timeBound";
+    default:
+      return "fixed";
+  }
+}
+
+function computeCostAmountForRange(cost: AnyRecord, ctx: CostComputationContext): number {
+  const amount = safeNumber(cost.amount ?? cost.value ?? cost.total ?? 0);
+  if (amount === 0) return 0;
+
+  const mode = toCostMode(cost);
+  switch (mode) {
+    case "perOrder":
+      return amount * ctx.ordersCount;
+    case "perUnit":
+      return amount * ctx.unitsSold;
+    case "percentageRevenue":
+      return ctx.revenue > 0 ? (amount / 100) * ctx.revenue : 0;
+    case "timeBound": {
+      const rangeStart = Number.isFinite(ctx.rangeStartMs) ? ctx.rangeStartMs : 0;
+      const rangeEnd = Number.isFinite(ctx.rangeEndMs) ? ctx.rangeEndMs : rangeStart;
+      const from = safeNumber(cost.effectiveFrom ?? rangeStart);
+      const rawTo = cost.effectiveTo ?? rangeEnd;
+      const to = safeNumber(rawTo) || rangeEnd;
+      if (!Number.isFinite(from) || !Number.isFinite(to)) return 0;
+      if (to <= from) return 0;
+
+      const overlapStart = Math.max(from, rangeStart);
+      const overlapEnd = Math.min(to, rangeEnd);
+      if (overlapEnd <= overlapStart) return 0;
+
+      const overlapMs = overlapEnd - overlapStart;
+      const totalWindow = Math.max(1, to - from);
+      const proportion = overlapMs / totalWindow;
+      return amount * proportion;
+    }
+    case "fixed":
+    default:
+      return amount;
+  }
+}
+
+function calculatePnLMetricsForRange({
+  orders,
+  costs,
+  metaInsights,
+  rangeStartMs,
+  rangeEndMs,
+}: {
+  orders: AnyRecord[];
+  costs: AnyRecord[];
+  metaInsights: AnyRecord[];
+  rangeStartMs: number;
+  rangeEndMs: number;
+}): { metrics: PnLMetrics; marketingCost: number } {
+  const filteredOrders = orders.filter((order) => {
+    const createdAt = safeNumber(order.shopifyCreatedAt ?? order.createdAt ?? order.processedAt ?? 0);
+    if (!Number.isFinite(createdAt)) return false;
+    if (Number.isFinite(rangeStartMs) && createdAt < rangeStartMs) return false;
+    if (Number.isFinite(rangeEndMs) && createdAt > rangeEndMs) return false;
+    return true;
+  });
+
+  const grossSales = sumBy(filteredOrders, (order) =>
+    safeNumber(order.subtotalPrice ?? order.totalSales ?? order.totalPrice ?? 0),
+  );
+  const revenue = sumBy(filteredOrders, (order) => safeNumber(order.totalPrice ?? order.revenue ?? 0));
+  const discounts = sumBy(filteredOrders, (order) => safeNumber(order.totalDiscounts ?? order.discounts ?? 0));
+  const refunds = sumBy(filteredOrders, (order) => safeNumber(order.totalRefunded ?? order.totalRefunds ?? 0));
+  let cogs = sumBy(filteredOrders, (order) => safeNumber(order.totalCostOfGoods ?? order.cogs ?? 0));
+  let shippingCosts = sumBy(filteredOrders, (order) => safeNumber(order.totalShippingPrice ?? order.shippingCosts ?? 0));
+  let transactionFees = sumBy(filteredOrders, (order) => safeNumber(order.totalFees ?? order.transactionFees ?? 0));
+  let handlingFees = sumBy(filteredOrders, (order) => safeNumber(order.handlingFees ?? 0));
+  let taxesCollected = sumBy(filteredOrders, (order) => safeNumber(order.totalTax ?? order.taxesCollected ?? 0));
+
+  const unitsSold = sumBy(filteredOrders, (order) =>
+    safeNumber(
+      order.totalQuantity ??
+        order.totalQuantityOrdered ??
+        order.totalItems ??
+        order.unitsSold ??
+        0,
+    ),
+  );
+
+  const context: CostComputationContext = {
+    ordersCount: filteredOrders.length,
+    unitsSold,
+    revenue,
+    rangeStartMs,
+    rangeEndMs,
+  };
+
+  const marketingCostEntries = costs.filter((cost) => cost.type === "marketing");
+  const shippingCostEntries = costs.filter((cost) => cost.type === "shipping");
+  const paymentCostEntries = costs.filter((cost) => cost.type === "payment");
+  const handlingCostEntries = costs.filter((cost) => cost.type === "handling");
+  const operationalCostEntries = costs.filter((cost) => cost.type === "operational" || cost.type === "custom");
+  const productCostEntries = costs.filter((cost) => cost.type === "product");
+  const taxCostEntries = costs.filter((cost) => cost.type === "tax");
+
+  const marketingCostFromCosts = sumBy(marketingCostEntries, (cost) => computeCostAmountForRange(cost, context));
+  shippingCosts += sumBy(shippingCostEntries, (cost) => computeCostAmountForRange(cost, context));
+  transactionFees += sumBy(paymentCostEntries, (cost) => computeCostAmountForRange(cost, context));
+  handlingFees += sumBy(handlingCostEntries, (cost) => computeCostAmountForRange(cost, context));
+  const operationalCostsAmount = sumBy(operationalCostEntries, (cost) => computeCostAmountForRange(cost, context));
+  const productCostAmount = sumBy(productCostEntries, (cost) => computeCostAmountForRange(cost, context));
+  const taxCostsAmount = sumBy(taxCostEntries, (cost) => computeCostAmountForRange(cost, context));
+
+  if (productCostAmount > 0) {
+    cogs += productCostAmount;
+  }
+  taxesCollected += taxCostsAmount;
+
+  const metaSpend = sumBy(metaInsights, (insight) => {
+    if (!insight || typeof insight.date !== "string") return 0;
+    const timestamp = Date.parse(`${insight.date}T00:00:00.000Z`);
+    if (!Number.isFinite(timestamp)) return 0;
+    if (Number.isFinite(rangeStartMs) && timestamp < rangeStartMs) return 0;
+    if (Number.isFinite(rangeEndMs) && timestamp > rangeEndMs) return 0;
+    return safeNumber(insight.spend ?? 0);
+  });
+
+  const marketingCost = marketingCostFromCosts + metaSpend;
+  const totalAdSpend = marketingCost;
+  const customCosts = operationalCostsAmount;
+
+  const netRevenue = revenue - refunds;
+  const grossProfit = netRevenue - cogs;
+  const netProfit = grossProfit - (shippingCosts + transactionFees + handlingFees + taxesCollected + customCosts + totalAdSpend);
+
+  const metrics = finalisePnLMetrics({
+    grossSales,
+    discounts,
+    refunds,
+    revenue: netRevenue,
+    cogs,
+    shippingCosts,
+    transactionFees,
+    handlingFees,
+    grossProfit,
+    taxesCollected,
+    customCosts,
+    totalAdSpend,
+    netProfit,
+    netProfitMargin: 0,
+  });
+
+  return {
+    metrics,
+    marketingCost,
+  };
+}
+
 function buildPnLKPIs(total: PnLMetrics, marketingCost: number): PnLKPIMetrics {
-  const netRevenue = total.revenue - total.refunds;
+  const netRevenue = total.revenue;
   const operatingExpenses = total.customCosts + total.totalAdSpend;
   const ebitda = total.netProfit + total.totalAdSpend;
   const marketingROAS = marketingCost > 0 ? total.revenue / marketingCost : 0;
@@ -1186,52 +1395,110 @@ export function computePnLAnalytics(
   response: AnalyticsSourceResponse<any> | null | undefined,
   granularity: PnLGranularity,
 ): PnLAnalyticsResult {
+  const emptyTotals = finalisePnLMetrics(aggregatePnLMetrics([]));
   if (!response) {
-    return { metrics: null, periods: [], exportRows: [], totals: finalisePnLMetrics(aggregatePnLMetrics([])) } satisfies PnLAnalyticsResult;
+    return { metrics: null, periods: [], exportRows: [], totals: emptyTotals } satisfies PnLAnalyticsResult;
   }
 
   const data = ensureDataset(response);
   if (!data) {
-    return { metrics: null, periods: [], exportRows: [], totals: finalisePnLMetrics(aggregatePnLMetrics([])) } satisfies PnLAnalyticsResult;
+    return { metrics: null, periods: [], exportRows: [], totals: emptyTotals } satisfies PnLAnalyticsResult;
   }
 
   const orders = (data.orders || []) as AnyRecord[];
   const costs = (data.costs || []) as AnyRecord[];
   const metaInsights = (data.metaInsights || []) as AnyRecord[];
+  const buckets = new Map<
+    string,
+    {
+      label: string;
+      date: string;
+      rangeStartMs: number;
+      rangeEndMs: number;
+      orders: AnyRecord[];
+    }
+  >();
 
-  const timelineMap = new Map<string, { label: string; date: string; items: AnyRecord[] }>();
+  const ensureBucket = (dateValue: Date) => {
+    const period = getPeriodKey(dateValue, granularity);
+    const existing = buckets.get(period.key);
+    if (existing) return existing;
+    const bucket = {
+      label: period.label,
+      date: period.date,
+      rangeStartMs: period.rangeStartMs,
+      rangeEndMs: period.rangeEndMs,
+      orders: [] as AnyRecord[],
+    };
+    buckets.set(period.key, bucket);
+    return bucket;
+  };
 
   for (const order of orders) {
-    const createdAt = safeNumber(order.shopifyCreatedAt ?? order.createdAt ?? Date.now());
-    const date = new Date(createdAt);
-    const { key, label, date: dateKey } = getPeriodKey(date, granularity);
-    const bucket = timelineMap.get(key) ?? { label, date: dateKey, items: [] };
-    bucket.items.push(order);
-    timelineMap.set(key, bucket);
+    const createdAt = safeNumber(order.shopifyCreatedAt ?? order.createdAt ?? order.processedAt ?? Date.now());
+    if (!Number.isFinite(createdAt)) continue;
+    const bucket = ensureBucket(new Date(createdAt));
+    bucket.orders.push(order);
   }
 
-  const periods: PnLTablePeriod[] = Array.from(timelineMap.values())
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-    .map((bucket) => {
-      const metrics = aggregatePnLMetrics(bucket.items);
-      return {
-        label: bucket.label,
-        date: bucket.date,
-        metrics: finalisePnLMetrics(metrics),
-        growth: null,
-      } satisfies PnLTablePeriod;
+  for (const insight of metaInsights) {
+    if (!insight || typeof insight.date !== "string") continue;
+    const parsed = Date.parse(`${insight.date}T00:00:00.000Z`);
+    if (!Number.isFinite(parsed)) continue;
+    ensureBucket(new Date(parsed));
+  }
+
+  const sortedBuckets = Array.from(buckets.values()).sort((a, b) => a.rangeStartMs - b.rangeStartMs);
+
+  const totalRangeStart = response.dateRange?.startDate
+    ? Date.parse(`${response.dateRange.startDate}T00:00:00.000Z`)
+    : Number.NEGATIVE_INFINITY;
+  const totalRangeEnd = response.dateRange?.endDate
+    ? Date.parse(`${response.dateRange.endDate}T23:59:59.999Z`)
+    : Number.POSITIVE_INFINITY;
+
+  const totalComputation = calculatePnLMetricsForRange({
+    orders,
+    costs,
+    metaInsights,
+    rangeStartMs: totalRangeStart,
+    rangeEndMs: totalRangeEnd,
+  });
+
+  const periods: PnLTablePeriod[] = sortedBuckets.map((bucket) => {
+    const { metrics } = calculatePnLMetricsForRange({
+      orders: bucket.orders,
+      costs,
+      metaInsights,
+      rangeStartMs: bucket.rangeStartMs,
+      rangeEndMs: bucket.rangeEndMs,
     });
 
-  const totalMetrics = finalisePnLMetrics(aggregatePnLMetrics(orders));
-  const marketingCost = sumBy(costs.filter((cost) => cost.type === "marketing"), (cost) => safeNumber(cost.amount)) +
-    sumBy(metaInsights, (entry) => safeNumber(entry.spend));
+    return {
+      label: bucket.label,
+      date: bucket.date,
+      metrics,
+      growth: null,
+    } satisfies PnLTablePeriod;
+  });
 
-  const metrics = buildPnLKPIs(totalMetrics, marketingCost);
+  if (periods.length > 0) {
+    periods.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    periods.push({
+      label: "Total",
+      date: response.dateRange?.endDate ?? new Date().toISOString().slice(0, 10),
+      metrics: totalComputation.metrics,
+      growth: null,
+      isTotal: true,
+    });
+  }
 
-  const exportRows = periods.map((period) => ({
+  const kpis = buildPnLKPIs(totalComputation.metrics, totalComputation.metrics.totalAdSpend);
+
+  const regularPeriods = periods.filter((period) => !period.isTotal);
+  const exportRows = regularPeriods.map((period) => ({
     Period: period.label,
-    Revenue: period.metrics.revenue,
-    GrossSales: period.metrics.grossSales,
+    NetRevenue: period.metrics.revenue,
     Discounts: period.metrics.discounts,
     Returns: period.metrics.refunds,
     COGS: period.metrics.cogs,
@@ -1246,11 +1513,28 @@ export function computePnLAnalytics(
     NetMargin: period.metrics.netProfitMargin,
   }));
 
+  exportRows.push({
+    Period: "TOTAL",
+    NetRevenue: totalComputation.metrics.revenue,
+    Discounts: totalComputation.metrics.discounts,
+    Returns: totalComputation.metrics.refunds,
+    COGS: totalComputation.metrics.cogs,
+    Shipping: totalComputation.metrics.shippingCosts,
+    TransactionFees: totalComputation.metrics.transactionFees,
+    HandlingFees: totalComputation.metrics.handlingFees,
+    GrossProfit: totalComputation.metrics.grossProfit,
+    Taxes: totalComputation.metrics.taxesCollected,
+    OperatingCosts: totalComputation.metrics.customCosts,
+    AdSpend: totalComputation.metrics.totalAdSpend,
+    NetProfit: totalComputation.metrics.netProfit,
+    NetMargin: totalComputation.metrics.netProfitMargin,
+  });
+
   return {
-    metrics,
+    metrics: kpis,
     periods,
     exportRows,
-    totals: totalMetrics,
+    totals: totalComputation.metrics,
   } satisfies PnLAnalyticsResult;
 }
 

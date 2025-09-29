@@ -25,12 +25,21 @@ const metricConfig: Record<
     isSection?: boolean;
     isBold?: boolean;
     isSubItem?: boolean;
+    hidden?: boolean;
   }
 > = {
   grossSales: {
     label: "Gross Sales",
     icon: "solar:sale-bold-duotone",
     iconColor: "text-success",
+    category: "revenue",
+    isBold: true,
+    hidden: true,
+  },
+  revenue: {
+    label: "Net Revenue",
+    icon: "solar:wallet-2-bold-duotone",
+    iconColor: "text-success-600",
     category: "revenue",
     isBold: true,
   },
@@ -47,13 +56,6 @@ const metricConfig: Record<
     iconColor: "text-default-500",
     category: "revenue",
     isSubItem: true,
-  },
-  revenue: {
-    label: "Net Revenue",
-    icon: "solar:wallet-2-bold-duotone",
-    iconColor: "text-success-600",
-    category: "revenue",
-    isBold: true,
   },
   cogs: {
     label: "Total COGS",
@@ -187,11 +189,11 @@ export const PnLTable = React.memo(function PnLTable({
 
     // Adjust number of periods shown based on granularity for better readability
     if (granularity === "daily") {
-      // Show last 5 days - fits better on screen
-      regularPeriods = regularPeriods.slice(-5);
+      // Show last 7 days for quick pulse
+      regularPeriods = regularPeriods.slice(-7);
     } else if (granularity === "weekly") {
-      // Show last 4 weeks
-      regularPeriods = regularPeriods.slice(-4);
+      // Show last 6 weeks to capture recent trends
+      regularPeriods = regularPeriods.slice(-6);
     } else if (granularity === "monthly") {
       // Show last 3 months for better readability
       regularPeriods = regularPeriods.slice(-3);
@@ -371,7 +373,7 @@ export const PnLTable = React.memo(function PnLTable({
               </td>
             </tr>
             {Object.entries(metricConfig)
-              .filter(([_, config]) => config.category === "revenue")
+              .filter(([_, config]) => !config.hidden && config.category === "revenue")
               .map(([key, config]) => renderMetricRow(key, config))}
 
             {/* Spacer */}
@@ -397,7 +399,7 @@ export const PnLTable = React.memo(function PnLTable({
               </td>
             </tr>
             {Object.entries(metricConfig)
-              .filter(([_, config]) => config.category === "cogs")
+              .filter(([_, config]) => !config.hidden && config.category === "cogs")
               .map(([key, config]) => renderMetricRow(key, config))}
 
             {/* Spacer */}
@@ -434,7 +436,7 @@ export const PnLTable = React.memo(function PnLTable({
               </td>
             </tr>
             {Object.entries(metricConfig)
-              .filter(([_, config]) => config.category === "operations")
+              .filter(([_, config]) => !config.hidden && config.category === "operations")
               .map(([key, config]) => renderMetricRow(key, config))}
 
             {/* Spacer */}

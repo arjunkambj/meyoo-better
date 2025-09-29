@@ -48,11 +48,11 @@ export default function AgentChatInput({
           classNames={{
             // Keep background stable across all states
             inputWrapper: cn(
-              "bg-background rounded-2xl",
+              "bg-background rounded-lg",
               "hover:bg-default-100",
               "focus-within:bg-background",
               "data-[hover=true]:bg-background ",
-              "border-1 hover:border-2 focus-within:border-2",
+              "border-1",
               "hover:border-primary-300",
               "focus-within:border-primary",
               "transition-colors duration-200",

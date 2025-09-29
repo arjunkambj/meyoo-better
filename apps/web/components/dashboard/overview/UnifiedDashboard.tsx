@@ -172,6 +172,8 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
         overviewMetrics?.taxesPercentageOfRevenue?.value || 0,
 
       // Customers
+      totalCustomers: overviewMetrics?.totalCustomers?.value || 0,
+      newCustomers: overviewMetrics?.newCustomers?.value || 0,
       returningCustomers: overviewMetrics?.returningCustomers?.value || 0,
       repeatCustomerRate: overviewMetrics?.repeatCustomerRate?.value || 0,
       customerAcquisitionCost:

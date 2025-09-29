@@ -62,10 +62,15 @@ export function WidgetRenderer({
     case "customerSummary":
       return (
         <CustomerSummaryWidget
-          cac={metricsData.customerAcquisitionCost ?? 0}
-          cacChange={overviewMetrics?.customerAcquisitionCost?.change ?? 0}
-          currency={primaryCurrency}
           loading={isLoading}
+          totalCustomers={metricsData.totalCustomers ?? 0}
+          totalCustomersChange={overviewMetrics?.totalCustomers?.change ?? 0}
+          returningCustomers={metricsData.returningCustomers ?? 0}
+          returningCustomersChange={
+            overviewMetrics?.returningCustomers?.change ?? 0
+          }
+          newCustomers={metricsData.newCustomers ?? 0}
+          newCustomersChange={overviewMetrics?.newCustomers?.change ?? 0}
           repurchaseRate={metricsData.repurchaseRate ?? 0}
           repurchaseRateChange={overviewMetrics?.repeatCustomerRate?.change ?? 0}
           returnRate={metricsData.returnRate ?? 0}

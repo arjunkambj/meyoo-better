@@ -31,14 +31,14 @@ export default function AssistantMessage({
   return (
     <div className="flex items-start py-2">
       <div className="max-w-[90%] group relative">
-        <div className="inline-block rounded-lg rounded-tl-sm bg-content2 text-foreground text-sm px-3 py-2.5">
+        <div className="inline-block rounded-xl rounded-tl-sm bg-default-200 text-foreground text-sm px-3 py-2.5">
           <AgentResponseFormatter
             content={content}
             onCopy={() => void handleCopyAll()}
           />
         </div>
         {streaming ? null : (
-          <div className="mt-1.5 flex items-center gap-0.5 text-xs text-default-500">
+          <div className="mt-1 flex items-center  text-xs text-default-500">
             <Button
               isIconOnly
               size="sm"

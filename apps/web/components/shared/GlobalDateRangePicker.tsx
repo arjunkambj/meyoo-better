@@ -3,7 +3,8 @@
 import { Button, Divider, Input, Popover, PopoverContent, PopoverTrigger, RangeCalendar } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { type CalendarDate, type DateValue, getLocalTimeZone, parseDate, today } from "@internationalized/date";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import clsx from "clsx";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AnalyticsDateRange } from "@repo/types";
 
 interface RangeValue<T> {
@@ -177,6 +178,10 @@ export default function GlobalDateRangePicker({
     defaultPreset ?? presets[0] ?? null,
   );
 
+  const fallbackPresetKey = useMemo<string>(() => {
+    return defaultPreset ?? presets[0] ?? "last_30_days";
+  }, [defaultPreset, presets]);
+
   const initialRange = useMemo(() => {
     if (value) return value;
     if (selectedPreset) return getPresetRange(selectedPreset);
@@ -184,14 +189,7 @@ export default function GlobalDateRangePicker({
   }, [value, selectedPreset]);
 
   const [internalRange, setInternalRange] = useState<CalendarDateRange>(initialRange);
-
-  useEffect(() => {
-    if (value) {
-      setInternalRange(value);
-    }
-  }, [value]);
-
-  const effectiveRange = value ?? internalRange;
+  const hasEmittedInitial = useRef(false);
 
   const emitChange = useCallback(
     (range: CalendarDateRange, preset?: string | null) => {
@@ -201,6 +199,23 @@ export default function GlobalDateRangePicker({
     },
     [onAnalyticsChange],
   );
+
+  useEffect(() => {
+    if (value) {
+      setInternalRange(value);
+    }
+  }, [value]);
+
+  const effectiveRange = value ?? internalRange;
+
+  useEffect(() => {
+    if (value || hasEmittedInitial.current) {
+      return;
+    }
+
+    hasEmittedInitial.current = true;
+    emitChange(internalRange, selectedPreset ?? null);
+  }, [value, internalRange, selectedPreset, emitChange]);
 
   const handlePresetChange = useCallback(
     (key: string) => {
@@ -278,59 +293,67 @@ export default function GlobalDateRangePicker({
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="p-4 w-[320px]">
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-default-900">Date Range</span>
-            {selectedPreset && (
-              <span className="text-xs text-default-500">
-                {allDateRangePresets[selectedPreset as keyof typeof allDateRangePresets]?.label}
-              </span>
-            )}
+      <PopoverContent className="w-[700px] p-0">
+        <div className="flex">
+          <div className="w-40 border-r border-default-200 bg-default-50 p-3">
+            <p className="mb-2 text-xs font-semibold uppercase text-default-400">
+              Quick ranges
+            </p>
+            <div className="flex flex-col gap-1">
+              {presetItems.map((preset) => {
+                const isActive = selectedPreset === preset.key;
+                return (
+                  <Button
+                    key={preset.key}
+                    size="sm"
+                    variant="light"
+                    className={clsx(
+                      "justify-start text-left text-sm font-medium",
+                      isActive
+                        ? "bg-primary-50 text-primary-600 data-[hover=true]:bg-primary-100"
+                        : "text-default-600 data-[hover=true]:bg-default-100",
+                    )}
+                    onPress={() => handlePresetChange(preset.key)}
+                  >
+                    {preset.label}
+                  </Button>
+                );
+              })}
+            </div>
           </div>
 
-          <RangeCalendar
-            aria-label="Analytics date range"
-            minValue={minDate}
-            maxValue={maxDate}
-            value={effectiveRange}
-            onChange={handleCalendarChange}
-          />
+          <div className="flex-1 p-4">
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                value={calendarDateToString(effectiveRange.start)}
+                onValueChange={(input) => handleInputChange("start", input)}
+              />
+              <Input
+                value={calendarDateToString(effectiveRange.end)}
+                onValueChange={(input) => handleInputChange("end", input)}
+              />
+            </div>
 
-          <Divider className="my-1" />
+            <div className="mt-4">
+              <RangeCalendar
+                aria-label="Analytics date range"
+                minValue={minDate}
+                maxValue={maxDate}
+                value={effectiveRange}
+                onChange={handleCalendarChange}
+                visibleMonths={2}
+                weekdayStyle="short"
+                calendarWidth={240}
+              />
+            </div>
 
-          <div className="flex flex-wrap gap-2">
-            {presetItems.map((preset) => (
-              <Button
-                key={preset.key}
-                size="sm"
-                variant={selectedPreset === preset.key ? "solid" : "light"}
-                onPress={() => handlePresetChange(preset.key)}
-              >
-                {preset.label}
+            <Divider className="my-4" />
+
+            <div className="flex justify-end">
+              <Button size="sm" color="primary" onPress={() => setIsOpen(false)}>
+                Apply
               </Button>
-            ))}
-          </div>
-
-          <Divider className="my-1" />
-
-          <div className="flex items-center gap-2">
-            <Input
-              label="Start"
-              value={calendarDateToString(effectiveRange.start)}
-              onValueChange={(input) => handleInputChange("start", input)}
-            />
-            <Input
-              label="End"
-              value={calendarDateToString(effectiveRange.end)}
-              onValueChange={(input) => handleInputChange("end", input)}
-            />
-          </div>
-
-          <div className="flex justify-end gap-2">
-            <Button size="sm" variant="light" onPress={() => setIsOpen(false)}>
-              Close
-            </Button>
+            </div>
           </div>
         </div>
       </PopoverContent>

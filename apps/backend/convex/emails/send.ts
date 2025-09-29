@@ -20,7 +20,7 @@ export const sendOtpEmail = internalMutation({
       </div>
     `;
     await resend.sendEmail(ctx, {
-      from: "Meyoo <noreply@mail.meyoo.io>",
+      from: "Meyoo <noreply@meyoo.io>",
       to,
       subject: "Your Meyoo verification code",
       html,

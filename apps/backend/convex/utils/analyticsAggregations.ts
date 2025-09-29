@@ -115,7 +115,16 @@ function computeCostOverlap(
 }
 
 function safeNumber(value: unknown): number {
-  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed.length === 0) return 0;
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
 }
 
 function sumBy<T>(items: T[] | undefined, getter: (item: T) => number): number {
@@ -277,11 +286,48 @@ export function computeOverviewMetrics(
   const customers = (data.customers || []) as AnyRecord[];
   const analytics = (data.analytics || []) as AnyRecord[];
 
-  const revenue = sumBy(orders, (order) => safeNumber(order.totalPrice));
-  const grossSales = sumBy(orders, (order) => safeNumber(order.subtotalPrice ?? order.totalPrice));
-  const discounts = sumBy(orders, (order) => safeNumber(order.totalDiscounts));
-  let shippingCosts = sumBy(orders, (order) => safeNumber(order.totalShippingPrice));
-  let taxesCollected = sumBy(orders, (order) => safeNumber(order.totalTax));
+  const toOrderKey = (order: AnyRecord): string =>
+    toStringId(order._id ?? order.id ?? order.orderId ?? order.shopifyId ?? order.order_id);
+
+  const isCancelledOrder = (order: AnyRecord): boolean => {
+    const candidates = [
+      order.status,
+      order.orderStatus,
+      order.financialStatus,
+      order.fulfillmentStatus,
+      order.financial_status,
+      order.fulfillment_status,
+    ];
+
+    return candidates.some((value) => {
+      if (!value) return false;
+      const normalized = String(value).toLowerCase();
+      return (
+        normalized.includes("cancel") ||
+        normalized.includes("void") ||
+        normalized.includes("decline")
+      );
+    });
+  };
+
+  const cancelledOrderIds = new Set<string>();
+  for (const order of orders) {
+    const key = toOrderKey(order);
+    if (key && isCancelledOrder(order)) {
+      cancelledOrderIds.add(key);
+    }
+  }
+
+  const activeOrders = orders.filter((order) => !cancelledOrderIds.has(toOrderKey(order)));
+  const activeOrderCount = activeOrders.length;
+
+  const revenue = sumBy(activeOrders, (order) => safeNumber(order.totalPrice));
+  const grossSales = sumBy(activeOrders, (order) => safeNumber(order.subtotalPrice ?? order.totalPrice));
+  const discounts = sumBy(activeOrders, (order) => safeNumber(order.totalDiscounts));
+  // Start with order-level shipping costs as the base
+  const shippingCostsFromOrders = sumBy(activeOrders, (order) => safeNumber(order.totalShippingPrice));
+  let shippingCosts = shippingCostsFromOrders;
+  let taxesCollected = sumBy(activeOrders, (order) => safeNumber(order.totalTax));
   const refundsAmountFromDocs = refunds.length
     ? sumBy(refunds, (refund) => safeNumber(refund.totalRefunded ?? refund.amount))
     : 0;
@@ -289,45 +335,111 @@ export function computeOverviewMetrics(
   const refundsAmount = refunds.length ? refundsAmountFromDocs : refundsAmountFromOrders;
 
   const variantMap = new Map<string, AnyRecord>();
+  const variantByShopifyId = new Map<string, AnyRecord>();
   for (const variant of variants) {
-    variantMap.set(toStringId(variant._id ?? variant.id ?? variant.variantId), variant);
+    const internalId = toStringId(variant._id ?? variant.id ?? variant.variantId);
+    if (internalId) {
+      variantMap.set(internalId, variant);
+    }
+    const shopifyVariantId =
+      variant.shopifyVariantId ??
+      variant.shopifyVariantID ??
+      variant.shopify_variant_id ??
+      variant.shopifyVariant ??
+      variant.shopifyId ??
+      variant.shopify_id;
+    if (typeof shopifyVariantId === "string" && shopifyVariantId.trim().length > 0) {
+      variantByShopifyId.set(shopifyVariantId.trim(), variant);
+    }
   }
 
   const componentMap = new Map<string, AnyRecord>();
   for (const component of productCostComponents) {
     const variantId = toStringId(component.variantId ?? component.variant_id);
     if (!variantId) continue;
+    if (component.isActive === false) continue;
     const current = componentMap.get(variantId);
     if (!current || safeNumber(component.effectiveFrom) > safeNumber(current?.effectiveFrom)) {
       componentMap.set(variantId, component);
     }
   }
 
+  const resolveVariantIdForItem = (item: AnyRecord): string => {
+    const direct = toStringId(item.variantId ?? item.variant_id);
+    if (direct && (componentMap.has(direct) || variantMap.has(direct))) {
+      return direct;
+    }
+    const shopifyVariantId = item.shopifyVariantId ?? item.shopify_variant_id ?? item.variantShopifyId;
+    if (typeof shopifyVariantId === "string" && shopifyVariantId.trim().length > 0) {
+      const matchingVariant = variantByShopifyId.get(shopifyVariantId.trim());
+      if (matchingVariant) {
+        return toStringId(matchingVariant._id ?? matchingVariant.id ?? matchingVariant.variantId);
+      }
+    }
+    return direct;
+  };
+
   const variantQuantities = new Map<string, number>();
   for (const item of orderItems) {
-    const variantId = toStringId(item.variantId ?? item.variant_id);
+    const variantId = resolveVariantIdForItem(item);
     if (!variantId) continue;
+    const orderKey = toStringId(
+      item.orderId ?? item.order_id ?? item.order ?? item.shopifyOrderId,
+    );
+    if (orderKey && cancelledOrderIds.has(orderKey)) {
+      continue;
+    }
+    const quantity = safeNumber(item.quantity);
+    if (quantity <= 0) continue;
     const prev = variantQuantities.get(variantId) ?? 0;
-    variantQuantities.set(variantId, prev + safeNumber(item.quantity));
+    variantQuantities.set(variantId, prev + quantity);
   }
 
   let cogs = 0;
   let unitsSold = 0;
+  let taxFromComponents = 0;
   for (const item of orderItems) {
     const quantity = safeNumber(item.quantity);
+    if (quantity <= 0) continue;
+    const orderKey = toStringId(
+      item.orderId ?? item.order_id ?? item.order ?? item.shopifyOrderId,
+    );
+    if (orderKey && cancelledOrderIds.has(orderKey)) {
+      continue;
+    }
     unitsSold += quantity;
-    const variantId = toStringId(item.variantId ?? item.variant_id);
+    const variantId = resolveVariantIdForItem(item);
     const component = componentMap.get(variantId);
     const variant = variantMap.get(variantId);
     const perUnit = safeNumber(
       component?.cogsPerUnit ?? component?.costPerUnit ?? variant?.costPerItem ?? 0,
     );
-    cogs += perUnit * quantity;
+    let itemCogs = perUnit * quantity;
+    if (itemCogs <= 0) {
+      const lineCogs = safeNumber(
+        item.totalCostOfGoods ?? item.totalCost ?? item.cost ?? item.cogs ?? 0,
+      );
+      if (lineCogs > 0) {
+        itemCogs = lineCogs;
+      }
+    }
+    cogs += itemCogs;
+
+    if (component) {
+      const taxPercent = safeNumber(component.taxPercent);
+      if (taxPercent > 0) {
+        const itemPrice = safeNumber(item.price);
+        // If taxPercent is greater than 1, treat as percentage (e.g., 10 for 10%)
+        // If less than or equal to 1, treat as decimal (e.g., 0.1 for 10%)
+        const taxMultiplier = taxPercent > 1 ? taxPercent / 100 : taxPercent;
+        taxFromComponents += (itemPrice * quantity) * taxMultiplier;
+      }
+    }
   }
 
   if (unitsSold === 0) {
     unitsSold = sumBy(
-      orders,
+      activeOrders,
       (order) =>
         safeNumber(
           order.totalQuantity ??
@@ -348,13 +460,18 @@ export function computeOverviewMetrics(
     shippingFromComponents += safeNumber(component?.shippingPerUnit) * quantity;
   }
 
+  if (taxFromComponents > 0) {
+    // Use component-level tax if available
+    taxesCollected = taxFromComponents;
+  }
+
   const customersById = new Map<string, AnyRecord>();
   for (const customer of customers) {
     customersById.set(toStringId(customer._id ?? customer.id ?? customer.customerId), customer);
   }
 
   const ordersPerCustomer = new Map<string, number>();
-  for (const order of orders) {
+  for (const order of activeOrders) {
     const customerId = toStringId(order.customerId ?? order.customer_id);
     if (!customerId) continue;
     ordersPerCustomer.set(customerId, (ordersPerCustomer.get(customerId) ?? 0) + 1);
@@ -383,7 +500,6 @@ export function computeOverviewMetrics(
   const operationalCosts = costs.filter((cost) => cost.type === "operational" || cost.type === "custom");
   const paymentCostEntries = costs.filter((cost) => cost.type === "payment");
   const productCostEntries = costs.filter((cost) => cost.type === "product");
-  const taxCostEntries = costs.filter((cost) => cost.type === "tax");
 
   const rangeStart = parseDateBoundary(response.dateRange.startDate);
   const rangeEnd = parseDateBoundary(response.dateRange.endDate, true);
@@ -425,7 +541,7 @@ export function computeOverviewMetrics(
 
     switch (mode) {
       case "perOrder":
-        return amount * orders.length;
+        return amount * activeOrderCount;
       case "perUnit":
         return amount * unitsSold;
       case "percentageRevenue":
@@ -448,15 +564,67 @@ export function computeOverviewMetrics(
   };
 
   const marketingCostTotal = sumBy(marketingCosts, computeCostAmount);
-  shippingCosts += shippingFromComponents;
-  shippingCosts += sumBy(shippingCostEntries, computeCostAmount);
-  const handlingCostTotal = sumBy(handlingCostEntries, computeCostAmount) + handlingFromComponents;
   const customCostTotal = sumBy(operationalCosts, computeCostAmount);
   const paymentCostTotal = sumBy(paymentCostEntries, computeCostAmount);
   const productCostTotal = sumBy(productCostEntries, computeCostAmount);
-  taxesCollected += sumBy(taxCostEntries, computeCostAmount);
   if (productCostTotal > 0) {
     cogs += productCostTotal;
+  }
+
+  const shippingCostPerOrderRate = shippingCostEntries
+    .filter((cost) => toCostMode(cost) === "perOrder")
+    .reduce((sum, cost) => sum + safeNumber(cost.amount ?? cost.value ?? cost.total ?? 0), 0);
+  const shippingCostPerUnitRate = shippingCostEntries
+    .filter((cost) => toCostMode(cost) === "perUnit")
+    .reduce((sum, cost) => sum + safeNumber(cost.amount ?? cost.value ?? cost.total ?? 0), 0);
+
+  const handlingCostPerOrderRate = handlingCostEntries
+    .filter((cost) => toCostMode(cost) === "perOrder")
+    .reduce((sum, cost) => sum + safeNumber(cost.amount ?? cost.value ?? cost.total ?? 0), 0);
+  const handlingCostPerUnitRate = handlingCostEntries
+    .filter((cost) => toCostMode(cost) === "perUnit")
+    .reduce((sum, cost) => sum + safeNumber(cost.amount ?? cost.value ?? cost.total ?? 0), 0);
+  // Add fixed handling costs that apply to the period
+  const handlingFixedCosts = sumBy(handlingCostEntries.filter((cost) => toCostMode(cost) === "fixed" || toCostMode(cost) === "timeBound"), computeCostAmount);
+
+  // Only add component shipping if we have it, otherwise rely on order-level shipping
+  if (shippingFromComponents > 0) {
+    shippingCosts = shippingFromComponents; // Replace order-level with component-level if available
+  }
+  shippingCosts += shippingCostPerOrderRate * activeOrderCount;
+  shippingCosts += shippingCostPerUnitRate * unitsSold;
+
+  let handlingCostTotal = handlingFromComponents;
+  handlingCostTotal += handlingCostPerOrderRate * activeOrderCount;
+  handlingCostTotal += handlingCostPerUnitRate * unitsSold;
+  handlingCostTotal += handlingFixedCosts;
+
+  // If no handling costs found from any source, check if there's a default handling fee
+  if (handlingCostTotal === 0 && handlingCostEntries.length === 0 && handlingFromComponents === 0) {
+    // Could add a default handling calculation here if needed
+    // For example: handlingCostTotal = activeOrderCount * DEFAULT_HANDLING_PER_ORDER;
+  }
+
+  // Debug logging for cost calculations
+  if (process.env.DEBUG_COSTS === "true") {
+    console.log("[Analytics Debug] Cost Calculations:", {
+      activeOrderCount,
+      unitsSold,
+      shippingCostsFromOrders,
+      shippingFromComponents,
+      shippingCostPerOrderRate,
+      shippingCostPerUnitRate,
+      totalShipping: shippingCosts,
+      handlingFromComponents,
+      handlingCostPerOrderRate,
+      handlingCostPerUnitRate,
+      handlingFixedCosts,
+      totalHandling: handlingCostTotal,
+      taxFromComponents,
+      taxesCollected,
+      variantCount: variantQuantities.size,
+      componentCount: componentMap.size,
+    });
   }
 
   const transactionFeesFromTransactions = sumBy(
@@ -479,11 +647,11 @@ export function computeOverviewMetrics(
   const profitMargin = revenue > 0 ? (netProfit / revenue) * 100 : 0;
   const grossProfitMargin = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
   const contributionMarginPercentage = revenue > 0 ? (contributionProfit / revenue) * 100 : 0;
-  const averageOrderValue = orders.length > 0 ? revenue / orders.length : 0;
-  const averageOrderCost = orders.length > 0 ? (totalCostsWithoutAds + totalAdSpend) / orders.length : 0;
-  const averageOrderProfit = orders.length > 0 ? netProfit / orders.length : 0;
+  const averageOrderValue = activeOrderCount > 0 ? revenue / activeOrderCount : 0;
+  const averageOrderCost = activeOrderCount > 0 ? (totalCostsWithoutAds + totalAdSpend) / activeOrderCount : 0;
+  const averageOrderProfit = activeOrderCount > 0 ? netProfit / activeOrderCount : 0;
   const profitPerUnit = unitsSold > 0 ? netProfit / unitsSold : 0;
-  const adSpendPerOrder = orders.length > 0 ? totalAdSpend / orders.length : 0;
+  const adSpendPerOrder = activeOrderCount > 0 ? totalAdSpend / activeOrderCount : 0;
   const poas = totalAdSpend > 0 ? netProfit / totalAdSpend : 0;
   const blendedRoas = totalAdSpend > 0 ? revenue / totalAdSpend : 0;
   const metaRoas = metaAdSpend > 0 ? (metaConversionValue || revenue) / metaAdSpend : 0;
@@ -496,7 +664,7 @@ export function computeOverviewMetrics(
   const shippingPercentageOfNet = revenue > 0 ? (shippingCosts / revenue) * 100 : 0;
   const taxesPercentageOfRevenue = revenue > 0 ? (taxesCollected / revenue) * 100 : 0;
 
-  const returnRate = orders.length > 0 ? (refunds.length / orders.length) * 100 : 0;
+  const returnRate = activeOrderCount > 0 ? (refunds.length / activeOrderCount) * 100 : 0;
   const customersCount = uniqueCustomerIds.size;
   const repeatCustomerRate = customersCount > 0 ? (returningCustomers / customersCount) * 100 : 0;
   const customerAcquisitionCost = newCustomers > 0 ? totalAdSpend / newCustomers : 0;
@@ -550,7 +718,7 @@ export function computeOverviewMetrics(
     ncROASChange: 0,
     poas,
     poasChange: 0,
-    orders: orders.length,
+    orders: activeOrderCount,
     ordersChange: 0,
     unitsSold,
     unitsSoldChange: 0,
@@ -609,7 +777,7 @@ export function computeOverviewMetrics(
   const metrics: Record<string, MetricValue> = {
     revenue: defaultMetric(revenue, 0),
     profit: defaultMetric(netProfit, 0),
-    orders: defaultMetric(orders.length, 0),
+    orders: defaultMetric(activeOrderCount, 0),
     avgOrderValue: defaultMetric(averageOrderValue, 0),
     roas: defaultMetric(blendedRoas, 0),
     poas: defaultMetric(poas, 0),

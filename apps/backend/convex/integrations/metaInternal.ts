@@ -4,7 +4,9 @@ import { createSimpleLogger } from "../../libs/logging/simple";
 import { internal } from "../_generated/api";
 import { internalAction, internalMutation, internalQuery } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
+import { createJob, PRIORITY } from "../engine/workpool";
 import { debugToken } from "./metaTokens";
+import { normalizeDateString } from "../utils/date";
 
 const logger = createSimpleLogger("MetaInternal");
 
@@ -51,6 +53,7 @@ export const storeInsightsInternal = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    const affectedDates = new Set<string>();
     for (const insight of args.insights) {
       // Check if insight for this date already exists
       const existing = await ctx.db
@@ -70,6 +73,39 @@ export const storeInsightsInternal = internalMutation({
         // Insert new record
         await ctx.db.insert("metaInsights", insight);
       }
+
+      const rawDate = typeof insight.date === "string"
+        ? insight.date
+        : typeof insight.date_start === "string"
+          ? insight.date_start
+          : undefined;
+      if (rawDate) {
+        try {
+          const normalized = normalizeDateString(rawDate);
+          affectedDates.add(normalized);
+        } catch (_error) {
+          // Ignore invalid dates
+        }
+      }
+    }
+
+    if (affectedDates.size > 0) {
+      const dates = Array.from(affectedDates);
+      await createJob(
+        ctx,
+        "analytics:rebuildDaily",
+        PRIORITY.LOW,
+        {
+          organizationId: args.organizationId,
+          dates,
+        },
+        {
+          context: {
+            scope: "metaInsights.storeInsights",
+            totalDates: dates.length,
+          },
+        },
+      );
     }
 
     return null;

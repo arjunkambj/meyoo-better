@@ -280,8 +280,8 @@ export default function SimpleCostsClient() {
           </h1>
         </div>
         <p className="text-default-600 text-sm">
-          Set fixed monthly operating cost and average shipping per order. You
-          can refine later in Cost Management.
+          Set global costs here. Product-specific costs (COGS, tax, handling)
+          are configured in the next step. You can refine all costs later in Cost Management.
         </p>
       </div>
 

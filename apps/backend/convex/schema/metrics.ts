@@ -21,16 +21,21 @@ export const dailyMetrics = defineTable({
   totalOrders: v.optional(v.number()),
   totalRevenue: v.optional(v.number()),
   uniqueCustomers: v.optional(v.number()),
-  cogs: v.optional(v.number()),
-  shippingCost: v.optional(v.number()),
-  handlingFee: v.optional(v.number()),
-  operatingCost: v.optional(v.number()),
+  totalCustomers: v.optional(v.number()), // Total customers who purchased that day
+  unitsSold: v.optional(v.number()), // Total units sold that day
+  totalCogs: v.optional(v.number()),
+  totalHandlingFee: v.optional(v.number()),
+  totalShippingCost: v.optional(v.number()),
+  dailyOperatingCost: v.optional(v.number()),
+  totalTaxes: v.optional(v.number()),
   blendedRoas: v.optional(v.number()),
-  blendedConversionRate: v.optional(v.number()),
   blendedCtr: v.optional(v.number()),
-  blendedCac: v.optional(v.number()),
   blendedMarketingCost: v.optional(v.number()),
+  cancelledOrders: v.optional(v.number()),
+  returnedOrders: v.optional(v.number()),
 
   paymentBreakdown: v.optional(paymentBreakdown),
   customerBreakdown: v.optional(customerBreakdown),
-}).index("by_organization_date", ["organizationId", "date"]);
+})
+  .index("by_organization_date", ["organizationId", "date"])
+  .index("by_organization", ["organizationId"]);

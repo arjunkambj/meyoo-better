@@ -3,7 +3,8 @@ import type { Infer } from "convex/values";
 
 import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
-import { internalAction, internalQuery } from "../_generated/server";
+import { internalAction, internalMutation, internalQuery } from "../_generated/server";
+import type { ActionCtx } from "../_generated/server";
 import {
   ANALYTICS_SOURCE_KEYS,
   type AnalyticsSourceKey,
@@ -16,6 +17,10 @@ import {
   toTimestampRange,
   validateDateRange,
 } from "../utils/analyticsSource";
+import { computeOverviewMetrics, computePlatformMetrics } from "../utils/analyticsAggregations";
+import { msToDateString, normalizeDateString } from "../utils/date";
+import { loadAnalyticsWithChunks } from "../utils/analyticsLoader";
+import type { AnalyticsResponse } from "../web/analyticsShared";
 
 const datasetCountValidator = v.object({
   orders: v.number(),
@@ -34,6 +39,19 @@ const datasetCountValidator = v.object({
 });
 
 type DatasetCounts = Infer<typeof datasetCountValidator>;
+
+const DAILY_METRICS_DATASETS = [
+  "orders",
+  "orderItems",
+  "transactions",
+  "refunds",
+  "customers",
+  "variants",
+  "productCostComponents",
+  "costs",
+  "metaInsights",
+  "analytics",
+] as const satisfies readonly AnalyticsSourceKey[];
 
 function resolveDateRange(
   input?: {
@@ -365,6 +383,196 @@ export const gatherSupplementalAnalyticsChunk = internalQuery({
   },
 });
 
+export const getAvailableDateBounds = internalQuery({
+  args: {
+    organizationId: v.id("organizations"),
+  },
+  returns: v.object({
+    earliest: v.optional(v.string()),
+    latest: v.optional(v.string()),
+  }),
+  handler: async (ctx, args) => {
+    const earliestCandidates: string[] = [];
+    const latestCandidates: string[] = [];
+
+    const addEarliestMs = (value: number | null | undefined) => {
+      const normalized = msToDateString(value ?? null);
+      if (normalized) {
+        earliestCandidates.push(normalized);
+      }
+    };
+
+    const addLatestMs = (value: number | null | undefined) => {
+      const normalized = msToDateString(value ?? null);
+      if (normalized) {
+        latestCandidates.push(normalized);
+      }
+    };
+
+    const addEarliestString = (value: string | null | undefined) => {
+      if (!value) return;
+      try {
+        earliestCandidates.push(normalizeDateString(value));
+      } catch (_error) {
+        // ignore invalid dates
+      }
+    };
+
+    const addLatestString = (value: string | null | undefined) => {
+      if (!value) return;
+      try {
+        latestCandidates.push(normalizeDateString(value));
+      } catch (_error) {
+        // ignore invalid dates
+      }
+    };
+
+    const earliestOrder = await ctx.db
+      .query("shopifyOrders")
+      .withIndex("by_organization_and_created", (q) =>
+        q.eq("organizationId", args.organizationId),
+      )
+      .order("asc")
+      .first();
+    if (earliestOrder) {
+      addEarliestMs(earliestOrder.shopifyCreatedAt);
+    }
+
+    const latestOrder = await ctx.db
+      .query("shopifyOrders")
+      .withIndex("by_organization_and_created", (q) =>
+        q.eq("organizationId", args.organizationId),
+      )
+      .order("desc")
+      .first();
+    if (latestOrder) {
+      addLatestMs(latestOrder.shopifyCreatedAt);
+    }
+
+    const earliestTransaction = await ctx.db
+      .query("shopifyTransactions")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", args.organizationId),
+      )
+      .order("asc")
+      .first();
+    if (earliestTransaction) {
+      addEarliestMs(earliestTransaction.shopifyCreatedAt);
+      addEarliestMs(earliestTransaction.processedAt ?? null);
+    }
+
+    const latestTransaction = await ctx.db
+      .query("shopifyTransactions")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", args.organizationId),
+      )
+      .order("desc")
+      .first();
+    if (latestTransaction) {
+      addLatestMs(latestTransaction.shopifyCreatedAt);
+      addLatestMs(latestTransaction.processedAt ?? null);
+    }
+
+    const earliestRefund = await ctx.db
+      .query("shopifyRefunds")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", args.organizationId),
+      )
+      .order("asc")
+      .first();
+    if (earliestRefund) {
+      addEarliestMs(earliestRefund.shopifyCreatedAt);
+      addEarliestMs(earliestRefund.processedAt ?? null);
+    }
+
+    const latestRefund = await ctx.db
+      .query("shopifyRefunds")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", args.organizationId),
+      )
+      .order("desc")
+      .first();
+    if (latestRefund) {
+      addLatestMs(latestRefund.shopifyCreatedAt);
+      addLatestMs(latestRefund.processedAt ?? null);
+    }
+
+    const earliestInsight = await ctx.db
+      .query("metaInsights")
+      .withIndex("by_org_date", (q) =>
+        q.eq("organizationId", args.organizationId),
+      )
+      .order("asc")
+      .first();
+    if (earliestInsight) {
+      addEarliestString(earliestInsight.date);
+    }
+
+    const latestInsight = await ctx.db
+      .query("metaInsights")
+      .withIndex("by_org_date", (q) =>
+        q.eq("organizationId", args.organizationId),
+      )
+      .order("desc")
+      .first();
+    if (latestInsight) {
+      addLatestString(latestInsight.date);
+    }
+
+    const earliestCost = await ctx.db
+      .query("costs")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", args.organizationId),
+      )
+      .order("asc")
+      .first();
+    if (earliestCost) {
+      addEarliestMs(earliestCost.effectiveFrom);
+    }
+
+    const latestCost = await ctx.db
+      .query("costs")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", args.organizationId),
+      )
+      .order("desc")
+      .first();
+    if (latestCost) {
+      addLatestMs(latestCost.effectiveFrom);
+    }
+
+    const earliestMetric = await ctx.db
+      .query("dailyMetrics")
+      .withIndex("by_organization_date", (q) =>
+        q.eq("organizationId", args.organizationId),
+      )
+      .order("asc")
+      .first();
+    if (earliestMetric) {
+      addEarliestString(earliestMetric.date);
+    }
+
+    const latestMetric = await ctx.db
+      .query("dailyMetrics")
+      .withIndex("by_organization_date", (q) =>
+        q.eq("organizationId", args.organizationId),
+      )
+      .order("desc")
+      .first();
+    if (latestMetric) {
+      addLatestString(latestMetric.date);
+    }
+
+    const sortedEarliest = earliestCandidates.sort();
+    const sortedLatest = latestCandidates.sort();
+
+    return {
+      earliest: sortedEarliest[0],
+      latest: sortedLatest[sortedLatest.length - 1],
+    };
+  },
+});
+
 export const updateOrderMetrics = internalAction({
   args: {
     organizationId: v.string(),
@@ -396,5 +604,358 @@ export const updateProductMetrics = internalAction({
   returns: v.object({ success: v.boolean() }),
   handler: async () => {
     return { success: true };
+  },
+});
+
+type GenericRecord = Record<string, any>;
+
+function toSafeNumber(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return 0;
+  }
+  return value;
+}
+
+function toStringId(value: unknown): string {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  return String(value);
+}
+
+function classifyPaymentMethod(order: GenericRecord, transactions: GenericRecord[]): "prepaid" | "cod" | "other" {
+  const financialStatus = String(
+    order.financialStatus ?? order.financial_status ?? "",
+  ).toLowerCase();
+
+  const primaryTx = transactions.find((tx) => String(tx.kind).toLowerCase() === "sale")
+    ?? transactions[0];
+  const rawGateway = String(
+    primaryTx?.gateway ?? order.gateway ?? order.paymentGateway,
+  ).toLowerCase();
+
+  const gateway = rawGateway.trim();
+
+  if (gateway.includes("cash_on_delivery") || gateway.includes("cash-on-delivery")) {
+    return "cod";
+  }
+
+  if (gateway.includes("cash") && gateway.includes("delivery")) {
+    return "cod";
+  }
+
+  if (gateway.includes("cod")) {
+    return "cod";
+  }
+
+  if (gateway.includes("manual") || gateway.includes("test")) {
+    return "other";
+  }
+
+  if (financialStatus.includes("pending") || financialStatus.includes("authorized")) {
+    return "other";
+  }
+
+  return "prepaid";
+}
+
+function sanitizeDocument(doc: Record<string, unknown>): Record<string, unknown> {
+  const cleaned: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(doc)) {
+    if (value === undefined) continue;
+    cleaned[key] = value;
+  }
+  return cleaned;
+}
+
+function buildDailyMetricsFromResponse(
+  response: AnalyticsResponse,
+): DailyMetricsPayload {
+  const overview = computeOverviewMetrics(response);
+  const platformMetrics = computePlatformMetrics(response);
+  const summary = overview?.summary;
+
+  const orders = (response.data.orders ?? []) as GenericRecord[];
+  const transactions = (response.data.transactions ?? []) as GenericRecord[];
+  const refunds = (response.data.refunds ?? []) as GenericRecord[];
+  const orderItems = (response.data.orderItems ?? []) as GenericRecord[];
+
+  const transactionsByOrder = new Map<string, GenericRecord[]>();
+  for (const transaction of transactions) {
+    const orderKey = toStringId(
+      transaction.orderId ?? transaction.order_id ?? transaction.shopifyOrderId,
+    );
+    if (!orderKey) continue;
+    const bucket = transactionsByOrder.get(orderKey) ?? [];
+    bucket.push(transaction);
+    transactionsByOrder.set(orderKey, bucket);
+  }
+
+  let prepaidOrders = 0;
+  let codOrders = 0;
+  let otherOrders = 0;
+  let cancelledOrders = 0;
+
+  const ordersPerCustomer = new Map<string, number>();
+
+  const isCancelledOrder = (order: GenericRecord): boolean => {
+    const candidates = [
+      order.status,
+      order.orderStatus,
+      order.financialStatus,
+      order.fulfillmentStatus,
+      order.financial_status,
+      order.fulfillment_status,
+    ];
+
+    return candidates.some((value) => {
+      if (!value) return false;
+      const normalized = String(value).toLowerCase();
+      return (
+        normalized.includes("cancel") ||
+        normalized.includes("void") ||
+        normalized.includes("decline")
+      );
+    });
+  };
+
+  for (const order of orders) {
+    const orderKey = toStringId(order._id ?? order.id ?? order.orderId ?? order.shopifyId);
+    const txs = transactionsByOrder.get(orderKey) ?? [];
+    const classification = classifyPaymentMethod(order, txs);
+    switch (classification) {
+      case "cod":
+        codOrders += 1;
+        break;
+      case "other":
+        otherOrders += 1;
+        break;
+      default:
+        prepaidOrders += 1;
+        break;
+    }
+
+    if (isCancelledOrder(order)) {
+      cancelledOrders += 1;
+    }
+
+    const customerKey = order.customerId ? String(order.customerId) : undefined;
+    if (customerKey) {
+      ordersPerCustomer.set(
+        customerKey,
+        (ordersPerCustomer.get(customerKey) ?? 0) + 1,
+      );
+    }
+  }
+
+  const paymentBreakdown = prepaidOrders + codOrders + otherOrders > 0
+    ? sanitizeDocument({
+        prepaidOrders: prepaidOrders || undefined,
+        codOrders: codOrders || undefined,
+        otherOrders: otherOrders || undefined,
+      })
+    : null;
+
+  const newCustomers = toSafeNumber(summary?.newCustomers);
+  const returningCustomers = toSafeNumber(summary?.returningCustomers);
+  const repeatCustomers = Array.from(ordersPerCustomer.values()).reduce(
+    (count, occurrences) => (occurrences > 1 ? count + 1 : count),
+    0,
+  );
+  const customerBreakdown = newCustomers + returningCustomers + repeatCustomers > 0
+    ? sanitizeDocument({
+        newCustomers: newCustomers || undefined,
+        returningCustomers: returningCustomers || undefined,
+        repeatCustomers: repeatCustomers || undefined,
+      })
+    : null;
+
+  const returnedOrders = (() => {
+    if (!refunds.length) return 0;
+    const withReturns = new Set<string>();
+    for (const refund of refunds) {
+      const key = toStringId(
+        refund.orderId ?? refund.shopifyOrderId ?? refund.shopify_order_id,
+      );
+      if (key) {
+        withReturns.add(key);
+      }
+    }
+    return withReturns.size;
+  })();
+
+  const uniqueCustomers = ordersPerCustomer.size > 0
+    ? ordersPerCustomer.size
+    : toSafeNumber(summary?.customers);
+
+  // Calculate units sold from order items
+  let unitsSold = 0;
+  for (const item of orderItems) {
+    const orderKey = toStringId(
+      item.orderId ?? item.order_id ?? item.order ?? item.shopifyOrderId,
+    );
+    // Skip cancelled orders
+    const order = orders.find(o => toStringId(o._id ?? o.id ?? o.orderId ?? o.shopifyId) === orderKey);
+    if (order && !isCancelledOrder(order)) {
+      unitsSold += toSafeNumber(item.quantity);
+    }
+  }
+
+  // If no order items, fall back to summary
+  if (unitsSold === 0) {
+    unitsSold = toSafeNumber(summary?.unitsSold);
+  }
+
+  const metrics = sanitizeDocument({
+    totalOrders: toSafeNumber(summary?.orders),
+    totalRevenue: toSafeNumber(summary?.revenue),
+    uniqueCustomers,
+    totalCustomers: ordersPerCustomer.size, // Total customers who made purchases
+    unitsSold, // Total units sold that day
+    totalCogs: toSafeNumber(summary?.cogs),
+    totalHandlingFee: toSafeNumber(summary?.handlingFees),
+    totalShippingCost: toSafeNumber(summary?.shippingCosts),
+    dailyOperatingCost: toSafeNumber(summary?.customCosts),
+    totalTaxes: toSafeNumber(summary?.taxesCollected),
+    blendedRoas: toSafeNumber(summary?.roas),
+    blendedCtr: toSafeNumber(platformMetrics.blendedCTR),
+    blendedMarketingCost: toSafeNumber(summary?.adSpend ?? summary?.totalAdSpend),
+    cancelledOrders,
+    returnedOrders,
+  });
+
+  return {
+    ...metrics,
+    paymentBreakdown: paymentBreakdown ?? undefined,
+    customerBreakdown: customerBreakdown ?? undefined,
+  } as DailyMetricsPayload;
+}
+
+const dailyMetricsPayload = v.object({
+  totalOrders: v.optional(v.number()),
+  totalRevenue: v.optional(v.number()),
+  uniqueCustomers: v.optional(v.number()),
+  totalCustomers: v.optional(v.number()),
+  unitsSold: v.optional(v.number()),
+  totalCogs: v.optional(v.number()),
+  totalHandlingFee: v.optional(v.number()),
+  totalShippingCost: v.optional(v.number()),
+  dailyOperatingCost: v.optional(v.number()),
+  totalTaxes: v.optional(v.number()),
+  blendedRoas: v.optional(v.number()),
+  blendedCtr: v.optional(v.number()),
+  blendedMarketingCost: v.optional(v.number()),
+  cancelledOrders: v.optional(v.number()),
+  returnedOrders: v.optional(v.number()),
+  paymentBreakdown: v.optional(
+    v.object({
+      prepaidOrders: v.optional(v.number()),
+      codOrders: v.optional(v.number()),
+      otherOrders: v.optional(v.number()),
+    }),
+  ),
+  customerBreakdown: v.optional(
+    v.object({
+      newCustomers: v.optional(v.number()),
+      returningCustomers: v.optional(v.number()),
+      repeatCustomers: v.optional(v.number()),
+    }),
+  ),
+});
+
+type DailyMetricsPayload = Infer<typeof dailyMetricsPayload>;
+
+export const upsertDailyMetric = internalMutation({
+  args: {
+    organizationId: v.id("organizations"),
+    date: v.string(),
+    metrics: dailyMetricsPayload,
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("dailyMetrics")
+      .withIndex("by_organization_date", (q) =>
+        q
+          .eq("organizationId", args.organizationId)
+          .eq("date", args.date),
+      )
+      .first();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, args.metrics as any);
+    } else {
+      await ctx.db.insert("dailyMetrics", {
+        organizationId: args.organizationId,
+        date: args.date,
+        ...args.metrics,
+      } as any);
+    }
+  },
+});
+
+export const rebuildDailyMetrics = internalAction({
+  args: {
+    organizationId: v.id("organizations"),
+    dates: v.array(v.string()),
+  },
+  returns: v.object({
+    processed: v.number(),
+    updated: v.number(),
+    skipped: v.number(),
+  }),
+  handler: async (ctx: ActionCtx, args) => {
+    const uniqueDates = Array.from(
+      new Set(args.dates.map((date) => normalizeDateString(date))),
+    );
+
+    if (uniqueDates.length === 0) {
+      return { processed: 0, updated: 0, skipped: 0 };
+    }
+
+    let processed = 0;
+    let updated = 0;
+    let skipped = 0;
+
+    for (const date of uniqueDates) {
+      processed += 1;
+      try {
+        const normalizedDate = normalizeDateString(date);
+        const { data } = await loadAnalyticsWithChunks(
+          ctx,
+          args.organizationId as Id<"organizations">,
+          {
+            startDate: normalizedDate,
+            endDate: normalizedDate,
+          },
+          {
+            datasets: DAILY_METRICS_DATASETS,
+          },
+        );
+
+        const response: AnalyticsResponse = {
+          dateRange: { startDate: normalizedDate, endDate: normalizedDate },
+          organizationId: args.organizationId,
+          data,
+        };
+
+        const metrics = buildDailyMetricsFromResponse(response);
+
+        await ctx.runMutation(internal.engine.analytics.upsertDailyMetric, {
+          organizationId: args.organizationId,
+          date,
+          metrics,
+        });
+
+        updated += 1;
+      } catch (error) {
+        skipped += 1;
+        console.warn("[Analytics] Failed to rebuild daily metrics", {
+          organizationId: args.organizationId,
+          date,
+          error,
+        });
+      }
+    }
+
+    return { processed, updated, skipped };
   },
 });

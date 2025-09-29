@@ -15,6 +15,8 @@ import {
 
 import { createIntegration, type SyncResult } from "./_base";
 import { normalizeShopDomain } from "../utils/shop";
+import { msToDateString } from "../utils/date";
+import { createJob, PRIORITY } from "../engine/workpool";
 import { toStringArray } from "../utils/shopify";
 
 const logger = createSimpleLogger("Shopify");
@@ -36,6 +38,27 @@ function chunkArray<T>(values: T[], chunkSize: number): T[][] {
   }
 
   return chunks;
+}
+
+type ContextWithDb = {
+  db: any;
+};
+
+export async function hasCompletedInitialShopifySync(
+  ctx: ContextWithDb,
+  organizationId: Id<"organizations">,
+): Promise<boolean> {
+  const onboarding = await (ctx.db.query("onboarding") as any)
+    .withIndex("by_organization", (q: any) =>
+      q.eq("organizationId", organizationId),
+    )
+    .first();
+
+  if (!onboarding) {
+    return true;
+  }
+
+  return Boolean(onboarding.isInitialSyncComplete);
 }
 
 const toOptionalString = (value: unknown): string | undefined => {
@@ -2394,6 +2417,38 @@ export const storeOrdersInternal = internalMutation({
 
     logger.info(`Processed ${args.orders.length} orders with bulk operations`);
 
+    const affectedDates = new Set<string>();
+    for (const order of args.orders) {
+      const date = msToDateString(order.shopifyCreatedAt);
+      if (date) {
+        affectedDates.add(date);
+      }
+    }
+
+    const canSchedule = await hasCompletedInitialShopifySync(
+      ctx,
+      args.organizationId as Id<"organizations">,
+    );
+
+    if (canSchedule && affectedDates.size > 0) {
+      const dates = Array.from(affectedDates);
+      await createJob(
+        ctx,
+        "analytics:rebuildDaily",
+        PRIORITY.LOW,
+        {
+          organizationId: args.organizationId as Id<"organizations">,
+          dates,
+        },
+        {
+          context: {
+            scope: "shopify.storeOrders",
+            totalDates: dates.length,
+          },
+        },
+      );
+    }
+
     // Calculate customer metrics for affected customers
     const uniqueCustomerIds = new Set<Id<"shopifyCustomers">>();
 
@@ -2685,6 +2740,7 @@ export const storeTransactionsInternal = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    const affectedDates = new Set<string>();
     for (const transaction of args.transactions) {
       // Find the order first
       const order = await ctx.db
@@ -2731,6 +2787,35 @@ export const storeTransactionsInternal = internalMutation({
       } else {
         await ctx.db.insert("shopifyTransactions", transactionData);
       }
+
+      const date = msToDateString(transaction.shopifyCreatedAt);
+      if (date) {
+        affectedDates.add(date);
+      }
+    }
+
+    const canSchedule = await hasCompletedInitialShopifySync(
+      ctx,
+      args.organizationId as Id<"organizations">,
+    );
+
+    if (canSchedule && affectedDates.size > 0) {
+      const dates = Array.from(affectedDates);
+      await createJob(
+        ctx,
+        "analytics:rebuildDaily",
+        PRIORITY.LOW,
+        {
+          organizationId: args.organizationId as Id<"organizations">,
+          dates,
+        },
+        {
+          context: {
+            scope: "shopify.storeTransactions",
+            totalDates: dates.length,
+          },
+        },
+      );
     }
 
     return null;
@@ -2744,6 +2829,7 @@ export const storeRefundsInternal = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    const affectedDates = new Set<string>();
     for (const refund of args.refunds) {
       // Find the order first
       const order = await ctx.db
@@ -2785,6 +2871,35 @@ export const storeRefundsInternal = internalMutation({
       } else {
         await ctx.db.insert("shopifyRefunds", refundData);
       }
+
+      const date = msToDateString(refund.shopifyCreatedAt);
+      if (date) {
+        affectedDates.add(date);
+      }
+    }
+
+    const canSchedule = await hasCompletedInitialShopifySync(
+      ctx,
+      args.organizationId as Id<"organizations">,
+    );
+
+    if (canSchedule && affectedDates.size > 0) {
+      const dates = Array.from(affectedDates);
+      await createJob(
+        ctx,
+        "analytics:rebuildDaily",
+        PRIORITY.LOW,
+        {
+          organizationId: args.organizationId as Id<"organizations">,
+          dates,
+        },
+        {
+          context: {
+            scope: "shopify.storeRefunds",
+            totalDates: dates.length,
+          },
+        },
+      );
     }
 
     return null;

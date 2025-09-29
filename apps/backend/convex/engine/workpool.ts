@@ -33,6 +33,7 @@ export type JobType =
   | "sync:shopifyOrdersBatch" // Persist Shopify order batch
   | "analytics:calculate" // Calculate metrics
   | "analytics:rollup" // Aggregate metrics
+  | "analytics:rebuildDaily" // Rebuild daily metrics snapshots
   | "cleanup:old_data" // Clean old data
   | "maintenance:reassign_store_users" // Post-auth store user reassign
   | "maintenance:dedupe_meta_accounts"; // Cleanup duplicate Meta ad accounts
@@ -66,6 +67,7 @@ export interface AnalyticsJobData {
   calculateProfits?: boolean;
   hasHistoricalCosts?: boolean;
   syncType?: "initial" | "incremental";
+  dates?: string[];
 }
 
 export interface CleanupJobData {
@@ -214,6 +216,30 @@ export async function createJob(
         },
       );
       break;
+    case "analytics:rebuildDaily": {
+      const payload = data as AnalyticsJobData;
+      if (!Array.isArray(payload.dates) || payload.dates.length === 0) {
+        throw new Error("analytics:rebuildDaily job requires one or more dates");
+      }
+
+      jobId = await workpool.enqueueAction(
+        ctx as any,
+        internal.engine.analytics.rebuildDailyMetrics,
+        {
+          organizationId: payload.organizationId,
+          dates: payload.dates,
+        } as any,
+        {
+          retry: {
+            maxAttempts: options?.maxAttempts || 3,
+            initialBackoffMs: options?.initialBackoffMs || 2000,
+            base: 2,
+          },
+          context: options?.context,
+        },
+      );
+      break;
+    }
     case "cleanup:old_data":
       jobId = await workpool.enqueueAction(
         ctx as any,

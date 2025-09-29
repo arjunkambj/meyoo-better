@@ -8,8 +8,8 @@ export default function ProductsPage() {
         hideSearch
         hideRowSave={true}
         compact={true}
-        hideShipping={true}
-        hideHandling={false}
+        hideShipping={true} // Shipping is handled globally in cost page
+        hideHandling={false} // Handling is per-variant
       />
     </section>
   );

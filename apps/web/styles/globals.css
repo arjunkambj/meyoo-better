@@ -13,6 +13,8 @@ html, body {
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  --scrollbar-width: 0.375rem;
+  --scrollbar-thumb-color: oklch(0.45 0.02 264 / 0.45);
 
   /* Custom width utilities for hero component */
   --width-75: 19rem; /* 304px - for button/link elements */
@@ -114,6 +116,8 @@ html, body {
 
 :root {
   --radius: 0.625rem;
+  --scrollbar-width: 0.375rem;
+  --scrollbar-thumb-color: oklch(0.45 0.02 264 / 0.45);
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -175,6 +179,90 @@ html, body {
     0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 8px 10px -1px hsl(0 0% 0% / 0.1);
   --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
   --tracking-normal: 0em;
+}
+
+html {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+html.scrollbar-visible {
+  scrollbar-color: var(--scrollbar-thumb-color) transparent;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+html.scrollbar-visible,
+html.scrollbar-visible * {
+  scrollbar-color: var(--scrollbar-thumb-color) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: var(--scrollbar-width);
+  height: var(--scrollbar-width);
+}
+
+*::-webkit-scrollbar-track {
+  background-color: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 9999px;
+  transition: background-color 200ms ease;
+}
+
+html.scrollbar-visible::-webkit-scrollbar-thumb,
+html.scrollbar-visible *::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb-color);
+}
+
+/* Hide scrollbar buttons/arrows completely */
+*::-webkit-scrollbar-button,
+*::-webkit-scrollbar-button:single-button,
+*::-webkit-scrollbar-button:double-button,
+*::-webkit-scrollbar-button:vertical:start,
+*::-webkit-scrollbar-button:vertical:end,
+*::-webkit-scrollbar-button:vertical:start:decrement,
+*::-webkit-scrollbar-button:vertical:end:increment,
+*::-webkit-scrollbar-button:horizontal:start,
+*::-webkit-scrollbar-button:horizontal:end,
+*::-webkit-scrollbar-button:horizontal:start:decrement,
+*::-webkit-scrollbar-button:horizontal:end:increment,
+*::-webkit-scrollbar-corner,
+*::-webkit-resizer {
+  display: none !important;
+  visibility: hidden !important;
+  width: 0 !important;
+  height: 0 !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  background: transparent !important;
+  background-color: var(--background) !important;
+  border: none !important;
+}
+
+/* Additional hiding for arrow buttons */
+*::-webkit-scrollbar-button:start:decrement,
+*::-webkit-scrollbar-button:end:increment {
+  display: none !important;
+  height: 0 !important;
+  width: 0 !important;
+}
+
+/* Fallback: Make scrollbar match background if buttons still show */
+*::-webkit-scrollbar {
+  background-color: var(--background);
+}
+
+/* For Firefox - hide buttons by making the scrollbar thin */
+@supports (scrollbar-width: thin) {
+  * {
+    scrollbar-width: thin;
+  }
 }
 
 .dark {

@@ -6,6 +6,7 @@ import { internalMutation, mutation, query } from "../_generated/server";
 import { createJob, PRIORITY } from "../engine/workpool";
 import { normalizeShopDomain } from "../utils/shop";
 import { getUserAndOrg, requireUserAndOrg } from "../utils/auth";
+import { buildDateSpan } from "../utils/date";
 import { isIanaTimeZone } from "@repo/time";
 import { ONBOARDING_STEPS } from "@repo/types";
 
@@ -1250,6 +1251,8 @@ export const monitorInitialSyncs = internalMutation({
           pendingCount += 1;
         }
 
+        const wasComplete = onboarding.isInitialSyncComplete;
+
         await ctx.db.patch(onboarding._id, {
           isInitialSyncComplete: allCompleted,
           onboardingData,
@@ -1263,6 +1266,41 @@ export const monitorInitialSyncs = internalMutation({
           });
         } catch (_error) {
           // Best-effort refresh; ignore failures
+        }
+
+        if (!wasComplete && allCompleted) {
+          const dates = buildDateSpan(
+            ONBOARDING_COST_LOOKBACK_DAYS,
+            new Date().toISOString(),
+          );
+
+          for (let index = 0; index < dates.length; index += ONBOARDING_ANALYTICS_REBUILD_CHUNK_SIZE) {
+            const chunk = dates.slice(
+              index,
+              index + ONBOARDING_ANALYTICS_REBUILD_CHUNK_SIZE,
+            );
+
+            if (chunk.length === 0) {
+              continue;
+            }
+
+            await createJob(
+              ctx,
+              "analytics:rebuildDaily",
+              PRIORITY.LOW,
+              {
+                organizationId: orgId,
+                dates: chunk,
+              },
+              {
+                context: {
+                  scope: "onboarding.analyticsRebuild",
+                  chunkSize: chunk.length,
+                  totalDates: dates.length,
+                },
+              },
+            );
+          }
         }
       } catch (error) {
         console.error(
@@ -1289,6 +1327,7 @@ export const monitorInitialSyncs = internalMutation({
  */
 const ONBOARDING_COST_LOOKBACK_DAYS = 60;
 const ONBOARDING_COST_LOOKBACK_MS = ONBOARDING_COST_LOOKBACK_DAYS * 24 * 60 * 60 * 1000;
+const ONBOARDING_ANALYTICS_REBUILD_CHUNK_SIZE = 5;
 
 export const saveInitialCosts = mutation({
   args: {

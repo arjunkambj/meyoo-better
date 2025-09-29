@@ -28,6 +28,8 @@ export function useDevTools() {
   const resetMeta = useAction(api.meyoo.admin.resetMetaData);
   const resetShopify = useAction(api.meyoo.admin.resetShopifyData);
   const resetAll = useAction(api.meyoo.admin.resetEverything);
+  const recalcAnalytics = useAction(api.meyoo.admin.recalculateAnalytics);
+  const deleteMetrics = useAction(api.meyoo.admin.deleteAnalyticsMetrics);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -119,6 +121,47 @@ export function useDevTools() {
     }
   };
 
+  const recalculateAnalytics = async (daysBack: number) => {
+    console.log(
+      `[DevTools] Recalculate analytics triggered - Organization: ${currentUser?.organizationId} - Days back: ${daysBack} - Timestamp: ${new Date().toISOString()}`,
+    );
+
+    if (!currentUser?.organizationId) {
+      throw new Error("No organization found");
+    }
+
+    const result = await recalcAnalytics({
+      organizationId: currentUser.organizationId,
+      daysBack,
+    });
+
+    console.log(
+      `[DevTools] Recalculate analytics completed - Organization: ${currentUser.organizationId} - Processed: ${result.processed}, Updated: ${result.updated}, Skipped: ${result.skipped} - Timestamp: ${new Date().toISOString()}`,
+    );
+
+    return result;
+  };
+
+  const deleteAnalyticsMetrics = async () => {
+    console.log(
+      `[DevTools] Delete analytics metrics triggered - Organization: ${currentUser?.organizationId} - Timestamp: ${new Date().toISOString()}`,
+    );
+
+    if (!currentUser?.organizationId) {
+      throw new Error("No organization found");
+    }
+
+    const result = await deleteMetrics({
+      organizationId: currentUser.organizationId,
+    });
+
+    console.log(
+      `[DevTools] Delete analytics metrics completed - Organization: ${currentUser.organizationId} - Deleted: ${result.deleted} - Tables: ${JSON.stringify(result.tables)} - Timestamp: ${new Date().toISOString()}`,
+    );
+
+    return result;
+  };
+
   return {
     enabled,
     setEnabled,
@@ -127,6 +170,8 @@ export function useDevTools() {
     resetEverything,
     disconnectShopify,
     disconnectMeta,
+    recalculateAnalytics,
+    deleteAnalyticsMetrics,
     isLoading: loading,
     error,
     loading,

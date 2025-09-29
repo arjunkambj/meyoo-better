@@ -7,6 +7,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 
 import { Providers } from "@/components/Providers";
+import { ScrollbarController } from "@/components/ScrollbarController";
 import { siteConfig } from "@/constants/config/site";
 
 const inter = Inter({
@@ -44,6 +45,7 @@ export default function RootLayout({
         <body>
           <Providers themeProps={{ attribute: "class", defaultTheme: "light" }}>
             <main className={`h-dvh w-full antialiased ${inter.className}`}>
+              <ScrollbarController />
               <ToastProvider />
               <SpeedInsights />
               <Analytics />

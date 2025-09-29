@@ -11,6 +11,9 @@ import {
 } from "../utils/shopify";
 import { optionalEnv, requireEnv } from "../utils/env";
 import type { Id } from "../_generated/dataModel";
+import { msToDateString } from "../utils/date";
+import { createJob, PRIORITY } from "../engine/workpool";
+import { hasCompletedInitialShopifySync } from "../integrations/shopify";
 
 const logger = createSimpleLogger("Webhooks.Shopify");
 const SHOPIFY_API_SECRET = requireEnv("SHOPIFY_API_SECRET");
@@ -29,6 +32,37 @@ const toOptionalString = (value: unknown): string | undefined => {
   if (typeof value === "number") return String(value);
 
   return undefined;
+};
+
+const scheduleAnalyticsRebuild = async (
+  ctx: any,
+  organizationId: Id<"organizations">,
+  dates: (string | null | undefined)[],
+  scope: string,
+) => {
+  const normalized = dates
+    .map((date) => (date ? String(date) : ""))
+    .filter((date): date is string => Boolean(date));
+
+  if (normalized.length === 0) {
+    return;
+  }
+
+  await createJob(
+    ctx,
+    "analytics:rebuildDaily",
+    PRIORITY.LOW,
+    {
+      organizationId,
+      dates: normalized,
+    },
+    {
+      context: {
+        scope,
+        totalDates: normalized.length,
+      },
+    },
+  );
 };
 
 /**
@@ -312,17 +346,33 @@ async function handleTopicInline(
         storeId,
         orders,
       });
-      // analytics recalculation handled client-side
+      // analytics recalculation handled by storeOrdersInternal when appropriate
       break;
     }
 
     case "orders/delete": {
       if (!organizationId) break;
+      const shopifyId = String((payload as any).id);
+      const existingOrder = await ctx.db
+        .query("shopifyOrders")
+        .withIndex("by_shopify_id", (q: any) => q.eq("shopifyId", shopifyId))
+        .first();
+
       await ctx.runMutation(
         internal.integrations.shopify.deleteOrderByShopifyIdInternal,
-        { organizationId, shopifyId: String((payload as any).id) },
+        { organizationId, shopifyId },
       );
       // analytics recalculation handled client-side
+      const deletionDate = existingOrder ? msToDateString(existingOrder.shopifyCreatedAt) : null;
+      const canSchedule = await hasCompletedInitialShopifySync(ctx as any, organizationId);
+      if (deletionDate && canSchedule) {
+        await scheduleAnalyticsRebuild(
+          ctx,
+          organizationId,
+          [deletionDate],
+          "shopifyWebhook.orderDelete",
+        );
+      }
       break;
     }
 
@@ -398,6 +448,16 @@ async function handleTopicInline(
         internal.integrations.shopify.upsertCustomerFromWebhook,
         { organizationId, storeId, customer: payload },
       );
+      const canSchedule = await hasCompletedInitialShopifySync(ctx as any, organizationId);
+      const today = msToDateString(Date.now());
+      if (canSchedule && today) {
+        await scheduleAnalyticsRebuild(
+          ctx,
+          organizationId,
+          [today],
+          "shopifyWebhook.customerUpsert",
+        );
+      }
       break;
     }
 
@@ -410,6 +470,16 @@ async function handleTopicInline(
         .withIndex("by_shopify_id_store", (q: any) => q.eq("shopifyId", shopifyId).eq("storeId", storeId))
         .first();
       if (existing) await ctx.db.delete(existing._id);
+      const canSchedule = await hasCompletedInitialShopifySync(ctx as any, organizationId);
+      const today = msToDateString(Date.now());
+      if (canSchedule && today) {
+        await scheduleAnalyticsRebuild(
+          ctx,
+          organizationId,
+          [today],
+          "shopifyWebhook.customerDelete",
+        );
+      }
       break;
     }
 
@@ -429,6 +499,16 @@ async function handleTopicInline(
         } as any,
       );
       // analytics recalculation handled client-side
+      const canSchedule = await hasCompletedInitialShopifySync(ctx as any, organizationId);
+      const today = msToDateString(Date.now());
+      if (canSchedule && today) {
+        await scheduleAnalyticsRebuild(
+          ctx,
+          organizationId,
+          [today],
+          "shopifyWebhook.customerState",
+        );
+      }
       break;
     }
 
@@ -458,6 +538,16 @@ async function handleTopicInline(
         refunds,
       });
       // analytics recalculation handled client-side
+      const canSchedule = await hasCompletedInitialShopifySync(ctx as any, organizationId);
+      const refundDate = msToDateString(refunds[0]?.shopifyCreatedAt);
+      if (canSchedule && refundDate) {
+        await scheduleAnalyticsRebuild(
+          ctx,
+          organizationId,
+          [refundDate],
+          "shopifyWebhook.refundCreate",
+        );
+      }
       break;
     }
 

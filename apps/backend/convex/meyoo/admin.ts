@@ -3,7 +3,9 @@ import { v } from "convex/values";
 import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { action, internalMutation, internalQuery, mutation, query } from "../_generated/server";
+import { createJob, PRIORITY } from "../engine/workpool";
 import { optionalEnv } from "../utils/env";
+import { buildDateSpan } from "../utils/date";
 
 const CONVEX_CLOUD_URL = optionalEnv("CONVEX_CLOUD_URL");
 
@@ -29,6 +31,170 @@ const RESET_DEFAULT_BATCH_SIZE = 200;
 const RESET_MAX_BATCH_SIZE = 500;
 const RESET_MEMBER_BATCH_SIZE = 25;
 const RESET_TICKET_BATCH_SIZE = 10;
+const ANALYTICS_REBUILD_CHUNK_SIZE = 5;
+
+// Helper to populate missing product cost components
+export const populateMissingCostComponents = mutation({
+  args: {
+    organizationId: v.id("organizations"),
+    defaults: v.optional(v.object({
+      shippingPerUnit: v.optional(v.number()),
+      handlingPerUnit: v.optional(v.number()),
+      taxPercent: v.optional(v.number()),
+    })),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const user = await ctx.db.get(userId);
+    if (!user || !isAdmin(user)) {
+      throw new Error("Not authorized");
+    }
+
+    // Default values
+    const defaults = {
+      shippingPerUnit: args.defaults?.shippingPerUnit ?? 0,
+      handlingPerUnit: args.defaults?.handlingPerUnit ?? 0,
+      taxPercent: args.defaults?.taxPercent ?? 0,
+    };
+
+    // Get all variants for the organization
+    const variants = await ctx.db
+      .query("shopifyProductVariants")
+      .withIndex("by_organization", (q) => q.eq("organizationId", args.organizationId))
+      .collect();
+
+    let created = 0;
+    let updated = 0;
+
+    for (const variant of variants) {
+      // Check if component exists
+      const existing = await ctx.db
+        .query("productCostComponents")
+        .withIndex("by_org_variant", (q) =>
+          q.eq("organizationId", args.organizationId)
+           .eq("variantId", variant._id)
+        )
+        .first();
+
+      if (!existing) {
+        // Create new component with defaults
+        await ctx.db.insert("productCostComponents", {
+          organizationId: args.organizationId,
+          variantId: variant._id,
+          cogsPerUnit: variant.costPerItem ?? 0,
+          shippingPerUnit: defaults.shippingPerUnit,
+          handlingPerUnit: defaults.handlingPerUnit,
+          taxPercent: defaults.taxPercent,
+          isActive: true,
+          effectiveFrom: Date.now(),
+          createdAt: Date.now(),
+        });
+        created++;
+      } else if (
+        (existing.shippingPerUnit === undefined || existing.shippingPerUnit === null) ||
+        (existing.handlingPerUnit === undefined || existing.handlingPerUnit === null)
+      ) {
+        // Update missing fields
+        const updates: any = {};
+        if (existing.shippingPerUnit === undefined || existing.shippingPerUnit === null) {
+          updates.shippingPerUnit = defaults.shippingPerUnit;
+        }
+        if (existing.handlingPerUnit === undefined || existing.handlingPerUnit === null) {
+          updates.handlingPerUnit = defaults.handlingPerUnit;
+        }
+        if (Object.keys(updates).length > 0) {
+          await ctx.db.patch(existing._id, {
+            ...updates,
+            updatedAt: Date.now(),
+          });
+          updated++;
+        }
+      }
+    }
+
+    return {
+      variantsProcessed: variants.length,
+      componentsCreated: created,
+      componentsUpdated: updated,
+    };
+  },
+});
+
+// Debug function to check cost components
+export const debugCostComponents = query({
+  args: {
+    organizationId: v.id("organizations"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const user = await ctx.db.get(userId);
+    if (!user || !isAdmin(user)) {
+      throw new Error("Not authorized");
+    }
+
+    // Get product cost components
+    const costComponents = await ctx.db
+      .query("productCostComponents")
+      .withIndex("by_organization", (q) => q.eq("organizationId", args.organizationId))
+      .take(10);
+
+    // Get costs table entries
+    const costs = await ctx.db
+      .query("costs")
+      .withIndex("by_organization", (q) => q.eq("organizationId", args.organizationId))
+      .filter((q) => q.or(
+        q.eq(q.field("type"), "shipping"),
+        q.eq(q.field("type"), "handling"),
+        q.eq(q.field("type"), "tax")
+      ))
+      .take(10);
+
+    // Get a sample order with items
+    const orders = await ctx.db
+      .query("shopifyOrders")
+      .withIndex("by_organization", (q) => q.eq("organizationId", args.organizationId))
+      .take(1);
+
+    let orderItems = [];
+    if (orders.length > 0) {
+      const firstOrder = orders[0];
+      if (firstOrder) {
+        orderItems = await ctx.db
+          .query("shopifyOrderItems")
+          .withIndex("by_order", (q) => q.eq("orderId", firstOrder._id))
+          .collect();
+      }
+    }
+
+    return {
+      costComponentsCount: costComponents.length,
+      costComponents: costComponents.map(c => ({
+        variantId: c.variantId,
+        cogsPerUnit: c.cogsPerUnit,
+        shippingPerUnit: c.shippingPerUnit,
+        handlingPerUnit: c.handlingPerUnit,
+        taxPercent: c.taxPercent,
+      })),
+      costsCount: costs.length,
+      costs: costs.map(c => ({
+        type: c.type,
+        name: c.name,
+        value: c.value,
+        frequency: c.frequency,
+        calculation: c.calculation,
+      })),
+      sampleOrder: orders.length > 0 && orders[0] ? {
+        totalTax: orders[0].totalTax,
+        totalShippingPrice: orders[0].totalShippingPrice,
+        orderItemsCount: orderItems.length,
+      } : null,
+    };
+  },
+});
 
 const ORG_SCOPED_TABLES = [
   "shopifyOrderItems",
@@ -43,6 +209,7 @@ const ORG_SCOPED_TABLES = [
   "shopifyStores",
   "shopifySessions",
   "shopifyAnalytics",
+  "dailyMetrics",
   "integrationSessions",
   "metaAdAccounts",
   "metaInsights",
@@ -73,6 +240,17 @@ const normalizeBatchSize = (
   }
 
   return Math.min(Math.max(1, Math.floor(size)), max);
+};
+
+const chunkArray = <T>(items: readonly T[], size: number): T[][] => {
+  const chunkSize = Math.max(1, Math.floor(size));
+  const chunks: T[][] = [];
+
+  for (let index = 0; index < items.length; index += chunkSize) {
+    chunks.push(items.slice(index, index + chunkSize));
+  }
+
+  return chunks;
 };
 
 export const deleteOrgRecordsBatch = internalMutation({
@@ -1165,6 +1343,212 @@ export const resetMetaData = action({
         webhookLogs,
         usersUpdated: counts.usersUpdated,
       },
+    };
+  },
+});
+
+/**
+ * Recalculate analytics aggregates for an organization.
+ * Rebuilds daily metric snapshots for the requested lookback period using the new dailyMetrics table.
+ */
+export const recalculateAnalytics = action({
+  args: {
+    daysBack: v.optional(v.number()),
+    organizationId: v.optional(v.id("organizations")),
+  },
+  returns: v.object({
+    success: v.boolean(),
+    processed: v.number(),
+    updated: v.number(),
+    skipped: v.number(),
+    message: v.string(),
+  }),
+  handler: async (ctx, args): Promise<{
+    success: boolean;
+    processed: number;
+    updated: number;
+    skipped: number;
+    message: string;
+  }> => {
+    const userId = await getAuthUserId(ctx);
+
+    if (!userId) {
+      throw new Error("Not authenticated");
+    }
+
+    const user = await ctx.runQuery(internal.meyoo.admin.getUserById, {
+      userId,
+    });
+
+    if (!user || !isAdmin(user)) {
+      throw new Error("Admin access required");
+    }
+
+    const organizationId = (args.organizationId ?? user.organizationId) as
+      | Id<"organizations">
+      | undefined;
+
+    if (!organizationId) {
+      throw new Error("No organization found for user");
+    }
+
+    const daysBack = Math.max(1, Math.floor(args.daysBack ?? 60));
+    const dates = buildDateSpan(daysBack);
+
+    if (dates.length === 0) {
+      return {
+        success: true,
+        processed: 0,
+        updated: 0,
+        skipped: 0,
+        message: "No dates to rebuild.",
+      };
+    }
+
+    const bounds = await ctx.runQuery(
+      internal.engine.analytics.getAvailableDateBounds,
+      {
+        organizationId,
+      },
+    );
+
+    const filteredDates = dates.filter((date) => {
+      const withinLowerBound = !bounds.earliest || date >= bounds.earliest;
+      const withinUpperBound = !bounds.latest || date <= bounds.latest;
+      return withinLowerBound && withinUpperBound;
+    });
+
+    if (filteredDates.length === 0) {
+      return {
+        success: true,
+        processed: 0,
+        updated: 0,
+        skipped: 0,
+        message:
+          bounds.earliest && bounds.latest
+            ? `No analytics sources found between ${bounds.earliest} and ${bounds.latest}.`
+            : "No analytics source data available yet.",
+      };
+    }
+
+    const startedAt = Date.now();
+    const chunks = chunkArray(filteredDates, ANALYTICS_REBUILD_CHUNK_SIZE);
+    const jobIds: string[] = [];
+
+    for (const chunk of chunks) {
+      const jobId = await createJob(
+        ctx,
+        "analytics:rebuildDaily",
+        PRIORITY.LOW,
+        {
+          organizationId,
+          dates: chunk,
+        },
+        {
+          context: {
+            scope: "admin.recalculateAnalytics",
+            requestedBy: String(userId),
+            chunkSize: chunk.length,
+            totalDates: filteredDates.length,
+            requestedDates: dates.length,
+            earliestAvailable: bounds.earliest,
+            latestAvailable: bounds.latest,
+          },
+        },
+      );
+
+      jobIds.push(jobId);
+    }
+
+    const duration = Date.now() - startedAt;
+    const jobCount = jobIds.length;
+
+    return {
+      success: true,
+      processed: filteredDates.length,
+      updated: 0,
+      skipped: 0,
+      message: `Queued ${jobCount} analytics rebuild job${jobCount === 1 ? "" : "s"} for ${filteredDates.length} day${filteredDates.length === 1 ? "" : "s"} in ${duration}ms (requested ${dates.length}). Progress will update as jobs complete.`,
+    };
+  },
+});
+
+/**
+ * Delete precomputed analytics snapshots for an organization.
+ */
+export const deleteAnalyticsMetrics = action({
+  args: {
+    organizationId: v.optional(v.id("organizations")),
+  },
+  returns: v.object({
+    success: v.boolean(),
+    deleted: v.number(),
+    tables: v.record(v.string(), v.number()),
+  }),
+  handler: async (ctx, args): Promise<{
+    success: boolean;
+    deleted: number;
+    tables: Record<string, number>;
+  }> => {
+    const userId = await getAuthUserId(ctx);
+
+    if (!userId) {
+      throw new Error("Not authenticated");
+    }
+
+    const user = await ctx.runQuery(internal.meyoo.admin.getUserById, {
+      userId,
+    });
+
+    if (!user || !isAdmin(user)) {
+      throw new Error("Admin access required");
+    }
+
+    if (CONVEX_CLOUD_URL?.includes("prod")) {
+      throw new Error("Cannot delete analytics data in production");
+    }
+
+    const organizationId = (args.organizationId ?? user.organizationId) as
+      | Id<"organizations">
+      | undefined;
+
+    if (!organizationId) {
+      throw new Error("No organization found for user");
+    }
+
+    const tablesToClear: OrgScopedTable[] = ["dailyMetrics"];
+    let totalDeleted = 0;
+    const perTable: Record<string, number> = {};
+
+    for (const table of tablesToClear) {
+      let hasMore = true;
+      let cursor: string | undefined;
+      let tableDeleted = 0;
+
+      while (hasMore) {
+        const result = await ctx.runMutation(
+          internal.meyoo.admin.deleteOrgRecordsBatch,
+          {
+            table,
+            organizationId,
+            cursor,
+            batchSize: RESET_DEFAULT_BATCH_SIZE,
+          },
+        );
+
+        tableDeleted += result.deleted;
+        totalDeleted += result.deleted;
+        hasMore = result.hasMore;
+        cursor = result.cursor;
+      }
+
+      perTable[table] = tableDeleted;
+    }
+
+    return {
+      success: true,
+      deleted: totalDeleted,
+      tables: perTable,
     };
   },
 });

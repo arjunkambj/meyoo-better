@@ -82,6 +82,7 @@ import type * as utils_auth from "../utils/auth.js";
 import type * as utils_billing from "../utils/billing.js";
 import type * as utils_crypto from "../utils/crypto.js";
 import type * as utils_dashboardConfig from "../utils/dashboardConfig.js";
+import type * as utils_date from "../utils/date.js";
 import type * as utils_env from "../utils/env.js";
 import type * as utils_integrationStatus from "../utils/integrationStatus.js";
 import type * as utils_onboarding from "../utils/onboarding.js";
@@ -192,6 +193,7 @@ declare const fullApi: ApiFromModules<{
   "utils/billing": typeof utils_billing;
   "utils/crypto": typeof utils_crypto;
   "utils/dashboardConfig": typeof utils_dashboardConfig;
+  "utils/date": typeof utils_date;
   "utils/env": typeof utils_env;
   "utils/integrationStatus": typeof utils_integrationStatus;
   "utils/onboarding": typeof utils_onboarding;

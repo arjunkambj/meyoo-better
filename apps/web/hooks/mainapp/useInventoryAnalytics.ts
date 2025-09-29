@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useQuery } from "convex-helpers/react/cache/hooks";
 import type { Product } from "@/components/dashboard/(analytics)/inventory/components/ProductsTable";
 
@@ -125,37 +126,80 @@ export function useInventoryAnalytics(
 
   const { timezone } = useOrganizationTimeZone();
 
+  const normalizedDateRange = useMemo(() => {
+    if (!dateRange) return undefined;
+    return toUtcRangeStrings(dateRange, timezone);
+  }, [dateRange?.endDate, dateRange?.startDate, timezone]);
+
+  const overviewArgs = useMemo(
+    () => ({
+      dateRange: normalizedDateRange,
+    }),
+    [normalizedDateRange],
+  );
+
   // Fetch inventory overview
-  const overview = useQuery(api.web.inventory.getInventoryOverview, {
-    dateRange: dateRange ? toUtcRangeStrings(dateRange, timezone) : undefined,
-  });
+  const overview = useQuery(
+    api.web.inventory.getInventoryOverview,
+    overviewArgs,
+  );
 
   // Fetch products list
-  const products = useQuery(api.web.inventory.getProductsList, {
-    page,
-    pageSize,
-    stockLevel: stockLevel === "all" ? undefined : stockLevel,
-    category: category === "all" ? undefined : category,
-    searchTerm,
-    dateRange: dateRange ? toUtcRangeStrings(dateRange, timezone) : undefined,
-  });
+  const productsArgs = useMemo(
+    () => ({
+      page,
+      pageSize,
+      stockLevel: stockLevel === "all" ? undefined : stockLevel,
+      category: category === "all" ? undefined : category,
+      searchTerm,
+      dateRange: normalizedDateRange,
+    }),
+    [
+      category,
+      normalizedDateRange,
+      page,
+      pageSize,
+      searchTerm,
+      stockLevel,
+    ],
+  );
+
+  const products = useQuery(api.web.inventory.getProductsList, productsArgs);
 
   // Fetch stock alerts
-  const stockAlerts = useQuery(api.web.inventory.getStockAlerts, {
-    limit: 10,
-  });
+  const stockAlertsArgs = useMemo(() => ({ limit: 10 }), []);
+  const stockAlerts = useQuery(
+    api.web.inventory.getStockAlerts,
+    stockAlertsArgs,
+  );
 
   // Fetch top performers
-  const topPerformers = useQuery(api.web.inventory.getTopPerformers, {
-    dateRange: dateRange ? toUtcRangeStrings(dateRange, timezone) : undefined,
-    limit: 3,
-  });
+  const topPerformersArgs = useMemo(
+    () => ({
+      dateRange: normalizedDateRange,
+      limit: 3,
+    }),
+    [normalizedDateRange],
+  );
+
+  const topPerformers = useQuery(
+    api.web.inventory.getTopPerformers,
+    topPerformersArgs,
+  );
 
   // Fetch real stock movement data
-  const stockMovement = useQuery(api.web.inventory.getStockMovement, {
-    dateRange: dateRange ? toUtcRangeStrings(dateRange, timezone) : undefined,
-    periods: 7,
-  });
+  const stockMovementArgs = useMemo(
+    () => ({
+      dateRange: normalizedDateRange,
+      periods: 7,
+    }),
+    [normalizedDateRange],
+  );
+
+  const stockMovement = useQuery(
+    api.web.inventory.getStockMovement,
+    stockMovementArgs,
+  );
 
   // Only treat `undefined` as loading; `null` means "no data" (not loading).
   const isLoading = overview === undefined || products === undefined;

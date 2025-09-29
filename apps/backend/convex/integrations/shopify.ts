@@ -1810,7 +1810,12 @@ export const storeProductsInternal = internalMutation({
     const existingVariants = new Map();
 
     if (variantShopifyIds.size > 0) {
-      const variants = await ctx.db.query("shopifyProductVariants").collect();
+      const variants = await ctx.db
+        .query("shopifyProductVariants")
+        .withIndex("by_organization", (q) =>
+          q.eq("organizationId", args.organizationId as Id<"organizations">),
+        )
+        .collect();
 
       for (const variant of variants) {
         if (variantShopifyIds.has(variant.shopifyId)) {

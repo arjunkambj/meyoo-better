@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useQuery } from "convex-helpers/react/cache/hooks";
 
 import { api } from "@/libs/convexApi";
@@ -60,13 +61,14 @@ export function useShopifyProductVariantsPaginated(
   pageSize?: number,
   searchTerm?: string,
 ) {
+  const args = useMemo(
+    () => ({ page, pageSize, searchTerm }),
+    [page, pageSize, searchTerm],
+  );
+
   const result = useQuery(
     api.integrations.shopify.getProductVariantsPaginated,
-    {
-      page,
-      pageSize,
-      searchTerm,
-    },
+    args,
   );
 
   return {

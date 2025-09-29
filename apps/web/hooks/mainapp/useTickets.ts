@@ -32,10 +32,11 @@ export function useUserTickets(
   status?: "open" | "in_progress" | "resolved" | "closed",
   limit?: number
 ) {
-  const tickets = useQuery(api.web.tickets.getUserTickets, {
-    status,
-    limit,
-  });
+  const args = useMemo(
+    () => ({ status, limit }),
+    [status, limit],
+  );
+  const tickets = useQuery(api.web.tickets.getUserTickets, args);
 
   const loading = tickets === undefined;
   const error = tickets === null && !loading ? "Failed to load tickets" : null;
@@ -113,7 +114,19 @@ function useAllTickets(filters?: {
   limit?: number;
 }) {
   // Admin-side list lives under meyoo namespace
-  const tickets = useQuery(api.meyoo.tickets.getAllTickets, filters || {});
+  const normalizedFilters = useMemo(
+    () => ({
+      status: filters?.status,
+      priority: filters?.priority,
+      limit: filters?.limit,
+    }),
+    [filters?.limit, filters?.priority, filters?.status],
+  );
+
+  const tickets = useQuery(
+    api.meyoo.tickets.getAllTickets,
+    normalizedFilters,
+  );
 
   const loading = tickets === undefined;
   const error =

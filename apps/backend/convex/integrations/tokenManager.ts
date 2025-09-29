@@ -199,7 +199,10 @@ export const updateSessionTokenInternal = internalMutation({
 export const listAllActiveSessionsInternal = internalQuery({
   args: {},
   handler: async (ctx) => {
-    const sessions = await ctx.db.query("integrationSessions").collect();
+    const sessions = await ctx.db
+      .query("integrationSessions")
+      .withIndex("by_is_active", (q) => q.eq("isActive", true))
+      .collect();
     return sessions;
   },
 });

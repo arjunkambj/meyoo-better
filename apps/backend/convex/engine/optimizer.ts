@@ -293,8 +293,11 @@ function analyzeDataChangePatterns(syncs: Doc<"syncSessions">[]) {
 export const balanceSyncLoad = internalMutation({
   args: {},
   handler: async (ctx) => {
-    // Get all sync profiles
-    const profiles = await ctx.db.query("syncProfiles").collect();
+    // Use index to avoid full table scan when fetching scheduled profiles
+    const profiles = await ctx.db
+      .query("syncProfiles")
+      .withIndex("by_next_sync", (q) => q.gt("nextScheduledSync", 0))
+      .collect();
 
     // Group by next sync hour
     const syncsByHour: Record<number, string[]> = {};

@@ -284,33 +284,36 @@ export const monitorWebhookHealth = internalQuery({
   }> => {
     // Compute minimal webhook stats using receipts in last 24h
     const since = Date.now() - 24 * 60 * 60 * 1000;
-    const receiptsAll = await ctx.db.query("webhookReceipts").collect();
-    const receipts = receiptsAll.filter((r) => r.processedAt >= since);
-    const stats = {
-      total: receipts.length,
-      failureRate: 0,
-      byStatus: { processed: receipts.length, failed: 0, pending: 0 },
-    };
+    let total = 0;
+    let processed = 0;
+    let failed = 0;
 
-    // Check for high failure rate (no side-effects in query context)
+    const iterator = ctx.db
+      .query("webhookReceipts")
+      .withIndex("by_processed_at", (q) => q.gte("processedAt", since));
+
+    for await (const receipt of iterator) {
+      total += 1;
+      if (receipt.status === "failed") {
+        failed += 1;
+      } else {
+        processed += 1;
+      }
+    }
+
+    const failureRate = total === 0 ? 0 : (failed / total) * 100;
 
     const byStatus = {
-      processed:
-        (stats.byStatus as any).processed ??
-        (stats.byStatus as any).completed ??
-        0,
-      failed: (stats.byStatus as any).failed ?? 0,
-      pending:
-        (stats.byStatus as any).pending ??
-        (stats.byStatus as any).received ??
-        0,
+      processed,
+      failed,
+      pending: 0,
     };
 
     return {
-      total: stats.total,
-      failureRate: stats.failureRate,
+      total,
+      failureRate,
       byStatus,
-      healthCheck: stats.failureRate <= 10 ? "healthy" : "unhealthy",
+      healthCheck: failureRate <= 10 ? "healthy" : "unhealthy",
       timestamp: Date.now(),
     };
   },
@@ -373,16 +376,30 @@ export const getOldRecords = internalQuery({
   },
   returns: v.array(v.any()),
   handler: async (ctx, args) => {
-    // TODO: Need indexes with createdAt field for better performance
-    // Once indexes are added for each table, replace with proper index queries
+    const { table, cutoffDate, limit } = args;
 
-    // Temporary: Get all records from table
-    const allRecords = await (ctx.db.query as any)(args.table as any).collect();
+    if (table === "auditLogs") {
+      return await ctx.db
+        .query("auditLogs")
+        .withIndex("by_created", (q) => q.lt("createdAt", cutoffDate))
+        .order("asc")
+        .take(limit);
+    }
 
-    // Filter old records in memory
+    if (table === "syncSessions") {
+      return await ctx.db
+        .query("syncSessions")
+        .withIndex("by_started_at", (q) => q.lt("startedAt", cutoffDate))
+        .order("asc")
+        .take(limit);
+    }
+
+    const genericQuery = (ctx.db.query as any)(table as any);
+    const allRecords = await genericQuery.collect();
+
     return allRecords
-      .filter((r: any) => r.createdAt && r.createdAt < args.cutoffDate)
-      .slice(0, args.limit);
+      .filter((r: any) => r.createdAt && r.createdAt < cutoffDate)
+      .slice(0, limit);
   },
 });
 
@@ -419,29 +436,18 @@ export const getRecentSyncFailures = internalQuery({
   handler: async (ctx, args) => {
     const cutoff = Date.now() - args.hoursBack * 60 * 60 * 1000;
 
-    // TODO: Need index "by_org_status_started" on syncSessions table
-    // Once index is added, replace with:
-    // const sessions = await ctx.db
-    //   .query("syncSessions")
-    //   .withIndex("by_org_status_started", (q) =>
-    //     q.eq("organizationId", args.organizationId)
-    //       .eq("status", "failed")
-    //       .gte("startedAt", cutoff)
-    //   )
-    //   .collect();
-
-    // Temporary: Get all sync sessions for organization
-    const allSessions = await ctx.db
+    // Use compound index to fetch only failed sessions in the time window
+    const failures = await ctx.db
       .query("syncSessions")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId),
+      .withIndex("by_org_status_and_startedAt", (q) =>
+        q
+          .eq("organizationId", args.organizationId)
+          .eq("status", "failed")
+          .gte("startedAt", cutoff),
       )
       .collect();
 
-    // Filter failed sessions within time range in memory
-    return allSessions.filter(
-      (s) => s.status === "failed" && s.startedAt >= cutoff,
-    );
+    return failures;
   },
 });
 
@@ -505,13 +511,16 @@ export const getActiveTrials = internalQuery({
     }),
   ),
   handler: async (ctx) => {
-    // Get all organizations with active trials
-    const allOrgs = await ctx.db.query("organizations").collect();
-
-    return allOrgs
-      .filter(
-        (org) => org.isTrialActive && !org.hasTrialExpired && org.trialEndDate,
+    // Get organizations with active trials using index to avoid table scans
+    const trialingOrgs = await ctx.db
+      .query("organizations")
+      .withIndex("by_trial_status", (q) =>
+        q.eq("isTrialActive", true).eq("hasTrialExpired", false),
       )
+      .collect();
+
+    return trialingOrgs
+      .filter((org) => org.trialEndDate)
       .map((org) => ({
         _id: org._id,
         isTrialActive: org.isTrialActive,

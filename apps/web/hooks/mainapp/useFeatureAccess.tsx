@@ -55,6 +55,17 @@ const PLAN_HIERARCHY = [
   "enterprise",
 ] as const;
 
+const FEATURE_QUERY_ARGS = {
+  sync: { action: "sync" },
+  basic_export: { action: "basic_export" },
+  export: { action: "export" },
+  api_access: { action: "api_access" },
+  email_reports: { action: "email_reports" },
+  advanced_analytics: { action: "advanced_analytics" },
+  ai_insights: { action: "ai_insights" },
+  custom_integrations: { action: "custom_integrations" },
+} as const satisfies { [K in Feature]: { action: K } };
+
 type FeatureAccessMap = Record<Feature, FeatureAccessResult>;
 
 const FeatureAccessContext = createContext<FeatureAccessMap | null>(null);
@@ -107,9 +118,10 @@ function evaluateFeatureAccess(
 
 function useFeatureAccessInternal(feature: Feature): FeatureAccessResult {
   const { currentUsage } = useBilling();
-  const featureAccess = useQuery(api.billing.trackUsage.canPerformAction, {
-    action: feature,
-  });
+  const featureAccess = useQuery(
+    api.billing.trackUsage.canPerformAction,
+    FEATURE_QUERY_ARGS[feature],
+  );
 
   return useMemo(
     () => evaluateFeatureAccess(feature, currentUsage, featureAccess),
@@ -124,30 +136,38 @@ export function FeatureAccessProvider({
 }) {
   const { currentUsage } = useBilling();
 
-  const syncFeature = useQuery(api.billing.trackUsage.canPerformAction, {
-    action: "sync",
-  });
-  const exportFeature = useQuery(api.billing.trackUsage.canPerformAction, {
-    action: "export",
-  });
-  const apiFeature = useQuery(api.billing.trackUsage.canPerformAction, {
-    action: "api_access",
-  });
-  const emailFeature = useQuery(api.billing.trackUsage.canPerformAction, {
-    action: "email_reports",
-  });
-  const advancedFeature = useQuery(api.billing.trackUsage.canPerformAction, {
-    action: "advanced_analytics",
-  });
-  const aiFeature = useQuery(api.billing.trackUsage.canPerformAction, {
-    action: "ai_insights",
-  });
-  const customFeature = useQuery(api.billing.trackUsage.canPerformAction, {
-    action: "custom_integrations",
-  });
-  const basicExportFeature = useQuery(api.billing.trackUsage.canPerformAction, {
-    action: "basic_export",
-  });
+  const syncFeature = useQuery(
+    api.billing.trackUsage.canPerformAction,
+    FEATURE_QUERY_ARGS.sync,
+  );
+  const exportFeature = useQuery(
+    api.billing.trackUsage.canPerformAction,
+    FEATURE_QUERY_ARGS.export,
+  );
+  const apiFeature = useQuery(
+    api.billing.trackUsage.canPerformAction,
+    FEATURE_QUERY_ARGS.api_access,
+  );
+  const emailFeature = useQuery(
+    api.billing.trackUsage.canPerformAction,
+    FEATURE_QUERY_ARGS.email_reports,
+  );
+  const advancedFeature = useQuery(
+    api.billing.trackUsage.canPerformAction,
+    FEATURE_QUERY_ARGS.advanced_analytics,
+  );
+  const aiFeature = useQuery(
+    api.billing.trackUsage.canPerformAction,
+    FEATURE_QUERY_ARGS.ai_insights,
+  );
+  const customFeature = useQuery(
+    api.billing.trackUsage.canPerformAction,
+    FEATURE_QUERY_ARGS.custom_integrations,
+  );
+  const basicExportFeature = useQuery(
+    api.billing.trackUsage.canPerformAction,
+    FEATURE_QUERY_ARGS.basic_export,
+  );
 
   const syncAccess = useMemo(
     () => evaluateFeatureAccess("sync", currentUsage, syncFeature),

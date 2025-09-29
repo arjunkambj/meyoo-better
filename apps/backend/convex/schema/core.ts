@@ -94,7 +94,8 @@ export const organizations = defineTable({
   createdAt: v.optional(v.number()),
   updatedAt: v.optional(v.number()),
 })
-  .index("by_owner", ["ownerId"]);
+  .index("by_owner", ["ownerId"])
+  .index("by_trial_status", ["isTrialActive", "hasTrialExpired"]);
 
 // Memberships: user ↔ organization link with role + seat info
 export const memberships = defineTable({
@@ -283,7 +284,8 @@ export const integrationSessions = defineTable({
     "isActive",
   ])
   .index("by_org_platform_and_user", ["organizationId", "platform", "userId"])
-  .index("by_user_and_organization", ["userId", "organizationId"]);
+  .index("by_user_and_organization", ["userId", "organizationId"])
+  .index("by_is_active", ["isActive"]);
 
 // Sync sessions for tracking sync operations
 export const syncSessions = defineTable({

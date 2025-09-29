@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useMutation } from "convex/react";
 import { useQuery } from "convex-helpers/react/cache/hooks";
 
@@ -21,6 +22,9 @@ const COST_TYPES = {
   HANDLING: "handling",
   MARKETING: "marketing",
 } as const;
+
+const PAYMENT_COST_ARGS = { type: "payment" } as const;
+const OPERATIONAL_COST_ARGS = { type: "operational" } as const;
 
 // Cost calculation methods
 const CALCULATION_METHODS = {
@@ -55,10 +59,20 @@ export function useCost(
   dateRange?: { startDate: string; endDate: string },
 ) {
   const { timezone } = useOrganizationTimeZone();
-  const costs = useQuery(api.core.costs.getCosts, {
-    type: type ? COST_TYPES[type] : undefined,
-    dateRange: dateRange ? toUtcRangeStrings(dateRange, timezone) : undefined,
-  });
+  const normalizedRange = useMemo(() => {
+    if (!dateRange) return undefined;
+    return toUtcRangeStrings(dateRange, timezone);
+  }, [dateRange?.endDate, dateRange?.startDate, timezone]);
+
+  const queryArgs = useMemo(
+    () => ({
+      type: type ? COST_TYPES[type] : undefined,
+      dateRange: normalizedRange,
+    }),
+    [normalizedRange, type],
+  );
+
+  const costs = useQuery(api.core.costs.getCosts, queryArgs);
 
   return {
     costs: costs || [],
@@ -73,7 +87,8 @@ export function useCost(
  * Get shipping costs
  */
 export function useShippingCosts(limit?: number) {
-  const shippingCosts = useQuery(api.core.costs.getShippingCosts, { limit });
+  const args = useMemo(() => ({ limit }), [limit]);
+  const shippingCosts = useQuery(api.core.costs.getShippingCosts, args);
 
   return {
     shippingCosts: shippingCosts || [],
@@ -86,9 +101,7 @@ export function useShippingCosts(limit?: number) {
  * Get transaction/payment fees
  */
 export function useTransactionFees() {
-  const fees = useQuery(api.core.costs.getCosts, {
-    type: "payment",
-  });
+  const fees = useQuery(api.core.costs.getCosts, PAYMENT_COST_ARGS);
 
   return {
     fees: fees || [],
@@ -101,9 +114,7 @@ export function useTransactionFees() {
  * Get operational expenses
  */
 export function useExpenses() {
-  const expenses = useQuery(api.core.costs.getCosts, {
-    type: "operational",
-  });
+  const expenses = useQuery(api.core.costs.getCosts, OPERATIONAL_COST_ARGS);
 
   return {
     expenses: expenses || [],

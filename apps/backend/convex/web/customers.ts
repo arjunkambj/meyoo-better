@@ -1603,7 +1603,7 @@ function decodeCustomerCursor(cursor: string | null): CustomerCursorState {
         carryIds: carry,
       };
     }
-  } catch (error) {
+  } catch (_error) {
     // Fallback to treat the cursor as a raw Convex cursor
   }
 

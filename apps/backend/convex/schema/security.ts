@@ -83,7 +83,8 @@ export const webhookReceipts = defineTable({
   error: v.optional(v.string()),
 })
   .index("by_provider", ["providerWebhookId"])
-  .index("by_shop_topic", ["shopDomain", "topic"]);
+  .index("by_shop_topic", ["shopDomain", "topic"])
+  .index("by_processed_at", ["processedAt"]);
 
 export const gdprRequests = defineTable({
   organizationId: v.id("organizations"),

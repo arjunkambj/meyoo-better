@@ -9,12 +9,41 @@ import {
   responseValidator,
   type AnalyticsResponse,
 } from "./analyticsShared";
-import { validateDateRange, type DateRange } from "../utils/analyticsSource";
+import {
+  validateDateRange,
+  type AnalyticsSourceKey,
+  type DateRange,
+} from "../utils/analyticsSource";
+import { computeOverviewMetrics, computePlatformMetrics, computeChannelRevenue } from "../utils/analyticsAggregations";
+import type { OverviewComputation, ChannelRevenueBreakdown, PlatformMetrics } from "@repo/types";
 import { getUserAndOrg } from "../utils/auth";
+import { resolveDashboardConfig } from "../utils/dashboardConfig";
+import { computeIntegrationStatus, integrationStatusValidator } from "../utils/integrationStatus";
+
+type IntegrationStatus = Awaited<ReturnType<typeof computeIntegrationStatus>>;
 
 const responseOrNull = v.union(v.null(), responseValidator);
 
 type DateRangeArg = { startDate: string; endDate: string };
+
+const DASHBOARD_SUMMARY_DATASETS = [
+  "orders",
+  "customers",
+  "costs",
+  "metaInsights",
+  "analytics",
+] as const satisfies readonly AnalyticsSourceKey[];
+
+async function loadDashboardAnalytics(
+  ctx: QueryCtx,
+  orgId: Id<"organizations">,
+  range: DateRange,
+): Promise<AnalyticsResponse> {
+  return await loadAnalytics(ctx, orgId, range, {
+    datasets: DASHBOARD_SUMMARY_DATASETS,
+  });
+}
+
 
 type QueryHandler = (
   ctx: QueryCtx,
@@ -41,18 +70,88 @@ async function runDashboardQuery(
   return await loadAnalytics(ctx, auth.orgId as Id<"organizations">, range);
 }
 
-export const getDashboardSummary = query({
+export const getOverviewData = query({
   args: {
     timeRange: v.optional(v.string()),
     startDate: v.optional(v.string()),
     endDate: v.optional(v.string()),
   },
+  returns: v.union(
+    v.null(),
+    v.object({
+      dateRange: v.object({ startDate: v.string(), endDate: v.string() }),
+      organizationId: v.string(),
+      overview: v.optional(v.any()),
+      platformMetrics: v.optional(v.any()),
+      channelRevenue: v.optional(v.any()),
+      primaryCurrency: v.optional(v.string()),
+      dashboardConfig: v.object({
+        kpis: v.array(v.string()),
+        widgets: v.array(v.string()),
+      }),
+      integrationStatus: integrationStatusValidator,
+      meta: v.optional(v.any()),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    const auth = await getUserAndOrg(ctx);
+    if (!auth) return null;
+
+    const range = args.startDate && args.endDate
+      ? validateDateRange({ startDate: args.startDate, endDate: args.endDate })
+      : defaultDateRange(parseTimeRange(args.timeRange));
+
+    const response = await loadDashboardAnalytics(
+      ctx,
+      auth.orgId as Id<"organizations">,
+      range,
+    );
+
+    const overview = computeOverviewMetrics(response);
+    const platformMetrics = computePlatformMetrics(response);
+    const channelRevenue = computeChannelRevenue(response);
+    const dashboardConfig = await resolveDashboardConfig(
+      ctx,
+      auth.user._id,
+      auth.orgId,
+    );
+    const integrationStatus = await computeIntegrationStatus(ctx, auth.orgId);
+    return {
+      dateRange: response.dateRange,
+      organizationId: response.organizationId,
+      overview,
+      platformMetrics,
+      channelRevenue,
+      primaryCurrency: auth.user.primaryCurrency ?? "USD",
+      dashboardConfig,
+      integrationStatus,
+      meta: response.meta,
+    } satisfies {
+      dateRange: DateRange;
+      organizationId: string;
+      overview: OverviewComputation | null;
+      platformMetrics: PlatformMetrics | null | undefined;
+      channelRevenue: ChannelRevenueBreakdown | null | undefined;
+      primaryCurrency?: string;
+      dashboardConfig: { kpis: string[]; widgets: string[] };
+      integrationStatus: IntegrationStatus;
+      meta?: Record<string, unknown> | undefined;
+    };
+  },
+});
+
+export const getDashboardSummary = query({
+  args: {
+    startDate: v.string(),
+    endDate: v.string(),
+  },
   returns: responseOrNull,
   handler: async (ctx, args) => {
-    const range = args.startDate && args.endDate
-      ? { startDate: args.startDate, endDate: args.endDate }
-      : defaultDateRange(parseTimeRange(args.timeRange));
-    return await runDashboardQuery(ctx, range);
+    return await runDashboardQuery(
+      ctx,
+      { startDate: args.startDate, endDate: args.endDate },
+      loadDashboardAnalytics,
+    );
   },
 });
 

@@ -44,18 +44,23 @@ export const CustomersView = memo(function CustomersView() {
     [statusFilter]
   );
 
-  const handleAnalyticsRangeChange = useCallback(
-    (range: { start: string; end: string }) => {
-      setDateRange({ startDate: range.start, endDate: range.end });
-    },
-    []
-  );
+  const handleAnalyticsRangeChange = useCallback((range: { startDate: string; endDate: string }) => {
+    setDateRange({ startDate: range.startDate, endDate: range.endDate });
+  }, []);
 
   const handleFilterChange = useCallback((key: string, value: unknown) => {
     if (key === "status") {
       setStatusFilter((value as string) || "all");
     }
   }, []);
+
+  const exportButtonData = useMemo(() => {
+    if (Array.isArray(exportData)) {
+      return (exportData as Record<string, unknown>[]).map((row) => ({ ...row }));
+    }
+    if (typeof exportData === "function") return exportData;
+    return [] as Record<string, unknown>[];
+  }, [exportData]);
 
   return (
     <div className="flex flex-col space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -74,7 +79,7 @@ export const CustomersView = memo(function CustomersView() {
         rightActions={
           <ExportButton
             color="primary"
-            data={exportData}
+            data={exportButtonData}
             disabled={loadingStates.customers}
             filename="customers-database"
             formats={["csv", "pdf"]}

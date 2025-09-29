@@ -9,12 +9,12 @@ import { useRouter } from 'expo-router';
 import { useUserDetails } from '@/hooks/useUserDetails';
 
 export default function SettingsTab() {
-  const { billing, isLoading } = useUserDetails();
+  const { billing, billingUsage, isLoading } = useUserDetails();
   const { signOut } = useAuthActions();
   const router = useRouter();
   const [darkModeEnabled, setDarkModeEnabled] = useState(false);
 
-  const plan = billing?.plan ?? 'free';
+  const plan = billingUsage?.plan ?? billing?.plan ?? 'free';
   const billingCopy = useMemo(() => {
     if (!billing) {
       return 'You are on the default free plan.';
@@ -24,6 +24,39 @@ export default function SettingsTab() {
     const status = billing.status ? `Status: ${billing.status}` : null;
     return [cycle, status].filter(Boolean).join(' · ');
   }, [billing]);
+
+  const usageDetails = useMemo(() => {
+    if (!billingUsage) {
+      return null;
+    }
+
+    const safePercentage = Math.round(billingUsage.percentage);
+    const boundedPercentage = Number.isFinite(safePercentage)
+      ? Math.max(0, Math.min(100, safePercentage))
+      : 0;
+
+    const barColor =
+      boundedPercentage >= 95
+        ? 'bg-danger-500'
+        : boundedPercentage >= 80
+          ? 'bg-warning-500'
+          : 'bg-primary-500';
+
+    return {
+      percentage: boundedPercentage,
+      labelPercentage: `${boundedPercentage}%`,
+      currentUsage: billingUsage.currentUsage,
+      limit: billingUsage.limit,
+      requiresUpgrade: billingUsage.requiresUpgrade,
+      barColor,
+      isOnTrial: billingUsage.isOnTrial,
+      daysLeftInTrial: billingUsage.daysLeftInTrial,
+    };
+  }, [billingUsage]);
+
+  const formatUsageValue = useCallback((value: number) => {
+    return Number.isFinite(value) ? value.toLocaleString() : '0';
+  }, []);
 
   const handleSignOut = useCallback(async () => {
     await signOut();
@@ -97,6 +130,41 @@ export default function SettingsTab() {
                         <Text className="text-sm font-medium text-foreground">
                           {billingCopy}
                         </Text>
+                      </View>
+                    )}
+
+                    {usageDetails && (
+                      <View className="gap-2">
+                        <View className="flex-row items-center justify-between">
+                          <Text className="text-xs font-medium text-default-500">
+                            Monthly usage
+                          </Text>
+                          <Text className="text-xs font-semibold text-foreground">
+                            {formatUsageValue(usageDetails.currentUsage)} /{' '}
+                            {formatUsageValue(usageDetails.limit)} orders
+                          </Text>
+                        </View>
+                        <View className="h-2 rounded-full bg-default-100 overflow-hidden">
+                          <View
+                            className={`h-full rounded-full ${usageDetails.barColor}`}
+                            style={{ width: `${usageDetails.percentage}%` }}
+                          />
+                        </View>
+                        <View className="flex-row items-center justify-between">
+                          <Text className="text-xs text-default-500">
+                            {usageDetails.labelPercentage} of plan
+                          </Text>
+                          {usageDetails.isOnTrial && usageDetails.daysLeftInTrial > 0 ? (
+                            <Text className="text-xs font-medium text-warning-500">
+                              Trial ends in {usageDetails.daysLeftInTrial} days
+                            </Text>
+                          ) : null}
+                        </View>
+                        {usageDetails.requiresUpgrade ? (
+                          <Text className="text-xs font-medium text-warning-500">
+                            {"You're nearing your plan limit. Upgrade to avoid service interruptions."}
+                          </Text>
+                        ) : null}
                       </View>
                     )}
                   </View>

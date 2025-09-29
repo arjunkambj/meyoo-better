@@ -10,12 +10,13 @@ import React from "react";
 interface DashboardHeaderProps {
   onCustomize: () => void;
   exportData?: Record<string, unknown>[] | (() => Promise<Record<string, unknown>[]>);
+  onDateRangeChange?: (range: { startDate: string; endDate: string }) => void;
 }
 
-export function DashboardHeader({ onCustomize, exportData }: DashboardHeaderProps) {
+export function DashboardHeader({ onCustomize, exportData, onDateRangeChange }: DashboardHeaderProps) {
   return (
     <AnalyticsHeader
-      leftActions={<GlobalDateRangePicker />}
+      leftActions={<GlobalDateRangePicker onAnalyticsChange={onDateRangeChange} />}
       rightActions={
         <div className="flex items-center gap-2">
           {exportData && (

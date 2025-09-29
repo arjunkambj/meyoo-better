@@ -1,54 +1,12 @@
-# Shopify Sync Overhaul Plan
-
-## Problem Definition
-
-1. **Duplicate Initial Sync Scheduling**  
-   - Repeated user clicks (billing/onboarding) trigger fresh `sync:initial` jobs even when one is already running.  
-   - Expected outcome: the platform should have at most one active initial sync per org/platform; new requests must reuse existing sessions and simply report progress.  
-   - Verification: multiple rapid triggers return the same session id and no extra jobs appear in Convex logs.
-
-2. **Legacy vs. New Pipeline Conflict**  
-   - Onboarding runs `shopifySync.initial`, while orchestrator/scheduler still use the legacy integration. Both pipelines process the same store, doubling work and causing write conflicts.  
-   - Expected outcome: only the new `shopifySync` pipeline remains, used everywhere.  
-   - Verification: orchestrator scheduling shows a single action path; the legacy integration entry points are removed.
-
-3. **Write Conflicts During Sync/Webhooks**  
-   - Small batches and per-record lookups cause Convex OCC failures when webhook processors and sync batches overlap.  
-   - Expected outcome: shared idempotent upsert helpers with retry, and larger indexed batches eliminate write conflicts under concurrent load.  
-   - Verification: load test with overlapping webhook + batch writes completes without Convex write conflict errors.
-
-4. **No Incremental Sync / Poor Recovery**  
-   - After initial sync, there is no robust incremental pipeline; failed runs block recovery.  
-   - Expected outcome: incremental sync driven by `lastSyncedAt`, and install/onboarding only skip when a completed session exists.  
-   - Verification: re-running incremental sync pulls only new/updated records; failed initial attempts can be retriggered cleanly.
-
-## Phase 1 · Guard & Deduplicate Job Scheduling (Root Fix)
-- [x] Introduce `ensureInitialSync` internal mutation that checks existing sessions and only enqueues when none are active
-- [x] Update Shopify OAuth callback, billing flow, and install provisioning to call `ensureInitialSync`
-- [x] Update `handleInitialSync` to respect reserved session ids and exit early if another worker owns the run
-- [x] Record session telemetry (status transitions, start/end timestamps) to confirm dedupe works
-- [ ] **Verify:** rapid onboarding/billing triggers reuse the same session (no duplicate jobs)
-
-## Phase 2 · Fix Install & Recovery Logic (Root Fix Continuation)
-- [x] Treat only `status === "completed"` sessions as "already synced" during install/onboarding checks
-- [x] Ensure failed initial syncs automatically retry when the user reconnects (no admin utility)
-- [x] Update onboarding UI queries to surface accurate sync status without creating new jobs
-- [ ] **Verify:** simulate failed initial sync, reconnect store, confirm exactly one new sync is enqueued and completes
-
-## Phase 3 · Consolidate Pipelines & Add Incremental Sync
-- [x] Route orchestrator/scheduler to `shopifySync.initial` / `.incremental` exclusively
-- [x] Implement `shopifySync.incremental` with `lastSyncedAt` per store and date cursor query
-- [x] Remove legacy Shopify integration sync code paths
-- [ ] **Verify:** run scheduled incremental sync, confirm only delta records are processed and no legacy code paths run
-
-## Phase 4 · Harden Persistence & Webhooks
-- [ ] Create shared upsert helpers with retry-on-conflict for orders/customers/line items/transactions
-- [ ] Increase batch sizes and rely on indexed bulk reads to reduce Convex load
-- [ ] Update webhook handlers to use the shared upsert logic and never enqueue initial syncs
-- [ ] Verification Steps: stress test with simultaneous sync + webhook traffic; ensure zero write conflicts and correct data counts
-
-## Phase 5 · Scaling & Analytics Safety
-- [ ] Move historical pulls to Shopify Bulk Operations for high-volume stores
-- [ ] Gate analytics/marketing jobs on sync telemetry and enforce per-org concurrency caps
-- [ ] Add dashboards/alerts for sync throughput, failure rate, and webhook latency
-- [ ] Verification Steps: backfill large store (20k orders) successfully; analytics runs only after dataChanged = true
+- [x] Refactor mobile Expo analytics hooks to consume new backend summaries instead of legacy `getMetrics`
+- [x] Update Convex agent tools/actions to use aggregated queries (dashboard summary, orders analytics, platform metrics)
+- [x] Remove legacy raw dataset queries and ensure all consumers use the new summary endpoints
+- [x] Overview refactor: consolidated Convex overview query now supplies metrics, platform stats, and channel revenue in one websocket, replacing multiple subscriptions that previously exceeded read limits.
+- [x] Dashboard overview UI now consumes the unified hook, eliminating redundant aggregator hooks and the sync banner while using one real-time source of truth.
+- [x] **Metric accuracy parity check** – validate each card/widget against source Convex data across the overview (Units Sold, Orders, customer counts, operating cost metrics, Shopify revenue fields). Adjusted backend aggregations to align with Convex data.
+- [x] Validate analytics flows across web, mobile, and agent surfaces after refactor.
+- [x] Audit onboarding routes under `apps/web/app/(protected)/onboarding` (accounts, shopify, products, marketing, cost, billing, complete) to consolidate data fetching and drop legacy sync flags (no outstanding legacy calls found).
+- [x] Refactor dashboard analytics routes (`apps/web/app/(protected)/(dashboard)/(analytics)/**`) to consume the new aggregated Convex endpoints instead of per-metric queries (verified hooks already use aggregated queries).
+- [x] Update dashboard feature routes (`apps/web/app/(protected)/(dashboard)/(features)/**`) to reuse shared analytics hooks where possible (confirmed shared hook usage).
+- [x] Simplify remaining dashboard hooks (e.g. `apps/web/hooks/mainapp/useOrdersAnalytics.ts`, `usePnLAnalytics.ts`) to leverage `getOverviewData`/related summaries and remove redundant aggregations (reviewed and aligned).
+- [x] Review MCP and agent tools (`apps/backend/convex/agent/tools.ts`, `apps/backend/convex/agent/mcpActions.ts`) to ensure they call the consolidated overview/platform metrics queries.

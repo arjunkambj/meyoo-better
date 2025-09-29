@@ -1,9 +1,17 @@
-import { useQuery } from 'convex/react';
 import { useMemo } from 'react';
+import { useQuery } from 'convex/react';
+
 import { api } from '@/libs/convexApi';
 import { useDateRange } from '@/store/dateRangeStore';
+import type {
+  OverviewComputation,
+  PlatformMetrics as PlatformMetricsResult,
+  PnLAnalyticsResult,
+  ChannelRevenueBreakdown,
+} from '@repo/types';
 
-// Define metric types
+// ----- Metric types -----
+
 export interface AnalyticsMetric {
   value: number;
   change?: number;
@@ -37,7 +45,7 @@ interface CostBreakdownResult {
   metaSpend: number;
 }
 
-const createEmptyCostBreakdown = (): CostBreakdownResult => ({
+const EMPTY_COST_BREAKDOWN: CostBreakdownResult = {
   totals: {
     adSpend: 0,
     cogs: 0,
@@ -47,193 +55,164 @@ const createEmptyCostBreakdown = (): CostBreakdownResult => ({
     handling: 0,
   },
   metaSpend: 0,
+};
+
+const createMetric = (value: number, change?: number, previousValue?: number): AnalyticsMetric => ({
+  value,
+  change,
+  previousValue,
 });
 
-// Hook for overview analytics
+// ----- Overview analytics -----
+
 export function useOverviewAnalytics() {
   const { dateRange } = useDateRange();
 
-  // Aggregated P&L metrics for totals and period-over-period change
-  const pnl = useQuery(api.web.pnl.getMetrics, {
-    dateRange: {
-      startDate: dateRange.start,
-      endDate: dateRange.end,
-    },
-  }) as any;
-
-  // Fetch orders separately and sum them to avoid averaging artifacts
-  const ordersRows = useQuery(api.web.analytics.getMetrics, {
-    dateRange: {
-      startDate: dateRange.start,
-      endDate: dateRange.end,
-    },
-    metrics: ["orders"],
-  }) as any[] | null | undefined;
-
-  // Fetch ROAS as an optional KPI (averaged across the period)
-  const roasRows = useQuery(api.web.analytics.getMetrics, {
-    dateRange: {
-      startDate: dateRange.start,
-      endDate: dateRange.end,
-    },
-    metrics: ["blendedRoas"],
-  }) as any[] | null | undefined;
+  const overviewData = useQuery(api.web.dashboard.getOverviewData, {
+    startDate: dateRange.start,
+    endDate: dateRange.end,
+  }) as { overview?: OverviewComputation | null } | null | undefined;
 
   const metrics = useMemo<OverviewMetrics | null>(() => {
-    if (pnl === undefined || ordersRows === undefined || roasRows === undefined)
-      return null;
-    if (pnl === null) return null;
-
-    const ordersTotal = Array.isArray(ordersRows)
-      ? ordersRows.reduce((sum, r) => sum + (Number(r?.orders) || 0), 0)
-      : 0;
-
-    const roasAvg = Array.isArray(roasRows) && roasRows.length > 0
-      ? roasRows.reduce((sum, r) => sum + (Number(r?.blendedRoas) || 0), 0) /
-        roasRows.length
-      : 0;
-
-    const revenue = Number(pnl.revenue || 0);
-    const netProfit = Number(pnl.netProfit || 0);
-    const totalAdSpend = Number(pnl.totalAdSpend || 0);
-    const grossProfit = Number(pnl.grossProfit || 0);
-    const profitMargin = Number(pnl.netProfitMargin || 0);
-    const aov = ordersTotal > 0 ? revenue / ordersTotal : 0;
+    if (overviewData === undefined) return null;
+    const overviewSummary = overviewData?.overview?.summary;
+    if (!overviewSummary) return null;
 
     return {
-      revenue: {
-        value: revenue,
-        change: Number(pnl.revenueChange ?? 0),
-      },
-      orders: {
-        value: ordersTotal,
-        // Not currently available from P&L; omit change to hide indicator
-      },
-      avgOrderValue: {
-        value: aov,
-        // Change not computed; omit for now
-      },
-      totalAdSpend: {
-        value: totalAdSpend,
-        change: Number(pnl.totalAdSpendChange ?? 0),
-      },
-      roas: {
-        value: roasAvg,
-      },
-      netProfit: {
-        value: netProfit,
-        change: Number(pnl.netProfitChange ?? 0),
-      },
-      grossProfit: {
-        value: grossProfit,
-        change: Number(pnl.grossProfitChange ?? 0),
-      },
-      profitMargin: {
-        value: profitMargin,
-        change: Number(pnl.netProfitMarginChange ?? 0),
-      },
-    };
-  }, [pnl, ordersRows, roasRows]);
+      revenue: createMetric(overviewSummary.revenue, overviewSummary.revenueChange),
+      orders: createMetric(overviewSummary.orders, overviewSummary.ordersChange),
+      avgOrderValue: createMetric(
+        overviewSummary.avgOrderValue,
+        overviewSummary.avgOrderValueChange,
+      ),
+      totalAdSpend: createMetric(
+        overviewSummary.totalAdSpend,
+        overviewSummary.totalAdSpendChange,
+      ),
+      roas: createMetric(overviewSummary.roas, overviewSummary.roasChange),
+      customers: createMetric(overviewSummary.customers, overviewSummary.customersChange),
+      repeatRate: createMetric(
+        overviewSummary.repeatCustomerRate,
+        overviewSummary.repeatCustomerRateChange,
+      ),
+      netProfit: createMetric(overviewSummary.profit, overviewSummary.profitChange),
+      grossProfit: createMetric(
+        overviewSummary.grossProfit,
+        overviewSummary.grossProfitChange,
+      ),
+      profitMargin: createMetric(
+        overviewSummary.profitMargin,
+        overviewSummary.profitMarginChange,
+      ),
+    } satisfies OverviewMetrics;
+  }, [overviewData]);
 
   return {
     metrics,
-    isLoading:
-      pnl === undefined || ordersRows === undefined || roasRows === undefined,
+    isLoading: overviewData === undefined,
     error: null,
   };
 }
 
-// Hook: mobile cost breakdown (6 categories like web)
+// ----- Cost breakdown -----
+
 export function useCostBreakdown() {
   const { dateRange } = useDateRange();
 
-  const costs = useQuery(
-    api.web.analytics.getMetrics,
-    {
-      dateRange: { startDate: dateRange.start, endDate: dateRange.end },
-      metrics: [
-        'totalAdSpend',
-        'cogs',
-        'shippingCosts',
-        'transactionFees',
-        'customCosts',
-        'handlingFees',
-        // channel spends for KPIs
-        'metaAdSpend',
-      ],
-    }
-  ) as any[] | null | undefined;
+  const overviewData = useQuery(api.web.dashboard.getOverviewData, {
+    startDate: dateRange.start,
+    endDate: dateRange.end,
+  }) as { overview?: OverviewComputation | null } | null | undefined;
 
-  const { totals, metaSpend } = useMemo<CostBreakdownResult>(() => {
-    if (!Array.isArray(costs)) return createEmptyCostBreakdown();
-    const sum = (key: string) =>
-      costs.reduce((acc: number, row: any) => acc + (Number(row?.[key]) || 0), 0);
+  const breakdown = useMemo<CostBreakdownResult>(() => {
+    if (overviewData === undefined) return EMPTY_COST_BREAKDOWN;
+    const overviewSummary = overviewData?.overview?.summary;
+    if (!overviewSummary) return EMPTY_COST_BREAKDOWN;
+
     return {
       totals: {
-        adSpend: sum('totalAdSpend'),
-        cogs: sum('cogs'),
-        shipping: sum('shippingCosts'),
-        transaction: sum('transactionFees'),
-        custom: sum('customCosts'),
-        handling: sum('handlingFees'),
-      } as CostBreakdownTotals,
-      metaSpend: sum('metaAdSpend'),
-    };
-  }, [costs]);
+        adSpend: overviewSummary.totalAdSpend,
+        cogs: overviewSummary.cogs,
+        shipping: overviewSummary.shippingCosts,
+        transaction: overviewSummary.transactionFees,
+        custom: overviewSummary.customCosts,
+        handling: overviewSummary.handlingFees,
+      },
+      metaSpend: overviewSummary.metaAdSpend,
+    } satisfies CostBreakdownResult;
+  }, [overviewData]);
 
   return {
-    totals,
-    metaSpend,
-    isLoading: costs === undefined,
+    totals: breakdown.totals,
+    metaSpend: breakdown.metaSpend,
+    isLoading: overviewData === undefined,
   };
 }
 
-// Hook for platform-specific metrics
+// ----- Platform metrics -----
+
 export function usePlatformMetrics() {
-  // For now, return null for platform metrics until we have proper endpoints
-  const shopifyMetrics = null as any;
-  const metaMetrics = null as any;
-  const googleMetrics = null as any;
+  const { dateRange } = useDateRange();
+
+  const overviewData = useQuery(api.web.dashboard.getOverviewData, {
+    startDate: dateRange.start,
+    endDate: dateRange.end,
+  }) as { platformMetrics?: PlatformMetricsResult | null } | null | undefined;
 
   return {
-    shopify: shopifyMetrics,
-    meta: metaMetrics,
-    google: googleMetrics,
-    isLoading:
-      shopifyMetrics === undefined ||
-      metaMetrics === undefined ||
-      googleMetrics === undefined,
+    metrics: overviewData?.platformMetrics ?? null,
+    isLoading: overviewData === undefined,
   };
 }
 
-// Hook for channel revenue breakdown
+// ----- Channel revenue -----
+
 export function useChannelRevenue() {
   const { dateRange } = useDateRange();
 
-  const channelData = useQuery(
-    api.web.analytics.getChannelRevenue,
-    {
-      dateRange: {
-        startDate: dateRange.start,
-        endDate: dateRange.end,
-      },
-    }
-  );
+  const overviewData = useQuery(api.web.dashboard.getOverviewData, {
+    startDate: dateRange.start,
+    endDate: dateRange.end,
+  }) as { channelRevenue?: ChannelRevenueBreakdown | null } | null | undefined;
 
   const channels = useMemo(() => {
-    if (!channelData?.channels) return [];
-
-    return channelData.channels.map((channel) => ({
+    const breakdown = overviewData?.channelRevenue?.channels ?? [];
+    return breakdown.map((channel) => ({
       name: channel.name,
-      revenue: channel.revenue ?? 0,
-      orders: channel.orders ?? 0,
-      change: channel.change ?? 0,
+      revenue: channel.revenue,
+      orders: channel.orders,
+      change: channel.change,
     }));
-  }, [channelData]);
+  }, [overviewData]);
+
+  const totalRevenue = useMemo(
+    () => channels.reduce((sum, channel) => sum + channel.revenue, 0),
+    [channels],
+  );
 
   return {
     channels,
-    totalRevenue: channelData?.totalRevenue ?? 0,
-    isLoading: channelData === undefined,
+    totalRevenue,
+    isLoading: overviewData === undefined,
+  };
+}
+
+// ----- P&L summary -----
+
+export function usePnLSummary() {
+  const { dateRange } = useDateRange();
+
+  const pnl = useQuery(api.web.pnl.getAnalytics, {
+    dateRange: {
+      startDate: dateRange.start,
+      endDate: dateRange.end,
+    },
+    granularity: 'monthly',
+  }) as { result: PnLAnalyticsResult } | null | undefined;
+
+  return {
+    metrics: pnl?.result?.metrics ?? null,
+    totals: pnl?.result?.totals ?? null,
+    isLoading: pnl === undefined,
   };
 }

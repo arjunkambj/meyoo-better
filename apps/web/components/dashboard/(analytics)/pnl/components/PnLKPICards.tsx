@@ -5,33 +5,7 @@ import { memo } from "react";
 import KPI from "@/components/shared/cards/KPI";
 import { useUser } from "@/hooks";
 import { getCurrencySymbol } from "@/libs/utils/format";
-
-export interface PnLKPIMetrics {
-  grossSales: number;
-  discountsReturns: number;
-  netRevenue: number;
-  grossProfit: number;
-  operatingExpenses: number;
-  ebitda: number;
-  netProfit: number;
-  netMargin: number;
-  marketingCost: number;
-  marketingROAS: number;
-  marketingROI: number;
-  changes: {
-    grossSales: number;
-    discountsReturns: number;
-    netRevenue: number;
-    grossProfit: number;
-    operatingExpenses: number;
-    ebitda: number;
-    netProfit: number;
-    netMargin: number;
-    marketingCost: number;
-    marketingROAS: number;
-    marketingROI: number;
-  };
-}
+import type { PnLKPIMetrics } from "@repo/types";
 
 interface PnLKPICardsProps {
   metrics?: PnLKPIMetrics;

@@ -58,6 +58,10 @@ export interface AnalyticsSourceData {
 
 export type AnalyticsSourceKey = keyof AnalyticsSourceData;
 
+interface AnalyticsOrderChunkOptions extends PaginationOptions {
+  datasets?: readonly AnalyticsSourceKey[];
+}
+
 type OrderScopedTable =
   | "shopifyOrderItems"
   | "shopifyTransactions"
@@ -96,8 +100,9 @@ async function fetchOrders(
   ctx: QueryCtx,
   organizationId: OrganizationId,
   timestamps: TimestampRange,
-): Promise<Doc<"shopifyOrders">[]> {
-  return await ctx.db
+  options?: { limit?: number },
+): Promise<{ orders: Doc<"shopifyOrders">[]; isTruncated: boolean }> {
+  const baseQuery = ctx.db
     .query("shopifyOrders")
     .withIndex("by_organization_and_created", (q) =>
       q
@@ -105,7 +110,21 @@ async function fetchOrders(
         .gte("shopifyCreatedAt", timestamps.start)
         .lte("shopifyCreatedAt", timestamps.end),
     )
-    .collect();
+    .order("desc");
+
+  if (options?.limit && options.limit > 0) {
+    const page = await baseQuery.paginate({ numItems: options.limit, cursor: null });
+    return {
+      orders: page.page,
+      isTruncated: !page.isDone,
+    };
+  }
+
+  const orders = await baseQuery.collect();
+  return {
+    orders,
+    isTruncated: false,
+  };
 }
 
 async function fetchOrdersPage(
@@ -160,57 +179,106 @@ export async function fetchAnalyticsOrderChunk(
   ctx: QueryCtx,
   organizationId: OrganizationId,
   dateRange: DateRange,
-  options?: PaginationOptions,
+  options?: AnalyticsOrderChunkOptions,
 ): Promise<AnalyticsOrderChunkResult> {
+  const requested = options?.datasets ? new Set(options.datasets) : null;
+  const shouldFetch = (key: AnalyticsSourceKey) => (requested ? requested.has(key) : true);
+
+  const needCustomers = shouldFetch("customers");
+  const needProducts = shouldFetch("products");
+  const needVariants = shouldFetch("variants");
+  const needProductCostComponents = shouldFetch("productCostComponents");
+  const needTransactions = shouldFetch("transactions");
+  const needRefunds = shouldFetch("refunds");
+  const needFulfillments = shouldFetch("fulfillments");
+  const needOrderItems =
+    shouldFetch("orderItems") || needProducts || needVariants || needProductCostComponents;
+
   const timestamps = toTimestampRange(dateRange);
   const orderPage = await fetchOrdersPage(ctx, organizationId, timestamps, options);
   const orders = orderPage.docs;
   const orderIds = orders.map((order) => order._id as OrderId);
 
-  const [orderItems, transactions, refunds, fulfillments] = await Promise.all([
-    fetchOrderScopedDocs(ctx, "shopifyOrderItems", organizationId, orderIds),
-    fetchOrderScopedDocs(ctx, "shopifyTransactions", organizationId, orderIds),
-    fetchOrderScopedDocs(ctx, "shopifyRefunds", organizationId, orderIds),
-    fetchOrderScopedDocs(ctx, "shopifyFulfillments", organizationId, orderIds),
-  ]);
+  let orderItems: Doc<"shopifyOrderItems">[] = [];
+  if (needOrderItems && orderIds.length > 0) {
+    orderItems = await fetchOrderScopedDocs(ctx, "shopifyOrderItems", organizationId, orderIds);
+  }
 
-  const customerIds = new Set<Id<"shopifyCustomers">>();
-  const productIds = new Set<Id<"shopifyProducts">>();
-  const variantIds = new Set<Id<"shopifyProductVariants">>();
+  let transactions: Doc<"shopifyTransactions">[] = [];
+  if (needTransactions && orderIds.length > 0) {
+    transactions = await fetchOrderScopedDocs(ctx, "shopifyTransactions", organizationId, orderIds);
+  }
 
-  for (const order of orders) {
-    if (order.customerId) {
-      customerIds.add(order.customerId as Id<"shopifyCustomers">);
+  let refunds: Doc<"shopifyRefunds">[] = [];
+  if (needRefunds && orderIds.length > 0) {
+    refunds = await fetchOrderScopedDocs(ctx, "shopifyRefunds", organizationId, orderIds);
+  }
+
+  let fulfillments: Doc<"shopifyFulfillments">[] = [];
+  if (needFulfillments && orderIds.length > 0) {
+    fulfillments = await fetchOrderScopedDocs(ctx, "shopifyFulfillments", organizationId, orderIds);
+  }
+
+  const customerIds = needCustomers ? new Set<Id<"shopifyCustomers">>() : null;
+  if (customerIds) {
+    for (const order of orders) {
+      if (order.customerId) {
+        customerIds.add(order.customerId as Id<"shopifyCustomers">);
+      }
     }
   }
 
-  for (const item of orderItems) {
-    if (item.productId) {
-      productIds.add(item.productId as Id<"shopifyProducts">);
-    }
-    if (item.variantId) {
-      variantIds.add(item.variantId as Id<"shopifyProductVariants">);
+  const productIds = needProducts ? new Set<Id<"shopifyProducts">>() : null;
+  const variantIds =
+    needVariants || needProductCostComponents ? new Set<Id<"shopifyProductVariants">>() : null;
+
+  if ((productIds || variantIds) && orderItems.length > 0) {
+    for (const item of orderItems) {
+      if (productIds && item.productId) {
+        productIds.add(item.productId as Id<"shopifyProducts">);
+      }
+      if (variantIds && item.variantId) {
+        variantIds.add(item.variantId as Id<"shopifyProductVariants">);
+      }
     }
   }
 
-  const [customers, products, variants, productCostComponents] = await Promise.all([
-    fetchCustomers(ctx, customerIds),
-    fetchProducts(ctx, productIds),
-    fetchVariants(ctx, variantIds),
-    fetchProductCostComponents(ctx, organizationId, variantIds, timestamps),
-  ]);
+  let customers: Doc<"shopifyCustomers">[] = [];
+  if (customerIds && customerIds.size > 0) {
+    customers = await fetchCustomers(ctx, customerIds);
+  }
+
+  let products: Doc<"shopifyProducts">[] = [];
+  if (productIds && productIds.size > 0) {
+    products = await fetchProducts(ctx, productIds);
+  }
+
+  let productCostComponents: Doc<"productCostComponents">[] = [];
+  if (variantIds && needProductCostComponents && variantIds.size > 0) {
+    productCostComponents = await fetchProductCostComponents(
+      ctx,
+      organizationId,
+      variantIds,
+      timestamps,
+    );
+  }
+
+  let variants: Doc<"shopifyProductVariants">[] = [];
+  if (variantIds && needVariants && variantIds.size > 0) {
+    variants = await fetchVariants(ctx, variantIds);
+  }
 
   return {
     data: {
       orders,
-      orderItems,
-      transactions,
-      refunds,
-      fulfillments,
-      products,
-      variants,
-      customers,
-      productCostComponents,
+      orderItems: shouldFetch("orderItems") ? orderItems : [],
+      transactions: shouldFetch("transactions") ? transactions : [],
+      refunds: shouldFetch("refunds") ? refunds : [],
+      fulfillments: shouldFetch("fulfillments") ? fulfillments : [],
+      products: shouldFetch("products") ? products : [],
+      variants: shouldFetch("variants") ? variants : [],
+      customers: shouldFetch("customers") ? customers : [],
+      productCostComponents: shouldFetch("productCostComponents") ? productCostComponents : [],
     },
     cursor: orderPage.cursor,
     isDone: orderPage.isDone,
@@ -546,12 +614,18 @@ export async function fetchAnalyticsSourceData(
   ctx: QueryCtx,
   organizationId: OrganizationId,
   dateRange: DateRange,
-  options?: { datasets?: readonly AnalyticsSourceKey[] },
-): Promise<AnalyticsSourceData> {
+  options?: {
+    datasets?: readonly AnalyticsSourceKey[];
+    limits?: {
+      maxOrders?: number;
+    };
+  },
+): Promise<{ data: AnalyticsSourceData; meta?: Record<string, unknown> }> {
   const requested = options?.datasets ? new Set(options.datasets) : null;
   const shouldFetch = (key: AnalyticsSourceKey) => requested ? requested.has(key) : true;
 
   const timestamps = toTimestampRange(dateRange);
+  const meta: Record<string, unknown> = {};
 
   const data: AnalyticsSourceData = {
     orders: [],
@@ -582,7 +656,14 @@ export async function fetchAnalyticsSourceData(
 
   let orders: Doc<"shopifyOrders">[] = [];
   if (needsOrders) {
-    orders = await fetchOrders(ctx, organizationId, timestamps);
+    const { orders: fetchedOrders, isTruncated } = await fetchOrders(ctx, organizationId, timestamps, {
+      limit: options?.limits?.maxOrders,
+    });
+    orders = fetchedOrders;
+    if (isTruncated) {
+      meta.truncatedOrders = true;
+      meta.processedOrderCount = orders.length;
+    }
     if (shouldFetch("orders")) {
       data.orders = orders;
     }
@@ -653,11 +734,11 @@ export async function fetchAnalyticsSourceData(
     data.customers = await fetchCustomers(ctx, customerIds);
   }
 
-  const needsProducts = shouldFetch("products") || shouldFetch("productCostComponents");
-  const needsVariants = shouldFetch("variants") || shouldFetch("productCostComponents");
+  const shouldLoadProducts = shouldFetch("products");
+  const shouldLoadVariants = shouldFetch("variants") || shouldFetch("productCostComponents");
 
-  const productIds = needsProducts ? new Set<Id<"shopifyProducts">>() : null;
-  const variantIds = needsVariants ? new Set<Id<"shopifyProductVariants">>() : null;
+  const productIds = shouldLoadProducts ? new Set<Id<"shopifyProducts">>() : null;
+  const variantIds = shouldLoadVariants ? new Set<Id<"shopifyProductVariants">>() : null;
 
   if ((productIds || variantIds) && orderItems.length > 0) {
     for (const item of orderItems) {
@@ -674,17 +755,35 @@ export async function fetchAnalyticsSourceData(
     data.products = await fetchProducts(ctx, productIds);
   }
 
-  if (variantIds) {
-    data.variants = await fetchVariants(ctx, variantIds);
-  }
-
-  if (shouldFetch("productCostComponents") && variantIds) {
-    data.productCostComponents = await fetchProductCostComponents(
+  let productCostComponents: Doc<"productCostComponents">[] = [];
+  if (shouldFetch("productCostComponents") && variantIds && variantIds.size > 0) {
+    productCostComponents = await fetchProductCostComponents(
       ctx,
       organizationId,
       variantIds,
       timestamps,
     );
+    data.productCostComponents = productCostComponents;
+  }
+
+  if (shouldFetch("productCostComponents") && !data.productCostComponents.length) {
+    data.productCostComponents = [];
+  }
+
+  if (variantIds && shouldFetch("variants")) {
+    const remainingVariantIds = new Set(variantIds);
+    if (productCostComponents.length > 0) {
+      for (const component of productCostComponents) {
+        const variantId = component.variantId as Id<"shopifyProductVariants">;
+        remainingVariantIds.delete(variantId);
+      }
+    }
+
+    data.variants = remainingVariantIds.size > 0 ? await fetchVariants(ctx, remainingVariantIds) : [];
+  }
+
+  if (!shouldFetch("productCostComponents")) {
+    data.productCostComponents = [];
   }
 
   if (shouldFetch("metaInsights")) {
@@ -708,7 +807,7 @@ export async function fetchAnalyticsSourceData(
     data.analytics = await fetchAnalytics(ctx, organizationId, dateRange);
   }
 
-  return data;
+  return { data, meta: Object.keys(meta).length > 0 ? meta : undefined };
 }
 
 export const ANALYTICS_SOURCE_KEYS = [

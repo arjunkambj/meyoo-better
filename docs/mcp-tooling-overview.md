@@ -32,13 +32,13 @@ The current toolset is defined in `apps/web/app/api/[transport]/route.ts` and ba
 
 | Tool | Purpose | Backend action | Notes |
 | ---- | ------- | -------------- | ----- |
-| `orders_summary` | Summaries order volumes, fulfillment states, and revenue KPIs. | `api.agent.mcpActions.ordersSummary` | Wraps `api.web.orders.getOrdersOverview` with optional date filters. |
+| `orders_summary` | Summaries order volumes, fulfillment states, and revenue KPIs. | `api.agent.mcpActions.ordersSummary` | Aggregates data via `api.web.orders.getAnalytics` with optional filters. |
 | `inventory_low_stock` | Surfaces critical/low stock alerts for replenishment. | `api.agent.mcpActions.inventoryLowStock` | Uses `api.web.inventory.getStockAlerts` and filters out overstock results. |
-| `analytics_summary` | Summaries store metrics over a date range (daily/weekly/monthly). | `api.agent.mcpActions.analyticsSummary` | Aggregates totals from `api.web.analytics.getMetrics`; supports optional metric filter list. |
-| `meta_ads_overview` | Meta ads performance window (impressions, CTR, CAC, conversions). | `api.agent.mcpActions.metaAdsOverview` | Wraps `api.web.analytics.getPlatformMetrics` and formats KPIs for dashboards. |
+| `analytics_summary` | Summaries store metrics over a date range (daily/weekly/monthly). | `api.agent.mcpActions.analyticsSummary` | Uses `api.web.pnl.getAnalytics` periods and optional metric filters. |
+| `meta_ads_overview` | Meta ads performance window (impressions, CTR, CAC, conversions). | `api.agent.mcpActions.metaAdsOverview` | Wraps `api.web.analytics.getPlatformMetricsSummary` and formats KPIs for dashboards. |
 | `current_date` | Returns canonical UTC date/time strings. | `api.agent.mcpActions.getCurrentDate` | Keeps agent responses anchored to the current day. |
 | `brand_summary` | Fetches the latest RAG-stored overview of the merchant brand. | `api.agent.mcpActions.getBrandSummary` | Reads from the org-specific namespace populated by onboarding jobs. |
-| `pnl_snapshot` | Provides revenue, profit, and margin snapshot for a period. | `api.agent.mcpActions.pnlSnapshot` | Relies on `api.web.pnl.getMetrics` for daily aggregates. |
+| `pnl_snapshot` | Provides revenue, profit, and margin snapshot for a period. | `api.agent.mcpActions.pnlSnapshot` | Relies on `api.web.pnl.getAnalytics` for aggregated totals. |
 
 All tool schemas keep an optional `apiKey` string, but when a bearer token is present the helper `resolveApiToken` ignores the argument so requests stay consistent.
 

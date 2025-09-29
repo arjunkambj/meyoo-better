@@ -1,7 +1,7 @@
 "use client";
 
 import { Skeleton, Spacer } from "@heroui/react";
-import { memo, useCallback, useState } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
 import { AnalyticsHeader } from "@/components/shared/AnalyticsHeader";
 import { ExportButton } from "@/components/shared/actions/ExportButton";
 import GlobalDateRangePicker from "@/components/shared/GlobalDateRangePicker";
@@ -32,12 +32,17 @@ export const CustomerInsightsView = memo(function CustomerInsightsView() {
       ? ((orderOverview.cancelledOrders ?? 0) / orderOverview.totalOrders) * 100
       : 0;
 
-  const handleAnalyticsRangeChange = useCallback(
-    (range: { start: string; end: string }) => {
-      setDateRange({ startDate: range.start, endDate: range.end });
-    },
-    [],
-  );
+  const handleAnalyticsRangeChange = useCallback((range: { startDate: string; endDate: string }) => {
+    setDateRange({ startDate: range.startDate, endDate: range.endDate });
+  }, []);
+
+  const exportButtonData = useMemo(() => {
+    if (Array.isArray(exportData)) {
+      return (exportData as Record<string, unknown>[]).map((row) => ({ ...row }));
+    }
+    if (typeof exportData === "function") return exportData;
+    return [] as Record<string, unknown>[];
+  }, [exportData]);
 
   return (
     <div className="flex flex-col space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -52,7 +57,7 @@ export const CustomerInsightsView = memo(function CustomerInsightsView() {
         rightActions={
           <ExportButton
             color="primary"
-            data={exportData}
+            data={exportButtonData}
             disabled={isInitialLoading}
             filename="customers"
             formats={["csv", "pdf"]}

@@ -3,12 +3,8 @@
 import { Skeleton, Tab, Tabs } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import React, { useCallback, useMemo } from "react";
-import {
-  type PnLGranularity,
-  type PnLMetrics,
-  type PnLTablePeriod,
-  useUser,
-} from "@/hooks";
+import { useUser } from "@/hooks";
+import type { PnLGranularity, PnLMetrics, PnLTablePeriod } from "@repo/types";
 import { formatCurrency } from "@/libs/utils/format";
 
 interface PnLTableProps {

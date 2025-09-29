@@ -31,12 +31,9 @@ export const OrdersInsightsView = memo(function OrdersInsightsView() {
     loadingStates: customerLoading,
   } = useCustomerAnalytics(dateRange);
 
-  const handleAnalyticsRangeChange = useCallback(
-    (range: { start: string; end: string }) => {
-      setDateRange({ startDate: range.start, endDate: range.end });
-    },
-    [],
-  );
+  const handleAnalyticsRangeChange = useCallback((range: { startDate: string; endDate: string }) => {
+    setDateRange({ startDate: range.startDate, endDate: range.endDate });
+  }, []);
 
   const isExportDisabled = useMemo(
     () =>
@@ -59,7 +56,7 @@ export const OrdersInsightsView = memo(function OrdersInsightsView() {
         rightActions={
           <ExportButton
             color="primary"
-            data={exportData}
+            data={exportData.map((row) => ({ ...row }))}
             disabled={isExportDisabled}
             filename="orders-insights"
             formats={["csv", "pdf"]}

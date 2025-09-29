@@ -40,12 +40,9 @@ export const OrdersView = memo(function OrdersView() {
     }
   }, []);
 
-  const handleAnalyticsRangeChange = useCallback(
-    (range: { start: string; end: string }) => {
-      setDateRange({ startDate: range.start, endDate: range.end });
-    },
-    [],
-  );
+  const handleAnalyticsRangeChange = useCallback((range: { startDate: string; endDate: string }) => {
+    setDateRange({ startDate: range.startDate, endDate: range.endDate });
+  }, []);
 
   const filters = [
     {
@@ -90,7 +87,7 @@ export const OrdersView = memo(function OrdersView() {
         rightActions={
           <ExportButton
             color="primary"
-            data={exportData}
+            data={exportData.map((row) => ({ ...row }))}
             disabled={isInitialLoading}
             filename="orders-report"
             formats={["csv", "pdf"]}
@@ -119,6 +116,7 @@ export const OrdersView = memo(function OrdersView() {
                 page: orders.pagination.page,
                 setPage: setCurrentPage,
                 total: orders.pagination.total,
+                pageSize: orders.pagination.pageSize,
               }
             : undefined
         }

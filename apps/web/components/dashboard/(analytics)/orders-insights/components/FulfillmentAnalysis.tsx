@@ -5,17 +5,7 @@ import { Icon } from "@iconify/react";
 import { useMemo } from "react";
 
 import { formatNumber } from "@/libs/utils/format";
-
-export interface FulfillmentData {
-  avgProcessingTime: number;
-  avgShippingTime: number;
-  avgDeliveryTime: number;
-  onTimeDeliveryRate: number;
-  fulfillmentAccuracy: number;
-  returnRate: number;
-  avgFulfillmentCost?: number;
-  totalOrders?: number;
-}
+import type { OrdersFulfillmentMetrics as FulfillmentData } from "@repo/types";
 
 interface FulfillmentAnalysisProps {
   metrics?: FulfillmentData;

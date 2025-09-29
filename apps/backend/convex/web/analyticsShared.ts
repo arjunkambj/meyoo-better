@@ -42,6 +42,9 @@ export type AnalyticsResponse = {
 
 export interface LoadAnalyticsOptions {
   datasets?: readonly AnalyticsSourceKey[];
+  limits?: {
+    maxOrders?: number;
+  };
 }
 
 export function defaultDateRange(daysBack = 30): DateRange {
@@ -82,6 +85,6 @@ export async function loadAnalytics(
   range: DateRange,
   options?: LoadAnalyticsOptions,
 ): Promise<AnalyticsResponse> {
-  const data = await fetchAnalyticsSourceData(ctx, organizationId, range, options);
-  return { dateRange: range, organizationId, data };
+  const { data, meta } = await fetchAnalyticsSourceData(ctx, organizationId, range, options);
+  return { dateRange: range, organizationId, data, ...(meta ? { meta } : {}) };
 }

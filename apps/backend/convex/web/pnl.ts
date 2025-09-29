@@ -8,8 +8,10 @@ import {
   responseValidator,
   type AnalyticsResponse,
 } from "./analyticsShared";
-import { validateDateRange } from "../utils/analyticsSource";
+import { validateDateRange, type AnalyticsSourceKey } from "../utils/analyticsSource";
 import { getUserAndOrg } from "../utils/auth";
+import { computePnLAnalytics } from "../utils/analyticsAggregations";
+import type { PnLAnalyticsResult, PnLGranularity } from "@repo/types";
 
 const responseOrNull = v.union(v.null(), responseValidator);
 
@@ -20,6 +22,12 @@ type QueryHandler = (
   orgId: Id<"organizations">,
   range: DateRangeArg,
 ) => Promise<AnalyticsResponse>;
+
+const PNL_DATASETS: readonly AnalyticsSourceKey[] = [
+  "orders",
+  "costs",
+  "metaInsights",
+];
 
 async function handleQuery(
   ctx: QueryCtx,
@@ -156,5 +164,41 @@ export const getTableData = query({
   returns: responseOrNull,
   handler: async (ctx, args) => {
     return await handleQuery(ctx, args.dateRange);
+  },
+});
+
+export const getAnalytics = query({
+  args: {
+    dateRange: v.object({ startDate: v.string(), endDate: v.string() }),
+    granularity: v.optional(
+      v.union(v.literal("daily"), v.literal("weekly"), v.literal("monthly")),
+    ),
+  },
+  returns: v.union(
+    v.null(),
+    v.object({
+      dateRange: v.object({ startDate: v.string(), endDate: v.string() }),
+      organizationId: v.string(),
+      result: v.optional(v.any()),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    const auth = await getUserAndOrg(ctx);
+    if (!auth) return null;
+
+    const range = validateDateRange(args.dateRange);
+    const response = await loadAnalytics(
+      ctx,
+      auth.orgId as Id<"organizations">,
+      range,
+      { datasets: PNL_DATASETS },
+    );
+    const result = computePnLAnalytics(response, (args.granularity ?? "monthly") as PnLGranularity);
+
+    return {
+      dateRange: response.dateRange,
+      organizationId: response.organizationId,
+      result,
+    } satisfies { dateRange: { startDate: string; endDate: string }; organizationId: string; result: PnLAnalyticsResult };
   },
 });

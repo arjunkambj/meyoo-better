@@ -78,7 +78,7 @@ export function InventoryView() {
       <div className="flex flex-wrap items-center gap-2">
         <GlobalDateRangePicker
           onAnalyticsChange={(range) => {
-            setDateRange({ startDate: range.start, endDate: range.end });
+            setDateRange({ startDate: range.startDate, endDate: range.endDate });
           }}
         />
         <FilterBar
@@ -90,10 +90,18 @@ export function InventoryView() {
     </div>
   );
 
+  const exportButtonData = useMemo(() => {
+    if (Array.isArray(exportData)) {
+      return (exportData as Record<string, unknown>[]).map((row) => ({ ...row }));
+    }
+    if (typeof exportData === "function") return exportData;
+    return [] as Record<string, unknown>[];
+  }, [exportData]);
+
   const headerRight = (
     <ExportButton
       color="primary"
-      data={exportData}
+      data={exportButtonData}
       filename="inventory-report"
       formats={["csv", "pdf"]}
     />

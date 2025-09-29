@@ -5,6 +5,8 @@ import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { internalAction, internalQuery } from "../_generated/server";
 import {
+  ANALYTICS_SOURCE_KEYS,
+  type AnalyticsSourceKey,
   type DateRange,
   fetchAnalyticsOrderChunk,
   fetchCostsPage,
@@ -242,6 +244,7 @@ export const gatherAnalyticsOrderChunk = internalQuery({
     endDate: v.string(),
     cursor: v.optional(v.string()),
     pageSize: v.optional(v.number()),
+    datasets: v.optional(v.array(v.string())),
   },
   returns: v.object({
     orders: v.array(v.any()),
@@ -263,6 +266,11 @@ export const gatherAnalyticsOrderChunk = internalQuery({
     });
 
     const organizationId = args.organizationId as Id<"organizations">;
+    const datasetKeys = args.datasets
+      ? args.datasets.filter((key): key is AnalyticsSourceKey =>
+          (ANALYTICS_SOURCE_KEYS as ReadonlyArray<string>).includes(key),
+        )
+      : undefined;
     const { data, cursor, isDone } = await fetchAnalyticsOrderChunk(
       ctx,
       organizationId,
@@ -270,6 +278,7 @@ export const gatherAnalyticsOrderChunk = internalQuery({
       {
         cursor: args.cursor ?? null,
         pageSize: args.pageSize,
+        datasets: datasetKeys,
       },
     );
 

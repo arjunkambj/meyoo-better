@@ -84,6 +84,17 @@ export default function PlanOverview() {
     currentPlanName,
   ]);
 
+  const usagePercentage = useMemo(() => {
+    if (!currentUsage.ordersLimit || currentUsage.ordersLimit <= 0) {
+      return 0;
+    }
+
+    return Math.min(
+      (currentUsage.orders / currentUsage.ordersLimit) * 100,
+      100
+    );
+  }, [currentUsage.orders, currentUsage.ordersLimit]);
+
   // Calculate next billing date (first day of next month)
   const getNextBillingDate = useMemo(
     () => () => {
@@ -112,13 +123,6 @@ export default function PlanOverview() {
       };
 
       return prices[plan] || "$0/month";
-    },
-    []
-  );
-
-  const getUsagePercentage = useMemo(
-    () => (current: number, limit: number) => {
-      return (current / limit) * 100;
     },
     []
   );
@@ -181,21 +185,13 @@ export default function PlanOverview() {
 
       {/* Compact Usage Display */}
       <div className="rounded-lg px-3 py-2.5">
-        <div className="flex items-center justify-between mb-1.5">
-          <span className="text-xs text-default-600">
-            Monthly Usage
-          </span>
-          <span className="text-xs font-semibold text-default-800">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-xs text-default-600">Monthly Usage</span>
+          <span className="text-xs  font-semibold text-default-800">
             {formatNumber(currentUsage.orders)} /{" "}
             {formatNumber(currentUsage.ordersLimit)} orders
             <span className="text-xs text-default-500 ml-2">
-              (
-              {Math.round(
-                getUsagePercentage(
-                  currentUsage.orders,
-                  currentUsage.ordersLimit
-                )
-              )}
+              ({Math.round(usagePercentage)}
               %)
             </span>
           </span>
@@ -203,19 +199,11 @@ export default function PlanOverview() {
         <Progress
           classNames={{
             base: "max-w-full",
-            indicator: "bg-gradient-to-r",
           }}
-          color={
-            getUsagePercentage(currentUsage.orders, currentUsage.ordersLimit) >
-            80
-              ? "warning"
-              : "primary"
-          }
+          color={usagePercentage > 80 ? "warning" : "primary"}
+          maxValue={100}
           size="sm"
-          value={getUsagePercentage(
-            currentUsage.orders,
-            currentUsage.ordersLimit
-          )}
+          value={usagePercentage}
         />
       </div>
 

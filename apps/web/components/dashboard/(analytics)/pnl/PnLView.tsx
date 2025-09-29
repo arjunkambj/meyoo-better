@@ -32,12 +32,9 @@ export const PnLView = memo(function PnLView() {
     exportData,
   } = usePnLAnalytics(dateRange);
 
-  const handleAnalyticsRangeChange = useCallback(
-    (range: { start: string; end: string }) => {
-      setDateRange({ startDate: range.start, endDate: range.end });
-    },
-    []
-  );
+  const handleAnalyticsRangeChange = useCallback((range: { startDate: string; endDate: string }) => {
+    setDateRange({ startDate: range.startDate, endDate: range.endDate });
+  }, []);
 
   return (
     <div className="flex flex-col space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -46,7 +43,6 @@ export const PnLView = memo(function PnLView() {
         leftActions={
           <GlobalDateRangePicker
             defaultPreset="last_30_days"
-            stateKey="analytics:pnl"
             onAnalyticsChange={handleAnalyticsRangeChange}
           />
         }

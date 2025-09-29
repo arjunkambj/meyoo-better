@@ -5,28 +5,7 @@ import { memo } from "react";
 import KPI from "@/components/shared/cards/KPI";
 import { useUser } from "@/hooks";
 import { getCurrencySymbol, formatNumber } from "@/libs/utils/format";
-
-export interface OrdersOverviewMetrics {
-  totalOrders: number;
-  cancelledOrders?: number;
-  totalRevenue: number;
-  totalCosts: number;
-  netProfit: number;
-  totalTax: number;
-  avgOrderValue: number;
-  customerAcquisitionCost: number;
-  grossMargin: number;
-  fulfillmentRate: number;
-  changes: {
-    totalOrders: number;
-    revenue: number;
-    netProfit: number;
-    avgOrderValue: number;
-    cac: number;
-    margin: number;
-    fulfillmentRate: number;
-  };
-}
+import type { OrdersOverviewMetrics } from "@repo/types";
 
 interface OrdersOverviewCardsProps {
   metrics?: OrdersOverviewMetrics;

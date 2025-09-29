@@ -1,20 +1,12 @@
 "use client";
 
-import { Card, CardBody, Spacer, Spinner } from "@heroui/react";
-import { useQuery } from "convex/react";
+import { Spacer } from "@heroui/react";
 import { useAtomValue } from "jotai";
-import { usePathname } from "next/navigation";
 import React, { useCallback, useMemo, useState } from "react";
 import { PlanUsageAlert } from "@/components/shared/billing/PlanUsageAlert";
-import { api } from "@/libs/convexApi";
-import { computeChannelRevenue } from "@/libs/analytics/aggregations";
-import {
-  useDashboard,
-  useOverviewAnalytics,
-  usePlatformMetrics,
-  useUser,
-} from "@/hooks";
-import { analyticsDateRangeFamily, devToolsVisibleAtom } from "@/store/atoms";
+import { useDashboardOverview } from "@/hooks";
+import { devToolsVisibleAtom } from "@/store/atoms";
+import type { ChannelRevenueBreakdown } from "@repo/types";
 
 import { CustomizationModalUnified } from "./CustomizationModalUnified";
 import { DashboardHeader } from "./components/DashboardHeader";
@@ -22,7 +14,14 @@ import { MetricsContainer } from "./components/MetricsContainer";
 import { WidgetsContainer } from "./components/WidgetsContainer";
 import { DevTools } from "./DevTools";
 
-type OverviewMetricView = { value: number; change?: number };
+type OverviewMetricView = {
+  value: number;
+  change?: number;
+  label?: string;
+  prefix?: string;
+  suffix?: string;
+  decimal?: number;
+};
 
 const derivePreviousValue = (current: number, changePercent?: number) => {
   if (!Number.isFinite(current) || current === 0) {
@@ -51,57 +50,44 @@ const computePercentChange = (current: number, previous: number) => {
 
 export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
   const [isCustomizing, setIsCustomizing] = useState(false);
-  const pathname = usePathname();
-
-  // Use global date range
-  const dateRange = useAtomValue(
-    analyticsDateRangeFamily(pathname ?? "default"),
-  );
+  const [dateRange, setDateRange] = useState<{ start: string; end: string }>(() => {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - 30);
+    return {
+      start: start.toISOString().slice(0, 10),
+      end: end.toISOString().slice(0, 10),
+    };
+  });
   const devToolsVisible = useAtomValue(devToolsVisibleAtom);
 
-  // Get user's primary currency and cost setup status
-  const { primaryCurrency } = useUser();
+  const {
+    isLoading,
+    overviewMetrics,
+    platformMetrics,
+    channelRevenue,
+    dashboardConfig,
+    saveConfig,
+    primaryCurrency,
+  } = useDashboardOverview({ startDate: dateRange.start, endDate: dateRange.end });
+
   // Note: Cost setup status is now tracked in onboarding table
   const showCostSetupWarning = false; // TODO: Get from onboarding status when needed
 
-  // Get dashboard configuration
-  const { config, saveConfig, isLoading: configLoading } = useDashboard();
-
-  // Get analytics data
-  const { metrics: overviewMetrics, isLoading: metricsLoading } =
-    useOverviewAnalytics(
-      dateRange
-        ? { startDate: dateRange.start, endDate: dateRange.end }
-        : undefined
-    );
-
-  // Get platform-specific metrics
-  const platformMetrics = usePlatformMetrics(dateRange);
-  const rawChannelRevenue = useQuery(
-    api.web.analytics.getChannelRevenue,
-    dateRange
-      ? { dateRange: { startDate: dateRange.start, endDate: dateRange.end } }
-      : ("skip" as const),
-  );
-
-  const channelRevenue = useMemo(
-    () => computeChannelRevenue(rawChannelRevenue ?? undefined),
-    [rawChannelRevenue],
-  );
+  const config = dashboardConfig;
+  const channelBreakdown: ChannelRevenueBreakdown | undefined = channelRevenue ?? undefined;
 
   const utmRoas = useMemo(() => {
-    if (!channelRevenue || !channelRevenue.channels) {
+    const channels = channelBreakdown?.channels ?? [];
+    if (channels.length === 0) {
       return { value: 0, change: 0 };
     }
 
-    const paidChannels = channelRevenue.channels.filter((channel) =>
+    const paidChannels = channels.filter((channel) =>
       ["Meta Ads", "Google Ads"].includes(channel.name),
     );
 
-    const currentRevenue = paidChannels.reduce(
-      (sum, channel) => sum + (channel.revenue || 0),
-      0,
-    );
+    const currentRevenue = paidChannels.reduce((sum, channel) => sum + (channel.revenue || 0), 0);
 
     const previousRevenue = paidChannels.reduce((sum, channel) => {
       const prev = derivePreviousValue(channel.revenue || 0, channel.change);
@@ -133,118 +119,11 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
       value: currentRoas,
       change: computePercentChange(currentRoas, previousRoas),
     };
-  }, [channelRevenue, overviewMetrics]);
-
-  const onboardingStatus = useQuery(api.core.onboarding.getOnboardingStatus);
-  const integrationStatus = useQuery(api.core.status.getIntegrationStatus);
-  const shopifyIntegration = integrationStatus?.shopify;
-  const metaIntegration = integrationStatus?.meta;
-  // Useful for correcting progress numbers when DB already has orders
-  const kpiOrdersValue = overviewMetrics?.orders?.value || 0;
-  // Determine if any platform is actively running initial sync or failed
-  const { syncBannerVisible, bannerVariant } = useMemo(() => {
-    const activeStates = new Set(["pending", "processing", "syncing"]);
-    type Overall = 'unsynced' | 'syncing' | 'complete' | 'failed';
-    const shopifyOverall = (onboardingStatus?.syncStatus?.shopify as { overallState?: Overall } | undefined)?.overallState;
-    const metaOverall = (onboardingStatus?.syncStatus?.meta as { overallState?: Overall } | undefined)?.overallState;
-    const shopifyState = onboardingStatus?.syncStatus?.shopify?.status;
-    const metaState = onboardingStatus?.syncStatus?.meta?.status;
-    const shopifyConnected = shopifyIntegration?.connected ?? onboardingStatus?.connections?.shopify ?? false;
-    const metaConnected = metaIntegration?.connected ?? onboardingStatus?.connections?.meta ?? false;
-    const shopifyComplete = shopifyIntegration?.initialSynced ?? (shopifyOverall === 'complete');
-    const metaComplete = metaIntegration?.initialSynced ?? (metaOverall === 'complete');
-    const shopifyFailed = shopifyOverall === 'failed' || shopifyState === 'failed';
-    const metaFailed = metaOverall === 'failed' || metaState === 'failed';
-
-    const shopifySyncing =
-      shopifyConnected && !shopifyComplete && !shopifyFailed &&
-      (shopifyOverall === 'syncing' || (shopifyState && activeStates.has(shopifyState)));
-    const metaSyncing =
-      metaConnected && !metaComplete && !metaFailed &&
-      (metaOverall === 'syncing' || (metaState && activeStates.has(metaState)));
-
-    const hasActive = shopifySyncing || metaSyncing;
-    const hasFailed = shopifyFailed || metaFailed;
-
-    return {
-      syncBannerVisible: hasActive || hasFailed,
-      bannerVariant: hasFailed ? ("danger" as const) : ("warning" as const),
-    };
-  }, [onboardingStatus, shopifyIntegration, metaIntegration]);
-
-  const syncStatusSummaries = useMemo(() => {
-    if (!syncBannerVisible) return [] as string[];
-
-    const summaries: string[] = [];
-
-    {
-      const shopify = onboardingStatus?.syncStatus?.shopify;
-
-      if (shopify) {
-        const denom =
-          shopifyIntegration?.expectedOrders ??
-          (typeof shopify.totalOrdersSeen === 'number'
-            ? shopify.totalOrdersSeen
-            : typeof shopify.ordersQueued === 'number' && shopify.ordersQueued > 0
-              ? shopify.ordersQueued
-              : undefined);
-
-        let normalizedStatus = shopifyIntegration?.initialSynced
-          ? 'completed'
-          : shopify.overallState === 'complete'
-            ? 'completed'
-            : shopify.status
-              ? shopify.status.replace(/_/g, ' ')
-              : 'in progress';
-
-        const ordersInDb = shopifyIntegration?.ordersInDb ?? 0;
-        const rawProcessed = typeof shopify.ordersProcessed === 'number' ? shopify.ordersProcessed : 0;
-        const processedBase = Math.max(rawProcessed, ordersInDb, kpiOrdersValue);
-
-        let processedText = '';
-        if (denom !== undefined && denom > 0) {
-          const corrected = Math.min(denom, processedBase);
-          if (corrected >= denom) {
-            normalizedStatus = 'completed';
-          }
-          processedText = ` • Orders processed: ${corrected} of ${denom}`;
-        } else if (processedBase > 0) {
-          processedText = ` • Orders processed: ${processedBase}`;
-        } else if (shopify.recordsProcessed) {
-          processedText = ` • Records processed: ${shopify.recordsProcessed}`;
-        }
-
-        summaries.push(`Shopify: ${normalizedStatus}${processedText}`);
-      } else {
-        summaries.push("Shopify: pending");
-      }
-    }
-
-    {
-      const meta = onboardingStatus?.syncStatus?.meta;
-
-      if (meta) {
-        type Overall = 'unsynced' | 'syncing' | 'complete' | 'failed';
-        const normalizedStatus = metaIntegration?.initialSynced
-          ? 'completed'
-          : ((meta as { overallState?: Overall } | undefined)?.overallState === 'complete')
-            ? 'completed'
-            : meta.status
-              ? meta.status.replace(/_/g, " ")
-              : "in progress";
-        summaries.push(`Meta: ${normalizedStatus}`);
-      } else {
-        summaries.push("Meta: pending");
-      }
-    }
-
-    return summaries;
-  }, [onboardingStatus, syncBannerVisible, kpiOrdersValue, shopifyIntegration, metaIntegration]);
+  }, [channelBreakdown, overviewMetrics]);
 
   // Combine all metrics data
   const allMetricsData = useMemo(() => {
-    const { isLoading: _platformLoading, ...platformNumbers } =
-      platformMetrics || {};
+    const platformNumbers = platformMetrics as unknown as Record<string, number>;
     return {
       // Overview metrics
       revenue: overviewMetrics?.revenue?.value || 0,
@@ -356,8 +235,6 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
     [saveConfig]
   );
 
-  const isLoading = configLoading || metricsLoading;
-
   // Prepare export data
   const prepareExportData = useCallback(async () => {
     const exportData: Record<string, unknown>[] = [];
@@ -399,64 +276,10 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
       <DashboardHeader
         onCustomize={() => setIsCustomizing(true)}
         exportData={prepareExportData}
+        onDateRangeChange={(range) => setDateRange({ start: range.startDate, end: range.endDate })}
       />
 
       {/* Data Status Chips removed */}
-
-      {syncBannerVisible && (
-        <Card
-          className={
-            bannerVariant === "danger"
-              ? "border-danger bg-danger-50/40"
-              : "border-warning bg-warning-50/40"
-          }
-        >
-          <CardBody className="flex flex-col gap-3 text-default-700">
-            <div className="flex items-start gap-3">
-              <div
-                className={
-                  bannerVariant === "danger"
-                    ? "mt-0.5 flex-none text-danger-500"
-                    : "mt-0.5 flex-none text-warning-500"
-                }
-              >
-                <Spinner size="sm" color={bannerVariant} />
-              </div>
-              <div className="space-y-1">
-                <p
-                  className={
-                    bannerVariant === "danger"
-                      ? "font-medium text-danger-600"
-                      : "font-medium text-warning-600"
-                  }
-                >
-                  {bannerVariant === "danger"
-                    ? "Sync needs attention"
-                    : "We’re still syncing your data"}
-                </p>
-                <p className="text-sm leading-relaxed">
-                  Dashboards will update automatically once the initial imports finish. Feel free to keep exploring in the meantime.
-                </p>
-                {syncStatusSummaries.length > 0 && (
-                  <div
-                    className={
-                      bannerVariant === "danger"
-                        ? "flex flex-col gap-1 text-xs uppercase tracking-wide text-danger-500"
-                        : "flex flex-col gap-1 text-xs uppercase tracking-wide text-warning-500"
-                    }
-                  >
-                    {syncStatusSummaries.map((summary) => (
-                      <span key={summary}>{summary}</span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </CardBody>
-        </Card>
-      )}
-
-      {/* Sync Status removed: syncs run automatically; manual disabled */}
 
       {/* Plan Usage Alert */}
       <PlanUsageAlert variant="compact" />

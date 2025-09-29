@@ -8,7 +8,6 @@ export * from "./useBilling";
 // ============ BUSINESS LOGIC HOOKS ============
 export * from "./useCost";
 export * from "./useCustomerAnalytics";
-export * from "./useDashboard";
 // ============ UTILITY HOOKS ============
 export * from "./useDebounce";
 // ============ DEVELOPMENT HOOKS ============
@@ -26,8 +25,7 @@ export * from "./useInvoices";
 // ============ ANALYTICS HOOKS ============
 export * from "./useOrdersAnalytics";
 export * from "./useOrganization";
-export * from "./useOverviewAnalytics";
-export * from "./usePlatformMetrics";
+export * from "./useDashboardOverview";
 export * from "./usePnLAnalytics";
 export * from "./useTeam";
 // ============ SUPPORT HOOKS ============

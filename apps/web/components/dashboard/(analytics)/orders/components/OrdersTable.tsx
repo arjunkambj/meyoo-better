@@ -28,47 +28,15 @@ import {
   DATA_TABLE_HEADER_CLASS,
   DATA_TABLE_TABLE_CLASS,
 } from "@/components/shared/table/DataTableCard";
-
-export interface Order {
-  id: string;
-  orderNumber: string;
-  customer: {
-    name: string;
-    email: string;
-  };
-  status: string;
-  fulfillmentStatus: string;
-  financialStatus: string;
-  items: number;
-  totalPrice: number;
-  totalCost: number;
-  profit: number;
-  profitMargin: number;
-  taxAmount: number;
-  shippingCost: number;
-  paymentMethod: string;
-  tags?: string[];
-  shippingAddress: {
-    city: string;
-    country: string;
-  };
-  createdAt: string;
-  updatedAt: string;
-  lineItems?: Array<{
-    id: string;
-    name: string;
-    quantity: number;
-    price: number;
-    cost: number;
-  }>;
-}
+import type { AnalyticsOrder } from "@repo/types";
 
 interface OrdersTableProps {
-  orders: Order[];
+  orders: AnalyticsOrder[];
   pagination?: {
     page: number;
     setPage: (page: number) => void;
     total: number;
+    pageSize: number;
   };
   loading?: boolean;
 }
@@ -122,7 +90,7 @@ export const OrdersTable = React.memo(function OrdersTable({
   }, [orders.length, selectedKeys]);
 
   const renderCell = useCallback(
-    (item: Order, columnKey: React.Key) => {
+    (item: AnalyticsOrder, columnKey: React.Key) => {
       const formatCurrency = (value: number) =>
         formatCurrencyPrecise(value, primaryCurrency);
 
@@ -336,7 +304,7 @@ export const OrdersTable = React.memo(function OrdersTable({
           page={page}
           siblings={1}
           size="sm"
-          total={Math.ceil(pagination.total / 50)}
+          total={Math.max(1, Math.ceil(pagination.total / Math.max(1, pagination.pageSize)))}
           onChange={(newPage) => {
             setPage(newPage);
             pagination.setPage(newPage);

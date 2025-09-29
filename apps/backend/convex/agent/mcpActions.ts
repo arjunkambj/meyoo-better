@@ -4,6 +4,12 @@ import type { ActionCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { api, internal } from "../_generated/api";
 import { rag } from "../rag";
+import type {
+  OrdersAnalyticsResult,
+  PlatformMetrics as AggregatedPlatformMetrics,
+  PnLAnalyticsResult,
+  PnLTablePeriod,
+} from "@repo/types";
 
 const hashApiKey = (key: string) => {
   let h1 = 0xdeadbeef ^ key.length;
@@ -38,34 +44,6 @@ type ValidatedOrganization = {
   trialEndDate?: number;
 };
 
-type OrdersOverview = {
-  totalOrders: number;
-  pendingOrders: number;
-  processingOrders: number;
-  completedOrders: number;
-  cancelledOrders: number;
-  totalRevenue: number;
-  totalCosts: number;
-  netProfit: number;
-  avgOrderValue: number;
-  customerAcquisitionCost: number;
-  grossMargin: number;
-  fulfillmentRate: number;
-  avgFulfillmentTime: number;
-  returnRate: number;
-  changes?: {
-    totalOrders?: number;
-    revenue?: number;
-    netProfit?: number;
-    avgOrderValue?: number;
-    cac?: number;
-    margin?: number;
-    fulfillmentRate?: number;
-  };
-};
-
-type OrdersOverviewChanges = NonNullable<OrdersOverview["changes"]>;
-
 type InventoryAlert = {
   id: string;
   type: "critical" | "low" | "reorder" | "overstock";
@@ -81,21 +59,47 @@ type NormalizedInventoryAlert = Omit<InventoryAlert, "type"> & {
   type: "critical" | "low" | "reorder";
 };
 
-type PnlMetrics = {
-  revenue?: number;
-  grossProfit?: number;
-  netProfit?: number;
-  grossProfitMargin?: number;
-  netProfitMargin?: number;
-  operatingExpenses?: number;
-  totalAdSpend?: number;
-  marketingROI?: number;
-  ebitda?: number;
-  revenueChange?: number;
-  netProfitChange?: number;
-  grossProfitMarginChange?: number;
-  netProfitMarginChange?: number;
-  marketingROIChange?: number;
+type MetaPlatformSummary = {
+  sessions: number;
+  conversionRate: number;
+  impressions: number;
+  ctr: number;
+  reach: number;
+  frequency: number;
+  uniqueClicks: number;
+  cpc: number;
+  costPerConversion: number;
+  addToCart: number;
+  initiateCheckout: number;
+  pageViews: number;
+  viewContent: number;
+  linkClicks: number;
+  outboundClicks: number;
+  landingPageViews: number;
+  videoViews: number;
+  video3SecViews: number;
+  costPerThruPlay: number;
+};
+
+type PnLSnapshotResult = {
+  summary: string;
+  dateRange: { startDate: string; endDate: string };
+  revenue: number;
+  grossProfit: number;
+  netProfit: number;
+  grossMargin: number;
+  netMargin: number;
+  operatingExpenses: number;
+  adSpend: number;
+  marketingROI: number;
+  ebitda: number;
+  changes: {
+    revenue: number;
+    netProfit: number;
+    grossMargin: number;
+    netMargin: number;
+    marketingROI: number;
+  };
 };
 
 const validateAndGetOrgContext = async (
@@ -160,17 +164,14 @@ export const analyticsSummary = action({
   handler: async (ctx, args): Promise<{ summary: string; totals: Record<string, number>; records: any[] }> => {
     const { organizationId: _organizationId } = await validateAndGetOrgContext(ctx, args.apiKey);
 
-    const analyticsResponse = await ctx.runQuery(api.web.analytics.getMetrics, {
+    const analyticsResponse = await ctx.runQuery(api.web.pnl.getAnalytics, {
       dateRange: { startDate: args.startDate, endDate: args.endDate },
       granularity: args.granularity ?? "daily",
-      metrics: args.metrics,
     });
 
-    const rows = Array.isArray(analyticsResponse)
-      ? analyticsResponse
-      : (analyticsResponse?.data?.orders ?? []);
+    const periods = analyticsResponse?.result?.periods ?? [];
 
-    if (!rows.length) {
+    if (periods.length === 0) {
       return {
         summary: "No analytics available for the selected date range.",
         totals: {},
@@ -178,8 +179,25 @@ export const analyticsSummary = action({
       };
     }
 
+    const selected = args.metrics && args.metrics.length > 0 ? new Set(args.metrics) : null;
+
+    const records = periods.map((period: PnLTablePeriod) => {
+      const record: Record<string, number | string> = {
+        label: period.label,
+        date: period.date,
+      };
+
+      for (const [key, value] of Object.entries(period.metrics as unknown as Record<string, number>)) {
+        if (!selected || selected.has(key)) {
+          record[key] = value;
+        }
+      }
+
+      return record;
+    });
+
     const totals: Record<string, number> = {};
-    for (const entry of rows) {
+    for (const entry of records) {
       for (const [key, value] of Object.entries(entry)) {
         if (typeof value === "number") {
           totals[key] = (totals[key] ?? 0) + value;
@@ -188,9 +206,9 @@ export const analyticsSummary = action({
     }
 
     return {
-      summary: `Aggregated ${rows.length} ${args.granularity ?? "daily"} records from ${args.startDate} to ${args.endDate}.`,
+      summary: `Aggregated ${records.length} ${args.granularity ?? "daily"} records from ${args.startDate} to ${args.endDate}.`,
       totals,
-      records: rows,
+      records,
     };
   },
 });
@@ -229,73 +247,74 @@ export const metaAdsOverview = action({
       costPerThruPlay: v.number(),
     }),
   }),
-  handler: async (ctx, args): Promise<{ summary: string; dateRange: { startDate: string; endDate: string; }; meta: { sessions: number; conversionRate: number; impressions: number; ctr: number; reach: number; frequency: number; uniqueClicks: number; cpc: number; costPerConversion: number; addToCart: number; initiateCheckout: number; pageViews: number; viewContent: number; linkClicks: number; outboundClicks: number; landingPageViews: number; videoViews: number; video3SecViews: number; costPerThruPlay: number; } }> => {
+  handler: async (ctx, args): Promise<{ summary: string; dateRange: { startDate: string; endDate: string; }; meta: MetaPlatformSummary }> => {
     const { organizationId: _organizationId } = await validateAndGetOrgContext(ctx, args.apiKey);
 
     const dateRange = args.startDate && args.endDate
       ? { startDate: args.startDate, endDate: args.endDate }
       : defaultDateRange();
 
-    const metrics: any = await ctx.runQuery(api.web.analytics.getPlatformMetrics, {
-      dateRange,
-    });
-
-    const emptyMeta = {
-      sessions: 0,
-      conversionRate: 0,
-      impressions: 0,
-      ctr: 0,
-      reach: 0,
-      frequency: 0,
-      uniqueClicks: 0,
-      cpc: 0,
-      costPerConversion: 0,
-      addToCart: 0,
-      initiateCheckout: 0,
-      pageViews: 0,
-      viewContent: 0,
-      linkClicks: 0,
-      outboundClicks: 0,
-      landingPageViews: 0,
-      videoViews: 0,
-      video3SecViews: 0,
-      costPerThruPlay: 0,
-    };
-
-    if (!metrics) {
-      return {
-        summary: "No Meta ads metrics available",
+    const metricsResponse = await ctx.runQuery(
+      api.web.analytics.getPlatformMetricsSummary,
+      {
         dateRange,
-        meta: emptyMeta,
-      };
-    }
+      },
+    );
 
-    const metaMetrics: { sessions: number; conversionRate: number; impressions: number; ctr: number; reach: number; frequency: number; uniqueClicks: number; cpc: number; costPerConversion: number; addToCart: number; initiateCheckout: number; pageViews: number; viewContent: number; linkClicks: number; outboundClicks: number; landingPageViews: number; videoViews: number; video3SecViews: number; costPerThruPlay: number; } = {
-      sessions: metrics.metaSessions ?? 0,
-      conversionRate: metrics.metaConversion ?? 0,
-      impressions: metrics.metaImpressions ?? 0,
-      ctr: metrics.metaCTR ?? 0,
-      reach: metrics.metaReach ?? 0,
-      frequency: metrics.metaFrequency ?? 0,
-      uniqueClicks: metrics.metaUniqueClicks ?? 0,
-      cpc: metrics.metaCPC ?? 0,
-      costPerConversion: metrics.metaCostPerConversion ?? 0,
-      addToCart: metrics.metaAddToCart ?? 0,
-      initiateCheckout: metrics.metaInitiateCheckout ?? 0,
-      pageViews: metrics.metaPageViews ?? 0,
-      viewContent: metrics.metaViewContent ?? 0,
-      linkClicks: metrics.metaLinkClicks ?? 0,
-      outboundClicks: metrics.metaOutboundClicks ?? 0,
-      landingPageViews: metrics.metaLandingPageViews ?? 0,
-      videoViews: metrics.metaVideoViews ?? 0,
-      video3SecViews: metrics.metaVideo3SecViews ?? 0,
-      costPerThruPlay: metrics.metaCostPerThruPlay ?? 0,
-    };
+    const metrics = (metricsResponse as { metrics: AggregatedPlatformMetrics } | null)?.metrics;
+
+    const meta: MetaPlatformSummary = metrics
+      ? {
+          sessions: metrics.metaSessions,
+          conversionRate: metrics.metaConversionRate,
+          impressions: metrics.metaImpressions,
+          ctr: metrics.metaCTR,
+          reach: metrics.metaReach,
+          frequency: metrics.metaFrequency,
+          uniqueClicks: metrics.metaUniqueClicks,
+          cpc: metrics.metaCPC,
+          costPerConversion: metrics.metaCostPerConversion,
+          addToCart: metrics.metaAddToCart,
+          initiateCheckout: metrics.metaInitiateCheckout,
+          pageViews: metrics.metaPageViews,
+          viewContent: metrics.metaViewContent,
+          linkClicks: metrics.metaLinkClicks,
+          outboundClicks: metrics.metaOutboundClicks,
+          landingPageViews: metrics.metaLandingPageViews,
+          videoViews: metrics.metaVideoViews,
+          video3SecViews: metrics.metaVideo3SecViews,
+          costPerThruPlay: metrics.metaCostPerThruPlay,
+        }
+      : {
+          sessions: 0,
+          conversionRate: 0,
+          impressions: 0,
+          ctr: 0,
+          reach: 0,
+          frequency: 0,
+          uniqueClicks: 0,
+          cpc: 0,
+          costPerConversion: 0,
+          addToCart: 0,
+          initiateCheckout: 0,
+          pageViews: 0,
+          viewContent: 0,
+          linkClicks: 0,
+          outboundClicks: 0,
+          landingPageViews: 0,
+          videoViews: 0,
+          video3SecViews: 0,
+          costPerThruPlay: 0,
+        };
+
+    const summary = metrics
+      ? `Meta ads performance from ${dateRange.startDate} to ${dateRange.endDate}.`
+      : "No Meta ads metrics available";
 
     return {
-      summary: `Meta ads performance from ${dateRange.startDate} to ${dateRange.endDate}.`,
+      summary,
       dateRange,
-      meta: metaMetrics,
+      meta,
     };
   },
 });
@@ -349,9 +368,44 @@ export const ordersSummary = action({
       ? { startDate: args.startDate, endDate: args.endDate }
       : defaultDateRange();
 
-    const overview = (await ctx.runQuery(api.web.orders.getOrdersOverview, {
+    const analyticsResponse = await ctx.runAction(api.web.orders.getAnalytics, {
       dateRange,
-    })) as OrdersOverview | null;
+      pageSize: 500,
+    });
+
+    const result = analyticsResponse?.result as OrdersAnalyticsResult | undefined;
+    const overview = result?.overview;
+    const fulfillmentDetails = result?.fulfillment;
+
+    const orders = result?.orders?.data ?? [];
+    const statusCounts = orders.reduce(
+      (acc, order) => {
+        const status = (order.status ?? "").toLowerCase();
+        const fulfillment = (order.fulfillmentStatus ?? "").toLowerCase();
+        if (status.includes("cancel")) {
+          acc.cancelled += 1;
+        } else if (
+          fulfillment.includes("fulfill") ||
+          status.includes("fulfill") ||
+          fulfillment.includes("shipp") ||
+          status.includes("shipp") ||
+          fulfillment.includes("deliver")
+        ) {
+          acc.completed += 1;
+        } else if (
+          status.includes("process") ||
+          fulfillment.includes("process") ||
+          status.includes("partial") ||
+          fulfillment.includes("partial")
+        ) {
+          acc.processing += 1;
+        } else {
+          acc.pending += 1;
+        }
+        return acc;
+      },
+      { pending: 0, processing: 0, completed: 0, cancelled: 0 },
+    );
 
     const zeroState = {
       dateRange,
@@ -392,47 +446,54 @@ export const ordersSummary = action({
     }
 
     const totals = {
-      totalOrders: Number(overview.totalOrders ?? 0),
-      pendingOrders: Number(overview.pendingOrders ?? 0),
-      processingOrders: Number(overview.processingOrders ?? 0),
-      completedOrders: Number(overview.completedOrders ?? 0),
-      cancelledOrders: Number(overview.cancelledOrders ?? 0),
+      totalOrders: overview.totalOrders,
+      pendingOrders: statusCounts.pending,
+      processingOrders: statusCounts.processing,
+      completedOrders: statusCounts.completed,
+      cancelledOrders: statusCounts.cancelled,
     };
 
     const financials = {
-      totalRevenue: Number(overview.totalRevenue ?? 0),
-      totalCosts: Number(overview.totalCosts ?? 0),
-      netProfit: Number(overview.netProfit ?? 0),
-      avgOrderValue: Number(overview.avgOrderValue ?? 0),
-      grossMargin: Number(overview.grossMargin ?? 0),
-      customerAcquisitionCost: Number(overview.customerAcquisitionCost ?? 0),
+      totalRevenue: overview.totalRevenue,
+      totalCosts: overview.totalCosts,
+      netProfit: overview.netProfit,
+      avgOrderValue: overview.avgOrderValue,
+      grossMargin: overview.grossMargin,
+      customerAcquisitionCost: overview.customerAcquisitionCost,
     };
 
     const fulfillment = {
-      fulfillmentRate: Number(overview.fulfillmentRate ?? 0),
-      avgFulfillmentTime: Number(overview.avgFulfillmentTime ?? 0),
-      returnRate: Number(overview.returnRate ?? 0),
+      fulfillmentRate: overview.fulfillmentRate,
+      avgFulfillmentTime: fulfillmentDetails?.avgProcessingTime ?? 0,
+      returnRate: fulfillmentDetails?.returnRate ?? 0,
     };
 
-    const changesData = (overview.changes ?? {}) as Partial<OrdersOverviewChanges>;
-    const changes = {
-      totalOrders: Number(changesData.totalOrders ?? 0),
-      revenue: Number(changesData.revenue ?? 0),
-      netProfit: Number(changesData.netProfit ?? 0),
-      avgOrderValue: Number(changesData.avgOrderValue ?? 0),
-      cac: Number(changesData.cac ?? 0),
-      margin: Number(changesData.margin ?? 0),
-      fulfillmentRate: Number(changesData.fulfillmentRate ?? 0),
+    const changesData = overview.changes ?? {
+      totalOrders: 0,
+      revenue: 0,
+      netProfit: 0,
+      avgOrderValue: 0,
+      cac: 0,
+      margin: 0,
+      fulfillmentRate: 0,
     };
 
-    const summary = `Processed ${totals.totalOrders} orders (${totals.completedOrders} completed, ${totals.pendingOrders} pending) generating $${financials.totalRevenue.toFixed(2)} in revenue and $${financials.netProfit.toFixed(2)} net profit with a ${fulfillment.fulfillmentRate.toFixed(1)}% fulfillment rate.`;
+    const summary = `Processed ${totals.totalOrders} orders (${totals.completedOrders} fulfilled, ${totals.pendingOrders} pending) generating $${financials.totalRevenue.toFixed(2)} in revenue and $${financials.netProfit.toFixed(2)} net profit with a ${fulfillment.fulfillmentRate.toFixed(1)}% fulfillment rate.`;
 
     return {
       dateRange,
       totals,
       financials,
       fulfillment,
-      changes,
+      changes: {
+        totalOrders: Number(changesData.totalOrders ?? 0),
+        revenue: Number(changesData.revenue ?? 0),
+        netProfit: Number(changesData.netProfit ?? 0),
+        avgOrderValue: Number(changesData.avgOrderValue ?? 0),
+        cac: Number(changesData.cac ?? 0),
+        margin: Number(changesData.margin ?? 0),
+        fulfillmentRate: Number(changesData.fulfillmentRate ?? 0),
+      },
       summary,
     };
   },
@@ -521,18 +582,22 @@ export const pnlSnapshot = action({
       marketingROI: v.number(),
     }),
   }),
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<PnLSnapshotResult> => {
     await validateAndGetOrgContext(ctx, args.apiKey);
 
     const dateRange = args.startDate && args.endDate
       ? { startDate: args.startDate, endDate: args.endDate }
       : defaultDateRange();
 
-    const metrics = (await ctx.runQuery(api.web.pnl.getMetrics, {
+    const pnlResponse = (await ctx.runQuery(api.web.pnl.getAnalytics, {
       dateRange,
-    })) as PnlMetrics | null;
+      granularity: "monthly",
+    })) as { result: PnLAnalyticsResult } | null;
 
-    if (!metrics) {
+    const metrics = pnlResponse?.result?.metrics;
+    const totals = pnlResponse?.result?.totals;
+
+    if (!metrics || !totals) {
       return {
         summary: `No financial data available between ${dateRange.startDate} and ${dateRange.endDate}.`,
         dateRange,
@@ -555,22 +620,22 @@ export const pnlSnapshot = action({
       };
     }
 
-    const revenue = Number(metrics.revenue ?? 0);
-    const grossProfit = Number(metrics.grossProfit ?? 0);
-    const netProfit = Number(metrics.netProfit ?? 0);
-    const grossMargin = Number(metrics.grossProfitMargin ?? 0);
-    const netMargin = Number(metrics.netProfitMargin ?? 0);
+    const revenue = Number(totals.revenue ?? 0);
+    const grossProfit = Number(totals.grossProfit ?? 0);
+    const netProfit = Number(totals.netProfit ?? 0);
+    const grossMargin = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
+    const netMargin = Number(metrics.netMargin ?? 0);
     const operatingExpenses = Number(metrics.operatingExpenses ?? 0);
-    const adSpend = Number(metrics.totalAdSpend ?? 0);
+    const adSpend = Number(metrics.marketingCost ?? totals.totalAdSpend ?? 0);
     const marketingROI = Number(metrics.marketingROI ?? 0);
     const ebitda = Number(metrics.ebitda ?? 0);
 
     const changes = {
-      revenue: Number(metrics.revenueChange ?? 0),
-      netProfit: Number(metrics.netProfitChange ?? 0),
-      grossMargin: Number(metrics.grossProfitMarginChange ?? 0),
-      netMargin: Number(metrics.netProfitMarginChange ?? 0),
-      marketingROI: Number(metrics.marketingROIChange ?? 0),
+      revenue: Number(metrics.changes?.grossSales ?? 0),
+      netProfit: Number(metrics.changes?.netProfit ?? 0),
+      grossMargin: Number(metrics.changes?.grossProfit ?? 0),
+      netMargin: Number(metrics.changes?.netMargin ?? 0),
+      marketingROI: Number(metrics.changes?.marketingROI ?? 0),
     };
 
     const summary = `Revenue of $${revenue.toFixed(2)} generated $${netProfit.toFixed(2)} in net profit (${netMargin.toFixed(1)}% net margin) with $${operatingExpenses.toFixed(2)} in operating expenses.`;

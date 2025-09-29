@@ -1,6 +1,7 @@
 // Domain types - Core business logic
 
 export * from "./analytics";
+export * from "./src/dashboard";
 export * from "./src/onboarding";
 export * from "./src/agentToolsMetadata";
 // API types

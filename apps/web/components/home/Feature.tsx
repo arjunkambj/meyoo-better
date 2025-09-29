@@ -77,34 +77,36 @@ const Feature = () => {
           </span>
         </div>
         <h2 className={`relative z-20 ${designSystem.typography.sectionTitle}`}>
-          What Makes Meyoo Special
+          Everything You Need to Grow
         </h2>
-        <p className={designSystem.typography.sectionSubtitle}>
-          From setup to scale in three simple steps: connect your tools, unlock insights, and make better decisions to grow your brand.
+        <p className={`${designSystem.typography.sectionSubtitle} max-w-2xl mx-auto`}>
+          Powerful features designed specifically for D2C brands. Track every metric that matters and make data-driven decisions with confidence.
         </p>
 
-        <div className="mx-auto mt-12 grid w-full max-w-7xl grid-cols-1 gap-10 px-4 sm:px-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="mx-auto mt-16 grid w-full max-w-7xl grid-cols-1 gap-8 px-4 sm:px-6 md:grid-cols-2 lg:grid-cols-3">
           {featureData.map((item, index) => (
             <article
               key={item.id}
-              className={`${designSystem.card.base} group relative flex h-full flex-col rounded-2xl p-4`}
+              className={`${designSystem.card.base} group relative flex h-full flex-col rounded-3xl p-1.5 transition-all duration-300 hover:scale-[1.02]`}
             >
-              <div className="relative aspect-[4/3] overflow-hidden rounded-xl">
+              <div className="relative aspect-[4/3] overflow-hidden rounded-[20px]">
                 <Image
                   src={item.img}
                   alt={item.title}
                   fill
                   sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                  className="pointer-events-none object-cover transform transition-transform duration-300 ease-out group-hover:scale-[1.035]"
+                  className="pointer-events-none object-cover transform transition-transform duration-500 ease-out group-hover:scale-110"
                   priority={index === 0}
                 />
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/30 via-black/5 to-transparent" />
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/40 via-black/10 to-transparent" />
               </div>
-              <div className="mt-4 w-full space-y-3 p-3">
-                <p className="text-xs uppercase tracking-[0.15em] text-muted-foreground font-medium">
-                  {item.badge}
-                </p>
-                <h3 className="text-lg font-semibold tracking-tight">
+              <div className="mt-5 w-full space-y-3 p-4">
+                <div className="inline-block rounded-full bg-primary/10 px-3 py-1">
+                  <p className="text-xs uppercase tracking-[0.15em] text-primary font-semibold">
+                    {item.badge}
+                  </p>
+                </div>
+                <h3 className="text-xl font-semibold tracking-tight leading-tight">
                   {item.title}
                 </h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">

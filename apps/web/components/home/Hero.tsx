@@ -28,29 +28,27 @@ const Hero = () => {
           {/* Left Column - Text Content */}
           <div className="text-left flex flex-col">
             {/* Header  */}
-            <h1 className="text-4xl leading-tight tracking-tight text-balance sm:text-5xl lg:text-6xl font-semibold">
+            <h1 className="text-4xl leading-[1.1] tracking-tight text-balance sm:text-5xl lg:text-6xl xl:text-7xl font-semibold mb-5">
               See, Measure And <span className="text-primary">Grow Profit</span>
               <br />
-              <span className="font-playfair italic">
+              <span className="font-playfair italic text-3xl sm:text-4xl lg:text-5xl xl:text-6xl leading-[1.2]">
                 Built for <span className="text-primary italic">D2C</span>{" "}
                 brands.
               </span>
             </h1>
 
             {/* Professional info */}
-            <p
-              className={`${designSystem.typography.sectionSubtitle} text-balance text-left`}
-            >
-              Meyoo gathers orders, ad spend, and every cost in one place so D2C
-              operators can see margin without digging through spreadsheets.
+            <p className="text-base sm:text-lg text-muted-foreground leading-relaxed text-left max-w-xl mb-2">
+              Meyoo connects Shopify, ad platforms, and costs to show real profit
+              by product and channel—so D2C brands can make smarter decisions fast.
             </p>
 
             {/* CTA Buttons */}
-            <div className="mt-8 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-start sm:gap-4">
+            <div className="mt-10 flex flex-col items-stretch gap-4 sm:flex-row sm:items-center sm:justify-start">
               <Button
                 as={Link}
                 href="/signin"
-                className="w-full sm:w-auto font-semibold px-6 sm:px-8 transition-transform duration-200 will-change-transform hover:-translate-y-0.5 active:translate-y-0 focus-visible:ring-2 focus-visible:ring-primary/40"
+                className="w-full sm:w-auto font-semibold px-8 h-12 transition-all duration-200 hover:scale-105 active:scale-100"
                 color="primary"
                 endContent={<Icon icon="solar:arrow-right-linear" width={20} />}
                 size="lg"
@@ -60,39 +58,40 @@ const Hero = () => {
               <Button
                 as={Link}
                 href="#pricing"
-                variant="flat"
+                variant="bordered"
                 size="lg"
-                className="transition-transform duration-200 hover:-translate-y-0.5"
+                className="w-full sm:w-auto h-12 transition-all duration-200 hover:scale-105 active:scale-100"
               >
                 View pricing
               </Button>
             </div>
 
             {/* Money Back Guarantee */}
-            <div className="mt-6">
-              <div className="inline-flex items-center gap-2 text-sm text-default-600">
-                <Icon icon="solar:shield-check-bold" width={16} />
-                <span>14-day free trial · Cancel anytime</span>
+            <div className="mt-8">
+              <div className="inline-flex items-center gap-2.5 text-sm text-default-600">
+                <Icon icon="solar:shield-check-bold" width={18} className="text-success" />
+                <span className="font-medium">14-day free trial · Cancel anytime</span>
               </div>
             </div>
           </div>
 
           {/* Right Column - Dashboard Preview */}
           <motion.div
-            initial={{ opacity: 0, x: 100 }}
-            animate={{ opacity: 1, x: 0 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{
-              ease: [0, 0.71, 0.2, 1.01],
-              duration: 0.8,
-              delay: 0.2,
+              ease: [0.16, 1, 0.3, 1],
+              duration: 0.9,
+              delay: 0.1,
             }}
             className="relative flex justify-center lg:justify-end"
           >
-            <Card className="relative h-[420px] w-full max-w-[720px] rounded-2xl bg-muted/30 p-4 backdrop-blur-sm md:h-[560px] lg:h-[640px] ring-1 ring-white/10">
-              <CardBody className="relative size-full rounded-xl bg-gradient-to-br from-background/90 via-background/80 to-muted/20 overflow-hidden">
+            <Card className="relative h-[420px] w-full max-w-[720px] rounded-3xl bg-gradient-to-br from-muted/40 to-muted/20 p-1.5 backdrop-blur-sm md:h-[560px] lg:h-[640px] ring-1 ring-default-100">
+              <CardBody className="relative size-full rounded-[20px] bg-gradient-to-br from-background via-background to-muted/10 overflow-hidden p-4">
+                <div className="absolute inset-0 bg-gradient-to-tr from-primary/5 via-transparent to-secondary/5" />
                 <Image
                   alt="Dashboard preview"
-                  className="size-full rounded-xl object-cover"
+                  className="size-full rounded-2xl object-cover transition-transform duration-300 hover:scale-[1.02]"
                   fill
                   priority
                   src="https://deifkwefumgah.cloudfront.net/shadcnblocks/block/placeholder-1.svg"
@@ -103,20 +102,23 @@ const Hero = () => {
           </motion.div>
         </div>
 
-        <div className="mt-16">
+        <div className="mt-20 lg:mt-24">
+          <p className="text-center text-sm font-medium text-muted-foreground uppercase tracking-wider mb-8">
+            Trusted by leading D2C brands
+          </p>
           <div className="mx-auto w-full max-w-7xl px-4">
-            <div className="flex w-full flex-nowrap items-center justify-between gap-4 text-default-400 sm:gap-8">
+            <div className="flex w-full flex-nowrap items-center justify-between gap-6 text-default-400 sm:gap-10">
               {d2cBrands.map((brand) => (
                 <div
                   key={brand.name}
-                  className="flex flex-1 items-center justify-center px-1 opacity-90 transition-opacity duration-150 hover:opacity-100"
+                  className="flex flex-1 items-center justify-center px-1 opacity-60 transition-all duration-200 hover:opacity-100 hover:scale-105"
                 >
                   <Image
                     alt={`${brand.name} logo`}
                     src={brand.logo}
                     width={brand.width}
                     height={32}
-                    className="h-8 w-auto max-w-[128px] sm:h-10"
+                    className="h-7 w-auto max-w-[120px] sm:h-9 grayscale hover:grayscale-0 transition-all"
                   />
                 </div>
               ))}

@@ -151,14 +151,14 @@ export const AuthForm = React.memo(function AuthForm({
   }, []);
 
   return (
-    <div className="w-full bg-transparent  max-w-lg  mx-auto">
+    <div className="w-full bg-transparent max-w-lg mx-auto">
       <div className="p-8">
         {/* Header */}
-        <div className="mb-8 text-center">
-          <h1 className="text-3xl font-semibold text-foreground mb-2">
+        <div className="mb-10 text-center space-y-3">
+          <h1 className="text-4xl font-bold text-foreground tracking-tight">
             {mode === "signin" ? "Welcome back" : "Get started free"}
           </h1>
-          <p className="text-default-600">
+          <p className="text-base text-muted-foreground">
             {mode === "signin"
               ? "Sign in to access your dashboard"
               : "Start your profit intelligence journey"}
@@ -200,30 +200,35 @@ export const AuthForm = React.memo(function AuthForm({
             onSelectionChange={(key) => setAuthMethod(key as AuthMethod)}
           >
             <Tab key="password" title="Password">
-              <form className="mt-6 space-y-4" onSubmit={handlePasswordAuth}>
+              <form className="mt-8 space-y-5" onSubmit={handlePasswordAuth}>
                 <Input
                   isRequired
                   isDisabled={isLoading}
                   placeholder="you@example.com"
                   variant="bordered"
                   radius="lg"
+                  size="lg"
                   startContent={
                     <Icon
-                      className="mr-1"
+                      className="mr-1 text-default-400"
                       icon="solar:letter-bold"
-                      width={18}
+                      width={20}
                     />
                   }
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  classNames={{
+                    input: "text-base",
+                    inputWrapper: "h-12"
+                  }}
                 />
 
                 <Input
                   isRequired
                   endContent={
                     <button
-                      className="focus:outline-none"
+                      className="focus:outline-none transition-colors hover:text-foreground"
                       type="button"
                       onClick={togglePasswordVisibility}
                     >
@@ -234,24 +239,29 @@ export const AuthForm = React.memo(function AuthForm({
                             ? "solar:eye-closed-linear"
                             : "solar:eye-linear"
                         }
-                        width={18}
+                        width={20}
                       />
                     </button>
                   }
                   isDisabled={isLoading}
                   placeholder="Enter password"
                   radius="lg"
+                  size="lg"
                   startContent={
                     <Icon
-                      className="mr-1"
+                      className="mr-1 text-default-400"
                       icon="solar:lock-keyhole-bold"
-                      width={18}
+                      width={20}
                     />
                   }
                   type={showPassword ? "text" : "password"}
                   value={password}
                   variant="bordered"
                   onChange={(e) => setPassword(e.target.value)}
+                  classNames={{
+                    input: "text-base",
+                    inputWrapper: "h-12"
+                  }}
                 />
 
                 <Button
@@ -261,6 +271,7 @@ export const AuthForm = React.memo(function AuthForm({
                   radius="lg"
                   size="lg"
                   type="submit"
+                  className="h-12 font-semibold transition-all duration-200 hover:scale-[1.02] active:scale-100"
                 >
                   Sign In
                 </Button>
@@ -287,13 +298,13 @@ export const AuthForm = React.memo(function AuthForm({
         )}
 
         {/* Footer Links */}
-        <div className="mt-4 text-center space-y-2">
-          <p className="text-sm text-default-500">
+        <div className="mt-8 text-center space-y-3">
+          <p className="text-sm text-muted-foreground">
             {mode === "signin" ? (
               <>
                 Don&apos;t have an account?{" "}
                 <Link
-                  className="text-primary hover:text-primary/80 font-medium transition-colors"
+                  className="text-primary hover:text-primary/90 font-semibold transition-colors underline-offset-4 hover:underline"
                   href="/signup"
                 >
                   Sign up
@@ -303,7 +314,7 @@ export const AuthForm = React.memo(function AuthForm({
               <>
                 Already have an account?{" "}
                 <Link
-                  className="text-primary hover:text-primary/80 font-medium transition-colors"
+                  className="text-primary hover:text-primary/90 font-semibold transition-colors underline-offset-4 hover:underline"
                   href="/signin"
                 >
                   Sign in
@@ -314,18 +325,18 @@ export const AuthForm = React.memo(function AuthForm({
         </div>
 
         {/* Terms */}
-        <div className="mt-2">
-          <p className="text-center text-xs text-default-500">
+        <div className="mt-6">
+          <p className="text-center text-xs text-muted-foreground leading-relaxed">
             By continuing, you agree to our{" "}
             <Link
-              className="text-primary hover:text-primary/80 font-medium transition-colors"
+              className="text-foreground hover:text-primary font-medium transition-colors underline-offset-2 hover:underline"
               href="/privacy/terms"
             >
               Terms
             </Link>{" "}
             and{" "}
             <Link
-              className="text-primary hover:text-primary/80 font-medium transition-colors"
+              className="text-foreground hover:text-primary font-medium transition-colors underline-offset-2 hover:underline"
               href="/privacy/policy"
             >
               Privacy Policy

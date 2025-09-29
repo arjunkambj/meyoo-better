@@ -55,7 +55,7 @@ export default function AgentSidebar({
       {isMobile && (
         <div
           className={cn(
-            "fixed inset-0 bg-black/50 z-40 transition-opacity duration-300",
+            "fixed inset-0 bg-black/60 backdrop-blur-sm z-40 transition-opacity duration-300",
             isAnimating ? "opacity-100" : "opacity-0"
           )}
           onClick={() => setIsOpen(false)}
@@ -63,12 +63,12 @@ export default function AgentSidebar({
       )}
       <aside
         className={cn(
-          "h-full bg-default-100 px-1 pb-2",
+          "h-full bg-default-50 px-1 pb-2",
           "flex flex-col overflow-hidden transition-all duration-300 ease-in-out",
-          "border-l border-default-200/50",
+          "border-l border-default-200",
           isMobile
             ? cn(
-                "fixed right-0 top-0 bottom-0 w-full max-w-md z-50 transform",
+                "fixed right-0 top-0 bottom-0 w-full max-w-lg z-50 transform",
                 isAnimating ? "translate-x-0" : "translate-x-full"
               )
             : cn(
@@ -78,23 +78,23 @@ export default function AgentSidebar({
         )}
       >
         {isMobile && (
-          <div className="absolute top-4 right-4 z-10">
+          <div className="absolute top-3 right-3 z-10">
             <Button
               isIconOnly
               size="sm"
-              variant="light"
-              radius="md"
+              variant="flat"
+              radius="lg"
               onPress={() => setIsOpen(false)}
-              className="hover:bg-content2 transition-colors"
+              className="hover:bg-default-200 transition-colors"
             >
-              <Icon icon="solar:close-circle-bold-duotone" width={22} />
+              <Icon icon="solar:close-circle-bold-duotone" width={20} />
             </Button>
           </div>
         )}
         <div
           className={cn(
             "h-full flex flex-col",
-            "transition-opacity duration-500 delay-150",
+            "transition-opacity duration-500 delay-100",
             isAnimating ? "opacity-100" : "opacity-0"
           )}
         >

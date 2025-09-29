@@ -79,13 +79,13 @@ const Pricing = () => {
             </span>
           </div>
           <h2 className={designSystem.typography.sectionTitle}>Simple, Transparent Pricing</h2>
-          <p className={designSystem.typography.sectionSubtitle}>
-            Choose the perfect plan for you to go viral. Upgrade anytime.
+          <p className={`${designSystem.typography.sectionSubtitle} max-w-2xl mx-auto`}>
+            Choose the perfect plan for your business. Start free, scale as you grow, cancel anytime.
           </p>
         </div>
 
-        <div className="flex items-center justify-center gap-3 text-sm text-muted-foreground">
-          <span className="font-medium text-foreground">Monthly</span>
+        <div className="flex items-center justify-center gap-4 text-sm">
+          <span className={`font-medium transition-colors ${billingCycle === FrequencyEnum.Monthly ? 'text-foreground' : 'text-muted-foreground'}`}>Monthly</span>
           <Switch
             isSelected={billingCycle === FrequencyEnum.Yearly}
             onValueChange={(isSelected) => {
@@ -93,12 +93,15 @@ const Pricing = () => {
                 isSelected ? FrequencyEnum.Yearly : FrequencyEnum.Monthly
               );
             }}
-            size="sm"
+            size="lg"
           />
-          <span className="font-medium text-foreground">Yearly</span>
+          <div className="flex items-center gap-2">
+            <span className={`font-medium transition-colors ${billingCycle === FrequencyEnum.Yearly ? 'text-foreground' : 'text-muted-foreground'}`}>Yearly</span>
+            <span className="text-xs font-semibold text-success bg-success/10 px-2 py-0.5 rounded-full">Save 20%</span>
+          </div>
         </div>
 
-        <div className="flex flex-col items-stretch justify-center gap-5 sm:flex-row sm:gap-6">
+        <div className="flex flex-col items-stretch justify-center gap-6 sm:flex-row sm:items-stretch">
           {showcasedTiers.map((tier) => {
             const price = getTierPrice(tier, billingCycle);
             const previousPrice = getTierPrice(
@@ -118,20 +121,22 @@ const Pricing = () => {
             return (
               <Card
                 key={tier.key}
-                className={`h-full w-full ${designSystem.card.base} rounded-2xl pb-5 transition duration-300 sm:w-80`}
+                className={`h-full w-full ${designSystem.card.base} rounded-3xl p-1.5 transition-all duration-300 hover:scale-[1.02] sm:w-96`}
               >
-                <CardHeader className="flex flex-col gap-4  py-6">
-                  <h3 className="text-lg font-semibold text-center tracking-tight text-foreground">
-                    {tier.title}
-                  </h3>
-                  <p className="text-sm text-center leading-relaxed text-muted-foreground">
-                    {tier.description}
-                  </p>
-                  <div className="flex flex-col items-center gap-1">
-                    <div className="flex items-end gap-1 text-4xl font-semibold text-center tracking-tight text-foreground">
+                <CardHeader className="flex flex-col gap-5 py-8 px-6">
+                  <div className="text-center space-y-2">
+                    <h3 className="text-xl font-semibold tracking-tight text-foreground">
+                      {tier.title}
+                    </h3>
+                    <p className="text-sm leading-relaxed text-muted-foreground">
+                      {tier.description}
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-center gap-2 py-4">
+                    <div className="flex items-end gap-1.5 text-5xl font-bold tracking-tight text-foreground">
                       {shouldAnimate ? (
                         <>
-                          <span className="text-2xl font-medium text-center text-muted-foreground">
+                          <span className="text-3xl font-semibold text-muted-foreground">
                             $
                           </span>
                           <NumberTicker
@@ -142,35 +147,36 @@ const Pricing = () => {
                           />
                         </>
                       ) : (
-                        <span className="text-2xl font-medium text-center text-muted-foreground">
+                        <span className="text-3xl font-semibold text-muted-foreground">
                           {price}
                         </span>
                       )}
                     </div>
-                    <div className="text-xs text-center text-muted-foreground">
+                    <div className="text-sm text-muted-foreground font-medium">
                       {periodCopy}
                     </div>
                   </div>
 
                   <Button
                     as={Link}
-                    className="mt-2 w-full"
+                    className="mt-2 w-full h-11 font-semibold transition-all duration-200 hover:scale-105 active:scale-100"
                     color={tier.buttonColor}
                     href={tier.href}
                     variant={tier.buttonVariant}
+                    size="lg"
                   >
                     {tier.buttonText}
                   </Button>
                 </CardHeader>
 
-                <Divider className="my-2 bg-default-200" />
+                <Divider className="my-3 bg-default-100" />
 
-                <CardBody className="flex flex-col px-6 pb-6 pt-2">
+                <CardBody className="flex flex-col px-6 pb-8 pt-4">
                   <div className="flex-1">
-                    <ul className="space-y-3">
+                    <ul className="space-y-4">
                       {tier.features?.map((feature) => (
                         <li key={feature} className="flex items-start gap-3">
-                          <BadgeCheck className="mt-0.5 size-5 text-primary/60" />
+                          <BadgeCheck className="mt-0.5 size-5 shrink-0 text-primary" />
                           <span className="text-sm leading-relaxed text-muted-foreground">
                             {feature}
                           </span>

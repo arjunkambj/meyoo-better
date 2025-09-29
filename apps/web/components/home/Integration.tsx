@@ -69,63 +69,66 @@ const Integration = () => {
           </div>
         </div>
         <h2 className={designSystem.typography.sectionTitle}>How Meyoo Works</h2>
-        <p className={designSystem.typography.sectionSubtitle}>
+        <p className={`${designSystem.typography.sectionSubtitle} max-w-2xl mx-auto`}>
           From setup to scale in three simple steps: connect your tools, unlock insights, and make better decisions to grow your brand.
         </p>
 
-        <div className="relative mt-12">
-          <Marquee pauseOnHover className="[--duration:20s]">
+        <div className="relative mt-16">
+          <Marquee pauseOnHover className="[--duration:25s]">
             {logos.map((logo, index) => (
               <div
                 key={index}
-                className="flex items-center justify-center gap-4 rounded-full bg-muted/40 px-5 py-2 backdrop-blur-sm"
+                className="flex items-center justify-center gap-3.5 rounded-full bg-gradient-to-br from-muted/60 to-muted/40 px-6 py-3 backdrop-blur-md ring-1 ring-default-100 transition-all duration-200 hover:scale-105 hover:ring-primary/30"
               >
                 {"image" in logo ? (
                   <Image
                     alt={logo.name}
-                    className={cn("size-5", logo.className)}
-                    height={20}
+                    className={cn("size-6", logo.className)}
+                    height={24}
                     src={logo.image as string}
                     unoptimized
-                    width={20}
+                    width={24}
                   />
                 ) : (
                   <Icon
                     icon={logo.icon}
-                    width={20}
-                    height={20}
+                    width={24}
+                    height={24}
                     className={cn(logo.className)}
                   />
                 )}
-                <p className="text-lg">{logo.name}</p>
+                <p className="text-base font-medium">{logo.name}</p>
               </div>
             ))}
           </Marquee>
-          <div className="pointer-events-none absolute inset-y-0 left-0 w-36 bg-gradient-to-r from-background"></div>
-          <div className="pointer-events-none absolute inset-y-0 right-0 w-36 bg-gradient-to-l from-background"></div>
+          <div className="pointer-events-none absolute inset-y-0 left-0 w-40 bg-gradient-to-r from-background via-background/80 to-transparent"></div>
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-40 bg-gradient-to-l from-background via-background/80 to-transparent"></div>
         </div>
       </div>
-      <div className="relative mx-auto mt-12 grid min-h-[28rem] w-full max-w-7xl items-stretch ${designSystem.spacing.gap.md} gap-10 px-4 sm:px-6 lg:px-8 md:grid-cols-2 lg:grid-cols-3">
+      <div className="relative mx-auto mt-20 grid min-h-[28rem] w-full max-w-7xl items-stretch gap-8 px-4 sm:px-6 lg:px-8 md:grid-cols-2 lg:grid-cols-3">
         {howItWorks.map((feature, index) => (
           <PinContainer
             key={index}
-            className={`${designSystem.card.base} group w-full rounded-2xl p-4 transition-all duration-300`}
+            className={`${designSystem.card.base} group w-full rounded-3xl p-1.5 transition-all duration-300 hover:scale-[1.02]`}
           >
-            <div className="flex flex-col">
-              <div className={cn("relative overflow-hidden rounded-xl", feature.imageOrder)}>
+            <div className="flex flex-col h-full">
+              <div className={cn("relative overflow-hidden rounded-[20px]", feature.imageOrder)}>
                 <Image
                   src={feature.image}
                   height={1000}
                   width={1000}
-                  className="h-64 w-full sm:h-70 object-cover transform transition-transform duration-300 ease-out group-hover:scale-[1.035]"
+                  className="h-64 w-full sm:h-72 object-cover transform transition-transform duration-500 ease-out group-hover:scale-110"
                   alt="thumbnail"
                 />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+                <div className="absolute top-4 left-4 bg-background/90 backdrop-blur-sm rounded-full px-4 py-1.5">
+                  <p className="text-xs uppercase tracking-[0.15em] text-primary font-semibold">
+                    Step {feature.number}
+                  </p>
+                </div>
               </div>
-              <div className={`mt-4 w-full p-3 ${feature.contentOrder}`}>
-                <p className="text-xs uppercase tracking-[0.15em] text-muted-foreground font-medium">
-                  Step {feature.number}
-                </p>
-                <h2 className="my-3 text-xl font-semibold tracking-tight">
+              <div className={`mt-5 w-full p-4 flex-1 ${feature.contentOrder}`}>
+                <h2 className="mb-3 text-xl font-semibold tracking-tight leading-tight">
                   {feature.title}
                 </h2>
                 <p className="text-sm text-muted-foreground leading-relaxed">

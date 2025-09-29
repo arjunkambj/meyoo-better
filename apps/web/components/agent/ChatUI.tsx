@@ -117,12 +117,12 @@ export default function ChatUI() {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="px-1 py-2.5 flex items-center border-b border-default-200/80">
+      <div className="px-2 py-3 flex items-center gap-2 border-b border-default-200">
         <Button
           size="sm"
-          variant="light"
+          variant="flat"
           isIconOnly
-          radius="md"
+          radius="lg"
           startContent={
             <Icon
               icon={
@@ -138,7 +138,7 @@ export default function ChatUI() {
           }
           title={viewMode === "chat" ? "View History" : "Back to Chat"}
           onPress={() => setViewMode(viewMode === "chat" ? "history" : "chat")}
-          className="hover:bg-content3 transition-colors text-default-600"
+          className="hover:bg-default-200 transition-colors text-default-700"
         >
           {viewMode === "chat" ? "" : ""}
         </Button>
@@ -147,21 +147,32 @@ export default function ChatUI() {
 
         <NewChatButton onNew={startNewChat} />
       </div>
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 pb-2">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 pb-3">
         {viewMode === "history" ? (
           isLoadingThreads ? (
             <HistorySkeleton />
           ) : conversationOptions.length === 0 ? (
             <div className="h-full flex items-center justify-center text-center px-6">
-              <div>
-                <div className="text-sm font-medium">No conversations yet</div>
-                <div className="text-xs text-default-500 mt-1">
-                  Start a new chat to see it here.
+              <div className="max-w-xs">
+                <div className="flex justify-center mb-4">
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
+                    <Icon
+                      icon="solar:inbox-line-bold-duotone"
+                      width={32}
+                      className="text-primary/60"
+                    />
+                  </div>
+                </div>
+                <div className="text-base font-semibold text-default-900 mb-1.5">
+                  No conversations yet
+                </div>
+                <div className="text-sm text-default-500 leading-relaxed">
+                  Start a new chat to see it here
                 </div>
               </div>
             </div>
           ) : (
-            <div className="space-y-2 pt-2">
+            <div className="space-y-1.5 pt-3">
               {conversationOptions.map((c) => (
                 <ChatHistoryItem
                   key={c.id}
@@ -187,29 +198,29 @@ export default function ChatUI() {
             <MessageSkeleton rows={4} />
           ) : (
             <div className="h-full flex items-center justify-center text-center px-6">
-              <div>
-                <div className="flex justify-center mb-3">
-                  <div className="w-10 h-10 rounded-full bg-content2 flex items-center justify-center">
+              <div className="max-w-sm">
+                <div className="flex justify-center mb-5">
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
                     <Icon
                       icon="solar:magic-stick-3-bold-duotone"
-                      width={24}
-                      className="text-default-600"
+                      width={32}
+                      className="text-primary"
                     />
                   </div>
                 </div>
-                <div className="text-sm font-medium">
-                  Start a new conversation
+                <div className="text-base font-semibold text-default-900 mb-2">
+                  {isNewChat ? "How can I help you today?" : "Start the conversation"}
                 </div>
-                <div className="text-xs text-default-500 mt-1">
+                <div className="text-sm text-default-500 leading-relaxed">
                   {isNewChat
-                    ? "Ask anything about your store’s data, inventory, orders, or ads."
-                    : "No messages here yet. Say hello to get started."}
+                    ? "Ask about your store's data, inventory, orders, or ad performance"
+                    : "Send a message to begin"}
                 </div>
               </div>
             </div>
           )
         ) : (
-          <div className="space-y-1">
+          <div className="space-y-2 pt-2">
             {displayedMessages.map((m) => {
               if (m.role === "assistant") {
                 const streaming = m.status === "streaming";
@@ -259,7 +270,7 @@ export default function ChatUI() {
           </div>
         )}
       </div>
-      <div className="px-1 pt-2">
+      <div className="px-3 pt-3 pb-2">
         <AgentChatInput onSend={handleSend} busy={isSending} />
       </div>
       <RenameThreadDialog

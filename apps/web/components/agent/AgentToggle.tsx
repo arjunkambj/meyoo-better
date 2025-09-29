@@ -12,10 +12,10 @@ export default function AgentToggle() {
   if (isOpen) return null; // Hide toggle when sidebar is open
 
   return (
-    <Tooltip content="AI Assistant" placement="left">
+    <Tooltip content="AI Assistant" placement="left" delay={300}>
       <Button
         isIconOnly
-        className="fixed right-4 bottom-20 z-40 bg-primary text-primary-foreground hover:bg-primary/90 transition-all hover:scale-105"
+        className="fixed right-4 bottom-20 z-40 bg-gradient-to-br from-primary to-primary-600 text-primary-foreground hover:shadow-lg hover:shadow-primary/30 transition-all hover:scale-110 active:scale-95"
         radius="full"
         size="lg"
         onPress={() => setIsOpen(true)}

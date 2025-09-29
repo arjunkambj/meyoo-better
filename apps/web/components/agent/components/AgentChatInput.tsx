@@ -37,28 +37,31 @@ export default function AgentChatInput({
         <Textarea
           aria-label="Chat message"
           className="w-full"
-          size="sm"
-          minRows={4}
-          maxRows={4}
+          size="md"
+          minRows={3}
+          maxRows={8}
           isDisabled={disabled}
           isReadOnly={busy}
           placeholder={placeholder}
           value={message}
           onValueChange={setMessage}
           classNames={{
-            // Keep background stable across all states
             inputWrapper: cn(
-              "bg-background rounded-lg",
+              "bg-default-50 rounded-xl",
               "hover:bg-default-100",
               "focus-within:bg-background",
-              "data-[hover=true]:bg-background ",
-              "border-1",
-              "hover:border-primary-300",
+              "data-[hover=true]:bg-default-100",
+              "border-2 border-default-200",
+              "hover:border-default-300",
               "focus-within:border-primary",
-              "transition-colors duration-200",
-              "pr-12" // Add padding for the button
+              "transition-all duration-200",
+              "pr-14 pb-12"
             ),
-            input: cn("bg-transparent", "placeholder:text-default-500"),
+            input: cn(
+              "bg-transparent text-sm",
+              "placeholder:text-default-400",
+              "min-h-[60px]"
+            ),
           }}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
@@ -68,17 +71,24 @@ export default function AgentChatInput({
           }}
         />
 
-        <div className="absolute right-2 bottom-2 z-10">
-          <Tooltip content={canSend ? "Send" : "Type a message"}>
+        <div className="absolute right-2.5 bottom-2.5 z-10 flex items-center gap-1.5">
+          <div className="text-xs text-default-400 mr-1">
+            {!busy && message.length > 0 && "↵ to send"}
+          </div>
+          <Tooltip
+            content={canSend ? "Send message" : "Type a message"}
+            delay={500}
+          >
             <Button
               isIconOnly
-              size="sm"
+              size="md"
               color="primary"
               radius="lg"
-              variant="solid"
+              variant="flat"
               isDisabled={!canSend}
               isLoading={busy}
               onPress={handleSend}
+              className="hover:scale-105 transition-transform"
             >
               <Icon icon="solar:plain-2-bold-duotone" width={20} />
             </Button>

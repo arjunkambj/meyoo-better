@@ -355,7 +355,19 @@ export const syncSessions = defineTable({
   .index("by_platform", ["platform"])
   .index("by_status", ["status"])
   .index("by_started_at", ["startedAt"])
+  .index("by_org_and_startedAt", ["organizationId", "startedAt"])
+  .index("by_org_status_and_startedAt", [
+    "organizationId",
+    "status",
+    "startedAt",
+  ])
   .index("by_org_platform_and_status", ["organizationId", "platform", "status"])
+  .index("by_org_platform_status_and_startedAt", [
+    "organizationId",
+    "platform",
+    "status",
+    "startedAt",
+  ])
   .index("by_org_platform_and_date", [
     "organizationId",
     "platform",

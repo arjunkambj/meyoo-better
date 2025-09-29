@@ -13,14 +13,14 @@ interface UsePnLAnalyticsParams {
 }
 
 export function usePnLAnalytics(params?: UsePnLAnalyticsParams) {
-  const [granularity, setGranularity] = useState<PnLGranularity>("monthly");
+  const [granularity, setGranularity] = useState<PnLGranularity>("daily");
   const { offsetMinutes, isLoading: isShopTimeLoading } = useShopifyTime();
   const { timezone, loading: isTimezoneLoading } = useOrganizationTimeZone();
 
   const defaultDateRange = useMemo<{ startDate: string; endDate: string }>(() => {
     const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - 30);
+    const startDate = new Date(endDate);
+    startDate.setDate(startDate.getDate() - 6);
     return {
       startDate: startDate.toISOString().slice(0, 10),
       endDate: endDate.toISOString().slice(0, 10),
@@ -52,6 +52,7 @@ export function usePnLAnalytics(params?: UsePnLAnalyticsParams) {
   const analytics = useQuery(api.web.pnl.getAnalytics, args);
 
   const result = analytics?.result as PnLAnalyticsResult | undefined;
+  const resolvedDateRange = analytics?.dateRange ?? { startDate, endDate };
 
   const metricsData: PnLKPIMetrics | undefined = result?.metrics ?? undefined;
   const tablePeriods: PnLTablePeriod[] | undefined = result?.periods ?? undefined;
@@ -69,5 +70,6 @@ export function usePnLAnalytics(params?: UsePnLAnalyticsParams) {
     setGranularity,
     loadingStates,
     exportData,
+    dateRange: resolvedDateRange,
   };
 }

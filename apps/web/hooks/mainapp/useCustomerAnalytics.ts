@@ -1,35 +1,176 @@
-import { useQuery } from "convex-helpers/react/cache/hooks";
-import { useMemo, useState } from "react";
-import type { JourneyStage } from "@/components/dashboard/(analytics)/customer-insights/components/CustomerJourney";
-import { api } from "@/libs/convexApi";
-import { formatCurrency } from "@/libs/utils/format";
-import { toUtcRangeStrings } from "@/libs/dateRange";
-import { useOrganizationTimeZone } from "./useUser";
+import { useAction } from "convex/react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-// Define types locally
+import { api } from "@/libs/convexApi";
+import { toUtcRangeStrings } from "@/libs/dateRange";
+import { useOrganizationTimeZone, useUser } from "./useUser";
+import type { JourneyStage } from "@/components/dashboard/(analytics)/customer-insights/components/CustomerJourney";
+import type { CohortData } from "@/components/dashboard/(analytics)/orders-insights/components/CohortAnalysis";
+import type { GeoData } from "@/components/dashboard/(analytics)/orders-insights/components/GeographicDistribution";
+import { formatCurrency } from "@/libs/utils/format";
+
 interface CustomerOverviewMetrics {
   totalCustomers: number;
   newCustomers: number;
   returningCustomers: number;
   activeCustomers: number;
   churnedCustomers: number;
-  avgLTV: number; // Changed from avgLifetimeValue
-  avgCAC: number; // Changed from customerAcquisitionCost
-  ltvCacRatio: number; // Added
+  avgLTV: number;
+  avgCAC: number;
+  ltvCacRatio: number;
   avgOrderValue: number;
   avgOrdersPerCustomer: number;
   repeatPurchaseRate: number;
+  periodCustomerCount: number;
+  prepaidRate: number;
+  periodRepeatRate: number;
+  abandonedCartCustomers: number;
   changes: {
     totalCustomers: number;
     newCustomers: number;
-    avgLTV: number; // Changed from lifetimeValue
+    avgLTV: number;
   };
 }
 
-import type { CohortData } from "@/components/dashboard/(analytics)/orders-insights/components/CohortAnalysis";
-import type { GeoData } from "@/components/dashboard/(analytics)/orders-insights/components/GeographicDistribution";
+interface CustomerListEntry {
+  id: string;
+  name: string;
+  email: string;
+  avatar?: string;
+  status: string;
+  lifetimeValue: number;
+  orders: number;
+  avgOrderValue: number;
+  lastOrderDate: string;
+  firstOrderDate: string;
+  segment: string;
+  city?: string;
+  country?: string;
+}
 
-import { useUser } from "./useUser";
+interface CustomerListPagination {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
+interface CustomersAnalyticsActionResult {
+  overview: {
+    totalCustomers: number;
+    newCustomers: number;
+    returningCustomers: number;
+    activeCustomers: number;
+    churnedCustomers: number;
+    avgLifetimeValue: number;
+    avgOrderValue: number;
+    avgOrdersPerCustomer: number;
+    customerAcquisitionCost: number;
+    churnRate: number;
+    repeatPurchaseRate: number;
+    periodCustomerCount: number;
+    prepaidRate: number;
+    periodRepeatRate: number;
+    abandonedCartCustomers: number;
+    changes: {
+      totalCustomers: number;
+      newCustomers: number;
+      lifetimeValue: number;
+    };
+  } | null;
+  cohorts: Array<{
+    cohort: string;
+    cohortSize: number;
+    periods: Array<{
+      period: number;
+      retained: number;
+      percentage: number;
+      revenue: number;
+    }>;
+  }>;
+  customerList: {
+    data: CustomerListEntry[];
+    pagination: CustomerListPagination;
+    continueCursor: string;
+  } | null;
+  geographic: {
+    countries: Array<{
+      country: string;
+      customers: number;
+      revenue: number;
+      orders: number;
+      avgOrderValue: number;
+      zipCodes: Array<{
+        zipCode: string;
+        city?: string;
+        customers: number;
+        revenue: number;
+      }>;
+    }>;
+    cities: Array<{
+      city: string;
+      country: string;
+      customers: number;
+      revenue: number;
+    }>;
+    heatmapData: Array<{ lat: number; lng: number; value: number }>;
+  } | null;
+  journey: Array<{
+    stage: string;
+    customers: number;
+    percentage: number;
+    avgDays: number;
+    conversionRate: number;
+    icon: string;
+    color: string;
+  }>;
+}
+
+interface CustomersAnalyticsActionResponse {
+  dateRange: { startDate: string; endDate: string };
+  organizationId: string;
+  result: CustomersAnalyticsActionResult;
+}
+
+interface Customer {
+  id: string;
+  name: string;
+  email: string;
+  avatar?: string;
+  status: string;
+  lifetimeValue: number;
+  orders: number;
+  avgOrderValue: number;
+  lastOrderDate: string;
+  firstOrderDate: string;
+  segment: string;
+  city?: string;
+  country?: string;
+}
+
+interface CustomersResult {
+  data: Customer[];
+  pagination: {
+    page: number;
+    setPage: (page: number) => void;
+    total: number;
+    pageSize: number;
+    hasMore: boolean;
+  };
+}
+
+const END_CURSOR = "__END__";
+const DEFAULT_PAGE_SIZE = 50;
+
+const defaultRange = () => {
+  const end = new Date();
+  const start = new Date();
+  start.setDate(start.getDate() - 30);
+  return {
+    startDate: start.toISOString().slice(0, 10),
+    endDate: end.toISOString().slice(0, 10),
+  };
+};
 
 export function useCustomerAnalytics(dateRange?: {
   startDate: string;
@@ -37,64 +178,113 @@ export function useCustomerAnalytics(dateRange?: {
 }) {
   const { primaryCurrency } = useUser();
   const { timezone } = useOrganizationTimeZone();
+
   const [page, setPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSegment, setSelectedSegment] = useState<string | undefined>();
 
-  // Default date range: last 30 days
-  const defaultDateRange = useMemo<{
-    startDate: string;
-    endDate: string;
-  }>(() => {
-    const endDate = new Date();
-    const startDate = new Date();
+  const [analytics, setAnalytics] = useState<
+    CustomersAnalyticsActionResponse | null | undefined
+  >(undefined);
+  const [isOverviewLoading, setIsOverviewLoading] = useState(false);
+  const [isCustomersLoading, setIsCustomersLoading] = useState(false);
+  const [isCohortsLoading, setIsCohortsLoading] = useState(false);
+  const [isGeographicLoading, setIsGeographicLoading] = useState(false);
+  const [isJourneyLoading, setIsJourneyLoading] = useState(false);
 
-    startDate.setDate(startDate.getDate() - 30);
+  const requestIdRef = useRef(0);
+  const previousArgsRef = useRef<{
+    dateRange: { startDate: string; endDate: string };
+    page: number;
+    pageSize: number;
+    searchTerm?: string;
+    segment?: string;
+  } | null>(null);
+
+  const effectiveDateRange = useMemo(() => {
+    if (dateRange) return dateRange;
+    return defaultRange();
+  }, [dateRange?.startDate, dateRange?.endDate]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [
+    effectiveDateRange.startDate,
+    effectiveDateRange.endDate,
+    selectedSegment,
+    searchTerm,
+  ]);
+
+  const actionArgs = useMemo(() => {
+    const rangeStrings = toUtcRangeStrings(effectiveDateRange, timezone);
+    const trimmedSearch = searchTerm.trim();
 
     return {
-      startDate: startDate.toISOString().slice(0, 10),
-      endDate: endDate.toISOString().slice(0, 10),
+      dateRange: rangeStrings,
+      page,
+      pageSize: DEFAULT_PAGE_SIZE,
+      searchTerm: trimmedSearch.length > 0 ? trimmedSearch : undefined,
+      segment: selectedSegment,
     };
-  }, []);
+  }, [effectiveDateRange, timezone, page, searchTerm, selectedSegment]);
 
-  const effectiveDateRange: { startDate: string; endDate: string } = {
-    startDate: dateRange?.startDate ?? defaultDateRange.startDate,
-    endDate: dateRange?.endDate ?? defaultDateRange.endDate,
-  };
+  const getAnalytics = useAction(api.web.customers.getAnalytics);
 
-  // Fetch customer overview metrics
-  const overviewData = useQuery(api.web.customers.getCustomerOverview, {
-    dateRange: toUtcRangeStrings(effectiveDateRange, timezone),
-  });
+  useEffect(() => {
+    const previousArgs = previousArgsRef.current;
+    const onlyPageChanged =
+      previousArgs !== null &&
+      previousArgs.dateRange.startDate === actionArgs.dateRange.startDate &&
+      previousArgs.dateRange.endDate === actionArgs.dateRange.endDate &&
+      previousArgs.searchTerm === actionArgs.searchTerm &&
+      previousArgs.segment === actionArgs.segment &&
+      previousArgs.pageSize === actionArgs.pageSize &&
+      previousArgs.page !== actionArgs.page;
 
-  // Fetch cohort analysis
-  const cohortsData = useQuery(api.web.customers.getCohortAnalysis, {
-    dateRange: toUtcRangeStrings(effectiveDateRange, timezone),
-    cohortType: "monthly",
-  });
+    previousArgsRef.current = actionArgs;
 
-  // Fetch customer list
-  const customersData = useQuery(api.web.customers.getCustomerList, {
-    page,
-    pageSize: 50,
-    searchTerm: searchTerm || undefined,
-    segment: selectedSegment,
-    sortBy: "lifetimeValue",
-    sortOrder: "desc",
-  });
+    setIsOverviewLoading(!onlyPageChanged);
+    setIsCohortsLoading(!onlyPageChanged);
+    setIsGeographicLoading(!onlyPageChanged);
+    setIsJourneyLoading(!onlyPageChanged);
+    setIsCustomersLoading(true);
 
-  // Fetch geographic distribution
-  const geographicData = useQuery(api.web.customers.getGeographicDistribution, {
-    dateRange: toUtcRangeStrings(effectiveDateRange, timezone),
-  });
+    if (!onlyPageChanged) {
+      setAnalytics(undefined);
+    }
 
-  // Fetch customer journey
-  const journeyData = useQuery(api.web.customers.getCustomerJourney, {
-    dateRange: toUtcRangeStrings(effectiveDateRange, timezone),
-  });
+    let cancelled = false;
+    requestIdRef.current += 1;
+    const currentRequestId = requestIdRef.current;
 
-  // Process overview metrics
+    getAnalytics(actionArgs)
+      .then((response) => {
+        if (cancelled || requestIdRef.current !== currentRequestId) return;
+        setAnalytics(response ?? null);
+      })
+      .catch((error) => {
+        if (cancelled || requestIdRef.current !== currentRequestId) return;
+        console.error("Failed to load customer analytics", error);
+        setAnalytics(null);
+      })
+      .finally(() => {
+        if (cancelled || requestIdRef.current !== currentRequestId) return;
+        setIsOverviewLoading(false);
+        setIsCohortsLoading(false);
+        setIsGeographicLoading(false);
+        setIsJourneyLoading(false);
+        setIsCustomersLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [actionArgs, getAnalytics]);
+
+  const result = analytics?.result as CustomersAnalyticsActionResult | undefined;
+
   const overview: CustomerOverviewMetrics | undefined = useMemo(() => {
+    const overviewData = result?.overview;
     if (!overviewData) return undefined;
 
     const ltv = overviewData.avgLifetimeValue;
@@ -112,19 +302,22 @@ export function useCustomerAnalytics(dateRange?: {
       avgOrderValue: overviewData.avgOrderValue,
       avgOrdersPerCustomer: overviewData.avgOrdersPerCustomer,
       repeatPurchaseRate: overviewData.repeatPurchaseRate,
+      periodCustomerCount: overviewData.periodCustomerCount,
+      prepaidRate: overviewData.prepaidRate,
+      periodRepeatRate: overviewData.periodRepeatRate,
+      abandonedCartCustomers: overviewData.abandonedCartCustomers,
       changes: {
         totalCustomers: overviewData.changes.totalCustomers,
         newCustomers: overviewData.changes.newCustomers,
         avgLTV: overviewData.changes.lifetimeValue,
       },
     };
-  }, [overviewData]);
+  }, [result?.overview]);
 
-  // Process cohort data
   const cohorts: CohortData[] | undefined = useMemo(() => {
-    if (!cohortsData) return undefined;
+    if (!result?.cohorts) return undefined;
 
-    return cohortsData.map((cohort) => ({
+    return result.cohorts.map((cohort) => ({
       cohort: cohort.cohort,
       size: cohort.cohortSize,
       months: cohort.periods.map((period) => ({
@@ -133,50 +326,50 @@ export function useCustomerAnalytics(dateRange?: {
         revenue: period.revenue,
       })),
     }));
-  }, [cohortsData]);
+  }, [result?.cohorts]);
 
-  // Process customer list
-  const customers = useMemo(() => {
-    if (!customersData) return undefined;
+  const customers: CustomersResult | undefined = useMemo(() => {
+    if (!result?.customerList) return undefined;
+
+    const pagination = result.customerList.pagination ?? {
+      page,
+      pageSize: DEFAULT_PAGE_SIZE,
+      total: result.customerList.data?.length ?? 0,
+      totalPages: Math.max(
+        1,
+        Math.ceil((result.customerList.data?.length ?? 0) / DEFAULT_PAGE_SIZE),
+      ),
+    };
 
     return {
-      data: customersData.data.map((customer) => ({
-        id: customer.id,
-        name: customer.name,
-        email: customer.email,
-        avatar: customer.avatar,
-        status: customer.status,
-        lifetimeValue: customer.lifetimeValue,
-        orders: customer.orders,
-        avgOrderValue: customer.avgOrderValue,
-        lastOrderDate: customer.lastOrderDate,
-        firstOrderDate: customer.firstOrderDate,
-        segment: customer.segment,
-        city: customer.city,
-        country: customer.country,
-      })),
+      data: result.customerList.data ?? [],
       pagination: {
-        page: customersData.pagination.page,
+        page: pagination.page,
         setPage,
-        total: customersData.pagination.total,
+        total: pagination.total,
+        pageSize: pagination.pageSize,
+        hasMore:
+          !!result.customerList.continueCursor &&
+          result.customerList.continueCursor !== END_CURSOR,
       },
     };
-  }, [customersData]);
+  }, [result?.customerList, page]);
 
-  // Process geographic data
-  const totalCustomersAcrossCountries = useMemo(() => {
-    if (!geographicData) return 0;
+  const geographicTotals = useMemo(() => {
+    if (!result?.geographic) return 0;
 
-    return geographicData.countries.reduce((sum, country) => sum + country.customers, 0);
-  }, [geographicData]);
+    return result.geographic.countries.reduce(
+      (sum, country) => sum + country.customers,
+      0,
+    );
+  }, [result?.geographic]);
 
   const geographic: GeoData[] | undefined = useMemo(() => {
-    if (!geographicData) return undefined;
+    if (!result?.geographic) return undefined;
 
-    const total = totalCustomersAcrossCountries || 1;
+    const total = geographicTotals || 1;
 
-    // Convert to GeoData array format expected by GeographicDistribution component
-    return geographicData.countries.map((country) => ({
+    return result.geographic.countries.map((country) => ({
       country: country.country,
       customers: country.customers,
       revenue: country.revenue,
@@ -189,11 +382,10 @@ export function useCustomerAnalytics(dateRange?: {
         revenue: zip.revenue,
       })),
     }));
-  }, [geographicData, totalCustomersAcrossCountries]);
+  }, [result?.geographic, geographicTotals]);
 
-  // Process journey data
   const journey: JourneyStage[] | undefined = useMemo(() => {
-    if (!journeyData) return undefined;
+    if (!result?.journey) return undefined;
 
     const colorMap: Record<string, { bg: string; text: string }> = {
       primary: { bg: "bg-primary/10", text: "text-primary" },
@@ -204,26 +396,22 @@ export function useCustomerAnalytics(dateRange?: {
       default: { bg: "bg-default-100", text: "text-default-500" },
     };
 
-    return journeyData.map((stage) => {
-      return {
-        stage: stage.stage,
-        customers: stage.customers,
-        percentage: stage.percentage,
-        avgDays: stage.avgDays,
-        conversionRate: stage.conversionRate,
-        icon: stage.icon,
-        color: stage.color,
-        bgColor: (colorMap[stage.color] ?? colorMap.default)!.bg,
-        textColor: (colorMap[stage.color] ?? colorMap.default)!.text,
-      };
-    });
-  }, [journeyData]);
+    return result.journey.map((stage) => ({
+      stage: stage.stage,
+      customers: stage.customers,
+      percentage: stage.percentage,
+      avgDays: stage.avgDays,
+      conversionRate: stage.conversionRate,
+      icon: stage.icon,
+      color: stage.color,
+      bgColor: (colorMap[stage.color] ?? colorMap.default)!.bg,
+      textColor: (colorMap[stage.color] ?? colorMap.default)!.text,
+    }));
+  }, [result?.journey]);
 
-  // Export data function
   const exportData = async () => {
-    const exportableData = [];
+    const exportableData = [] as Array<Record<string, unknown>>;
 
-    // Add overview metrics
     if (overview) {
       exportableData.push({
         section: "Overview",
@@ -235,16 +423,16 @@ export function useCustomerAnalytics(dateRange?: {
           "Churned Customers": overview.churnedCustomers,
           "Avg Lifetime Value": formatCurrency(
             overview.avgLTV,
-            primaryCurrency
+            primaryCurrency,
           ),
           "Avg Order Value": formatCurrency(
             overview.avgOrderValue,
-            primaryCurrency
+            primaryCurrency,
           ),
           "Avg Orders per Customer": overview.avgOrdersPerCustomer.toFixed(2),
           "Customer Acquisition Cost": formatCurrency(
             overview.avgCAC,
-            primaryCurrency
+            primaryCurrency,
           ),
           "LTV:CAC Ratio": `${overview.ltvCacRatio.toFixed(1)}x`,
           "Repeat Purchase Rate": `${overview.repeatPurchaseRate.toFixed(1)}%`,
@@ -252,7 +440,6 @@ export function useCustomerAnalytics(dateRange?: {
       });
     }
 
-    // Add cohort analysis
     if (cohorts) {
       exportableData.push({
         section: "Cohort Analysis",
@@ -263,19 +450,18 @@ export function useCustomerAnalytics(dateRange?: {
             (
               acc: Record<string, string>,
               m: { month: number; retention: number; revenue?: number },
-              idx: number
+              idx: number,
             ) => {
               acc[`Month ${idx}`] = `${m.retention.toFixed(1)}%`;
 
               return acc;
             },
-            {} as Record<string, string>
+            {} as Record<string, string>,
           ),
         })),
       });
     }
 
-    // Add customer list
     if (customers) {
       exportableData.push({
         section: "Customers",
@@ -289,12 +475,12 @@ export function useCustomerAnalytics(dateRange?: {
           "Last Order": c.lastOrderDate,
           "First Order": c.firstOrderDate,
           Segment: c.segment,
-          Location: c.city && c.country ? `${c.city}, ${c.country}` : "Unknown",
+          Location:
+            c.city && c.country ? `${c.city}, ${c.country}` : "Unknown",
         })),
       });
     }
 
-    // Add geographic distribution
     if (geographic) {
       exportableData.push({
         section: "Geographic Distribution",
@@ -308,7 +494,6 @@ export function useCustomerAnalytics(dateRange?: {
       });
     }
 
-    // Add customer journey
     if (journey) {
       exportableData.push({
         section: "Customer Journey",
@@ -325,20 +510,16 @@ export function useCustomerAnalytics(dateRange?: {
     return exportableData;
   };
 
-  // Granular loading states for each data type
   const loadingStates = {
-    overview: overviewData === undefined,
-    cohorts: cohortsData === undefined,
-    customers: customersData === undefined,
-    geographic: geographicData === undefined,
-    journey: journeyData === undefined,
+    overview: isOverviewLoading,
+    cohorts: isCohortsLoading,
+    customers: isCustomersLoading,
+    geographic: isGeographicLoading,
+    journey: isJourneyLoading,
   };
 
-  // Check if any data is loading (for backward compatibility)
-  const isLoading = Object.values(loadingStates).some((loading) => loading);
-
-  // Check if initial critical data is loading (overview and segments)
-  const isInitialLoading = loadingStates.overview;
+  const isLoading = Object.values(loadingStates).some(Boolean);
+  const isInitialLoading = analytics === undefined;
 
   return {
     overview,
@@ -346,11 +527,10 @@ export function useCustomerAnalytics(dateRange?: {
     customers,
     geographic,
     journey,
+    exportData,
     isLoading,
     isInitialLoading,
     loadingStates,
-    exportData,
-    // Search and filter functions for customer table
     setSearchTerm,
     setSelectedSegment,
   };

@@ -1,35 +1,28 @@
 "use client";
 
 import { Skeleton, Spacer } from "@heroui/react";
-import type { CalendarDate } from "@internationalized/date";
 import { memo, useCallback, useState } from "react";
 import { AnalyticsHeader } from "@/components/shared/AnalyticsHeader";
 import { ExportButton } from "@/components/shared/actions/ExportButton";
 import { FilterBar } from "@/components/shared/filters/FilterBar";
 import GlobalDateRangePicker from "@/components/shared/GlobalDateRangePicker";
-import { useOrdersAnalytics } from "@/hooks";
+import { useAnalyticsDateRange, useOrdersAnalytics } from "@/hooks";
 import { OrdersOverviewCards } from "./components/OrdersOverviewCards";
 import { OrdersTable } from "./components/OrdersTable";
 
-// Helper to convert CalendarDate to string
-const _calendarDateToString = (date: CalendarDate): string => {
-  const year = date.year;
-  const month = String(date.month).padStart(2, "0");
-  const day = String(date.day).padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
-};
-
 export const OrdersView = memo(function OrdersView() {
-  const [dateRange, setDateRange] = useState<
-    { startDate: string; endDate: string } | undefined
-  >();
+  const {
+    analyticsRange: ordersRange,
+    calendarRange: ordersCalendarRange,
+    preset: ordersPreset,
+    updateRange: updateOrdersRange,
+  } = useAnalyticsDateRange('dashboard-orders', { defaultPreset: 'today' });
   const [selectedStatus, setSelectedStatus] = useState<string | undefined>();
   const [currentPage, setCurrentPage] = useState(1);
 
   const { overview, orders, isInitialLoading, loadingStates, exportData } =
     useOrdersAnalytics({
-      dateRange,
+      dateRange: ordersRange,
       status: selectedStatus,
       page: currentPage,
     });
@@ -40,9 +33,7 @@ export const OrdersView = memo(function OrdersView() {
     }
   }, []);
 
-  const handleAnalyticsRangeChange = useCallback((range: { startDate: string; endDate: string }) => {
-    setDateRange({ startDate: range.startDate, endDate: range.endDate });
-  }, []);
+  const handleAnalyticsRangeChange = useCallback(updateOrdersRange, [updateOrdersRange]);
 
   const filters = [
     {
@@ -75,6 +66,8 @@ export const OrdersView = memo(function OrdersView() {
           <div className="flex items-center gap-2">
             <GlobalDateRangePicker
               size="md"
+              value={ordersCalendarRange}
+              preset={ordersPreset}
               onAnalyticsChange={handleAnalyticsRangeChange}
             />
             <FilterBar

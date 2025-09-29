@@ -1,27 +1,21 @@
 "use client";
 
 import { Spacer } from "@heroui/react";
-import { memo, useCallback, useState } from "react";
+import { memo } from "react";
 import { AnalyticsHeader } from "@/components/shared/AnalyticsHeader";
 import { ExportButton } from "@/components/shared/actions/ExportButton";
 import GlobalDateRangePicker from "@/components/shared/GlobalDateRangePicker";
-import { usePnLAnalytics } from "@/hooks";
+import { useAnalyticsDateRange, usePnLAnalytics } from "@/hooks";
 import { PnLKPICards } from "./components/PnLKPICards";
 import { PnLTable } from "./components/PnLTable";
 
 export const PnLView = memo(function PnLView() {
-  const [dateRange, setDateRange] = useState<
-    { startDate: string; endDate: string } | undefined
-  >(() => {
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - 30);
-
-    return {
-      startDate: startDate.toISOString().slice(0, 10),
-      endDate: endDate.toISOString().slice(0, 10),
-    };
-  });
+  const {
+    analyticsRange: pnlRange,
+    calendarRange: pnlCalendarRange,
+    preset: pnlPreset,
+    updateRange: updatePnlRange,
+  } = useAnalyticsDateRange('dashboard-pnl', { defaultPreset: 'last_7_days' });
 
   const {
     metricsData,
@@ -30,11 +24,8 @@ export const PnLView = memo(function PnLView() {
     setGranularity,
     loadingStates,
     exportData,
-  } = usePnLAnalytics(dateRange);
-
-  const handleAnalyticsRangeChange = useCallback((range: { startDate: string; endDate: string }) => {
-    setDateRange({ startDate: range.startDate, endDate: range.endDate });
-  }, []);
+    dateRange: analyticsDateRange,
+  } = usePnLAnalytics(pnlRange);
 
   return (
     <div className="flex flex-col space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -42,8 +33,10 @@ export const PnLView = memo(function PnLView() {
       <AnalyticsHeader
         leftActions={
           <GlobalDateRangePicker
-            defaultPreset="last_30_days"
-            onAnalyticsChange={handleAnalyticsRangeChange}
+            value={pnlCalendarRange}
+            preset={pnlPreset}
+            defaultPreset="last_7_days"
+            onAnalyticsChange={updatePnlRange}
           />
         }
         rightActions={
@@ -60,6 +53,7 @@ export const PnLView = memo(function PnLView() {
 
       {/* P&L Table with integrated granularity controls */}
       <PnLTable
+        dateRange={analyticsDateRange}
         granularity={granularity}
         setGranularity={setGranularity}
         loading={loadingStates.table}

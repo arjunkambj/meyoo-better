@@ -4,7 +4,7 @@ import { Spacer } from "@heroui/react";
 import { useAtomValue } from "jotai";
 import React, { useCallback, useMemo, useState } from "react";
 import { PlanUsageAlert } from "@/components/shared/billing/PlanUsageAlert";
-import { useDashboardOverview } from "@/hooks";
+import { useAnalyticsDateRange, useDashboardOverview } from "@/hooks";
 import { devToolsVisibleAtom } from "@/store/atoms";
 import type { ChannelRevenueBreakdown } from "@repo/types";
 
@@ -50,15 +50,12 @@ const computePercentChange = (current: number, previous: number) => {
 
 export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
   const [isCustomizing, setIsCustomizing] = useState(false);
-  const [dateRange, setDateRange] = useState<{ start: string; end: string }>(() => {
-    const end = new Date();
-    const start = new Date();
-    start.setDate(start.getDate() - 30);
-    return {
-      start: start.toISOString().slice(0, 10),
-      end: end.toISOString().slice(0, 10),
-    };
-  });
+  const {
+    analyticsRange: overviewRange,
+    calendarRange: overviewCalendarRange,
+    preset: overviewPreset,
+    updateRange: updateOverviewRange,
+  } = useAnalyticsDateRange('dashboard-overview', { defaultPreset: 'today' });
   const devToolsVisible = useAtomValue(devToolsVisibleAtom);
 
   const {
@@ -69,7 +66,7 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
     dashboardConfig,
     saveConfig,
     primaryCurrency,
-  } = useDashboardOverview({ startDate: dateRange.start, endDate: dateRange.end });
+  } = useDashboardOverview({ startDate: overviewRange.startDate, endDate: overviewRange.endDate });
 
   // Note: Cost setup status is now tracked in onboarding table
   const showCostSetupWarning = false; // TODO: Get from onboarding status when needed
@@ -278,7 +275,9 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
       <DashboardHeader
         onCustomize={() => setIsCustomizing(true)}
         exportData={prepareExportData}
-        onDateRangeChange={(range) => setDateRange({ start: range.startDate, end: range.endDate })}
+        onDateRangeChange={updateOverviewRange}
+        dateRange={overviewCalendarRange}
+        datePreset={overviewPreset}
       />
 
       {/* Data Status Chips removed */}

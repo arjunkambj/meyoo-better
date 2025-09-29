@@ -91,46 +91,61 @@ export const getUserTickets = query({
     if (!auth) return [];
     const user = auth.user;
 
-    // Get tickets by email or user ID
-    let tickets: Array<Doc<"tickets">> = [];
+    const statusFilter = args.status ?? null;
+    const limit = args.limit && args.limit > 0 ? Math.floor(args.limit) : null;
+    const takeCount = limit ? Math.min(limit * 2, 200) : null;
+
+    const candidateSets: Array<Doc<"tickets">[]> = [];
+
     if (user.email) {
-      const userEmail = user.email;
-      tickets = await ctx.db
+      const emailQuery = ctx.db
         .query("tickets")
-        .withIndex("by_email", (q) => q.eq("email", userEmail))
-        .collect();
+        .withIndex(
+          statusFilter ? "by_email_status" : "by_email",
+          (q) => {
+            const range = q.eq("email", user.email as string);
+            return statusFilter ? range.eq("status", statusFilter) : range;
+          },
+        )
+        .order("desc");
+
+      candidateSets.push(
+        takeCount ? await emailQuery.take(takeCount) : await emailQuery.collect(),
+      );
     }
 
-    // Also get tickets by user ID if different
-    const userIdTickets = await ctx.db
+    const userQuery = ctx.db
       .query("tickets")
-      .withIndex("by_user", (q) => q.eq("userId", user._id))
-      .collect();
+      .withIndex(
+        statusFilter ? "by_user_status" : "by_user",
+        (q) => {
+          const range = q.eq("userId", user._id);
+          return statusFilter ? range.eq("status", statusFilter) : range;
+        },
+      )
+      .order("desc");
 
-    // Merge and deduplicate
-    const ticketMap = new Map();
+    candidateSets.push(
+      takeCount ? await userQuery.take(takeCount) : await userQuery.collect(),
+    );
 
-    [...tickets, ...userIdTickets].forEach((ticket) => {
-      ticketMap.set(ticket._id, ticket);
-    });
-    tickets = Array.from(ticketMap.values());
+    const dedupedTickets = new Map<Doc<"tickets">["_id"], Doc<"tickets">>();
 
-    // Filter by status if specified
-    if (args.status) {
-      tickets = tickets.filter((t) => t.status === args.status);
+    for (const set of candidateSets) {
+      for (const ticket of set) {
+        dedupedTickets.set(ticket._id, ticket);
+      }
     }
 
-    // Sort by creation date (newest first)
-    tickets.sort((a, b) => b.createdAt - a.createdAt);
+    const tickets = Array.from(dedupedTickets.values()).sort(
+      (a, b) => b.createdAt - a.createdAt,
+    );
 
-    // Apply limit
-    if (args.limit) {
-      tickets = tickets.slice(0, args.limit);
-    }
+    const limitedTickets = limit ? tickets.slice(0, limit) : tickets;
 
     // Get response counts
     const ticketsWithResponses = await Promise.all(
-      tickets.map(async (ticket) => {
+      limitedTickets.map(async (ticket) => {
         const responses = await ctx.db
           .query("ticketResponses")
           .withIndex("by_ticket", (q) => q.eq("ticketId", ticket._id))

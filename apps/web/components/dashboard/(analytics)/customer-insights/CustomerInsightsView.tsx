@@ -1,18 +1,21 @@
 "use client";
 
 import { Skeleton, Spacer } from "@heroui/react";
-import { memo, useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useMemo } from "react";
 import { AnalyticsHeader } from "@/components/shared/AnalyticsHeader";
 import { ExportButton } from "@/components/shared/actions/ExportButton";
 import GlobalDateRangePicker from "@/components/shared/GlobalDateRangePicker";
-import { useCustomerAnalytics, useOrdersAnalytics } from "@/hooks";
+import { useAnalyticsDateRange, useCustomerAnalytics, useOrdersAnalytics } from "@/hooks";
 import { CustomerJourney } from "./components/CustomerJourney";
 import { CustomerOverviewCards } from "./components/CustomerOverviewCards";
 
 export const CustomerInsightsView = memo(function CustomerInsightsView() {
-  const [dateRange, setDateRange] = useState<
-    { startDate: string; endDate: string } | undefined
-  >();
+  const {
+    analyticsRange: customerInsightsRange,
+    calendarRange: customerInsightsCalendarRange,
+    preset: customerInsightsPreset,
+    updateRange: updateCustomerInsightsRange,
+  } = useAnalyticsDateRange('dashboard-customer-insights', { defaultPreset: 'today' });
 
   const {
     overview,
@@ -20,11 +23,11 @@ export const CustomerInsightsView = memo(function CustomerInsightsView() {
     isInitialLoading,
     loadingStates,
     exportData,
-  } = useCustomerAnalytics(dateRange);
+  } = useCustomerAnalytics(customerInsightsRange);
 
   // Fetch order metrics for cancel and return rates
   const { fulfillmentMetrics, orderOverview } = useOrdersAnalytics({
-    dateRange,
+    dateRange: customerInsightsRange,
   });
 
   const cancelRate =
@@ -32,9 +35,7 @@ export const CustomerInsightsView = memo(function CustomerInsightsView() {
       ? ((orderOverview.cancelledOrders ?? 0) / orderOverview.totalOrders) * 100
       : 0;
 
-  const handleAnalyticsRangeChange = useCallback((range: { startDate: string; endDate: string }) => {
-    setDateRange({ startDate: range.startDate, endDate: range.endDate });
-  }, []);
+  const handleAnalyticsRangeChange = useCallback(updateCustomerInsightsRange, [updateCustomerInsightsRange]);
 
   const exportButtonData = useMemo(() => {
     if (Array.isArray(exportData)) {
@@ -51,6 +52,8 @@ export const CustomerInsightsView = memo(function CustomerInsightsView() {
       <AnalyticsHeader
         leftActions={
           <GlobalDateRangePicker
+            value={customerInsightsCalendarRange}
+            preset={customerInsightsPreset}
             onAnalyticsChange={handleAnalyticsRangeChange}
           />
         }

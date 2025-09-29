@@ -51,6 +51,8 @@ interface CustomerTableProps {
     page: number;
     setPage: (page: number) => void;
     total: number;
+    pageSize?: number;
+    hasMore?: boolean;
   };
   loading?: boolean;
   statusFilter?: string;
@@ -75,10 +77,8 @@ export const CustomerTable = React.memo(function CustomerTable({
   loading,
   statusFilter = "all",
 }: CustomerTableProps) {
-  const [selectedKeys, setSelectedKeys] = useState<
-    "all" | Set<never> | Set<string>
-  >(new Set<string>());
   const [page, setPage] = useState(pagination?.page || 1);
+  const pageSize = pagination?.pageSize ?? 50;
   const { primaryCurrency } = useUser();
   const currencySymbol = getCurrencySymbol(primaryCurrency);
 
@@ -109,22 +109,6 @@ export const CustomerTable = React.memo(function CustomerTable({
 
     return true;
   });
-
-  // Helper functions for selection
-  const isItemsSelected = useCallback(() => {
-    return (
-      selectedKeys === "all" ||
-      (selectedKeys instanceof Set && selectedKeys.size > 0)
-    );
-  }, [selectedKeys]);
-
-  const getSelectedCount = useCallback(() => {
-    if (selectedKeys === "all") {
-      return filteredCustomers.length;
-    }
-
-    return selectedKeys instanceof Set ? selectedKeys.size : 0;
-  }, [selectedKeys, filteredCustomers]);
 
   const renderCell = useCallback(
     (item: Customer, columnKey: React.Key) => {
@@ -282,84 +266,9 @@ export const CustomerTable = React.memo(function CustomerTable({
     [currencySymbol]
   );
 
-  const selectionToolbarContent = isItemsSelected() ? (
-    <>
-      <span className="text-sm">{getSelectedCount()} customers selected</span>
-      <Dropdown>
-        <DropdownTrigger>
-          <Button
-            size="sm"
-            startContent={
-              <Icon icon="solar:bolt-circle-bold-duotone" width={16} />
-            }
-            variant="flat"
-          >
-            Bulk Actions
-          </Button>
-        </DropdownTrigger>
-        <DropdownMenu
-          aria-label="Bulk actions"
-          onAction={(key) => {
-            switch (key) {
-              case "send_email":
-                addToast({
-                  title: "Bulk email",
-                  description: "This feature is coming soon",
-                  color: "primary",
-                  timeout: 3000,
-                });
-                break;
-              case "add_tag":
-                addToast({
-                  title: "Tag customers",
-                  description: "This feature is coming soon",
-                  color: "primary",
-                  timeout: 3000,
-                });
-                break;
-              case "export":
-                addToast({
-                  title: "Export selected",
-                  description: "Exporting selected customers...",
-                  color: "default",
-                  timeout: 3000,
-                });
-                break;
-            }
-          }}
-        >
-          <DropdownItem
-            key="send_email"
-            startContent={<Icon icon="solar:letter-linear" width={16} />}
-          >
-            Send Email Campaign
-          </DropdownItem>
-          <DropdownItem
-            key="add_tag"
-            startContent={
-              <Icon icon="solar:tag-horizontal-linear" width={16} />
-            }
-          >
-            Add Tags
-          </DropdownItem>
-          <DropdownItem
-            key="export"
-            startContent={<Icon icon="solar:export-outline" width={16} />}
-          >
-            Export Selected
-          </DropdownItem>
-        </DropdownMenu>
-      </Dropdown>
-      <Button
-        color="danger"
-        size="sm"
-        variant="flat"
-        onPress={() => setSelectedKeys(new Set<string>())}
-      >
-        Clear Selection
-      </Button>
-    </>
-  ) : null;
+  const totalPages = pagination
+    ? Math.max(page, Math.ceil((pagination.total || 0) / pageSize) || 1)
+    : 1;
 
   const paginationNode =
     !loading && pagination && filteredCustomers.length > 0 ? (
@@ -370,7 +279,7 @@ export const CustomerTable = React.memo(function CustomerTable({
           page={page}
           siblings={1}
           size="sm"
-          total={Math.ceil(pagination.total / 50)}
+          total={totalPages}
           onChange={(newPage) => {
             setPage(newPage);
             pagination.setPage(newPage);
@@ -381,13 +290,6 @@ export const CustomerTable = React.memo(function CustomerTable({
 
   return (
     <div className="space-y-4">
-      {selectionToolbarContent ? (
-        <div
-          className={`${DATA_TABLE_TABLE_CLASS} flex flex-wrap items-center gap-3 p-4`}
-        >
-          {selectionToolbarContent}
-        </div>
-      ) : null}
       {loading ? (
         <div className={DATA_TABLE_TABLE_CLASS}>
           <div className="space-y-2 p-4">
@@ -409,16 +311,7 @@ export const CustomerTable = React.memo(function CustomerTable({
             td: "py-2.5 px-3 text-sm text-default-800",
             table: "text-xs",
           }}
-          selectedKeys={selectedKeys}
-          selectionMode="multiple"
           shadow="none"
-          onSelectionChange={(keys) => {
-            if (keys === "all") {
-              setSelectedKeys("all");
-            } else {
-              setSelectedKeys(new Set(Array.from(keys).map(String)));
-            }
-          }}
         >
           <TableHeader columns={columns}>
             {(column) => (

@@ -1,13 +1,7 @@
 "use client";
 
 import {
-  addToast,
-  Button,
   Chip,
-  Dropdown,
-  DropdownItem,
-  DropdownMenu,
-  DropdownTrigger,
   Pagination,
   Skeleton,
   Table,
@@ -58,9 +52,6 @@ export const OrdersTable = React.memo(function OrdersTable({
   pagination,
   loading,
 }: OrdersTableProps) {
-  const [selectedKeys, setSelectedKeys] = useState<
-    "all" | Set<never> | Set<string>
-  >(new Set<string>());
   const [page, setPage] = useState(pagination?.page || 1);
 
   const { primaryCurrency } = useUser();
@@ -72,22 +63,6 @@ export const OrdersTable = React.memo(function OrdersTable({
       setPage(nextPage);
     }
   }, [pagination?.page]);
-
-  // Helper functions for selection
-  const isItemsSelected = useCallback(() => {
-    return (
-      selectedKeys === "all" ||
-      (selectedKeys instanceof Set && selectedKeys.size > 0)
-    );
-  }, [selectedKeys]);
-
-  const getSelectedCount = useCallback(() => {
-    if (selectedKeys === "all") {
-      return orders.length;
-    }
-
-    return selectedKeys instanceof Set ? selectedKeys.size : 0;
-  }, [orders.length, selectedKeys]);
 
   const renderCell = useCallback(
     (item: AnalyticsOrder, columnKey: React.Key) => {
@@ -215,86 +190,6 @@ export const OrdersTable = React.memo(function OrdersTable({
     [primaryCurrency]
   );
 
-  const selectionToolbarContent = isItemsSelected() ? (
-    <div className="flex flex-wrap items-center gap-3">
-      <span className="text-sm">{getSelectedCount()} orders selected</span>
-      <Dropdown>
-        <DropdownTrigger>
-          <Button
-            size="sm"
-            startContent={
-              <Icon icon="solar:bolt-circle-bold-duotone" width={16} />
-            }
-            variant="flat"
-          >
-            Bulk Actions
-          </Button>
-        </DropdownTrigger>
-        <DropdownMenu
-          aria-label="Bulk actions"
-          onAction={(key) => {
-            switch (key) {
-              case "fulfill":
-                addToast({
-                  title: "Fulfilling orders",
-                  description: "Selected orders are being fulfilled",
-                  color: "default",
-                  timeout: 3000,
-                });
-                break;
-              case "cancel":
-                addToast({
-                  title: "Cancelling orders",
-                  description: "Selected orders are being cancelled",
-                  color: "warning",
-                  timeout: 3000,
-                });
-                break;
-              case "export":
-                addToast({
-                  title: "Export selected",
-                  description: "Exporting selected orders...",
-                  color: "default",
-                  timeout: 3000,
-                });
-                break;
-            }
-            setSelectedKeys(new Set<string>());
-          }}
-        >
-          <DropdownItem
-            key="fulfill"
-            startContent={<Icon icon="solar:check-circle-outline" width={16} />}
-          >
-            Mark as Fulfilled
-          </DropdownItem>
-          <DropdownItem
-            key="cancel"
-            className="text-danger"
-            color="danger"
-            startContent={<Icon icon="solar:close-circle-outline" width={16} />}
-          >
-            Cancel Orders
-          </DropdownItem>
-          <DropdownItem
-            key="export"
-            startContent={<Icon icon="solar:export-outline" width={16} />}
-          >
-            Export Selected
-          </DropdownItem>
-        </DropdownMenu>
-      </Dropdown>
-      <Button
-        color="danger"
-        size="sm"
-        variant="flat"
-        onPress={() => setSelectedKeys(new Set<string>())}
-      >
-        Clear Selection
-      </Button>
-    </div>
-  ) : null;
-
   const paginationNode =
     !loading && pagination && orders.length > 0 ? (
       <div className="flex justify-center py-3">
@@ -315,13 +210,6 @@ export const OrdersTable = React.memo(function OrdersTable({
 
   return (
     <div className="space-y-4">
-      {selectionToolbarContent ? (
-        <div
-          className={`${DATA_TABLE_TABLE_CLASS} flex flex-wrap items-center gap-3 p-4`}
-        >
-          {selectionToolbarContent}
-        </div>
-      ) : null}
       {loading ? (
         <div className={DATA_TABLE_TABLE_CLASS}>
           <div className="space-y-2 p-4">
@@ -343,16 +231,7 @@ export const OrdersTable = React.memo(function OrdersTable({
             td: "py-2.5 px-3 text-sm text-default-800 align-middle",
             table: "text-xs",
           }}
-          selectedKeys={selectedKeys}
-          selectionMode="multiple"
           shadow="none"
-          onSelectionChange={(keys) => {
-            if (keys === "all") {
-              setSelectedKeys("all");
-            } else {
-              setSelectedKeys(new Set(Array.from(keys).map(String)));
-            }
-          }}
         >
           <TableHeader columns={columns}>
             {(column) => (

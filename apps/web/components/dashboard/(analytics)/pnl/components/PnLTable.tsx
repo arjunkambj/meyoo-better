@@ -12,7 +12,98 @@ interface PnLTableProps {
   granularity: PnLGranularity;
   setGranularity?: (granularity: PnLGranularity) => void;
   loading?: boolean;
+  dateRange: { startDate: string; endDate: string };
 }
+
+const buildZeroMetrics = (): PnLMetrics => ({
+  grossSales: 0,
+  discounts: 0,
+  refunds: 0,
+  revenue: 0,
+  cogs: 0,
+  shippingCosts: 0,
+  transactionFees: 0,
+  handlingFees: 0,
+  grossProfit: 0,
+  taxesCollected: 0,
+  customCosts: 0,
+  totalAdSpend: 0,
+  netProfit: 0,
+  netProfitMargin: 0,
+});
+
+const toUtcMidnight = (isoDate: string) => new Date(`${isoDate}T00:00:00.000Z`);
+
+const formatISODate = (date: Date) => date.toISOString().slice(0, 10);
+
+const buildExpectedPeriods = (
+  granularity: PnLGranularity,
+  range: { startDate: string; endDate: string },
+): Array<{ key: string; label: string; date: string }> => {
+  const start = toUtcMidnight(range.startDate);
+  const end = toUtcMidnight(range.endDate);
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) {
+    return [];
+  }
+
+  const definitions: Array<{ key: string; label: string; date: string }> = [];
+
+  if (granularity === "daily") {
+    const cursor = new Date(end);
+    for (let index = 0; index < 7; index += 1) {
+      if (cursor < start) break;
+      const iso = formatISODate(cursor);
+      definitions.push({ key: iso, label: iso, date: iso });
+      cursor.setUTCDate(cursor.getUTCDate() - 1);
+    }
+  } else if (granularity === "weekly") {
+    const cursor = new Date(end);
+    const day = cursor.getUTCDay() || 7;
+    if (day !== 1) {
+      cursor.setUTCDate(cursor.getUTCDate() - day + 1);
+    }
+
+    for (let index = 0; index < 6; index += 1) {
+      if (cursor < start) break;
+      const weekStart = new Date(cursor);
+      const weekEnd = new Date(cursor);
+      weekEnd.setUTCDate(weekEnd.getUTCDate() + 6);
+      const startIso = formatISODate(weekStart);
+      const endIso = formatISODate(weekEnd);
+      definitions.push({
+        key: startIso,
+        label: `${startIso} – ${endIso}`,
+        date: startIso,
+      });
+      cursor.setUTCDate(cursor.getUTCDate() - 7);
+    }
+  } else {
+    const cursor = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), 1));
+
+    for (let index = 0; index < 2; index += 1) {
+      if (cursor < start) break;
+      const monthStartIso = formatISODate(cursor);
+      const monthKey = monthStartIso.slice(0, 7);
+      definitions.push({
+        key: `${monthKey}-01`,
+        label: monthKey,
+        date: `${monthKey}-01`,
+      });
+      cursor.setUTCMonth(cursor.getUTCMonth() - 1);
+    }
+  }
+
+  definitions.reverse();
+  return definitions;
+};
+
+const createPlaceholderPeriod = ({ label, date }: { label: string; date: string }): PnLTablePeriod => ({
+  label,
+  date,
+  metrics: buildZeroMetrics(),
+  growth: null,
+});
 
 // Enhanced metric configuration with vibrant colors
 const metricConfig: Record<
@@ -134,6 +225,7 @@ export const PnLTable = React.memo(function PnLTable({
   granularity,
   setGranularity,
   loading,
+  dateRange,
 }: PnLTableProps) {
   const { primaryCurrency } = useUser();
 
@@ -183,33 +275,27 @@ export const PnLTable = React.memo(function PnLTable({
   const tableContent = useMemo(() => {
     if (!periods || periods.length === 0) return null;
 
-    // Separate regular periods from total
-    let regularPeriods = periods.filter((p) => !p.isTotal);
-    const totalPeriod = periods.find((p) => p.isTotal);
+    const totalPeriod = periods.find((period) => period.isTotal);
+    const regularPeriods = periods.filter((period) => !period.isTotal);
 
-    // Adjust number of periods shown based on granularity for better readability
-    if (granularity === "daily") {
-      // Show last 7 days for quick pulse
-      regularPeriods = regularPeriods.slice(-7);
-    } else if (granularity === "weekly") {
-      // Show last 6 weeks to capture recent trends
-      regularPeriods = regularPeriods.slice(-6);
-    } else if (granularity === "monthly") {
-      // Show last 3 months for better readability
-      regularPeriods = regularPeriods.slice(-3);
-    }
+    const expectedDefinitions = buildExpectedPeriods(granularity, dateRange);
+    const periodMap = new Map(regularPeriods.map((period) => [period.date, period]));
+    const displayPeriods = expectedDefinitions.length
+      ? expectedDefinitions.map((definition) =>
+          periodMap.get(definition.key) ?? createPlaceholderPeriod(definition),
+        )
+      : regularPeriods;
 
-    // Format period labels more compactly
     const formatPeriodLabel = (period: PnLTablePeriod) => {
-      if (granularity === "weekly" && period.date) {
+      if (granularity === 'weekly' && period.date) {
         const date = new Date(period.date);
-        return `Week ${date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+        return `Week ${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
       }
-      if (granularity === "daily") {
+      if (granularity === 'daily') {
         const date = new Date(period.date || period.label);
-        return date.toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
+        return date.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
         });
       }
       return period.label;
@@ -217,9 +303,9 @@ export const PnLTable = React.memo(function PnLTable({
 
     const renderMetricRow = (
       metricKey: string,
-      config: (typeof metricConfig)[keyof typeof metricConfig]
+      config: (typeof metricConfig)[keyof typeof metricConfig],
     ) => {
-      const isPercentage = metricKey === "netProfitMargin";
+      const isPercentage = metricKey === 'netProfitMargin';
       const shouldAddParentheses = isDeduction(metricKey as keyof PnLMetrics);
       const isBoldRow = config.isBold;
       const isSubItem = config.isSubItem;
@@ -257,7 +343,7 @@ export const PnLTable = React.memo(function PnLTable({
               </span>
             </div>
           </td>
-          {regularPeriods.map((period) => {
+          {displayPeriods.map((period) => {
             const value = period.metrics[metricKey as keyof PnLMetrics];
             const textColor =
               metricKey === "netProfit" || metricKey === "grossProfit"
@@ -275,10 +361,7 @@ export const PnLTable = React.memo(function PnLTable({
                       : "text-foreground";
 
             return (
-              <td
-                key={period.label}
-                className="text-right py-2 px-3 border-r border-divider"
-              >
+              <td key={period.label} className="text-right py-2 px-3 border-r border-divider">
                 <span
                   className={`
                   ${isSubItem ? "text-xs" : "text-sm"}
@@ -310,16 +393,12 @@ export const PnLTable = React.memo(function PnLTable({
                           ? "text-danger"
                           : "text-success-600"
                         : isSubItem || shouldAddParentheses
-                          ? "text-default-600"
+                          ? "text-default-500"
                           : "text-foreground"
                 }
               `}
               >
-                {formatValue(
-                  totalPeriod.metrics[metricKey as keyof PnLMetrics],
-                  isPercentage,
-                  shouldAddParentheses
-                )}
+                {formatValue(totalPeriod.metrics[metricKey as keyof PnLMetrics], isPercentage, shouldAddParentheses)}
               </span>
             </td>
           )}
@@ -334,15 +413,11 @@ export const PnLTable = React.memo(function PnLTable({
             <tr className="bg-content2">
               <th className="text-left py-3 px-3 font-semibold text-foreground sticky left-0 bg-content2 min-w-[180px] max-w-[200px] z-30 border-b-2 border-divider shadow-[2px_0_4px_rgba(0,0,0,0.05)]">
                 <div className="flex items-center gap-1.5">
-                  <Icon
-                    icon="solar:chart-square-bold-duotone"
-                    width={16}
-                    className="text-primary"
-                  />
+                  <Icon icon="solar:chart-square-bold-duotone" width={16} className="text-primary" />
                   <span className="text-xs">Metrics</span>
                 </div>
               </th>
-              {regularPeriods.map((period) => (
+              {displayPeriods.map((period) => (
                 <th
                   key={period.label}
                   className="text-right py-3 px-3 font-medium text-xs text-default-600 min-w-[110px] border-r border-divider border-b-2 border-divider"
@@ -361,7 +436,7 @@ export const PnLTable = React.memo(function PnLTable({
             {/* Revenue Section */}
             <tr className="bg-success-50 dark:bg-success-900">
               <td
-                colSpan={regularPeriods.length + 1 + (totalPeriod ? 1 : 0)}
+                colSpan={displayPeriods.length + 1 + (totalPeriod ? 1 : 0)}
                 className="px-4 py-2.5 border-b border-divider"
               >
                 <div className="flex items-center gap-2">
@@ -379,7 +454,7 @@ export const PnLTable = React.memo(function PnLTable({
             {/* Spacer */}
             <tr className="h-2">
               <td
-                colSpan={regularPeriods.length + 1 + (totalPeriod ? 1 : 0)}
+                colSpan={displayPeriods.length + 1 + (totalPeriod ? 1 : 0)}
                 className="bg-transparent"
               />
             </tr>
@@ -387,7 +462,7 @@ export const PnLTable = React.memo(function PnLTable({
             {/* COGS Section */}
             <tr className="bg-danger-50 dark:bg-danger-900">
               <td
-                colSpan={regularPeriods.length + 1 + (totalPeriod ? 1 : 0)}
+                colSpan={displayPeriods.length + 1 + (totalPeriod ? 1 : 0)}
                 className="px-4 py-2.5 border-b border-divider"
               >
                 <div className="flex items-center gap-2">
@@ -405,7 +480,7 @@ export const PnLTable = React.memo(function PnLTable({
             {/* Spacer */}
             <tr className="h-2">
               <td
-                colSpan={regularPeriods.length + 1 + (totalPeriod ? 1 : 0)}
+                colSpan={displayPeriods.length + 1 + (totalPeriod ? 1 : 0)}
                 className="bg-transparent"
               />
             </tr>
@@ -416,7 +491,7 @@ export const PnLTable = React.memo(function PnLTable({
             {/* Spacer */}
             <tr className="h-2">
               <td
-                colSpan={regularPeriods.length + 1 + (totalPeriod ? 1 : 0)}
+                colSpan={displayPeriods.length + 1 + (totalPeriod ? 1 : 0)}
                 className="bg-transparent"
               />
             </tr>
@@ -424,7 +499,7 @@ export const PnLTable = React.memo(function PnLTable({
             {/* Operating Expenses Section */}
             <tr className="bg-warning-50 dark:bg-warning-900">
               <td
-                colSpan={regularPeriods.length + 1 + (totalPeriod ? 1 : 0)}
+                colSpan={displayPeriods.length + 1 + (totalPeriod ? 1 : 0)}
                 className="px-4 py-2.5 border-b border-divider"
               >
                 <div className="flex items-center gap-2">
@@ -442,7 +517,7 @@ export const PnLTable = React.memo(function PnLTable({
             {/* Spacer */}
             <tr className="h-4">
               <td
-                colSpan={regularPeriods.length + 1 + (totalPeriod ? 1 : 0)}
+                colSpan={displayPeriods.length + 1 + (totalPeriod ? 1 : 0)}
                 className="bg-transparent"
               />
             </tr>
@@ -454,7 +529,7 @@ export const PnLTable = React.memo(function PnLTable({
         </table>
       </div>
     );
-  }, [periods, formatValue, granularity, isDeduction]);
+  }, [periods, granularity, dateRange, isDeduction, formatValue]);
 
   return (
     <>

@@ -7,9 +7,10 @@ import { AnalyticsHeader } from "@/components/shared/AnalyticsHeader";
 import GlobalDateRangePicker from "@/components/shared/GlobalDateRangePicker";
 import { FilterBar } from "@/components/shared/filters/FilterBar";
 import { ExportButton } from "@/components/shared/actions/ExportButton";
-import { useCustomerAnalytics } from "@/hooks";
+import { useAnalyticsDateRange, useCustomerAnalytics } from "@/hooks";
 
 import { CustomerTable } from "../customer-insights/components/CustomerTable";
+import { CustomerKPICards } from "./CustomerKPICards";
 
 const STATUS_FILTERS = [
   { value: "all", label: "All Customers" },
@@ -18,12 +19,15 @@ const STATUS_FILTERS = [
 ];
 
 export const CustomersView = memo(function CustomersView() {
-  const [dateRange, setDateRange] = useState<
-    { startDate: string; endDate: string } | undefined
-  >();
+  const {
+    analyticsRange: customersRange,
+    calendarRange: customersCalendarRange,
+    preset: customersPreset,
+    updateRange: updateCustomersRange,
+  } = useAnalyticsDateRange('dashboard-customers', { defaultPreset: 'today' });
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
-  const { customers, loadingStates, exportData } = useCustomerAnalytics(dateRange);
+  const { overview, customers, loadingStates, exportData } = useCustomerAnalytics(customersRange);
 
   const filters = useMemo(
     () => [
@@ -44,9 +48,7 @@ export const CustomersView = memo(function CustomersView() {
     [statusFilter]
   );
 
-  const handleAnalyticsRangeChange = useCallback((range: { startDate: string; endDate: string }) => {
-    setDateRange({ startDate: range.startDate, endDate: range.endDate });
-  }, []);
+  const handleAnalyticsRangeChange = useCallback(updateCustomersRange, [updateCustomersRange]);
 
   const handleFilterChange = useCallback((key: string, value: unknown) => {
     if (key === "status") {
@@ -68,7 +70,11 @@ export const CustomersView = memo(function CustomersView() {
       <AnalyticsHeader
         leftActions={
           <div className="flex flex-wrap items-center gap-3">
-            <GlobalDateRangePicker onAnalyticsChange={handleAnalyticsRangeChange} />
+            <GlobalDateRangePicker
+              value={customersCalendarRange}
+              preset={customersPreset}
+              onAnalyticsChange={handleAnalyticsRangeChange}
+            />
             <FilterBar
               filters={filters}
               values={filterValues}
@@ -84,6 +90,20 @@ export const CustomersView = memo(function CustomersView() {
             filename="customers-database"
             formats={["csv", "pdf"]}
           />
+        }
+      />
+
+      <CustomerKPICards
+        loading={loadingStates.overview}
+        metrics={
+          overview
+            ? {
+                periodCustomerCount: overview.periodCustomerCount,
+                prepaidRate: overview.prepaidRate,
+                periodRepeatRate: overview.periodRepeatRate,
+                abandonedCartCustomers: overview.abandonedCartCustomers,
+              }
+            : undefined
         }
       />
 

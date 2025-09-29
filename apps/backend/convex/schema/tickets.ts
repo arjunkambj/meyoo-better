@@ -42,9 +42,11 @@ export const tickets = defineTable({
   userId: v.optional(v.id("users")),
   organizationId: v.optional(v.id("organizations")),
 })
-  .index("by_email", ["email"])
-  .index("by_user", ["userId"])
-  .index("by_status", ["status"])
+  .index("by_email", ["email", "createdAt"])
+  .index("by_email_status", ["email", "status", "createdAt"])
+  .index("by_user", ["userId", "createdAt"])
+  .index("by_user_status", ["userId", "status", "createdAt"])
+  .index("by_status", ["status", "createdAt"])
   .index("by_created", ["createdAt"]);
 
 // Ticket responses/comments

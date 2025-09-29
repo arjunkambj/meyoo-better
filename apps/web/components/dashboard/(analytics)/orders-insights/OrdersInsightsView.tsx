@@ -1,20 +1,23 @@
 "use client";
 
 import { Skeleton, Spacer } from "@heroui/react";
-import { memo, useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useMemo } from "react";
 import { AnalyticsHeader } from "@/components/shared/AnalyticsHeader";
 import { ExportButton } from "@/components/shared/actions/ExportButton";
 import GlobalDateRangePicker from "@/components/shared/GlobalDateRangePicker";
-import { useCustomerAnalytics, useOrdersAnalytics } from "@/hooks";
+import { useAnalyticsDateRange, useCustomerAnalytics, useOrdersAnalytics } from "@/hooks";
 import { OrdersOverviewCards } from "../orders/components/OrdersOverviewCards";
 import { CohortAnalysis } from "./components/CohortAnalysis";
 import { FulfillmentAnalysis } from "./components/FulfillmentAnalysis";
 import { GeographicDistribution } from "./components/GeographicDistribution";
 
 export const OrdersInsightsView = memo(function OrdersInsightsView() {
-  const [dateRange, setDateRange] = useState<
-    { startDate: string; endDate: string } | undefined
-  >();
+  const {
+    analyticsRange: ordersInsightsRange,
+    calendarRange: ordersInsightsCalendarRange,
+    preset: ordersInsightsPreset,
+    updateRange: updateOrdersInsightsRange,
+  } = useAnalyticsDateRange('dashboard-orders-insights', { defaultPreset: 'today' });
 
   const {
     overview,
@@ -22,18 +25,16 @@ export const OrdersInsightsView = memo(function OrdersInsightsView() {
     exportData,
     loadingStates: ordersLoading,
   } = useOrdersAnalytics({
-    dateRange,
+    dateRange: ordersInsightsRange,
   });
 
   const {
     cohorts,
     geographic,
     loadingStates: customerLoading,
-  } = useCustomerAnalytics(dateRange);
+  } = useCustomerAnalytics(ordersInsightsRange);
 
-  const handleAnalyticsRangeChange = useCallback((range: { startDate: string; endDate: string }) => {
-    setDateRange({ startDate: range.startDate, endDate: range.endDate });
-  }, []);
+  const handleAnalyticsRangeChange = useCallback(updateOrdersInsightsRange, [updateOrdersInsightsRange]);
 
   const isExportDisabled = useMemo(
     () =>
@@ -50,6 +51,8 @@ export const OrdersInsightsView = memo(function OrdersInsightsView() {
       <AnalyticsHeader
         leftActions={
           <GlobalDateRangePicker
+            value={ordersInsightsCalendarRange}
+            preset={ordersInsightsPreset}
             onAnalyticsChange={handleAnalyticsRangeChange}
           />
         }

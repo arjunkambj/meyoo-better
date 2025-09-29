@@ -1,7 +1,229 @@
+import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
-import { query } from "../_generated/server";
+import { action, query } from "../_generated/server";
+import type { QueryCtx } from "../_generated/server";
+import { api } from "../_generated/api";
 import { getUserAndOrg } from "../utils/auth";
+
+const MAX_CUSTOMER_PAGE_SIZE = 100;
+const MAX_CURSOR_CARRY = 100;
+const END_CURSOR = "__END__";
+
+const customerListEntryValidator = v.object({
+  id: v.string(),
+  name: v.string(),
+  email: v.string(),
+  avatar: v.optional(v.string()),
+  status: v.string(),
+  lifetimeValue: v.number(),
+  orders: v.number(),
+  avgOrderValue: v.number(),
+  lastOrderDate: v.string(),
+  firstOrderDate: v.string(),
+  segment: v.string(),
+  city: v.optional(v.string()),
+  country: v.optional(v.string()),
+});
+
+const customerListPaginationValidator = v.object({
+  page: v.number(),
+  pageSize: v.number(),
+  total: v.number(),
+  totalPages: v.number(),
+});
+
+const customerListResultValidator = v.object({
+  data: v.array(customerListEntryValidator),
+  pagination: customerListPaginationValidator,
+  continueCursor: v.string(),
+});
+
+const cohortValidator = v.object({
+  cohort: v.string(),
+  cohortSize: v.number(),
+  periods: v.array(
+    v.object({
+      period: v.number(),
+      retained: v.number(),
+      percentage: v.number(),
+      revenue: v.number(),
+    }),
+  ),
+});
+
+const geographicValidator = v.object({
+  countries: v.array(
+    v.object({
+      country: v.string(),
+      customers: v.number(),
+      revenue: v.number(),
+      orders: v.number(),
+      avgOrderValue: v.number(),
+      zipCodes: v.array(
+        v.object({
+          zipCode: v.string(),
+          city: v.optional(v.string()),
+          customers: v.number(),
+          revenue: v.number(),
+        }),
+      ),
+    }),
+  ),
+  cities: v.array(
+    v.object({
+      city: v.string(),
+      country: v.string(),
+      customers: v.number(),
+      revenue: v.number(),
+    }),
+  ),
+  heatmapData: v.array(
+    v.object({
+      lat: v.number(),
+      lng: v.number(),
+      value: v.number(),
+    }),
+  ),
+});
+
+const journeyStageValidator = v.object({
+  stage: v.string(),
+  customers: v.number(),
+  percentage: v.number(),
+  avgDays: v.number(),
+  conversionRate: v.number(),
+  icon: v.string(),
+  color: v.string(),
+});
+
+const overviewValidator = v.union(
+  v.null(),
+  v.object({
+    totalCustomers: v.number(),
+    newCustomers: v.number(),
+    returningCustomers: v.number(),
+    activeCustomers: v.number(),
+    churnedCustomers: v.number(),
+    avgLifetimeValue: v.number(),
+    avgOrderValue: v.number(),
+    avgOrdersPerCustomer: v.number(),
+    customerAcquisitionCost: v.number(),
+    churnRate: v.number(),
+    repeatPurchaseRate: v.number(),
+    periodCustomerCount: v.number(),
+    prepaidRate: v.number(),
+    periodRepeatRate: v.number(),
+    abandonedCartCustomers: v.number(),
+    changes: v.object({
+      totalCustomers: v.number(),
+      newCustomers: v.number(),
+      lifetimeValue: v.number(),
+    }),
+  }),
+);
+
+const customerAnalyticsResultValidator = v.object({
+  overview: overviewValidator,
+  cohorts: v.array(cohortValidator),
+  customerList: v.union(v.null(), customerListResultValidator),
+  geographic: v.union(v.null(), geographicValidator),
+  journey: v.array(journeyStageValidator),
+});
+
+type CustomerListEntry = {
+  id: string;
+  name: string;
+  email: string;
+  avatar?: string;
+  status: string;
+  lifetimeValue: number;
+  orders: number;
+  avgOrderValue: number;
+  lastOrderDate: string;
+  firstOrderDate: string;
+  segment: string;
+  city?: string;
+  country?: string;
+};
+
+type CustomerListPagination = {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+};
+
+type CustomerAnalyticsResult = {
+  overview: {
+    totalCustomers: number;
+    newCustomers: number;
+    returningCustomers: number;
+    activeCustomers: number;
+    churnedCustomers: number;
+    avgLifetimeValue: number;
+    avgOrderValue: number;
+    avgOrdersPerCustomer: number;
+    customerAcquisitionCost: number;
+    churnRate: number;
+    repeatPurchaseRate: number;
+    periodCustomerCount: number;
+    prepaidRate: number;
+    periodRepeatRate: number;
+    abandonedCartCustomers: number;
+    changes: {
+      totalCustomers: number;
+      newCustomers: number;
+      lifetimeValue: number;
+    };
+  } | null;
+  cohorts: Array<{
+    cohort: string;
+    cohortSize: number;
+    periods: Array<{
+      period: number;
+      retained: number;
+      percentage: number;
+      revenue: number;
+    }>;
+  }>;
+  customerList: {
+    data: CustomerListEntry[];
+    pagination: CustomerListPagination;
+    continueCursor: string;
+  } | null;
+  geographic: {
+    countries: Array<{
+      country: string;
+      customers: number;
+      revenue: number;
+      orders: number;
+      avgOrderValue: number;
+      zipCodes: Array<{
+        zipCode: string;
+        city?: string;
+        customers: number;
+        revenue: number;
+      }>;
+    }>;
+    cities: Array<{
+      city: string;
+      country: string;
+      customers: number;
+      revenue: number;
+    }>;
+    heatmapData: Array<{ lat: number; lng: number; value: number }>;
+  } | null;
+  journey: Array<{
+    stage: string;
+    customers: number;
+    percentage: number;
+    avgDays: number;
+    conversionRate: number;
+    icon: string;
+    color: string;
+  }>;
+};
 
 /**
  * Customer Analytics API
@@ -34,6 +256,10 @@ export const getCustomerOverview = query({
       customerAcquisitionCost: v.number(),
       churnRate: v.number(),
       repeatPurchaseRate: v.number(),
+      periodCustomerCount: v.number(),
+      prepaidRate: v.number(),
+      periodRepeatRate: v.number(),
+      abandonedCartCustomers: v.number(),
       changes: v.object({
         totalCustomers: v.number(),
         newCustomers: v.number(),
@@ -45,6 +271,8 @@ export const getCustomerOverview = query({
     const auth = await getUserAndOrg(ctx);
     if (!auth) return null;
     const orgId = auth.orgId;
+    const periodRange = normalizeDateRange(args.dateRange ?? undefined);
+    const hasPeriod = periodRange !== undefined;
 
     // Get all customers for the organization
     const customers = await ctx.db
@@ -224,6 +452,48 @@ export const getCustomerOverview = query({
         ? (returningCustomers / customersWithOrders.length) * 100
         : 0;
 
+    const customersWithOrdersInPeriod = hasPeriod
+      ? customerMetrics.filter((c) => c.ordersInPeriod > 0)
+      : customersWithOrders;
+
+    const repeatCustomersInPeriod = hasPeriod
+      ? customersWithOrdersInPeriod.filter((c) => c.ordersInPeriod >= 2)
+      : customersWithOrders.filter((c) => c.lifetimeOrders >= 2);
+
+    const periodCustomerCount = customersWithOrdersInPeriod.length;
+
+    const customersCreatedInPeriod = hasPeriod
+      ? customerMetrics.filter((c) => {
+          const createdAt =
+            typeof c.shopifyCreatedAt === "number" ? c.shopifyCreatedAt : null;
+
+          return (
+            createdAt != null &&
+            isTimestampInRange(createdAt, periodRange as TimestampRange)
+          );
+        })
+      : customerMetrics;
+
+    const abandonedCartCustomers = hasPeriod
+      ? customersCreatedInPeriod.filter((c) => c.ordersInPeriod === 0).length
+      : totalCustomers - customersWithOrders.length;
+
+    const prepaidOrdersCount = filteredOrders.filter((order) => {
+      const status = order.financialStatus?.toLowerCase();
+
+      return status === "paid" || status === "partially_paid";
+    }).length;
+
+    const prepaidRate =
+      filteredOrders.length > 0
+        ? (prepaidOrdersCount / filteredOrders.length) * 100
+        : 0;
+
+    const periodRepeatRate =
+      periodCustomerCount > 0
+        ? (repeatCustomersInPeriod.length / periodCustomerCount) * 100
+        : 0;
+
     // Calculate changes from previous period
     const changes = {
       totalCustomers: 0,
@@ -291,12 +561,16 @@ export const getCustomerOverview = query({
       churnedCustomers,
       avgLifetimeValue,
       avgOrderValue,
-      avgOrdersPerCustomer,
-      customerAcquisitionCost: avgCAC,
-      churnRate,
-      repeatPurchaseRate,
-      changes,
-    };
+        avgOrdersPerCustomer,
+        customerAcquisitionCost: avgCAC,
+        churnRate,
+        repeatPurchaseRate,
+        periodCustomerCount,
+        prepaidRate,
+        periodRepeatRate,
+        abandonedCartCustomers,
+        changes,
+      };
   },
 });
 
@@ -552,19 +826,46 @@ export const getCohortAnalysis = query({
       ),
     }),
   ),
-  handler: async (ctx, _args) => {
+  handler: async (ctx, args) => {
     const auth = await getUserAndOrg(ctx);
     if (!auth) return [];
 
-    // Get all customers and orders
+    const organizationId = auth.orgId as Id<"organizations">;
+
+    // Load orders scoped to the requested window (default: all time)
+    let orders: Doc<"shopifyOrders">[];
+
+    if (args.dateRange) {
+      const startTime = new Date(args.dateRange.startDate).getTime();
+      const endTime =
+        new Date(args.dateRange.endDate).getTime() + 24 * 60 * 60 * 1000 - 1;
+
+      orders = await ctx.db
+        .query("shopifyOrders")
+        .withIndex("by_organization_and_created", (q) =>
+          q
+            .eq("organizationId", organizationId)
+            .gte("shopifyCreatedAt", startTime)
+            .lte("shopifyCreatedAt", endTime),
+        )
+        .collect();
+    } else {
+      orders = await ctx.db
+        .query("shopifyOrders")
+        .withIndex("by_organization", (q) =>
+          q.eq("organizationId", organizationId),
+        )
+        .collect();
+    }
+
+    if (orders.length === 0) {
+      return [];
+    }
+
+    // Get customers linked to the organization
     const customers = await ctx.db
       .query("shopifyCustomers")
-      .withIndex("by_organization", (q) => q.eq("organizationId", auth.orgId as Id<"organizations">))
-      .collect();
-
-    const orders = await ctx.db
-      .query("shopifyOrders")
-      .withIndex("by_organization", (q) => q.eq("organizationId", auth.orgId as Id<"organizations">))
+      .withIndex("by_organization", (q) => q.eq("organizationId", organizationId))
       .collect();
 
     // Group orders by customer
@@ -592,7 +893,7 @@ export const getCohortAnalysis = query({
 
       if (!customerOrders || customerOrders.length === 0) return;
 
-      // Sort orders to find first order
+      // Sort orders within the selected period to find the first occurrence
       const sortedOrders = [...customerOrders].sort(
         (a, b) => a.shopifyCreatedAt - b.shopifyCreatedAt,
       );
@@ -684,15 +985,22 @@ export const getCohortAnalysis = query({
  */
 export const getCustomerList = query({
   args: {
-    page: v.optional(v.number()),
-    pageSize: v.optional(v.number()),
+    dateRange: v.optional(
+      v.object({
+        startDate: v.string(),
+        endDate: v.string(),
+      }),
+    ),
     searchTerm: v.optional(v.string()),
     segment: v.optional(v.string()),
+    paginationOpts: v.optional(paginationOptsValidator),
+    page: v.optional(v.number()),
+    pageSize: v.optional(v.number()),
     sortBy: v.optional(v.string()),
     sortOrder: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
   },
   returns: v.object({
-    data: v.array(
+    page: v.array(
       v.object({
         id: v.string(),
         name: v.string(),
@@ -709,155 +1017,614 @@ export const getCustomerList = query({
         country: v.optional(v.string()),
       }),
     ),
-    pagination: v.object({
-      page: v.number(),
-      pageSize: v.number(),
-      total: v.number(),
-      totalPages: v.number(),
-    }),
+    continueCursor: v.string(),
+    isDone: v.boolean(),
+    data: v.optional(
+      v.array(
+        v.object({
+          id: v.string(),
+          name: v.string(),
+          email: v.string(),
+          avatar: v.optional(v.string()),
+          status: v.string(),
+          lifetimeValue: v.number(),
+          orders: v.number(),
+          avgOrderValue: v.number(),
+          lastOrderDate: v.string(),
+          firstOrderDate: v.string(),
+          segment: v.string(),
+          city: v.optional(v.string()),
+          country: v.optional(v.string()),
+        }),
+      ),
+    ),
+    pagination: v.optional(
+      v.object({
+        page: v.number(),
+        pageSize: v.number(),
+        total: v.number(),
+        totalPages: v.number(),
+      }),
+    ),
   }),
   handler: async (ctx, args) => {
     const auth = await getUserAndOrg(ctx);
-    if (!auth)
+    if (!auth) {
       return {
+        page: [],
+        continueCursor: END_CURSOR,
+        isDone: true,
         data: [],
-        pagination: { page: 1, pageSize: 50, total: 0, totalPages: 0 },
+        pagination: {
+          page: 1,
+          pageSize: 0,
+          total: 0,
+          totalPages: 0,
+        },
       };
+    }
 
-    const page = args.page || 1;
-    const pageSize = args.pageSize || 50;
+    const orgId = auth.orgId as Id<"organizations">;
+    const dateRange = normalizeDateRange(args.dateRange ?? undefined);
+    const isLegacyRequest = !args.paginationOpts;
+    const legacyPage = Math.max(1, Math.floor(args.page ?? 1));
+    const requestedItems = args.paginationOpts?.numItems ?? args.pageSize ?? 50;
+    const pageSize = Math.max(
+      1,
+      Math.min(requestedItems, MAX_CUSTOMER_PAGE_SIZE),
+    );
+    const targetOffset = isLegacyRequest ? (legacyPage - 1) * pageSize : 0;
+    const cursorState = decodeCustomerCursor(args.paginationOpts?.cursor ?? null);
+    const sortByField = args.sortBy;
+    const sortOrder = args.sortOrder ?? "desc";
 
-    // Get all customers
-    const customers = await ctx.db
-      .query("shopifyCustomers")
-      .withIndex("by_organization", (q) => q.eq("organizationId", auth.orgId as Id<"organizations">))
-      .collect();
+    const searchTerm =
+      args.searchTerm && args.searchTerm.trim().length > 0
+        ? args.searchTerm.trim().toLowerCase()
+        : undefined;
 
-    // Get all orders to calculate metrics
-    const orders = await ctx.db
-      .query("shopifyOrders")
-      .withIndex("by_organization", (q) => q.eq("organizationId", auth.orgId as Id<"organizations">))
-      .collect();
+    if (isLegacyRequest) {
+      return handleLegacyCustomerList(ctx, {
+        orgId,
+        dateRange,
+        page: legacyPage,
+        pageSize,
+        searchTerm,
+        segment: args.segment,
+        sortBy: sortByField,
+        sortOrder,
+      });
+    }
 
-    // Group orders by customer
-    const customerOrdersMap = new Map<string, typeof orders>();
+    const results: {
+      id: string;
+      name: string;
+      email: string;
+      avatar: string | undefined;
+      status: string;
+      lifetimeValue: number;
+      orders: number;
+      avgOrderValue: number;
+      lastOrderDate: string;
+      firstOrderDate: string;
+      segment: string;
+      city?: string;
+      country?: string;
+    }[] = [];
 
-    for (const order of orders) {
-      if (order.customerId) {
-        if (!customerOrdersMap.has(order.customerId)) {
-          customerOrdersMap.set(order.customerId, []);
+    let nextCarry: string[] = [];
+    let nextDbCursor: string | null = cursorState.dbCursor ?? null;
+    let skipped = 0;
+
+    const addCustomer = async (
+      customer: Doc<"shopifyCustomers">,
+    ): Promise<void> => {
+      if (results.length >= pageSize) {
+        return;
+      }
+
+      if (customer.organizationId !== orgId) {
+        return;
+      }
+
+      if (searchTerm) {
+        const fullName = `${customer.firstName ?? ""} ${
+          customer.lastName ?? ""
+        }`
+          .trim()
+          .toLowerCase();
+        const email = (customer.email ?? "").toLowerCase();
+
+        if (
+          !fullName.includes(searchTerm) &&
+          !email.includes(searchTerm)
+        ) {
+          return;
         }
-        customerOrdersMap.get(order.customerId)?.push(order);
+      }
+
+      const orders = await ctx.db
+        .query("shopifyOrders")
+        .withIndex("by_customer", (q) =>
+          q.eq("customerId", customer._id as Id<"shopifyCustomers">),
+        )
+        .collect();
+
+      const sortedOrders = orders
+        .slice()
+        .sort((a, b) => a.shopifyCreatedAt - b.shopifyCreatedAt);
+
+      const ordersInRange = dateRange
+        ? sortedOrders.filter((order) =>
+            isTimestampInRange(order.shopifyCreatedAt, dateRange),
+          )
+        : sortedOrders;
+
+      if (dateRange && ordersInRange.length === 0) {
+        return;
+      }
+
+      const metricsOrders = ordersInRange;
+      const totalValue = metricsOrders.reduce(
+        (sum, order) => sum + (order.totalPrice ?? 0),
+        0,
+      );
+      const orderCount = metricsOrders.length;
+      const avgOrderValue =
+        orderCount > 0 ? totalValue / orderCount : 0;
+
+      const firstOrder = metricsOrders[0];
+      const lastOrder = metricsOrders[orderCount - 1];
+
+      const lifetimeOrders = sortedOrders.length;
+      const lifetimeLastOrder =
+        sortedOrders[sortedOrders.length - 1] ?? null;
+
+      const segment = determineSegment(
+        lifetimeOrders,
+        lifetimeLastOrder
+          ? new Date(lifetimeLastOrder.shopifyCreatedAt)
+          : null,
+      );
+
+      if (args.segment && args.segment !== segment) {
+        return;
+      }
+
+      if (skipped < targetOffset) {
+        skipped += 1;
+        return;
+      }
+
+      const status = lifetimeOrders > 0 ? "converted" : "abandoned_cart";
+
+      results.push({
+        id: customer._id,
+        name:
+          `${customer.firstName ?? ""} ${customer.lastName ?? ""}`.trim() ||
+          "Unknown",
+        email: customer.email ?? "",
+        avatar: undefined,
+        status,
+        lifetimeValue: totalValue,
+        orders: orderCount,
+        avgOrderValue,
+        lastOrderDate: lastOrder
+          ? new Date(lastOrder.shopifyCreatedAt)
+              .toISOString()
+              .substring(0, 10)
+          : "",
+        firstOrderDate: firstOrder
+          ? new Date(firstOrder.shopifyCreatedAt)
+              .toISOString()
+              .substring(0, 10)
+          : "",
+        segment,
+        city: customer.defaultAddress?.city,
+        country: customer.defaultAddress?.country,
+      });
+    };
+
+    if (cursorState.carryIds.length > 0) {
+      for (let index = 0; index < cursorState.carryIds.length; index += 1) {
+        if (results.length >= pageSize) {
+          nextCarry = cursorState.carryIds.slice(index);
+          break;
+        }
+
+        const carryId = cursorState.carryIds[index]!;
+        const customerDoc = await ctx.db.get(
+          carryId as Id<"shopifyCustomers">,
+        );
+
+        if (!customerDoc) {
+          continue;
+        }
+
+        await addCustomer(customerDoc);
+      }
+
+      if (results.length >= pageSize || nextCarry.length > 0) {
+        const continueCursor = encodeCustomerCursor({
+          dbCursor: cursorState.dbCursor ?? null,
+          carryIds: nextCarry,
+        });
+
+        if (sortByField) {
+          const direction = sortOrder === "asc" ? 1 : -1;
+          results.sort((a, b) => {
+            const aVal = a[sortByField as keyof typeof a];
+            const bVal = b[sortByField as keyof typeof b];
+
+            if (aVal === undefined || bVal === undefined) {
+              return 0;
+            }
+
+            if (aVal === bVal) return 0;
+            return aVal > bVal ? direction : -direction;
+          });
+        }
+
+        const legacyData =
+          isLegacyRequest
+            ? results.map((customer) => ({
+                id: customer.id,
+                name: customer.name,
+                email: customer.email,
+                avatar: customer.avatar,
+                status: customer.status,
+                lifetimeValue: customer.lifetimeValue,
+                orders: customer.orders,
+                avgOrderValue: customer.avgOrderValue,
+                lastOrderDate: customer.lastOrderDate,
+                firstOrderDate: customer.firstOrderDate,
+                segment: customer.segment,
+                city: customer.city,
+                country: customer.country,
+              }))
+            : undefined;
+
+        const legacyPagination = isLegacyRequest
+          ? {
+              page: legacyPage,
+              pageSize,
+              total:
+                targetOffset +
+                results.length +
+                (continueCursor === END_CURSOR ? 0 : pageSize),
+              totalPages:
+                results.length === 0
+                  ? legacyPage
+                  : Math.max(
+                      legacyPage,
+                      Math.ceil(
+                        (targetOffset + results.length +
+                          (continueCursor === END_CURSOR ? 0 : pageSize)) /
+                          pageSize,
+                      ),
+                    ),
+            }
+          : undefined;
+
+        return {
+          page: results,
+          continueCursor,
+          isDone: continueCursor === END_CURSOR,
+          data: legacyData,
+          pagination: legacyPagination,
+        };
       }
     }
 
-    // Merge customer data with calculated metrics
-    const mergedData = customers.map((customer) => {
-      const customerOrders = customerOrdersMap.get(customer._id) || [];
+    const paginated = await ctx.db
+      .query("shopifyCustomers")
+      .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
+      .order("desc")
+      .paginate({
+        cursor: cursorState.dbCursor ?? null,
+        numItems: Math.min(pageSize, MAX_CUSTOMER_PAGE_SIZE),
+      });
 
-      // Calculate metrics from orders
-      const lifetimeValue = customerOrders.reduce(
-        (sum, o) => sum + (o.totalPrice || 0),
-        0,
-      );
-      const lifetimeOrders = customerOrders.length;
-      const avgOrderValue =
-        lifetimeOrders > 0 ? lifetimeValue / lifetimeOrders : 0;
+    nextDbCursor = paginated.isDone ? null : paginated.continueCursor;
 
-      // Get first and last order dates
-      const sortedOrders = [...customerOrders].sort(
-        (a, b) => a.shopifyCreatedAt - b.shopifyCreatedAt,
-      );
-      const firstOrder = sortedOrders[0];
-      const lastOrder = sortedOrders[sortedOrders.length - 1]!;
+    for (let i = 0; i < paginated.page.length; i += 1) {
+      if (results.length >= pageSize) {
+        nextCarry = paginated.page.slice(i).map((customer) => customer._id);
+        break;
+      }
 
-      const metrics = {
-        lifetimeValue,
-        lifetimeOrders,
-        avgOrderValue,
-        firstOrderDate: firstOrder
-          ? new Date(firstOrder.shopifyCreatedAt).toISOString().substring(0, 10)
-          : "",
-        lastOrderDate: lastOrder
-          ? new Date(lastOrder.shopifyCreatedAt).toISOString().substring(0, 10)
-          : "",
-        segment: determineSegment(
-          lifetimeOrders,
-          lastOrder ? new Date(lastOrder.shopifyCreatedAt) : null,
-        ),
-      };
+      const customerDoc = paginated.page[i]!;
 
-      // Determine status: converted if has orders, abandoned_cart if no orders
-      const status = lifetimeOrders > 0 ? "converted" : "abandoned_cart";
+      await addCustomer(customerDoc);
+    }
 
-      return {
-        id: customer._id,
-        name:
-          `${customer.firstName || ""} ${customer.lastName || ""}`.trim() ||
-          "Unknown",
-        email: customer.email || "",
-        avatar: undefined,
-        status,
-        lifetimeValue: metrics.lifetimeValue,
-        orders: metrics.lifetimeOrders,
-        avgOrderValue: metrics.avgOrderValue,
-        lastOrderDate: metrics.lastOrderDate,
-        firstOrderDate: metrics.firstOrderDate,
-        segment: metrics.segment,
-        city: customer.defaultAddress?.city,
-        country: customer.defaultAddress?.country,
-      };
+    const continueCursor = encodeCustomerCursor({
+      dbCursor: nextDbCursor,
+      carryIds: nextCarry,
     });
 
-    // Apply search filter
-    let filteredData = mergedData;
-
-    if (args.searchTerm) {
-      const term = args.searchTerm.toLowerCase();
-
-      filteredData = filteredData.filter(
-        (c) =>
-          c.name.toLowerCase().includes(term) ||
-          c.email.toLowerCase().includes(term),
-      );
-    }
-
-    // Apply segment filter
-    if (args.segment) {
-      filteredData = filteredData.filter((c) => c.segment === args.segment);
-    }
-
-    // Sort
-    if (args.sortBy) {
-      filteredData.sort((a, b) => {
-        const aVal = a[args.sortBy as keyof typeof a];
-        const bVal = b[args.sortBy as keyof typeof b];
-        const order = args.sortOrder === "desc" ? -1 : 1;
+    if (sortByField) {
+      const direction = sortOrder === "asc" ? 1 : -1;
+      results.sort((a, b) => {
+        const aVal = a[sortByField as keyof typeof a];
+        const bVal = b[sortByField as keyof typeof b];
 
         if (aVal === undefined || bVal === undefined) {
           return 0;
         }
-        return aVal > bVal ? order : -order;
+
+        if (aVal === bVal) return 0;
+        return aVal > bVal ? direction : -direction;
       });
     }
 
-    // Paginate
-    const total = filteredData.length;
-    const totalPages = Math.ceil(total / pageSize);
-    const start = (page - 1) * pageSize;
-    const paginatedData = filteredData.slice(start, start + pageSize);
+    const legacyData =
+      isLegacyRequest
+        ? results.map((customer) => ({
+            id: customer.id,
+            name: customer.name,
+            email: customer.email,
+            avatar: customer.avatar,
+            status: customer.status,
+            lifetimeValue: customer.lifetimeValue,
+            orders: customer.orders,
+            avgOrderValue: customer.avgOrderValue,
+            lastOrderDate: customer.lastOrderDate,
+            firstOrderDate: customer.firstOrderDate,
+            segment: customer.segment,
+            city: customer.city,
+            country: customer.country,
+          }))
+        : undefined;
+
+    const legacyPagination = isLegacyRequest
+      ? {
+          page: legacyPage,
+          pageSize,
+          total:
+            targetOffset +
+            results.length +
+            (continueCursor === END_CURSOR ? 0 : pageSize),
+          totalPages:
+            results.length === 0
+              ? legacyPage
+              : Math.max(
+                  legacyPage,
+                  Math.ceil(
+                    (targetOffset + results.length +
+                      (continueCursor === END_CURSOR ? 0 : pageSize)) /
+                      pageSize,
+                  ),
+                ),
+        }
+      : undefined;
 
     return {
-      data: paginatedData,
-      pagination: {
-        page,
-        pageSize,
-        total,
-        totalPages,
-      },
+      page: results,
+      continueCursor,
+      isDone: continueCursor === END_CURSOR,
+      data: legacyData,
+      pagination: legacyPagination,
     };
   },
 });
+
+interface LegacyCustomerListArgs {
+  orgId: Id<"organizations">;
+  dateRange?: TimestampRange;
+  page: number;
+  pageSize: number;
+  searchTerm?: string;
+  segment?: string;
+  sortBy?: string;
+  sortOrder: "asc" | "desc";
+}
+
+async function handleLegacyCustomerList(
+  ctx: QueryCtx,
+  {
+    orgId,
+    dateRange,
+    page,
+    pageSize,
+    searchTerm,
+    segment,
+    sortBy,
+    sortOrder,
+  }: LegacyCustomerListArgs,
+) {
+  const customers = await ctx.db
+    .query("shopifyCustomers")
+    .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
+    .collect();
+
+  const orders = await ctx.db
+    .query("shopifyOrders")
+    .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
+    .collect();
+
+  const customerOrdersMap = new Map<string, typeof orders>();
+
+  for (const order of orders) {
+    if (!order.customerId) continue;
+    if (!customerOrdersMap.has(order.customerId)) {
+      customerOrdersMap.set(order.customerId, []);
+    }
+    customerOrdersMap.get(order.customerId)!.push(order);
+  }
+
+  const mergedData = customers.map((customer) => {
+    const customerOrders = customerOrdersMap.get(customer._id) ?? [];
+
+    const lifetimeValue = customerOrders.reduce(
+      (sum, o) => sum + (o.totalPrice || 0),
+      0,
+    );
+    const lifetimeOrders = customerOrders.length;
+    const avgOrderValue = lifetimeOrders > 0 ? lifetimeValue / lifetimeOrders : 0;
+
+    const sortedOrders = [...customerOrders].sort(
+      (a, b) => a.shopifyCreatedAt - b.shopifyCreatedAt,
+    );
+    const firstOrder = sortedOrders[0];
+    const lastOrder = sortedOrders[sortedOrders.length - 1];
+
+    const ordersInRange = dateRange
+      ? customerOrders.filter((order) =>
+          isTimestampInRange(order.shopifyCreatedAt, dateRange),
+        )
+      : customerOrders;
+
+    const segmentValue = determineSegment(
+      lifetimeOrders,
+      lastOrder ? new Date(lastOrder.shopifyCreatedAt) : null,
+    );
+
+    return {
+      id: customer._id,
+      name: `${customer.firstName ?? ""} ${customer.lastName ?? ""}`.trim() ||
+        "Unknown",
+      email: customer.email ?? "",
+      avatar: undefined,
+      status: lifetimeOrders > 0 ? "converted" : "abandoned_cart",
+      lifetimeValue,
+      orders: ordersInRange.length,
+      avgOrderValue,
+      lastOrderDate: lastOrder
+        ? new Date(lastOrder.shopifyCreatedAt).toISOString().substring(0, 10)
+        : "",
+      firstOrderDate: firstOrder
+        ? new Date(firstOrder.shopifyCreatedAt).toISOString().substring(0, 10)
+        : "",
+      segment: segmentValue,
+      city: customer.defaultAddress?.city,
+      country: customer.defaultAddress?.country,
+    };
+  });
+
+  let filteredData = mergedData;
+
+  if (searchTerm) {
+    filteredData = filteredData.filter((c) => {
+      const name = c.name.toLowerCase();
+      const email = c.email.toLowerCase();
+      return name.includes(searchTerm) || email.includes(searchTerm);
+    });
+  }
+
+  if (segment) {
+    filteredData = filteredData.filter((c) => c.segment === segment);
+  }
+
+  if (sortBy) {
+    const direction = sortOrder === "asc" ? 1 : -1;
+    filteredData = [...filteredData].sort((a, b) => {
+      const aVal = a[sortBy as keyof typeof a];
+      const bVal = b[sortBy as keyof typeof b];
+
+      if (aVal === undefined || bVal === undefined) return 0;
+      if (aVal === bVal) return 0;
+      return aVal > bVal ? direction : -direction;
+    });
+  }
+
+  const total = filteredData.length;
+  const totalPages = total > 0 ? Math.ceil(total / pageSize) : 0;
+  const safePage = totalPages > 0 ? Math.min(page, totalPages) : 1;
+  const startIndex = (safePage - 1) * pageSize;
+  const paginatedData = filteredData.slice(startIndex, startIndex + pageSize);
+
+  return {
+    page: paginatedData,
+    continueCursor: END_CURSOR,
+    isDone: true,
+    data: paginatedData,
+    pagination: {
+      page: safePage,
+      pageSize,
+      total,
+      totalPages,
+    },
+  };
+}
+
+// Customer pagination helpers
+type CustomerCursorState = {
+  dbCursor: string | null;
+  carryIds: string[];
+};
+
+type TimestampRange = {
+  start: number;
+  end: number;
+};
+
+function normalizeDateRange(
+  range?: { startDate: string; endDate: string },
+): TimestampRange | undefined {
+  if (!range) return undefined;
+
+  const start = new Date(range.startDate).getTime();
+  const endExclusive = new Date(range.endDate).getTime() + 24 * 60 * 60 * 1000;
+
+  if (Number.isNaN(start) || Number.isNaN(endExclusive)) {
+    return undefined;
+  }
+
+  return {
+    start,
+    end: endExclusive - 1,
+  };
+}
+
+function isTimestampInRange(timestamp: number, range: TimestampRange): boolean {
+  return timestamp >= range.start && timestamp <= range.end;
+}
+
+function decodeCustomerCursor(cursor: string | null): CustomerCursorState {
+  if (!cursor || cursor === END_CURSOR) {
+    return { dbCursor: null, carryIds: [] };
+  }
+
+  try {
+    const parsed = JSON.parse(cursor) as Partial<CustomerCursorState>;
+
+    if (
+      parsed &&
+      (typeof parsed.dbCursor === "string" || parsed.dbCursor === null) &&
+      Array.isArray(parsed.carryIds)
+    ) {
+      const carry = parsed.carryIds
+        .filter((id): id is string => typeof id === "string" && id.length > 0)
+        .slice(0, MAX_CURSOR_CARRY);
+
+      return {
+        dbCursor: parsed.dbCursor ?? null,
+        carryIds: carry,
+      };
+    }
+  } catch (error) {
+    // Fallback to treat the cursor as a raw Convex cursor
+  }
+
+  return { dbCursor: cursor, carryIds: [] };
+}
+
+function encodeCustomerCursor(state: CustomerCursorState): string {
+  const carry = state.carryIds
+    .filter((id) => typeof id === "string" && id.length > 0)
+    .slice(0, MAX_CURSOR_CARRY);
+  const dbCursor = typeof state.dbCursor === "string" ? state.dbCursor : null;
+
+  if (dbCursor === null && carry.length === 0) {
+    return END_CURSOR;
+  }
+
+  return JSON.stringify({
+    dbCursor,
+    carryIds: carry,
+  });
+}
 
 // Helper function to determine customer segment
 function determineSegment(
@@ -1029,22 +1796,48 @@ export const getGeographicDistribution = query({
       }),
     ),
   }),
-  handler: async (ctx, _args) => {
+  handler: async (ctx, args) => {
     const auth = await getUserAndOrg(ctx);
     if (!auth)
       return { countries: [], cities: [], heatmapData: [] };
 
+    const organizationId = auth.orgId as Id<"organizations">;
+
     // Get customers with addresses
     const customers = await ctx.db
       .query("shopifyCustomers")
-      .withIndex("by_organization", (q) => q.eq("organizationId", auth.orgId as Id<"organizations">))
+      .withIndex("by_organization", (q) => q.eq("organizationId", organizationId))
       .collect();
 
-    // Get all orders for revenue data
-    const orders = await ctx.db
-      .query("shopifyOrders")
-      .withIndex("by_organization", (q) => q.eq("organizationId", auth.orgId as Id<"organizations">))
-      .collect();
+    // Get orders scoped to the requested range (default: all time)
+    let orders: Doc<"shopifyOrders">[];
+
+    if (args.dateRange) {
+      const startTime = new Date(args.dateRange.startDate).getTime();
+      const endTime =
+        new Date(args.dateRange.endDate).getTime() + 24 * 60 * 60 * 1000 - 1;
+
+      orders = await ctx.db
+        .query("shopifyOrders")
+        .withIndex("by_organization_and_created", (q) =>
+          q
+            .eq("organizationId", organizationId)
+            .gte("shopifyCreatedAt", startTime)
+            .lte("shopifyCreatedAt", endTime),
+        )
+        .collect();
+    } else {
+      orders = await ctx.db
+        .query("shopifyOrders")
+        .withIndex("by_organization", (q) =>
+          q.eq("organizationId", organizationId),
+        )
+        .collect();
+    }
+
+    if (orders.length === 0) {
+      return { countries: [], cities: [], heatmapData: [] };
+    }
 
     // Group orders by customer
     const customerOrdersMap = new Map<string, typeof orders>();
@@ -1056,6 +1849,10 @@ export const getGeographicDistribution = query({
         }
         customerOrdersMap.get(order.customerId)?.push(order);
       }
+    }
+
+    if (customerOrdersMap.size === 0) {
+      return { countries: [], cities: [], heatmapData: [] };
     }
 
     // Group by country
@@ -1091,17 +1888,19 @@ export const getGeographicDistribution = query({
     >();
 
     customers.forEach((customer) => {
+      const customerOrders = customerOrdersMap.get(customer._id);
+      if (!customerOrders || customerOrders.length === 0) return;
+
       const country = customer.defaultAddress?.country || "Unknown";
       const city = customer.defaultAddress?.city || "Unknown";
       const zip = customer.defaultAddress?.zip?.trim();
-      const customerOrders = customerOrdersMap.get(customer._id) || [];
 
-      // Calculate customer metrics from orders
-      const lifetimeValue = customerOrders.reduce(
+      // Calculate metrics from orders within the selected window
+      const periodRevenue = customerOrders.reduce(
         (sum, o) => sum + (o.totalPrice || 0),
         0,
       );
-      const lifetimeOrders = customerOrders.length;
+      const periodOrders = customerOrders.length;
 
       // Country aggregation
       if (!countryMap.has(country)) {
@@ -1115,8 +1914,8 @@ export const getGeographicDistribution = query({
       const countryData = countryMap.get(country);
       if (countryData) {
         countryData.customers++;
-        countryData.revenue += lifetimeValue;
-        countryData.orders += lifetimeOrders;
+        countryData.revenue += periodRevenue;
+        countryData.orders += periodOrders;
       }
 
       // City aggregation
@@ -1133,7 +1932,7 @@ export const getGeographicDistribution = query({
       const cityData = cityMap.get(cityKey);
       if (cityData) {
         cityData.customers++;
-        cityData.revenue += lifetimeValue;
+        cityData.revenue += periodRevenue;
       }
 
       if (zip) {
@@ -1155,7 +1954,7 @@ export const getGeographicDistribution = query({
           const zipData = countryZipMap.get(zip);
           if (zipData) {
             zipData.customers += 1;
-            zipData.revenue += lifetimeValue;
+            zipData.revenue += periodRevenue;
 
             if (!zipData.city && customer.defaultAddress?.city) {
               zipData.city = customer.defaultAddress.city;
@@ -1350,5 +2149,103 @@ export const getCustomerJourney = query({
       customers: Math.round(stage.customers),
       percentage: Math.round((stage.customers / firstStageCustomers) * 100),
     }));
+  },
+});
+
+export const getAnalytics = action({
+  args: {
+    dateRange: v.object({
+      startDate: v.string(),
+      endDate: v.string(),
+    }),
+    page: v.optional(v.number()),
+    pageSize: v.optional(v.number()),
+    searchTerm: v.optional(v.string()),
+    segment: v.optional(v.string()),
+    sortBy: v.optional(v.string()),
+    sortOrder: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
+  },
+  returns: v.union(
+    v.null(),
+    v.object({
+      dateRange: v.object({ startDate: v.string(), endDate: v.string() }),
+      organizationId: v.string(),
+      result: customerAnalyticsResultValidator,
+    }),
+  ),
+  handler: async (ctx, args): Promise<
+    | {
+        dateRange: { startDate: string; endDate: string };
+        organizationId: string;
+        result: CustomerAnalyticsResult;
+      }
+    | null
+  > => {
+    const auth = await getUserAndOrg(ctx);
+    if (!auth) return null;
+
+    const page = Math.max(1, Math.floor(args.page ?? 1));
+    const pageSize = Math.min(
+      Math.max(args.pageSize ?? 50, 1),
+      MAX_CUSTOMER_PAGE_SIZE,
+    );
+    const searchTerm = args.searchTerm?.trim()
+      ? args.searchTerm.trim()
+      : undefined;
+    const sortOrder = args.sortOrder ?? "desc";
+
+    const [overview, cohorts, customerList, geographic, journey] =
+      await Promise.all([
+        ctx.runQuery(api.web.customers.getCustomerOverview, {
+          dateRange: args.dateRange,
+        }),
+        ctx.runQuery(api.web.customers.getCohortAnalysis, {
+          dateRange: args.dateRange,
+          cohortType: "monthly",
+        }),
+        ctx.runQuery(api.web.customers.getCustomerList, {
+          dateRange: args.dateRange,
+          page,
+          pageSize,
+          searchTerm,
+          segment: args.segment,
+          sortBy: args.sortBy,
+          sortOrder,
+        }),
+        ctx.runQuery(api.web.customers.getGeographicDistribution, {
+          dateRange: args.dateRange,
+        }),
+        ctx.runQuery(api.web.customers.getCustomerJourney, {
+          dateRange: args.dateRange,
+        }),
+      ]);
+
+    const listEntries = (customerList?.data ?? customerList?.page ?? []) as CustomerListEntry[];
+    const pagination = customerList?.pagination ?? {
+      page,
+      pageSize,
+      total: listEntries.length,
+      totalPages: Math.max(1, Math.ceil(Math.max(listEntries.length, 1) / pageSize)),
+    };
+
+    const customersData = customerList
+      ? {
+          data: listEntries,
+          pagination,
+          continueCursor: customerList.continueCursor,
+        }
+      : null;
+
+    return {
+      dateRange: args.dateRange,
+      organizationId: auth.orgId,
+      result: {
+        overview: overview ?? null,
+        cohorts: cohorts ?? [],
+        customerList: customersData,
+        geographic: geographic ?? null,
+        journey: journey ?? [],
+      },
+    };
   },
 });

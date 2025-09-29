@@ -1,7 +1,34 @@
 import { v } from "convex/values";
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import { mutation, query } from "../_generated/server";
 import { getUserAndOrg, requireUserAndOrg } from "../utils/auth";
+
+type SyncPlatform = "shopify" | "meta";
+type SyncStatus =
+  | "pending"
+  | "processing"
+  | "syncing"
+  | "completed"
+  | "failed"
+  | "cancelled";
+
+function isSyncPlatform(value: string): value is SyncPlatform {
+  return value === "shopify" || value === "meta";
+}
+
+function isSyncStatus(value: string): value is SyncStatus {
+  switch (value) {
+    case "pending":
+    case "processing":
+    case "syncing":
+    case "completed":
+    case "failed":
+    case "cancelled":
+      return true;
+    default:
+      return false;
+  }
+}
 
 /**
  * Sync Control API
@@ -28,19 +55,27 @@ export const getActiveSyncSessions = query({
     const auth = await getUserAndOrg(ctx);
     if (!auth) return [];
 
-    // Get active sync sessions (pending or syncing)
-    const sessions = await ctx.db
-      .query("syncSessions")
-      .withIndex("by_organization", (q) => q.eq("organizationId", auth.orgId as Id<"organizations">))
-      .collect()
-      .then((allSessions) =>
-        allSessions.filter(
-          (s) =>
-            s.status === "pending" ||
-            s.status === "syncing" ||
-            s.status === "processing",
-        ),
-      );
+    const ACTIVE_STATUSES = ["pending", "processing", "syncing"] as const;
+    const PER_STATUS_LIMIT = 25;
+
+    const sessionGroups = await Promise.all(
+      ACTIVE_STATUSES.map((status) =>
+        ctx.db
+          .query("syncSessions")
+          .withIndex("by_org_status_and_startedAt", (q) =>
+            q
+              .eq("organizationId", auth.orgId as Id<"organizations">)
+              .eq("status", status),
+          )
+          .order("desc")
+          .take(PER_STATUS_LIMIT),
+      ),
+    );
+
+    const sessions = sessionGroups
+      .flat()
+      .sort((a, b) => (b.startedAt || 0) - (a.startedAt || 0))
+      .slice(0, 50);
 
     return sessions.map((session) => ({
       id: session._id,
@@ -78,24 +113,59 @@ export const getSyncSessions = query({
     const auth = await getUserAndOrg(ctx);
     if (!auth) return [];
 
-    const allSessions = await ctx.db
-      .query("syncSessions")
-      .withIndex("by_organization", (q) => q.eq("organizationId", auth.orgId as Id<"organizations">))
-      .collect();
+    const orgId = auth.orgId as Id<"organizations">;
+    const MAX_LIMIT = 200;
+    const DEFAULT_LIMIT = 50;
+    const limit = args.limit && args.limit > 0
+      ? Math.min(Math.floor(args.limit), MAX_LIMIT)
+      : DEFAULT_LIMIT;
+    const platformFilter =
+      args.platform && typeof args.platform === "string" && isSyncPlatform(args.platform)
+        ? args.platform
+        : undefined;
+    const statusFilter =
+      args.status && typeof args.status === "string" && isSyncStatus(args.status)
+        ? args.status
+        : undefined;
 
-    // Optional filters
-    let filtered = allSessions;
-    if (args.platform) {
-      filtered = filtered.filter((s) => s.platform === args.platform);
-    }
-    if (args.status) {
-      filtered = filtered.filter((s) => s.status === args.status);
+    let sessions: Array<Doc<"syncSessions">> = [];
+
+    if (platformFilter && statusFilter) {
+      sessions = await ctx.db
+        .query("syncSessions")
+        .withIndex("by_org_platform_status_and_startedAt", (q) =>
+          q
+            .eq("organizationId", orgId)
+            .eq("platform", platformFilter)
+            .eq("status", statusFilter),
+        )
+        .order("desc")
+        .take(limit);
+    } else if (platformFilter) {
+      sessions = await ctx.db
+        .query("syncSessions")
+        .withIndex("by_org_platform_and_date", (q) =>
+          q.eq("organizationId", orgId).eq("platform", platformFilter),
+        )
+        .order("desc")
+        .take(limit);
+    } else if (statusFilter) {
+      sessions = await ctx.db
+        .query("syncSessions")
+        .withIndex("by_org_status_and_startedAt", (q) =>
+          q.eq("organizationId", orgId).eq("status", statusFilter),
+        )
+        .order("desc")
+        .take(limit);
+    } else {
+      sessions = await ctx.db
+        .query("syncSessions")
+        .withIndex("by_org_and_startedAt", (q) => q.eq("organizationId", orgId))
+        .order("desc")
+        .take(limit);
     }
 
-    // Sort by most recent start time and respect limit
-    const limited = filtered
-      .sort((a, b) => (b.startedAt || 0) - (a.startedAt || 0))
-      .slice(0, args.limit || 50);
+    const limited = sessions.sort((a, b) => (b.startedAt || 0) - (a.startedAt || 0));
 
     return limited.map((session) => ({
       id: session._id,
@@ -315,16 +385,16 @@ export const getSyncStatistics = query({
       new Date(dateRange.endDate || new Date().toISOString().substring(0, 10)).getTime() +
       24 * 60 * 60 * 1000; // Include end date
 
-    // Get sessions for organization within date range
+    // Get sessions for organization within date range using indexed filtering
     const sessions = await ctx.db
       .query("syncSessions")
-      .withIndex("by_organization", (q) => q.eq("organizationId", auth.orgId as Id<"organizations">))
-      .collect()
-      .then((allSessions) =>
-        allSessions.filter(
-          (s) => s.startedAt >= startTime && s.startedAt <= endTime,
-        ),
-      );
+      .withIndex("by_org_and_startedAt", (q) =>
+        q
+          .eq("organizationId", auth.orgId as Id<"organizations">)
+          .gte("startedAt", startTime)
+          .lte("startedAt", endTime),
+      )
+      .collect();
 
     // Calculate statistics
     const stats = {

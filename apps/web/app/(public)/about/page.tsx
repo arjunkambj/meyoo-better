@@ -2,7 +2,7 @@
 
 import { Card, CardBody, Divider } from "@heroui/react";
 import { Icon } from "@iconify/react";
-
+import { designSystem } from "@/libs/design-system";
 import CTAButton from "@/components/home/components/CTAButton";
 
 const values = [
@@ -32,22 +32,19 @@ const milestones = [
 
 export default function AboutPage() {
   return (
-    <div className="min-h-screen bg-background pt-28">
+    <div className={`min-h-screen ${designSystem.background.gradient} pt-28`}>
       {/* Hero Section */}
-      <section className="relative py-20 px-4">
+      <section className={`relative ${designSystem.spacing.section} px-4`}>
         <div className="max-w-4xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 bg-primary/10 border border-primary/20 rounded-full px-4 py-2 mb-6">
-            <Icon
-              className="text-primary"
-              icon="solar:buildings-bold"
-              width={16}
-            />
-            <span className="text-sm font-semibold text-default-700">
+          <div className={designSystem.typography.sectionChip}>
+            <span className="text-sm uppercase tracking-[0.15em] font-medium text-primary/70">
               About
             </span>
           </div>
-          <h1 className="text-5xl font-bold mb-4">Real Profit Intelligence</h1>
-          <p className="text-xl text-default-600">
+          <h1 className={`${designSystem.typography.sectionTitle} mb-6`}>
+            Real Profit Intelligence
+          </h1>
+          <p className={designSystem.typography.sectionSubtitle}>
             Helping e-commerce brands track what really matters.
           </p>
         </div>
@@ -58,10 +55,10 @@ export default function AboutPage() {
         <div className="max-w-4xl mx-auto">
           {/* Our Story */}
           <div className="mb-12">
-            <h2 className="text-2xl font-bold mb-6">Our Story</h2>
-            <Card className="bg-content1 border border-divider rounded-2xl">
+            <h2 className="text-2xl font-bold mb-6 text-foreground">Our Story</h2>
+            <Card className={`${designSystem.card.base} rounded-3xl p-1.5`}>
               <CardBody className="p-8">
-                <div className="space-y-4 text-default-700">
+                <div className="space-y-4 text-muted-foreground leading-relaxed">
                   <p>
                     We spent years in spreadsheets trying to calculate real
                     profits after ad spend, shipping, and fees.
@@ -79,16 +76,16 @@ export default function AboutPage() {
             </Card>
           </div>
 
-          <Divider className="my-12" />
+          <Divider className="my-12 bg-default-100" />
 
           {/* Our Values */}
           <div className="mb-12">
-            <h2 className="text-2xl font-bold mb-6">Values</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <h2 className="text-2xl font-bold mb-6 text-foreground">Values</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               {values.map((value) => (
                 <Card
                   key={value.title}
-                  className="bg-content1 border border-divider rounded-2xl"
+                  className={`${designSystem.card.base} rounded-3xl p-1.5 transition-all duration-300 hover:scale-[1.02]`}
                 >
                   <CardBody className="p-6">
                     <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
@@ -101,7 +98,7 @@ export default function AboutPage() {
                     <h3 className="font-semibold text-foreground mb-2">
                       {value.title}
                     </h3>
-                    <p className="text-sm text-default-600">
+                    <p className="text-sm text-muted-foreground leading-relaxed">
                       {value.description}
                     </p>
                   </CardBody>
@@ -110,35 +107,35 @@ export default function AboutPage() {
             </div>
           </div>
 
-          <Divider className="my-12" />
+          <Divider className="my-12 bg-default-100" />
 
           {/* Timeline */}
           <div className="mb-12">
-            <h2 className="text-2xl font-bold mb-6">Timeline</h2>
+            <h2 className="text-2xl font-bold mb-6 text-foreground">Timeline</h2>
             <div className="space-y-4">
               {milestones.map((milestone) => (
                 <div
                   key={`${milestone.year}-${milestone.event}`}
-                  className="flex items-center gap-4 p-4 bg-content1 border border-divider rounded-xl"
+                  className={`${designSystem.card.base} flex items-center gap-4 p-4 rounded-2xl transition-all duration-300 hover:scale-[1.01]`}
                 >
                   <div className="w-16 text-primary font-bold">
                     {milestone.year}
                   </div>
-                  <Divider className="h-6" orientation="vertical" />
-                  <p className="text-default-700">{milestone.event}</p>
+                  <Divider className="h-6 bg-default-100" orientation="vertical" />
+                  <p className="text-muted-foreground">{milestone.event}</p>
                 </div>
               ))}
             </div>
           </div>
 
-          <Divider className="my-12" />
+          <Divider className="my-12 bg-default-100" />
 
           {/* Company Info */}
           <div className="mb-12">
-            <Card className="bg-content1 border border-divider rounded-2xl">
+            <Card className={`${designSystem.card.base} rounded-3xl p-1.5`}>
               <CardBody className="p-8">
                 <h3 className="font-semibold text-foreground mb-4">Company</h3>
-                <p className="text-default-600 text-sm">
+                <p className="text-muted-foreground text-sm leading-relaxed">
                   Pyro Labs Private Limited
                   <br />
                   Operating as Meyoo
@@ -151,17 +148,19 @@ export default function AboutPage() {
 
           {/* CTA */}
           <div className="text-center">
-            <div className="bg-content1 border border-divider rounded-2xl p-8">
-              <h3 className="text-2xl font-bold mb-3">
-                Ready to track real profit?
-              </h3>
-              <p className="text-default-600 mb-6">
-                Join 500+ stores using Meyoo.
-              </p>
-              <CTAButton endIcon="solar:arrow-right-bold" href="/auth">
-                Get Started
-              </CTAButton>
-            </div>
+            <Card className={`${designSystem.card.base} rounded-3xl p-1.5`}>
+              <CardBody className="p-8">
+                <h3 className="text-2xl font-bold mb-3 text-foreground">
+                  Ready to track real profit?
+                </h3>
+                <p className="text-muted-foreground mb-6">
+                  Join 500+ stores using Meyoo.
+                </p>
+                <CTAButton endIcon="solar:arrow-right-bold" href="/auth">
+                  Get Started
+                </CTAButton>
+              </CardBody>
+            </Card>
           </div>
         </div>
       </section>

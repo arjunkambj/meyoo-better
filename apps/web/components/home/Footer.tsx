@@ -15,12 +15,12 @@ const navigationSections = [
     links: footerNavigation.product.slice(0, 4),
   },
   {
-    title: "Resources",
-    links: footerNavigation.resources.slice(0, 4),
-  },
-  {
     title: "Company",
     links: footerNavigation.company.slice(0, 4),
+  },
+  {
+    title: "Legal",
+    links: footerNavigation.legal.slice(0, 5),
   },
 ];
 

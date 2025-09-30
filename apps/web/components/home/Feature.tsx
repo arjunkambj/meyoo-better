@@ -1,12 +1,12 @@
 "use client";
 
 import Image from "next/image";
-
+import { Icon } from "@iconify/react";
 import { designSystem } from "@/libs/design-system";
 
 type FeatureCard = {
   id: number;
-  img: string;
+  icon: string;
   title: string;
   description: string;
   badge: string;
@@ -15,51 +15,51 @@ type FeatureCard = {
 const featureData: FeatureCard[] = [
   {
     id: 1,
-    img: "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&q=80&w=1200",
-    title: "Profit Pulse dashboard",
+    icon: "solar:chart-bold-duotone",
+    title: "Real Profit Dashboard",
     description:
-      "See covers, spend, and net margin in one snapshot so you can coach the shift before it ends.",
-    badge: "Live Ops",
+      "See your actual profit after all expenses in one place. Track revenue, costs, margins, and ROI—no more guessing if you're profitable.",
+    badge: "Live Insights",
   },
   {
     id: 2,
-    img: "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&q=80&w=1200",
-    title: "Menu intel, no spreadsheets",
+    icon: "solar:graph-new-bold-duotone",
+    title: "100+ Analytics Metrics",
     description:
-      "Meyoo surfaces top sellers, low performers, and real food cost so your menu decisions are quick and data backed.",
-    badge: "Menu Science",
+      "Track customer behavior, inventory levels, marketing performance, and more. Everything updates automatically from your connected platforms.",
+    badge: "Deep Analytics",
   },
   {
     id: 3,
-    img: "https://images.unsplash.com/photo-1542831371-29b0f74f9713?auto=format&fit=crop&q=80&w=1200",
-    title: "Team pacing alerts",
+    icon: "solar:chat-round-line-bold-duotone",
+    title: "Meyoo AI Copilot",
     description:
-      "Notifications keep FOH and BOH aligned on ticket times, so service feels effortless even when slammed.",
-    badge: "Guest Flow",
+      "Chat with an AI that knows your business inside out. Ask questions, get insights, and make data-driven decisions faster than ever.",
+    badge: "AI Powered",
   },
   {
     id: 4,
-    img: "https://images.unsplash.com/photo-1521119989659-a83eee488004?auto=format&fit=crop&q=80&w=1200",
-    title: "Shift recap, auto-delivered",
+    icon: "solar:box-bold-duotone",
+    title: "Track Inventory & Orders",
     description:
-      "Every morning you get a digest with labor, sales, and comps so you can make the call before the next service.",
-    badge: "Daily Digest",
-  },
-  {
-    id: 5,
-    img: "https://images.unsplash.com/photo-1481833761820-0509d3217039?auto=format&fit=crop&q=80&w=1200",
-    title: "Inventory that updates itself",
-    description:
-      "Connect vendors once and Meyoo keeps pars, price changes, and reorder points synced for you.",
+      "Monitor stock levels and order fulfillment in real-time. Get alerts when products are running low and track order status from purchase to delivery.",
     badge: "Smart Stock",
   },
   {
-    id: 6,
-    img: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&q=80&w=1200",
-    title: "Service standards, standardized",
+    id: 5,
+    icon: "solar:link-circle-bold-duotone",
+    title: "MCP Integration",
     description:
-      "Roll out updated playbooks to every location and watch adoption in real time with task tracking.",
-    badge: "Playbooks",
+      "Connect your data to Claude, ChatGPT, and other AI tools via MCP (Model Context Protocol). Your business intelligence follows you everywhere.",
+    badge: "AI Tools",
+  },
+  {
+    id: 6,
+    icon: "solar:phone-bold-duotone",
+    title: "Mobile App",
+    description:
+      "Access your dashboard anywhere. Check profits, monitor orders, and get real-time alerts on the go. Your entire business in your pocket.",
+    badge: "On The Go",
   },
 ];
 
@@ -89,16 +89,13 @@ const Feature = () => {
               key={item.id}
               className={`${designSystem.card.base} group relative flex h-full flex-col rounded-3xl p-1.5 transition-all duration-300 hover:scale-[1.02]`}
             >
-              <div className="relative aspect-[4/3] overflow-hidden rounded-[20px]">
-                <Image
-                  src={item.img}
-                  alt={item.title}
-                  fill
-                  sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                  className="pointer-events-none object-cover transform transition-transform duration-500 ease-out group-hover:scale-110"
-                  priority={index === 0}
+              <div className="relative aspect-[4/3] overflow-hidden rounded-[20px] bg-gradient-to-br from-primary/10 via-primary/5 to-transparent flex items-center justify-center">
+                <Icon
+                  icon={item.icon}
+                  className="text-primary/40 group-hover:text-primary/60 transition-colors duration-300"
+                  width={120}
+                  height={120}
                 />
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/40 via-black/10 to-transparent" />
               </div>
               <div className="mt-5 w-full space-y-3 p-4">
                 <div className="inline-block rounded-full bg-primary/10 px-3 py-1">

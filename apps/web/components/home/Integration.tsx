@@ -17,9 +17,8 @@ const howItWorks = [
     number: "01",
     title: "Connect Shopify",
     description:
-      "Install Meyoo and sync Shopify. We import orders, products, and customers automatically—no CSV shuffling.",
-    image:
-      "https://images.unsplash.com/photo-1460925895917-afdab827c52f?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80",
+      "Install Meyoo and sync Shopify in one click. We import orders, products, and customers automatically—plus your last 60 days of sales history.",
+    icon: "solar:shop-bold-duotone",
     imageOrder: "order-1",
     contentOrder: "order-2",
   },
@@ -27,9 +26,8 @@ const howItWorks = [
     number: "02",
     title: "Link your ad spend",
     description:
-      "Plug in Meta and Google Ads. We keep spend, ROAS, and conversions in sync so marketing and finance see the same truth.",
-    image:
-      "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80",
+      "Connect Meta and Google Ads to see which campaigns actually drive profit. Track spend, ROAS, and conversions—all in real-time.",
+    icon: "solar:graph-up-bold-duotone",
     imageOrder: "order-2",
     contentOrder: "order-1",
   },
@@ -37,9 +35,8 @@ const howItWorks = [
     number: "03",
     title: "Track profit automatically",
     description:
-      "Set up costs like COGS, shipping, and fees once. Meyoo updates profit and margin every day without extra work.",
-    image:
-      "https://images.unsplash.com/photo-1522071820081-009f0129c71c?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80",
+      "Add your product costs, shipping fees, and expenses once. Meyoo calculates your real profit on every sale automatically—no spreadsheets needed.",
+    icon: "solar:wallet-money-bold-duotone",
     imageOrder: "order-1",
     contentOrder: "order-2",
   },
@@ -112,14 +109,15 @@ const Integration = () => {
             className={`${designSystem.card.base} group w-full rounded-3xl p-1.5 transition-all duration-300 hover:scale-[1.02]`}
           >
             <div className="flex flex-col h-full">
-              <div className={cn("relative overflow-hidden rounded-[20px]", feature.imageOrder)}>
-                <Image
-                  src={feature.image}
-                  height={1000}
-                  width={1000}
-                  className="h-64 w-full sm:h-72 object-cover transform transition-transform duration-500 ease-out group-hover:scale-110"
-                  alt="thumbnail"
-                />
+              <div className={cn("relative overflow-hidden rounded-[20px] bg-gradient-to-br from-primary/10 via-primary/5 to-transparent", feature.imageOrder)}>
+                <div className="h-64 w-full sm:h-72 flex items-center justify-center">
+                  <Icon
+                    icon={feature.icon}
+                    className="text-primary/40 group-hover:text-primary/60 transition-all duration-500 ease-out group-hover:scale-110"
+                    width={120}
+                    height={120}
+                  />
+                </div>
                 <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
                 <div className="absolute top-4 left-4 bg-background/90 backdrop-blur-sm rounded-full px-4 py-1.5">
                   <p className="text-xs uppercase tracking-[0.15em] text-primary font-semibold">

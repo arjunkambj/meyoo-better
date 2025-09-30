@@ -87,15 +87,14 @@ const Hero = () => {
             className="relative flex justify-center lg:justify-end px-2 sm:px-0"
           >
             <Card className="relative h-[320px] w-full max-w-[720px] rounded-2xl sm:rounded-3xl bg-gradient-to-br from-muted/40 to-muted/20 p-1 sm:p-1.5 backdrop-blur-sm sm:h-[420px] md:h-[560px] lg:h-[640px] ring-1 ring-default-100">
-              <CardBody className="relative size-full rounded-[16px] sm:rounded-[20px] bg-gradient-to-br from-background via-background to-muted/10 overflow-hidden p-2 sm:p-4">
-                <div className="absolute inset-0 bg-gradient-to-tr from-primary/5 via-transparent to-secondary/5" />
+              <CardBody className="relative size-full rounded-[16px] sm:rounded-[20px] bg-gradient-to-br from-background via-background to-muted/10 overflow-hidden p-0">
+                <div className="absolute inset-0 bg-gradient-to-tr from-primary/5 via-transparent to-secondary/5 pointer-events-none z-10" />
                 <Image
-                  alt="Dashboard preview"
-                  className="size-full rounded-xl sm:rounded-2xl object-cover transition-transform duration-300 hover:scale-[1.02]"
+                  alt="Meyoo Analytics Dashboard - Real-time profit tracking"
+                  className="size-full rounded-xl sm:rounded-2xl object-cover object-left-top transition-transform duration-300 hover:scale-[1.02]"
                   fill
                   priority
-                  src="https://deifkwefumgah.cloudfront.net/shadcnblocks/block/placeholder-1.svg"
-                  unoptimized
+                  src="/screencapture-localhost-3000-overview-2025-09-30-13_56_07.png"
                 />
               </CardBody>
             </Card>

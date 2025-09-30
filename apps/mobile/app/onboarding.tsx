@@ -1,9 +1,10 @@
-import { Button, Card, Chip, useTheme } from "heroui-native";
+import { Button, Card, useTheme } from "heroui-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { View, Text } from "react-native";
+import { View, Text, Alert } from "react-native";
 import Animated, { FadeInDown, FadeIn, ZoomIn } from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
+import { useAuthActions } from "@convex-dev/auth/react";
 
 const FEATURES = [
   { icon: "flash-outline", label: "Fast insights" },
@@ -14,6 +15,25 @@ const FEATURES = [
 export default function OnboardingScreen() {
   const router = useRouter();
   const { colors } = useTheme();
+  const { signOut } = useAuthActions();
+
+  const handleLogout = async () => {
+    Alert.alert(
+      'Log Out',
+      'Are you sure you want to log out?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Log Out',
+          style: 'destructive',
+          onPress: async () => {
+            await signOut();
+            router.replace('/');
+          },
+        },
+      ]
+    );
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-background">
@@ -28,28 +48,15 @@ export default function OnboardingScreen() {
         />
       </View>
 
-      <View className="flex-1 px-6 py-12 justify-center">
+      <View className="flex-1 px-6 py-12 justify-between">
         <Animated.View
           entering={FadeIn.duration(600)}
-          className="gap-8"
+          className="gap-8 flex-1 justify-center"
         >
-          {/* Top Badge */}
-          <Animated.View
-            entering={FadeInDown.duration(400).delay(100)}
-            className="items-center"
-          >
-            <Chip
-              size="sm"
-              className="bg-accent/10 border border-accent/20"
-            >
-              <Text className="text-xs font-semibold text-accent">Mobile Experience</Text>
-            </Chip>
-          </Animated.View>
-
           {/* Main Card */}
           <Animated.View entering={FadeInDown.duration(500).delay(200)}>
-            <Card surfaceVariant="2" className="rounded-3xl border border-border/50">
-              <View className="gap-6 items-center p-6">
+            <Card surfaceVariant="2" className="rounded-2xl border border-border/50">
+              <View className="gap-6 items-center px-6 py-6">
                 {/* Icon with Gradient Border */}
                 <Animated.View
                   entering={ZoomIn.duration(600).delay(400)}
@@ -99,29 +106,22 @@ export default function OnboardingScreen() {
             ))}
           </Animated.View>
 
-          {/* Action Buttons */}
-          <Animated.View
-            entering={FadeInDown.duration(500).delay(800)}
-            className="gap-3"
+        </Animated.View>
+
+        {/* Logout Button at Bottom */}
+        <Animated.View
+          entering={FadeInDown.duration(500).delay(800)}
+        >
+          <Button
+            className="h-12"
+            variant="ghost"
+            onPress={handleLogout}
           >
-            <Button
-              className="h-12"
-              variant="primary"
-              onPress={() => router.replace("/(tabs)/overview")}
-            >
-              <Button.LabelContent>Jump to dashboard</Button.LabelContent>
-              <Button.EndContent>
-                <Ionicons name="arrow-forward" size={18} color={colors.accentForeground} />
-              </Button.EndContent>
-            </Button>
-            <Button
-              className="h-12"
-              variant="ghost"
-              onPress={() => router.push("/")}
-            >
-              Back to sign in
-            </Button>
-          </Animated.View>
+            <Button.StartContent>
+              <Ionicons name="log-out-outline" size={18} color={colors.foreground} />
+            </Button.StartContent>
+            <Button.LabelContent>Log Out</Button.LabelContent>
+          </Button>
         </Animated.View>
       </View>
     </SafeAreaView>

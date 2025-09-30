@@ -8,29 +8,35 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Card, Skeleton, Spinner } from 'heroui-native';
+import { Spinner } from 'heroui-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAgent, type AgentUIMessage } from '@/hooks/useAgent';
 
+const SUGGESTION_PROMPTS = [
+  "Optimize high inventory saree shapewear",
+  "Analyze Premium Sh...",
+  "What's new?",
+];
+
 function MessageBubble({ message }: { message: AgentUIMessage }) {
   const isUser = message.role === 'user';
 
   return (
     <View
-      className={`flex-row ${isUser ? 'justify-end' : 'justify-start'} mb-3`}
+      className={`flex-row ${isUser ? 'justify-end' : 'justify-start'} mb-4`}
     >
       <View
-        className={`max-w-[80%] px-4 py-3 rounded-2xl ${
+        className={`max-w-[85%] px-4 py-3 rounded-3xl ${
           isUser
             ? 'bg-primary rounded-br-md'
             : 'bg-surface-2 rounded-bl-md'
         }`}
       >
         <Text
-          className={`text-sm ${
+          className={`text-base leading-6 ${
             isUser ? 'text-white' : 'text-foreground'
           }`}
         >
@@ -61,18 +67,18 @@ export function AgentChatScreen() {
     loadMoreMessages,
   } = useAgent({ threadId });
 
-  const handleSend = useCallback(async () => {
-    const trimmed = message.trim();
-    if (!trimmed || isSending) return;
+  const handleSend = useCallback(async (text?: string) => {
+    const messageToSend = text || message.trim();
+    if (!messageToSend || isSending) return;
 
     setMessage('');
     setIsTyping(true);
 
     try {
       const result = await sendMessage({
-        message: trimmed,
+        message: messageToSend,
         threadId,
-        title: trimmed.slice(0, 40),
+        title: messageToSend.slice(0, 40),
       });
 
       // If this was a new chat, update URL with the new thread ID
@@ -81,14 +87,22 @@ export function AgentChatScreen() {
       }
     } catch (error) {
       console.error('Failed to send message:', error);
-      setMessage(trimmed); // Restore message on error
+      if (!text) setMessage(messageToSend); // Restore message on error only if typed
     } finally {
       setIsTyping(false);
     }
   }, [message, isSending, sendMessage, threadId, router]);
 
+  const handleSuggestionPress = useCallback((suggestion: string) => {
+    handleSend(suggestion);
+  }, [handleSend]);
+
   const handleBack = useCallback(() => {
     router.back();
+  }, [router]);
+
+  const handleNewChat = useCallback(() => {
+    router.push('/agent');
   }, [router]);
 
   const handleLoadMore = useCallback(() => {
@@ -108,32 +122,45 @@ export function AgentChatScreen() {
 
   const canLoadMore = messagesStatus === 'CanLoadMore';
   const isLoadingMore = messagesStatus === 'LoadingMore';
+  const showEmpty = (!messages || messages.length === 0) && !isLoadingMessages;
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={['top']}>
       {/* Header */}
-      <View className="flex-row items-center px-4 py-3 border-b border-default-100">
-        <TouchableOpacity onPress={handleBack} className="p-2 -ml-2">
-          <Ionicons name="arrow-back" size={24} color="#666" />
+      <View className="flex-row items-center justify-between px-4 py-3">
+        <TouchableOpacity
+          onPress={handleBack}
+          className="h-10 w-10 rounded-full bg-surface-2 items-center justify-center"
+        >
+          <Ionicons name="chevron-back" size={24} color="#666" />
         </TouchableOpacity>
-        <View className="flex-1 ml-3">
-          <Text className="text-lg font-semibold text-foreground">
-            Meyoo Agent
-          </Text>
-          <Text className="text-xs text-default-500">
-            {threadId ? 'Conversation' : 'New Chat'}
-          </Text>
-        </View>
-        <View className="flex-row items-center gap-2">
-          {isSending && <Spinner size="sm" />}
-        </View>
+
+        <TouchableOpacity className="flex-1 mx-3">
+          <View className="flex-row items-center justify-center gap-1">
+            <Text className="text-lg font-semibold text-foreground">
+              {threadId ? 'Conversation' : 'New conversation'}
+            </Text>
+            <Ionicons name="chevron-down" size={20} color="#666" />
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={handleNewChat}
+          className="h-10 w-10 rounded-full bg-surface-2 items-center justify-center"
+        >
+          <Ionicons name="create-outline" size={22} color="#666" />
+        </TouchableOpacity>
       </View>
 
       {/* Messages */}
       <ScrollView
         ref={scrollViewRef}
         className="flex-1"
-        contentContainerStyle={{ padding: 16, paddingBottom: 8 }}
+        contentContainerStyle={{
+          flexGrow: 1,
+          padding: 16,
+          paddingBottom: 8,
+        }}
         keyboardShouldPersistTaps="handled"
       >
         {canLoadMore && (
@@ -147,40 +174,55 @@ export function AgentChatScreen() {
           </TouchableOpacity>
         )}
 
-        {isLoadingMessages && (!messages || messages.length === 0) ? (
-          <View className="gap-3">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <Skeleton
-                key={i}
-                className={`h-16 rounded-2xl ${
-                  i % 2 === 0 ? 'self-start w-3/4' : 'self-end w-2/3'
-                }`}
-              />
-            ))}
-          </View>
-        ) : !messages || messages.length === 0 ? (
-          <Card surfaceVariant="1" className="mt-8">
-            <Card.Body className="items-center py-6">
-              <View className="items-center gap-3">
-                <View className="h-12 w-12 rounded-full bg-primary-100 items-center justify-center">
-                  <Ionicons name="sparkles" size={24} color="#6366f1" />
-                </View>
-                <Card.Title>Start a Conversation</Card.Title>
-                <Card.Description className="text-center px-4">
-                  Ask about your Shopify data, marketing campaigns, sync status, or anything else you need help with.
-                </Card.Description>
+        {showEmpty ? (
+          <View className="flex-1 items-center justify-center gap-8 px-6">
+            {/* Mascot Icon */}
+            <View className="items-center gap-4">
+              <View className="h-20 w-20 rounded-full bg-primary items-center justify-center">
+                <Text className="text-4xl">🤖</Text>
               </View>
-            </Card.Body>
-          </Card>
+              <View className="items-center gap-2">
+                <Text className="text-2xl font-bold text-foreground">
+                  Hey Bold
+                </Text>
+                <Text className="text-xl font-semibold text-primary">
+                  How can I help?
+                </Text>
+              </View>
+            </View>
+
+            {/* Suggestion Pills */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: 8, gap: 12 }}
+            >
+              {SUGGESTION_PROMPTS.map((prompt, index) => (
+                <TouchableOpacity
+                  key={index}
+                  onPress={() => handleSuggestionPress(prompt)}
+                  className="px-5 py-3 bg-surface-2 rounded-full border border-border/40"
+                  activeOpacity={0.7}
+                >
+                  <View className="flex-row items-center gap-2">
+                    <View className="h-2 w-2 rounded-full bg-primary" />
+                    <Text className="text-sm text-foreground">
+                      {prompt}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
         ) : (
           <>
-            {messages.map((msg) => (
+            {messages?.map((msg) => (
               <MessageBubble key={msg.id} message={msg} />
             ))}
             {isTyping && (
-              <View className="flex-row justify-start mb-3">
-                <View className="bg-surface-2 px-4 py-3 rounded-2xl rounded-bl-md">
-                  <View className="flex-row gap-1">
+              <View className="flex-row justify-start mb-4">
+                <View className="bg-surface-2 px-4 py-3 rounded-3xl rounded-bl-md">
+                  <View className="flex-row gap-1.5">
                     <View className="w-2 h-2 bg-default-400 rounded-full animate-pulse" />
                     <View className="w-2 h-2 bg-default-400 rounded-full animate-pulse" style={{ animationDelay: '150ms' }} />
                     <View className="w-2 h-2 bg-default-400 rounded-full animate-pulse" style={{ animationDelay: '300ms' }} />
@@ -197,37 +239,53 @@ export function AgentChatScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
-        <View className="px-4 py-3 border-t border-default-100">
-          <View className="flex-row items-end gap-2">
-            <View className="flex-1 min-h-[44px] max-h-[120px] bg-surface-1 rounded-2xl px-4 py-2">
+        <View className="px-4 py-3 bg-background border-t border-border/20">
+          <View className="flex-row items-end gap-2 px-2">
+            {/* Attachment Button */}
+            <TouchableOpacity className="h-10 w-10 items-center justify-center mb-0.5">
+              <Ionicons name="at" size={24} color="#666" />
+            </TouchableOpacity>
+
+            {/* Link/Attach Button */}
+            <TouchableOpacity className="h-10 w-10 items-center justify-center mb-0.5">
+              <Ionicons name="link" size={24} color="#666" />
+            </TouchableOpacity>
+
+            {/* Input Field */}
+            <View className="flex-1 min-h-[44px] max-h-[120px] bg-surface-1 rounded-3xl px-4 py-2.5 border border-border/40">
               <TextInput
                 ref={inputRef}
                 value={message}
                 onChangeText={setMessage}
-                placeholder="Type a message..."
+                placeholder="Ask anything..."
                 placeholderTextColor="#999"
                 multiline
                 maxLength={1000}
                 className="text-foreground text-base"
-                style={{ minHeight: 28, maxHeight: 100 }}
+                style={{ minHeight: 24, maxHeight: 100 }}
+                onSubmitEditing={() => {
+                  if (message.trim() && !isSending) {
+                    handleSend();
+                  }
+                }}
               />
             </View>
-            <TouchableOpacity
-              onPress={handleSend}
-              disabled={!message.trim() || isSending}
-              className={`h-11 w-11 rounded-full items-center justify-center ${
-                message.trim() && !isSending
-                  ? 'bg-primary'
-                  : 'bg-default-200'
-              }`}
-              activeOpacity={0.7}
-            >
-              <Ionicons
-                name="send"
-                size={20}
-                color={message.trim() && !isSending ? 'white' : '#999'}
-              />
-            </TouchableOpacity>
+
+            {/* Voice/Send Button */}
+            {message.trim() ? (
+              <TouchableOpacity
+                onPress={() => handleSend()}
+                disabled={isSending}
+                className="h-11 w-11 rounded-full bg-primary items-center justify-center"
+                activeOpacity={0.7}
+              >
+                <Ionicons name="arrow-up" size={24} color="white" />
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity className="h-11 w-11 items-center justify-center">
+                <Ionicons name="mic" size={24} color="#666" />
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </KeyboardAvoidingView>

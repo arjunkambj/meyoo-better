@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { View } from 'react-native';
+import { useCallback, useMemo } from 'react';
+import { Text, View } from 'react-native';
 import { Button, TextField, useTheme } from 'heroui-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -18,47 +18,60 @@ export function AgentChatComposer({
   onSend,
   disabled = false,
   loading = false,
-  placeholder = 'Ask a question or describe a task...',
+  placeholder = 'Ask anything…',
 }: AgentChatComposerProps) {
   const { colors } = useTheme();
   const trimmed = useMemo(() => value.trim(), [value]);
   const isSendDisabled = trimmed.length === 0 || disabled || loading;
 
+  const handleKeyPress = useCallback((e: any) => {
+    // On native, we handle this via onSubmitEditing
+    if (!isSendDisabled) {
+      onSend();
+    }
+  }, [isSendDisabled, onSend]);
+
   return (
-    <View className="flex-row items-end gap-2">
-      <View className="flex-1">
+    <View className="w-full">
+      <View className="relative">
         <TextField>
           <TextField.Input
             multiline
-            numberOfLines={2}
+            numberOfLines={3}
+            maxLength={2000}
             value={value}
             onChangeText={onChange}
             placeholder={placeholder}
+            editable={!disabled}
             returnKeyType="send"
             blurOnSubmit={false}
-            onSubmitEditing={() => {
-              if (!isSendDisabled) {
-                onSend();
-              }
-            }}
-            className="rounded-2xl bg-surface-3 border border-border/40 px-4 py-3"
+            onSubmitEditing={handleKeyPress}
+            className="min-h-[60px] rounded-xl bg-default-50 border-2 border-default-200 px-4 py-3 pr-16 pb-14"
+            style={{ maxHeight: 200 }}
           />
         </TextField>
+
+        <View className="absolute right-2.5 bottom-2.5 flex-row items-center gap-1.5">
+          {!loading && value.length > 0 && (
+            <Text className="text-xs text-default-400 mr-1">↵ to send</Text>
+          )}
+          <Button
+            variant="flat"
+            color="primary"
+            size="md"
+            isIconOnly
+            onPress={onSend}
+            isDisabled={isSendDisabled}
+            className="h-10 w-10 rounded-lg"
+          >
+            {loading ? (
+              <Ionicons name="hourglass-outline" size={20} color={colors.accentForeground} />
+            ) : (
+              <Ionicons name="send" size={20} color={isSendDisabled ? colors.muted : colors.accentForeground} />
+            )}
+          </Button>
+        </View>
       </View>
-      <Button
-        variant="primary"
-        size="lg"
-        isIconOnly
-        onPress={onSend}
-        isDisabled={isSendDisabled}
-        className="h-12 w-12 rounded-full"
-      >
-        <Ionicons
-          name={loading ? 'hourglass-outline' : 'send'}
-          size={20}
-          color={isSendDisabled ? colors.muted : colors.accentForeground}
-        />
-      </Button>
     </View>
   );
 }

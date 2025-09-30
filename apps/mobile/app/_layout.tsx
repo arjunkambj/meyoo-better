@@ -32,7 +32,9 @@ export default function RootLayout() {
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="index" />
             <Stack.Screen name="onboarding" />
-            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="overview" />
+            <Stack.Screen name="settings" />
+            <Stack.Screen name="agent" />
           </Stack>
         </AppThemeProvider>
       </SafeAreaProvider>

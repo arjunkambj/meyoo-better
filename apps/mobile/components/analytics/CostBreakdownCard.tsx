@@ -40,35 +40,42 @@ function CostBreakdownCard({ items, currencySymbol = '$' }: CostBreakdownCardPro
     .sort((a, b) => b.value - a.value);
 
   return (
-    <Card surfaceVariant="1">
-      <Card.Body>
-        <View className="gap-5">
+    <Card surfaceVariant="2" className="rounded-2xl border border-border/50">
+      <Card.Body className="px-5 py-5">
+        <View className="gap-4">
           <View className="flex-row items-center justify-between">
-            <Text className="text-lg font-bold text-foreground">Cost Breakdown</Text>
-            <Text className="text-xs text-default-500">{data.length} categories</Text>
+            <View>
+              <Text className="text-lg font-bold text-foreground">Cost Breakdown</Text>
+              <Text className="text-xs text-default-500 mt-0.5">{data.length} categories tracked</Text>
+            </View>
+            <View className="h-10 w-10 rounded-xl bg-orange-500/10 items-center justify-center">
+              <Text className="text-xl">📊</Text>
+            </View>
           </View>
 
           <DonutChart
             data={data}
-            size={240}
-            innerRadius={80}
+            size={220}
+            innerRadius={75}
             totalLabel="Total Costs"
             totalValue={formatCurrency(total, currencySymbol)}
           />
 
-          <View className="mt-1 -mx-1 flex-row flex-wrap">
+          <View className="mt-0 -mx-1.5 flex-row flex-wrap">
             {items.slice(0, 6).map((i) => {
               const pct = total > 0 ? (i.value / total) * 100 : 0;
               return (
-                <View key={i.key} className="w-1/2 px-1 mb-2.5">
-                  <View className="flex-col gap-2 rounded-xl border border-default-100 bg-background px-3 py-2.5">
+                <View key={i.key} className="w-1/2 px-1.5 mb-3">
+                  <View className="flex-col gap-2 rounded-2xl border border-border/40 bg-surface-1 px-3.5 py-2.5">
                     <View className="flex-row items-center gap-2">
-                      <View className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: i.color }} />
-                      <Text className="text-xs font-semibold text-default-700 flex-1" numberOfLines={1}>{i.label}</Text>
+                      <View className="h-3 w-3 rounded-full" style={{ backgroundColor: i.color, shadowColor: i.color, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.4, shadowRadius: 4 }} />
+                      <Text className="text-xs font-bold text-foreground flex-1" numberOfLines={1}>{i.label}</Text>
                     </View>
                     <View className="flex-row items-center justify-between">
-                      <Text className="text-xs font-medium text-default-500">{pct > 0 ? pct.toFixed(1) : '0'}%</Text>
-                      <Text className="text-sm font-bold text-foreground">{i.value > 0 ? formatCurrency(i.value, currencySymbol) : '—'}</Text>
+                      <View className="px-2 py-0.5 rounded-full bg-surface-2">
+                        <Text className="text-xs font-bold text-default-600">{pct > 0 ? pct.toFixed(1) : '0'}%</Text>
+                      </View>
+                      <Text className="text-sm font-black text-foreground">{i.value > 0 ? formatCurrency(i.value, currencySymbol) : '—'}</Text>
                     </View>
                   </View>
                 </View>

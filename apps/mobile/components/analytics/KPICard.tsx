@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text } from 'react-native';
 import { Card, Skeleton } from 'heroui-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export interface KPICardProps {
   title: string;
@@ -77,17 +78,25 @@ export function KPICard({
     return change >= 0 ? 'arrow-up' : 'arrow-down';
   };
 
+  const getGradientColors = () => {
+    if (isPrimary) {
+      return ['#6366f1', '#8b5cf6'];
+    }
+    // Use icon color to create a subtle gradient
+    const baseColor = iconColor || '#6366f1';
+    return [baseColor + '15', baseColor + '08'];
+  };
+
   if (loading) {
     return (
-      <Card surfaceVariant="1" className={isPrimary ? "border border-primary/20" : ""}>
+      <Card surfaceVariant="2" className="rounded-2xl overflow-hidden border border-border/50">
         <Card.Body>
           <View className="gap-3">
             <View className="flex-row items-center justify-between">
               <Skeleton className="h-4 w-24 rounded-md" />
-              <Skeleton className="h-6 w-6 rounded-full" />
+              <Skeleton className="h-4 w-4 rounded-full" />
             </View>
             <Skeleton className={`${isPrimary ? 'h-10' : 'h-9'} w-32 rounded-md`} />
-            <Skeleton className="h-4 w-20 rounded-md" />
           </View>
         </Card.Body>
       </Card>
@@ -95,43 +104,31 @@ export function KPICard({
   }
 
   return (
-    <Card surfaceVariant="1" className={isPrimary ? "border border-primary/20" : ""}>
-      <Card.Body>
-        <View className="gap-3">
+    <Card surfaceVariant="2" className="rounded-2xl overflow-hidden border border-border/50">
+      <LinearGradient
+        colors={getGradientColors()}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+      />
+      <Card.Body className={isPrimary ? 'px-5 py-5' : ''}>
+        <View className={isPrimary ? 'gap-4' : 'gap-3.5'}>
           {/* Header with title and icon */}
           <View className="flex-row items-center justify-between">
-            <Text className="text-xs font-semibold text-default-600 flex-1" numberOfLines={1}>
+            <Text className={`text-xs font-bold uppercase tracking-wider ${isPrimary ? 'text-white/90' : 'text-default-600'} flex-1`} numberOfLines={1}>
               {title}
             </Text>
             {icon && (
-              <Ionicons name={icon} size={24} color={iconColor} />
+              <View className="items-center justify-center">
+                <Ionicons name={icon} size={18} color={isPrimary ? '#ffffff' : iconColor} />
+              </View>
             )}
           </View>
 
           {/* Value */}
-          <Text className={`${isPrimary ? 'text-3xl' : 'text-2xl'} font-bold text-foreground`}>
+          <Text className={`${isPrimary ? 'text-4xl text-white' : 'text-3xl text-foreground'} font-black tracking-tight`}>
             {formatValue(value)}
           </Text>
-
-          {/* Change indicator */}
-          {change !== undefined && (
-            <View className="flex-row items-center gap-1.5">
-              {getChangeIcon() && (
-                <Ionicons
-                  name={getChangeIcon() as keyof typeof Ionicons.glyphMap}
-                  size={16}
-                  color={getChangeColor()}
-                />
-              )}
-              <Text
-                className="text-sm font-semibold"
-                style={{ color: getChangeColor() }}
-              >
-                {change >= 0 ? '+' : ''}{change.toFixed(1)}%
-              </Text>
-              <Text className="text-xs text-default-500">vs last period</Text>
-            </View>
-          )}
         </View>
       </Card.Body>
     </Card>

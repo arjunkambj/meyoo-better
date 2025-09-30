@@ -1,19 +1,24 @@
 import { useCallback, useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ScrollView, Text, View, RefreshControl } from "react-native";
+import { Spinner } from "heroui-native";
 import { KPICard } from "@/components/analytics/KPICard";
 import CostBreakdownCard from "@/components/analytics/CostBreakdownCard";
 import { DateRangePickerButton } from "@/components/shared/DateRangePicker";
 import { useOverviewAnalytics, useCostBreakdown } from "@/hooks/useAnalytics";
 import { useUserDetails } from "@/hooks/useUserDetails";
-// import { useRouter } from "expo-router";
+import { CustomBottomNav } from "@/components/navigation/CustomBottomNav";
+import { useAuthGuard } from "@/hooks/useAuthGuard";
 
 export default function OverviewTab() {
   const [refreshing, setRefreshing] = useState(false);
+
+  // Auth guard - ensure user is authenticated before loading data
+  const { isLoading: isAuthLoading } = useAuthGuard();
+
   const { metrics, isLoading } = useOverviewAnalytics();
   const { totals: costTotals, metaSpend } = useCostBreakdown();
   const { user } = useUserDetails();
-  // const router = useRouter();
 
   const primaryCurrency = (user as any)?.currency || "USD";
   const currencySymbol = primaryCurrency === "EUR" ? "€" : "$";
@@ -25,44 +30,42 @@ export default function OverviewTab() {
     setRefreshing(false);
   }, []);
 
+  // Show loading spinner while authentication is being checked
+  if (isAuthLoading) {
+    return (
+      <SafeAreaView className="flex-1 bg-background items-center justify-center" edges={['top']}>
+        <Spinner size="lg" />
+      </SafeAreaView>
+    );
+  }
+
   return (
-    <SafeAreaView className="flex-1 bg-background">
+    <SafeAreaView className="flex-1 bg-background" edges={['top']}>
       <ScrollView
-        contentContainerStyle={{ flexGrow: 1 }}
+        contentContainerStyle={{ flexGrow: 1, paddingBottom: 100 }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        <View className="flex-1 gap-8 px-5 py-4">
+        <View className="flex-1 gap-6 px-6 py-4">
           {/* Header with Date Picker */}
           <View className="gap-3">
             <View className="flex-row items-center justify-between">
               <View className="flex-1">
-                <Text className="text-xs font-bold uppercase tracking-[0.2em] text-primary">
-                  Analytics
-                </Text>
                 <Text className="text-3xl font-bold text-foreground">
                   Overview
                 </Text>
               </View>
               <DateRangePickerButton />
             </View>
-            <Text className="text-sm text-default-600">
-              Track your store performance and key metrics
-            </Text>
           </View>
 
           {/* Key Performance Section */}
           <View className="gap-5">
-            <View className="flex-row items-center gap-2">
-              <Text className="text-base font-bold text-foreground">Key Performance</Text>
-            </View>
-
             {/* Revenue - Full width primary */}
             <KPICard
               title="Revenue (Net)"
               value={metrics?.revenue.value ?? 0}
-              change={metrics?.revenue.change}
               format="currency"
               currencySymbol={currencySymbol}
               icon="cash-outline"
@@ -71,13 +74,12 @@ export default function OverviewTab() {
               isPrimary
             />
 
-            {/* Net Profit + Profit Margin */}
+            {/* 2x2 Grid for KPIs */}
             <View className="flex-row -mx-2">
               <View className="w-1/2 px-2">
                 <KPICard
                   title="Net Profit"
                   value={metrics?.netProfit.value ?? 0}
-                  change={metrics?.netProfit.change}
                   format="currency"
                   currencySymbol={currencySymbol}
                   icon="wallet-outline"
@@ -89,7 +91,6 @@ export default function OverviewTab() {
                 <KPICard
                   title="Profit Margin"
                   value={metrics?.profitMargin.value ?? 0}
-                  change={metrics?.profitMargin.change}
                   format="percent"
                   icon="analytics-outline"
                   iconColor="#6366f1"
@@ -97,21 +98,12 @@ export default function OverviewTab() {
                 />
               </View>
             </View>
-          </View>
 
-          {/* Sales Metrics Section */}
-          <View className="gap-5">
-            <View className="flex-row items-center gap-2">
-              <Text className="text-base font-bold text-foreground">Sales Metrics</Text>
-            </View>
-
-            {/* Orders + AOV */}
             <View className="flex-row -mx-2">
               <View className="w-1/2 px-2">
                 <KPICard
                   title="Total Orders"
                   value={metrics?.orders.value ?? 0}
-                  change={metrics?.orders.change}
                   format="number"
                   icon="cart-outline"
                   iconColor="#3b82f6"
@@ -122,7 +114,6 @@ export default function OverviewTab() {
                 <KPICard
                   title="Avg Order Value"
                   value={metrics?.avgOrderValue.value ?? 0}
-                  change={metrics?.avgOrderValue.change}
                   format="currency"
                   currencySymbol={currencySymbol}
                   icon="pricetags-outline"
@@ -132,13 +123,11 @@ export default function OverviewTab() {
               </View>
             </View>
 
-            {/* Gross Profit */}
             <View className="flex-row -mx-2">
               <View className="w-1/2 px-2">
                 <KPICard
                   title="Gross Profit"
                   value={metrics?.grossProfit.value ?? 0}
-                  change={metrics?.grossProfit.change}
                   format="currency"
                   currencySymbol={currencySymbol}
                   icon="trending-up-outline"
@@ -162,9 +151,6 @@ export default function OverviewTab() {
 
           {/* Cost Analysis Section */}
           <View className="gap-5">
-            <View className="flex-row items-center gap-2">
-              <Text className="text-base font-bold text-foreground">Cost Analysis</Text>
-            </View>
             <CostBreakdownCard
               items={[
                 { key: 'ad', label: 'Ad Spend', value: costTotals?.adSpend || 0, color: '#2563EB' },
@@ -179,6 +165,7 @@ export default function OverviewTab() {
           </View>
         </View>
       </ScrollView>
+      <CustomBottomNav />
     </SafeAreaView>
   );
 }

@@ -56,19 +56,19 @@ export function DateRangePicker({ onClose }: DateRangePickerProps) {
   };
 
   return (
-    <View className="flex-1">
-      <View className="flex-row items-center justify-between px-4 py-3 border-b border-default-200">
-        <Text className="text-lg font-semibold text-foreground">Select Date Range</Text>
-        <TouchableOpacity onPress={onClose} className="p-2">
-          <Ionicons name="close" size={24} color="#666" />
+    <View className="flex-1 bg-background">
+      <View className="flex-row items-center justify-between px-6 py-4 border-b border-border/40">
+        <Text className="text-xl font-bold text-foreground">Select Date Range</Text>
+        <TouchableOpacity onPress={onClose} className="h-9 w-9 items-center justify-center rounded-full bg-surface-2">
+          <Ionicons name="close" size={20} color="#666" />
         </TouchableOpacity>
       </View>
 
-      <ScrollView className="flex-1">
+      <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
         {/* Preset Options */}
-        <View className="px-4 py-4">
-          <Text className="text-sm font-semibold text-default-600 mb-3">Quick Select</Text>
-          <View className="gap-2">
+        <View className="px-6 py-5">
+          <Text className="text-sm font-bold uppercase tracking-wider text-default-500 mb-4">Quick Select</Text>
+          <View className="gap-2.5">
             {DATE_PRESETS.map((preset) => (
               <TouchableOpacity
                 key={preset.key}
@@ -76,25 +76,28 @@ export function DateRangePicker({ onClose }: DateRangePickerProps) {
                 activeOpacity={0.7}
               >
                 <Card
-                  className={
+                  surfaceVariant="2"
+                  className={`rounded-2xl ${
                     dateRange.preset === preset.key
-                      ? 'border-primary bg-primary/5'
-                      : 'border-default-200'
-                  }
+                      ? 'border-2 border-primary'
+                      : 'border border-border/50'
+                  }`}
                 >
-                  <Card.Body className="py-3">
+                  <Card.Body className="px-4 py-4">
                     <View className="flex-row items-center justify-between">
                       <Text
-                        className={
+                        className={`text-base font-semibold ${
                           dateRange.preset === preset.key
-                            ? 'text-primary font-semibold'
+                            ? 'text-primary'
                             : 'text-foreground'
-                        }
+                        }`}
                       >
                         {preset.label}
                       </Text>
                       {dateRange.preset === preset.key && (
-                        <Ionicons name="checkmark-circle" size={20} color="#6366f1" />
+                        <View className="h-6 w-6 rounded-full bg-primary items-center justify-center">
+                          <Ionicons name="checkmark" size={16} color="#ffffff" />
+                        </View>
                       )}
                     </View>
                   </Card.Body>
@@ -104,27 +107,29 @@ export function DateRangePicker({ onClose }: DateRangePickerProps) {
           </View>
         </View>
 
-        <Divider className="my-4" />
+        <Divider className="mx-6 my-2 bg-border/60" />
 
         {/* Custom Date Range */}
-        <View className="px-4 pb-4">
-          <Text className="text-sm font-semibold text-default-600 mb-3">Custom Range</Text>
+        <View className="px-6 py-5">
+          <Text className="text-sm font-bold uppercase tracking-wider text-default-500 mb-4">Custom Range</Text>
 
           <View className="gap-3">
             <TouchableOpacity
               onPress={() => setShowStartPicker(true)}
               activeOpacity={0.7}
             >
-              <Card>
-                <Card.Body className="py-3">
+              <Card surfaceVariant="2" className="rounded-2xl border border-border/50">
+                <Card.Body className="px-4 py-4">
                   <View className="flex-row items-center justify-between">
-                    <View>
-                      <Text className="text-xs text-default-500 mb-1">Start Date</Text>
-                      <Text className="text-base font-medium text-foreground">
+                    <View className="flex-1">
+                      <Text className="text-xs font-bold uppercase tracking-wider text-default-500 mb-1.5">Start Date</Text>
+                      <Text className="text-base font-semibold text-foreground">
                         {formatDate(customStart)}
                       </Text>
                     </View>
-                    <Ionicons name="calendar-outline" size={20} color="#666" />
+                    <View className="h-10 w-10 rounded-xl bg-primary/10 items-center justify-center">
+                      <Ionicons name="calendar" size={20} color="#6366f1" />
+                    </View>
                   </View>
                 </Card.Body>
               </Card>
@@ -134,16 +139,18 @@ export function DateRangePicker({ onClose }: DateRangePickerProps) {
               onPress={() => setShowEndPicker(true)}
               activeOpacity={0.7}
             >
-              <Card>
-                <Card.Body className="py-3">
+              <Card surfaceVariant="2" className="rounded-2xl border border-border/50">
+                <Card.Body className="px-4 py-4">
                   <View className="flex-row items-center justify-between">
-                    <View>
-                      <Text className="text-xs text-default-500 mb-1">End Date</Text>
-                      <Text className="text-base font-medium text-foreground">
+                    <View className="flex-1">
+                      <Text className="text-xs font-bold uppercase tracking-wider text-default-500 mb-1.5">End Date</Text>
+                      <Text className="text-base font-semibold text-foreground">
                         {formatDate(customEnd)}
                       </Text>
                     </View>
-                    <Ionicons name="calendar-outline" size={20} color="#666" />
+                    <View className="h-10 w-10 rounded-xl bg-primary/10 items-center justify-center">
+                      <Ionicons name="calendar" size={20} color="#6366f1" />
+                    </View>
                   </View>
                 </Card.Body>
               </Card>
@@ -151,10 +158,14 @@ export function DateRangePicker({ onClose }: DateRangePickerProps) {
 
             <Button
               variant="primary"
+              size="lg"
               onPress={handleCustomDateChange}
-              className="mt-2"
+              className="mt-3 h-14 rounded-2xl"
             >
-              <Button.LabelContent>Apply Custom Range</Button.LabelContent>
+              <Button.StartContent>
+                <Ionicons name="checkmark-circle" size={20} color="#ffffff" />
+              </Button.StartContent>
+              <Button.LabelContent classNames={{ text: 'font-bold' }}>Apply Custom Range</Button.LabelContent>
             </Button>
           </View>
         </View>
@@ -216,12 +227,12 @@ export function DateRangePickerButton() {
     <>
       <TouchableOpacity
         onPress={() => setShowPicker(true)}
-        className="bg-surface-2 rounded-xl px-4 py-2.5 flex-row items-center gap-2"
+        className="bg-primary/10 rounded-xl px-3.5 py-2.5 flex-row items-center gap-2 border border-primary/20"
         activeOpacity={0.7}
       >
-        <Ionicons name="calendar-outline" size={18} color="#6366f1" />
-        <Text className="text-sm font-medium text-foreground">{displayText}</Text>
-        <Ionicons name="chevron-down" size={16} color="#666" />
+        <Ionicons name="calendar" size={18} color="#6366f1" />
+        <Text className="text-sm font-semibold text-primary">{displayText}</Text>
+        <Ionicons name="chevron-down" size={16} color="#6366f1" />
       </TouchableOpacity>
 
       <Modal
@@ -230,7 +241,7 @@ export function DateRangePickerButton() {
         presentationStyle="pageSheet"
         onRequestClose={() => setShowPicker(false)}
       >
-        <SafeAreaView className="flex-1 bg-background">
+        <SafeAreaView className="flex-1 bg-background" edges={['top', 'bottom']}>
           <DateRangePicker onClose={() => setShowPicker(false)} />
         </SafeAreaView>
       </Modal>

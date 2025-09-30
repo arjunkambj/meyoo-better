@@ -1,6 +1,5 @@
 import { Children, type ReactNode, useMemo } from 'react';
 import { ScrollView, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Surface, useTheme } from 'heroui-native';
 
 type CompatibleReactNode = Exclude<ReactNode, Promise<ReactNode>>;
@@ -28,7 +27,7 @@ export function AuthLayout({ title, subtitle, footer, children = null }: AuthLay
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-background">
+   
       <View className="flex-1">
         <View className="absolute inset-0">
           <View
@@ -58,7 +57,7 @@ export function AuthLayout({ title, subtitle, footer, children = null }: AuthLay
 
             <Surface
               variant="1"
-              className="mt-8 gap-8 rounded-3xl border border-divider/30 bg-background/90 p-6"
+              className="mt-8 gap-8 rounded-3xl border border-divider/30 bg-background py-6 px-4"
             >
               {content}
             </Surface>
@@ -69,6 +68,6 @@ export function AuthLayout({ title, subtitle, footer, children = null }: AuthLay
           </View>
         </ScrollView>
       </View>
-    </SafeAreaView>
+
   );
 }

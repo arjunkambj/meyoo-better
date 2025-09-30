@@ -3,7 +3,9 @@ import { Spinner } from "heroui-native";
 import { View } from "react-native";
 import { useQuery } from "convex/react";
 import { useEffect } from "react";
-
+import {
+  SafeAreaView,
+} from 'react-native-safe-area-context';
 import { AuthLayout } from "@/components/auth/AuthLayout";
 import { AuthForm } from "@/components/auth/AuthForm";
 import { api } from "@/libs/convexApi";
@@ -40,6 +42,7 @@ export default function Index() {
   }
 
   return (
+    <SafeAreaView className="flex-1 bg-background">
     <AuthLayout
       title="Welcome to Meyoo"
       subtitle="Manage your store, marketing, and insights from one clean workspace."
@@ -51,5 +54,6 @@ export default function Index() {
         }, 100);
       }} />
     </AuthLayout>
+    </SafeAreaView>
   );
 }

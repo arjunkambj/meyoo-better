@@ -16,8 +16,6 @@ export function AuthForm({ onSuccess }: AuthFormProps) {
   const { colors } = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
-  const [isNewUser, setIsNewUser] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
@@ -29,16 +27,6 @@ export function AuthForm({ onSuccess }: AuthFormProps) {
       return;
     }
 
-    if (isNewUser && !name.trim()) {
-      setErrorMessage('Please enter your name to create an account.');
-      return;
-    }
-
-    if (isNewUser && password.length < 8) {
-      setErrorMessage('Password must be at least 8 characters long.');
-      return;
-    }
-
     setIsSubmitting(true);
     setErrorMessage(null);
 
@@ -46,32 +34,15 @@ export function AuthForm({ onSuccess }: AuthFormProps) {
       const formData = new FormData();
       formData.append('email', email.trim().toLowerCase());
       formData.append('password', password);
-      formData.append('flow', isNewUser ? 'signUp' : 'signIn');
-
-      if (isNewUser) {
-        formData.append('name', name.trim());
-      }
+      formData.append('flow', 'signIn');
 
       await signIn('password', formData);
       onSuccess?.();
     } catch (error: unknown) {
       const errorMessageText =
         error instanceof Error ? error.message ?? '' : '';
-      const invalidCredentials = errorMessageText
-        .toLowerCase()
-        .includes('invalid email or password');
-
-      // Check if it's a user not found error to suggest signup
-      if (invalidCredentials && !isNewUser) {
-        setErrorMessage('No account found. Create a new account to continue.');
-        setIsNewUser(true);
-      } else {
-        const fallback = isNewUser
-          ? 'Could not create account. Please try again.'
-          : 'Could not sign you in. Please check your credentials.';
-        setErrorMessage(fallback);
-        Alert.alert('Something went wrong', 'Please try again in a moment.');
-      }
+      setErrorMessage('Could not sign you in. Please check your credentials.');
+      Alert.alert('Something went wrong', 'Please try again in a moment.');
     } finally {
       setIsSubmitting(false);
     }
@@ -86,39 +57,11 @@ export function AuthForm({ onSuccess }: AuthFormProps) {
       className="flex-1"
     >
       <View className="gap-7">
-        <View className="gap-3">
-          <Text className="text-[11px] font-semibold uppercase tracking-[0.25em] text-default-500">
-            Quick start
+
+       <View className="gap-4">
+          <Text className="text-[11px] font-semibold text-center uppercase my-3 tracking-[0.25em] text-default-500">
+            Email & password
           </Text>
-          <View className="gap-3">
-            <GoogleAuthButton onSuccess={onSuccess} />
-            <AppleAuthButton onSuccess={onSuccess} />
-          </View>
-        </View>
-
-        <AuthDivider />
-
-        <View className="gap-4">
-          <Text className="text-[11px] font-semibold uppercase tracking-[0.25em] text-default-500">
-            {isNewUser ? 'Create account' : 'Email & password'}
-          </Text>
-
-          {isNewUser ? (
-            <TextField isRequired>
-              <TextField.Label>Full name</TextField.Label>
-              <TextField.Input
-                autoCapitalize="words"
-                onChangeText={setName}
-                placeholder="Jordan Meyers"
-                returnKeyType="next"
-                value={name}
-              >
-                <TextField.InputStartContent>
-                  <Ionicons name="person-outline" size={18} color={iconColor} />
-                </TextField.InputStartContent>
-              </TextField.Input>
-            </TextField>
-          ) : null}
 
           <TextField isRequired>
             <TextField.Label>Email address</TextField.Label>
@@ -142,7 +85,7 @@ export function AuthForm({ onSuccess }: AuthFormProps) {
             <TextField.Input
               autoCapitalize="none"
               onChangeText={setPassword}
-              placeholder={isNewUser ? 'Create a password' : 'Enter password'}
+              placeholder="Enter password"
               returnKeyType="done"
               secureTextEntry={!showPassword}
               value={password}
@@ -165,42 +108,27 @@ export function AuthForm({ onSuccess }: AuthFormProps) {
                 </Button>
               </TextField.InputEndContent>
             </TextField.Input>
-            {isNewUser ? (
-              <TextField.Description>
-                Use at least 8 characters with a number or symbol.
-              </TextField.Description>
-            ) : null}
           </TextField>
         </View>
 
-        <View className="gap-3 mt-1">
-          <Button
+        <Button
             className="h-12"
             variant="primary"
             isDisabled={isSubmitting}
             onPress={handleSubmit}
           >
-            {isSubmitting
-              ? isNewUser
-                ? 'Creating account...'
-                : 'Signing in...'
-              : isNewUser
-                ? 'Create account'
-                : 'Sign in'}
+            {isSubmitting ? 'Signing in...' : 'Sign in'}
           </Button>
+        <AuthDivider />
+        <View className="gap-3">
+          <View className="gap-3">
+            <GoogleAuthButton onSuccess={onSuccess} />
+            <AppleAuthButton onSuccess={onSuccess} />
+          </View>
+        </View>
 
-          <Button
-            variant="ghost"
-            size="sm"
-            onPress={() => {
-              setIsNewUser(!isNewUser);
-              setErrorMessage(null);
-            }}
-          >
-            {isNewUser
-              ? 'Already have an account? Sign in'
-              : "Need an account? Create one"}
-          </Button>
+        <View className="gap-3 mt-1">
+         
 
           <Text className="text-xs text-center text-default-400 mt-1">
             By continuing you agree to the Terms of Service and Privacy Policy.

@@ -41,7 +41,7 @@ const Faq = () => {
   return (
     <section
       id="faq"
-      className={`relative "pt-20 sm:pt-24 lg:pt-28 2xl:pt-36 ${designSystem.background.gradient}  w-full scroll-mt-24`}
+      className={`relative pt-12 sm:pt-16 lg:pt-20 2xl:pt-24 pb-12 sm:pb-16 lg:pb-20 2xl:pb-24 ${designSystem.background.gradient} w-full scroll-mt-24`}
     >
       <div className={`${designSystem.spacing.container} max-w-7xl`}>
         <div className="text-center mb-12">

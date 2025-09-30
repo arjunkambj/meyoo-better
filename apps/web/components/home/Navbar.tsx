@@ -91,7 +91,7 @@ export default function CenteredNavbar() {
   };
 
   return (
-    <div className="fixed w-full top-2 z-50 px-4 md:px-6 py-1">
+    <div className="fixed w-full top-2 z-50 px-2 sm:px-4 md:px-6 py-1">
       <div className="max-w-7xl mx-auto">
         <Navbar
           className={`
@@ -99,16 +99,16 @@ export default function CenteredNavbar() {
             rounded-2xl border border-default-200/50 transition-all duration-300
           `}
           classNames={{
-            base: "px-4 md:px-6 py-3 md:py-3.5 rounded-2xl",
-            wrapper: "px-0 max-w-none",
+            base: "px-3 sm:px-4 md:px-6 py-2.5 sm:py-3 md:py-3.5 rounded-2xl",
+            wrapper: "px-0 max-w-none gap-2 sm:gap-4",
           }}
           height="auto"
         >
           {/* Left side - Logo */}
-          <NavbarContent className="shrink-0" justify="start">
-            <NavbarBrand>
+          <NavbarContent className="shrink-0 flex-grow-0" justify="start">
+            <NavbarBrand className="gap-0">
               <Link
-                className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+                className="flex items-center gap-1 sm:gap-2 hover:opacity-80 transition-opacity"
                 href="/"
               >
                 <Logo />
@@ -184,16 +184,17 @@ export default function CenteredNavbar() {
           </NavbarContent>
 
           {/* Mobile Menu Toggle */}
-          <NavbarContent className="md:hidden shrink-0" justify="end">
+          <NavbarContent className="md:hidden shrink-0 flex-grow-0" justify="end">
             <NavbarItem>
               <Button
                 isIconOnly
-                className="text-muted-foreground hover:bg-muted/50 backdrop-blur-sm transition-all duration-300"
+                className="text-muted-foreground hover:bg-muted/50 backdrop-blur-sm transition-all duration-300 w-9 h-9 min-w-9"
                 radius="full"
+                size="sm"
                 variant="light"
                 onPress={() => setIsMenuOpen(true)}
               >
-                <Icon className="text-xl" icon="mdi:menu" />
+                <Icon className="text-lg" icon="mdi:menu" />
               </Button>
             </NavbarItem>
           </NavbarContent>
@@ -201,37 +202,38 @@ export default function CenteredNavbar() {
           {/* Mobile Modal */}
           <Modal
             classNames={{
-              base: "bg-background/95 backdrop-blur-md rounded-2xl",
-              body: "py-6",
+              base: "bg-background/95 backdrop-blur-md rounded-2xl m-4",
+              body: "py-4 sm:py-6",
             }}
             isOpen={isMenuOpen}
             placement="top"
             size="full"
             onClose={() => setIsMenuOpen(false)}
           >
-            <ModalContent className="p-6">
+            <ModalContent className="p-4 sm:p-6">
               <ModalBody>
-                <div className="flex flex-col h-full">
+                <div className="flex flex-col h-full min-h-[calc(100vh-2rem)]">
                   {/* Mobile Header */}
-                  <div className="flex items-center justify-between pb-6 border-b border-default-200/50">
+                  <div className="flex items-center justify-between pb-4 sm:pb-6 border-b border-default-200/50">
                     <Logo />
                     <Button
                       isIconOnly
-                      className="text-muted-foreground hover:bg-muted/50 transition-all duration-300"
+                      className="text-muted-foreground hover:bg-muted/50 transition-all duration-300 w-9 h-9 min-w-9"
+                      size="sm"
                       variant="light"
                       onPress={() => setIsMenuOpen(false)}
                     >
-                      <Icon className="text-xl" icon="mdi:close" />
+                      <Icon className="text-lg" icon="mdi:close" />
                     </Button>
                   </div>
 
                   {/* Mobile Navigation */}
-                  <div className="flex-1 flex flex-col justify-center space-y-8">
+                  <div className="flex-1 flex flex-col justify-center space-y-6 sm:space-y-8 py-8">
                     {navItems.map((item) => (
                       <Button
                         key={item.name}
                         variant="light"
-                        className="text-xl font-medium text-muted-foreground hover:text-primary transition-colors duration-300 text-left justify-start p-0 h-auto min-w-0"
+                        className="text-lg sm:text-xl font-medium text-muted-foreground hover:text-primary transition-colors duration-300 text-left justify-start p-0 h-auto min-w-0"
                         onPress={() => {
                           if (item.href.startsWith("/")) {
                             router.push(item.href);
@@ -246,11 +248,11 @@ export default function CenteredNavbar() {
                     ))}
 
                     {/* CTA buttons */}
-                    <div className="pt-8 space-y-4">
+                    <div className="pt-6 sm:pt-8 space-y-3 sm:space-y-4">
                       <Unauthenticated>
                         <Button
                           as={Link}
-                          className="w-full font-semibold"
+                          className="w-full font-semibold text-sm sm:text-base"
                           color="primary"
                           href="/signin"
                           radius="full"
@@ -262,7 +264,7 @@ export default function CenteredNavbar() {
                       </Unauthenticated>
                       <AuthLoading>
                         <Button
-                          className="w-full font-semibold"
+                          className="w-full font-semibold text-sm sm:text-base"
                           color="primary"
                           radius="full"
                           size="lg"
@@ -272,9 +274,10 @@ export default function CenteredNavbar() {
                       </AuthLoading>
                       <Authenticated>
                         <Button
-                          className="w-full font-semibold"
+                          as={Link}
+                          className="w-full font-semibold text-sm sm:text-base"
                           color="primary"
-                          href="/signin"
+                          href="/overview"
                           radius="full"
                           size="lg"
                         >

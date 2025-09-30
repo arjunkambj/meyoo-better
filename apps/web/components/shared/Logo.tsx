@@ -9,6 +9,7 @@ interface LogoProps {
   size?: "sm" | "md" | "lg";
   spacing?: "sm" | "md" | "lg";
   className?: string;
+  mobileStacked?: boolean;
 }
 
 const SIZES = {
@@ -34,6 +35,7 @@ export function Logo({
   size = "md",
   spacing = "md",
   className = "",
+  mobileStacked = false,
 }: LogoProps) {
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -48,10 +50,15 @@ export function Logo({
   const logoSrc =
     mounted && resolvedTheme === "dark" ? "/logo-white.svg" : "/logo-black.svg";
 
+  const textSizeClass = mobileStacked ? "text-sm sm:text-xl" : TEXT_SIZES[size];
+  const containerClass = mobileStacked
+    ? "flex-col items-start gap-0.5 sm:flex-row sm:items-center"
+    : "items-center";
+
   return (
     <div className={`inline-flex items-center ${className}`}>
       {variant === "full" ? (
-        <div className={`flex items-center ${SPACING[spacing]}`}>
+        <div className={`flex ${containerClass} ${SPACING[spacing]}`}>
           <Image
             alt="Meyoo"
             className="object-contain"
@@ -59,7 +66,7 @@ export function Logo({
             src={logoSrc}
             width={height}
           />
-          <span className={`font-bold text-foreground ${TEXT_SIZES[size]}`}>
+          <span className={`font-bold text-foreground ${textSizeClass}`}>
             Meyoo
           </span>
         </div>

@@ -152,7 +152,7 @@ export const AuthForm = React.memo(function AuthForm({
 
   return (
     <div className="w-full bg-transparent max-w-lg mx-auto">
-      <div className="p-8">
+      <div className="px-3 py-8 sm:px-6 md:px-8">
         {/* Header */}
         <div className="mb-10 text-center space-y-3">
           <h1 className="text-4xl font-bold text-foreground tracking-tight">

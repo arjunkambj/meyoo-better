@@ -17,19 +17,19 @@ const AuthLayoutClient = React.memo(function AuthLayoutClient({
       {/* Enhanced background decoration */}
 
       {/* Logo */}
-      <div className="absolute left-6 top-6 z-50">
+      <div className="absolute left-4 sm:left-6 top-4 sm:top-6 z-50">
         <Link href="/">
           <Logo size="lg" />
         </Link>
       </div>
 
       {/* Theme Switch */}
-      <div className="absolute right-6 top-6 z-50">
+      <div className="absolute right-4 sm:right-6 top-4 sm:top-6 z-50">
         <ThemeSwitch />
       </div>
 
       {/* Auth Form */}
-      <div className="relative z-10 flex w-full items-center justify-center p-6 lg:w-1/2">
+      <div className="relative z-10 flex w-full items-center justify-center py-4 sm:p-6 lg:w-1/2">
         <div className="w-full max-w-lg">{children}</div>
       </div>
 

@@ -38,17 +38,8 @@ export default function OnboardingScreen() {
   return (
     <SafeAreaView className="flex-1 bg-background">
       {/* Gradient Background Effect */}
-      <View className="absolute inset-0">
-        <View
-          className="h-80 rounded-b-[80px]"
-          style={{
-            backgroundColor: colors.accentSoft || colors.accent,
-            opacity: 0.08
-          }}
-        />
-      </View>
 
-      <View className="flex-1 px-6 py-12 justify-between">
+      <View className="flex-1 px-6  justify-between">
         <Animated.View
           entering={FadeIn.duration(600)}
           className="gap-8 flex-1 justify-center"
@@ -114,13 +105,16 @@ export default function OnboardingScreen() {
         >
           <Button
             className="h-12"
-            variant="ghost"
+            variant="danger"
             onPress={handleLogout}
           >
+            
             <Button.StartContent>
-              <Ionicons name="log-out-outline" size={18} color={colors.foreground} />
+              <Ionicons name="log-out-outline" size={18} color={colors.default} />
             </Button.StartContent>
-            <Button.LabelContent>Log Out</Button.LabelContent>
+            <Button.LabelContent classNames={{ text: 'font-semibold text-white' }}>
+                  Sign Out
+            </Button.LabelContent> 
           </Button>
         </Animated.View>
       </View>

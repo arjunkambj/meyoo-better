@@ -68,9 +68,8 @@ export const shopifyOrders = defineTable({
   // Financial
   totalPrice: v.number(),
   subtotalPrice: v.number(),
-  totalTax: v.number(),
-  totalDiscounts: v.number(),
-  totalShippingPrice: v.number(),
+   totalDiscounts: v.number(),
+  
   totalTip: v.optional(v.number()),
   currency: v.optional(v.string()), // Currency code for this order
 

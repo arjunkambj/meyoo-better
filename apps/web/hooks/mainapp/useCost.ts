@@ -186,7 +186,7 @@ export function useUpdateExpense() {
   const mutation = useMutation(api.core.costs.updateCost);
 
   return async (data: {
-    costId: Id<"costs">;
+    costId: Id<"globalCosts">;
     name?: string;
     value?: number;
     description?: string;
@@ -228,7 +228,7 @@ export function useUpdateExpense() {
 export function useDeleteExpense() {
   const mutation = useMutation(api.core.costs.deleteCost);
 
-  return async (costId: Id<"costs">) => {
+  return async (costId: Id<"globalCosts">) => {
     try {
       await mutation({ costId });
 
@@ -292,29 +292,21 @@ export function useCreateTransactionFee() {
   };
 }
 
-export function useUpsertProductCostComponents() {
-  const mutation = useMutation(api.core.costs.upsertProductCostComponents);
+export function useUpsertVariantCosts() {
+  const mutation = useMutation(api.core.costs.upsertVariantCosts);
 
   return async (data: {
     variantId: Id<"shopifyProductVariants"> | string;
     cogsPerUnit?: number;
-    shippingPerUnit?: number;
     handlingPerUnit?: number;
     taxPercent?: number;
-    paymentFeePercent?: number;
-    paymentFixedPerItem?: number;
-    paymentProvider?: string;
   }) => {
     try {
       const result = await mutation({
         variantId: data.variantId as Id<"shopifyProductVariants">,
         cogsPerUnit: data.cogsPerUnit,
-        shippingPerUnit: data.shippingPerUnit,
         handlingPerUnit: data.handlingPerUnit,
         taxPercent: data.taxPercent,
-        paymentFeePercent: data.paymentFeePercent,
-        paymentFixedPerItem: data.paymentFixedPerItem,
-        paymentProvider: data.paymentProvider,
       } as any);
 
       return { success: result.success };
@@ -330,31 +322,23 @@ export function useUpsertProductCostComponents() {
   };
 }
 
-export function useSaveProductCostComponents() {
-  const mutation = useMutation(api.core.costs.saveProductCostComponents);
+export function useSaveVariantCosts() {
+  const mutation = useMutation(api.core.costs.saveVariantCosts);
 
   return async (
     costs: Array<{
       variantId: Id<"shopifyProductVariants"> | string;
       cogsPerUnit?: number;
-      shippingPerUnit?: number;
       handlingPerUnit?: number;
       taxPercent?: number;
-      paymentFeePercent?: number;
-      paymentFixedPerItem?: number;
-      paymentProvider?: string;
     }>,
   ) => {
     const payload = costs
       .map((c) => ({
         variantId: c.variantId as Id<"shopifyProductVariants">,
         cogsPerUnit: c.cogsPerUnit,
-        shippingPerUnit: c.shippingPerUnit,
         handlingPerUnit: c.handlingPerUnit,
         taxPercent: c.taxPercent,
-        paymentFeePercent: c.paymentFeePercent,
-        paymentFixedPerItem: c.paymentFixedPerItem,
-        paymentProvider: c.paymentProvider,
       })) as any;
 
     try {

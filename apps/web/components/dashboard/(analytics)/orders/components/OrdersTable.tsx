@@ -40,7 +40,7 @@ const columns = [
   { name: "Customer", uid: "customer" },
   { name: "Fulfillment", uid: "status" },
   { name: "Revenue", uid: "revenue" },
-  { name: "Costs", uid: "costs" },
+  { name: "Costs", uid: "globalCosts" },
   { name: "Shipping", uid: "shipping" },
   { name: "Profit", uid: "profit" },
   { name: "Payment", uid: "payment" },
@@ -121,7 +121,7 @@ export const OrdersTable = React.memo(function OrdersTable({
             </div>
           );
 
-        case "costs":
+        case "globalCosts":
           return (
             <div>
               <p className="font-medium">{formatCurrency(item.totalCost)}</p>

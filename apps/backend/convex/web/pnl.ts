@@ -25,7 +25,7 @@ type QueryHandler = (
 
 const PNL_DATASETS: readonly AnalyticsSourceKey[] = [
   "orders",
-  "costs",
+  "globalCosts",
   "metaInsights",
 ];
 

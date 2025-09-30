@@ -19,7 +19,7 @@ import { sanitizeDecimal } from "@/components/shared/table/sanitize";
 
 import {
   useCurrentUser,
-  useSaveProductCostComponents,
+  useSaveVariantCosts,
   useShopifyProductVariantsPaginated,
 } from "@/hooks";
 import { getCurrencySymbol } from "@/libs/utils/format";
@@ -125,7 +125,7 @@ export default function ProductCostTable() {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [groupEdits, setGroupEdits] = useState<Record<string, RowEdit>>({});
   const [bulkPct, setBulkPct] = useState<string>("10");
-  const saveAll = useSaveProductCostComponents();
+  const saveAll = useSaveVariantCosts();
   const [savingAll, setSavingAll] = useState(false);
 
   // sanitizeDecimal shared via components/shared/table/sanitize

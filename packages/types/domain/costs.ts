@@ -2,7 +2,7 @@ import type { Id } from "@repo/convex/dataModel";
 
 // Cost type (based on costs table schema)
 export interface Cost {
-  _id: Id<"costs">;
+  _id: Id<"globalCosts">;
   organizationId: string;
   userId: Id<"users">;
   type:
@@ -58,7 +58,7 @@ export type ExpenseFrequency =
   | "quarterly"
   | "yearly";
 export interface Expense {
-  _id: Id<"costs">;
+  _id: Id<"globalCosts">;
   organizationId: string;
 
   // Expense details
@@ -111,7 +111,7 @@ export interface Expense {
 
 // Transaction fee types
 export interface TransactionFee {
-  _id: Id<"costs">;
+  _id: Id<"globalCosts">;
   organizationId: string;
 
   // Provider info

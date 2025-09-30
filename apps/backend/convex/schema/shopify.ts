@@ -217,14 +217,9 @@ export const shopifyProductVariants = defineTable({
   // Status
   available: v.optional(v.boolean()),
 
-  // Cost and financial fields
-  costPerItem: v.optional(v.number()),
+  // Cost metadata is sourced from variantCosts; only keep raw Shopify inventory linkage
   inventoryItemId: v.optional(v.string()),
   taxable: v.optional(v.boolean()),
-  taxRate: v.optional(v.number()),
-  channel: v.optional(v.string()),
-  grossMargin: v.optional(v.number()),
-  grossProfit: v.optional(v.number()),
 
   // Timestamps
   shopifyCreatedAt: v.number(),

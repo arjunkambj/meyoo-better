@@ -1355,7 +1355,7 @@ export const saveInitialCosts = mutation({
     // Create shipping cost record (flat per order)
     if (args.shippingCost !== undefined && args.shippingCost > 0) {
       const existingPerOrder = await ctx.db
-        .query("costs")
+        .query("globalCosts")
         .withIndex("by_org_type_frequency", (q) =>
           q
             .eq("organizationId", user.organizationId as Id<"organizations">)
@@ -1389,7 +1389,7 @@ export const saveInitialCosts = mutation({
           analyticsNeedsRefresh = true;
         }
       } else {
-        await ctx.db.insert("costs", {
+        await ctx.db.insert("globalCosts", {
           organizationId: user.organizationId as Id<"organizations">,
           userId: user._id,
           type: "shipping",
@@ -1411,7 +1411,7 @@ export const saveInitialCosts = mutation({
     // Create payment fee record if provided
     if (args.paymentFeePercent !== undefined && args.paymentFeePercent > 0) {
       const existingPayment = await ctx.db
-        .query("costs")
+        .query("globalCosts")
         .withIndex("by_org_and_type", (q) =>
           q.eq("organizationId", user.organizationId as Id<"organizations">).eq("type", "payment"),
         )
@@ -1442,7 +1442,7 @@ export const saveInitialCosts = mutation({
           analyticsNeedsRefresh = true;
         }
       } else {
-        await ctx.db.insert("costs", {
+        await ctx.db.insert("globalCosts", {
           organizationId: user.organizationId as Id<"organizations">,
           userId: user._id,
           type: "payment",
@@ -1464,7 +1464,7 @@ export const saveInitialCosts = mutation({
     // Create operating costs record if provided
     if (args.operatingCosts !== undefined && args.operatingCosts > 0) {
       const existingOp = await ctx.db
-        .query("costs")
+        .query("globalCosts")
         .withIndex("by_org_type_frequency", (q) =>
           q
             .eq("organizationId", user.organizationId as Id<"organizations">)
@@ -1498,7 +1498,7 @@ export const saveInitialCosts = mutation({
           analyticsNeedsRefresh = true;
         }
       } else {
-        await ctx.db.insert("costs", {
+        await ctx.db.insert("globalCosts", {
           organizationId: user.organizationId,
           userId: user._id,
           type: "operational",

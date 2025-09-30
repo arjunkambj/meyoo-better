@@ -22,8 +22,8 @@ const ORDER_ANALYTICS_DATASETS = [
   "orders",
   "orderItems",
   "variants",
-  "productCostComponents",
-  "costs",
+  "variantCosts",
+  "globalCosts",
   "metaInsights",
   "analytics",
 ] as const satisfies readonly AnalyticsSourceKey[];

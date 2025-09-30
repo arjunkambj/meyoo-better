@@ -1,8 +1,8 @@
 import { defineTable } from "convex/server";
 import { v } from "convex/values";
 
-// Unified cost table for all cost types
-export const costs = defineTable({
+// Organization-level cost records (global)
+export const globalCosts = defineTable({
   organizationId: v.id("organizations"),
   userId: v.optional(v.id("users")), // User who created this cost (optional for system-generated)
 
@@ -71,39 +71,8 @@ export const costs = defineTable({
   .index("by_type", ["type"])
   .index("by_effective_from", ["effectiveFrom"]);
 
-// Cost categories for grouping and organization
-export const costCategories = defineTable({
-  organizationId: v.id("organizations"),
-  userId: v.id("users"),
-
-  // Category info
-  name: v.string(),
-
-  // Type mapping
-  costType: v.union(
-    v.literal("product"),
-    v.literal("shipping"),
-    v.literal("payment"),
-    v.literal("operational"),
-    v.literal("tax"),
-    v.literal("handling"),
-    v.literal("marketing"),
-  ),
-
-  // Status
-  isActive: v.boolean(),
-  isDefault: v.boolean(),
-
-  // Metadata
-  createdAt: v.optional(v.number()),
-  updatedAt: v.optional(v.number()),
-})
-  .index("by_organization", ["organizationId"])
-  .index("by_org_active", ["organizationId", "isActive"])
-  .index("by_type", ["costType"]);
-
-// Per-variant product-level cost components
-export const productCostComponents = defineTable({
+// Per-variant cost configuration (COGS/handling/tax)
+export const variantCosts = defineTable({
   organizationId: v.id("organizations"),
   userId: v.optional(v.id("users")), // Optional for system-generated,
   variantId: v.id("shopifyProductVariants"),

@@ -20,8 +20,8 @@ export const datasetValidator = v.object({
   variants: v.array(v.any()),
   customers: v.array(v.any()),
   metaInsights: v.array(v.any()),
-  costs: v.array(v.any()),
-  productCostComponents: v.array(v.any()),
+  globalCosts: v.array(v.any()),
+  variantCosts: v.array(v.any()),
   sessions: v.array(v.any()),
   analytics: v.array(v.any()),
 });

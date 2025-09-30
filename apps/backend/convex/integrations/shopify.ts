@@ -148,8 +148,8 @@ const ORGANIZATION_TABLES = [
   "metaAdAccounts",
   "metaInsights",
   "shopifyAnalytics",
-  "costs",
-  "productCostComponents",
+  "globalCosts",
+  "variantCosts",
   "integrationSessions",
   "syncSessions",
   "invites",
@@ -177,8 +177,8 @@ const organizationTableValidator = v.union(
   v.literal("metaAdAccounts"),
   v.literal("metaInsights"),
   v.literal("shopifyAnalytics"),
-  v.literal("costs"),
-  v.literal("productCostComponents"),
+  v.literal("globalCosts"),
+  v.literal("variantCosts"),
   v.literal("integrationSessions"),
   v.literal("syncSessions"),
   v.literal("invites"),
@@ -1119,14 +1119,12 @@ export const getProductVariantsPaginated = query({
         option3: v.optional(v.string()),
         available: v.optional(v.boolean()),
         costPerItem: v.optional(v.number()),
+        cogsPerUnit: v.optional(v.number()),
         inventoryItemId: v.optional(v.string()),
         taxable: v.optional(v.boolean()),
+        taxPercent: v.optional(v.number()),
         taxRate: v.optional(v.number()),
         handlingPerUnit: v.optional(v.number()),
-        paymentFeePercent: v.optional(v.number()),
-        paymentFixedPerItem: v.optional(v.number()),
-        paymentProvider: v.optional(v.string()),
-        channel: v.optional(v.string()),
         grossMargin: v.optional(v.number()),
         grossProfit: v.optional(v.number()),
         shopifyCreatedAt: v.number(),
@@ -1176,23 +1174,6 @@ export const getProductVariantsPaginated = query({
       productMap.set(product._id, product);
     }
 
-    // Get default COGS percentage from onboarding costs if exists
-    const defaultCOGS = (
-      await ctx.db
-        .query("costs")
-        .withIndex("by_org_and_type", (q) =>
-          q.eq("organizationId", orgId).eq("type", "product")
-        )
-        .collect()
-    ).find(
-      (c) =>
-        c.isDefault &&
-        c.calculation === "percentage" &&
-        c.name === "Cost of Goods Sold"
-    );
-
-    // Deprecated: global default tax percentage no longer applied
-
     // Apply search filter if provided
     if (args.searchTerm) {
       const searchLower = args.searchTerm.toLowerCase();
@@ -1222,7 +1203,7 @@ export const getProductVariantsPaginated = query({
     // Join with product data and apply default costs
     // Load product-level cost components for tax percent
     const pcc = await ctx.db
-      .query("productCostComponents")
+      .query("variantCosts")
       .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
       .collect();
     const pccByVariant = new Map<string, typeof pcc[0]>();
@@ -1231,41 +1212,27 @@ export const getProductVariantsPaginated = query({
     const data = paginatedVariants.map((variant) => {
       const product = productMap.get(variant.productId);
 
-      // Apply default COGS if no specific cost is set
-      let costPerItem = variant.costPerItem;
-
-      if (costPerItem === undefined && defaultCOGS?.value) {
-        // Calculate cost as percentage of price
-        costPerItem = (variant.price * defaultCOGS.value) / 100;
-      }
-
       // Tax rate from product cost components when present
       const variantPcc = pccByVariant.get(variant._id);
-      const taxRate = variantPcc?.taxPercent ?? variant.taxRate;
+      const cogsPerUnit = variantPcc?.cogsPerUnit;
       const handlingPerUnit = variantPcc?.handlingPerUnit;
-      const paymentFeePercent = variantPcc?.paymentFeePercent;
-      const paymentFixedPerItem = variantPcc?.paymentFixedPerItem;
-      const paymentProvider = variantPcc?.paymentProvider;
+      const taxPercent = variantPcc?.taxPercent;
       const taxable = variant.taxable;
 
-      // Calculate gross margin if we have cost
-      let grossMargin = variant.grossMargin;
-      let grossProfit = variant.grossProfit;
-
-      if (costPerItem !== undefined && variant.price > 0) {
-        grossProfit = variant.price - costPerItem;
-        grossMargin = (grossProfit / variant.price) * 100;
-      }
+      const totalCost =
+        (cogsPerUnit ?? 0) +
+        (handlingPerUnit ?? 0);
+      const grossProfit = variant.price - totalCost;
+      const grossMargin = variant.price > 0 ? (grossProfit / variant.price) * 100 : 0;
 
       return {
         ...variant,
-        costPerItem,
-        taxRate,
+        costPerItem: cogsPerUnit,
+        cogsPerUnit,
+        taxPercent,
+        taxRate: taxPercent,
         taxable,
         handlingPerUnit,
-        paymentFeePercent,
-        paymentFixedPerItem,
-        paymentProvider,
         grossMargin,
         grossProfit,
         productName: product?.title,
@@ -1314,10 +1281,12 @@ export const getProductVariants = query({
       option3: v.optional(v.string()),
       available: v.optional(v.boolean()),
       costPerItem: v.optional(v.number()),
+      cogsPerUnit: v.optional(v.number()),
       inventoryItemId: v.optional(v.string()),
       taxable: v.optional(v.boolean()),
+      taxPercent: v.optional(v.number()),
       taxRate: v.optional(v.number()),
-      channel: v.optional(v.string()),
+      handlingPerUnit: v.optional(v.number()),
       grossMargin: v.optional(v.number()),
       grossProfit: v.optional(v.number()),
       shopifyCreatedAt: v.number(),
@@ -1365,12 +1334,38 @@ export const getProductVariants = query({
       }
     }
 
-    // Join variant with product data
+    // Load cost components for the organization once
+    const costComponents = await ctx.db
+      .query("variantCosts")
+      .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
+      .collect();
+    const componentByVariant = new Map<Id<"shopifyProductVariants">, typeof costComponents[number]>();
+    for (const component of costComponents) {
+      componentByVariant.set(component.variantId, component);
+    }
+
+    // Join variant with product and cost component data
     return variants.map((variant) => {
       const product = productMap.get(variant.productId);
+      const component = componentByVariant.get(variant._id);
+      const cogsPerUnit = component?.cogsPerUnit;
+      const handlingPerUnit = component?.handlingPerUnit;
+      const taxPercent = component?.taxPercent;
+
+      const totalCost =
+        (cogsPerUnit ?? 0) + (handlingPerUnit ?? 0);
+      const grossProfit = variant.price - totalCost;
+      const grossMargin = variant.price > 0 ? (grossProfit / variant.price) * 100 : 0;
 
       return {
         ...variant,
+        costPerItem: cogsPerUnit,
+        cogsPerUnit,
+        handlingPerUnit,
+        taxPercent,
+        taxRate: taxPercent,
+        grossProfit,
+        grossMargin,
         // Add product fields with "product" prefix
         productName: product?.title,
         productHandle: product?.handle,
@@ -1853,7 +1848,6 @@ export const storeProductsInternal = internalMutation({
         inventoryQuantity: variant.inventoryQuantity,
         available: typeof variant.available === "boolean" ? variant.available : undefined, // Add the available field
         inventoryItemId: toOptionalString(variant.inventoryItemId),
-        costPerItem: variant.costPerItem,
         taxable: typeof variant.taxable === "boolean" ? variant.taxable : undefined,
         weight: variant.weight,
         weightUnit: toOptionalString(variant.weightUnit),

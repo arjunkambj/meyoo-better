@@ -9,7 +9,7 @@ export type ShippingCalculationType =
   | "carrier_calculated";
 
 export interface ShippingCost {
-  _id: Id<"costs">;
+  _id: Id<"globalCosts">;
   organizationId: string;
 
   // Configuration name

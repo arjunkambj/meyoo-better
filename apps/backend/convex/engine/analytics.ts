@@ -10,7 +10,7 @@ import {
   type AnalyticsSourceKey,
   type DateRange,
   fetchAnalyticsOrderChunk,
-  fetchCostsPage,
+  fetchGlobalCostsPage,
   fetchMetaInsightsPage,
   fetchSessionsPage,
   fetchShopifyAnalyticsPage,
@@ -32,8 +32,8 @@ const datasetCountValidator = v.object({
   products: v.number(),
   variants: v.number(),
   metaInsights: v.number(),
-  costs: v.number(),
-  productCostComponents: v.number(),
+  globalCosts: v.number(),
+  variantCosts: v.number(),
   sessions: v.number(),
   analytics: v.number(),
 });
@@ -47,8 +47,8 @@ const DAILY_METRICS_DATASETS = [
   "refunds",
   "customers",
   "variants",
-  "productCostComponents",
-  "costs",
+  "variantCosts",
+  "globalCosts",
   "metaInsights",
   "analytics",
 ] as const satisfies readonly AnalyticsSourceKey[];
@@ -115,8 +115,8 @@ export const calculateAnalytics = internalAction({
       products: 0,
       variants: 0,
       metaInsights: 0,
-      costs: 0,
-      productCostComponents: 0,
+      globalCosts: 0,
+      variantCosts: 0,
       sessions: 0,
       analytics: 0,
     };
@@ -164,7 +164,7 @@ export const calculateAnalytics = internalAction({
       for (const variant of chunk.variants) {
         variantIds.add(variant._id as string);
       }
-      for (const component of chunk.productCostComponents) {
+      for (const component of chunk.variantCosts) {
         productCostComponentIds.add(component._id as string);
       }
 
@@ -183,10 +183,10 @@ export const calculateAnalytics = internalAction({
     counts.customers = customerIds.size;
     counts.products = productIds.size;
     counts.variants = variantIds.size;
-    counts.productCostComponents = productCostComponentIds.size;
+    counts.variantCosts = productCostComponentIds.size;
 
     const accumulateSupplementalCounts = async (
-      dataset: "metaInsights" | "costs" | "sessions" | "analytics",
+      dataset: "metaInsights" | "globalCosts" | "sessions" | "analytics",
     ) => {
       let cursor: string | null = null;
       let total = 0;
@@ -196,7 +196,7 @@ export const calculateAnalytics = internalAction({
           organizationId: string;
           startDate: string;
           endDate: string;
-          dataset: "metaInsights" | "costs" | "sessions" | "analytics";
+          dataset: "metaInsights" | "globalCosts" | "sessions" | "analytics";
           cursor?: string;
         } = {
           organizationId,
@@ -230,13 +230,13 @@ export const calculateAnalytics = internalAction({
 
     const [metaInsightCount, costCount, sessionCount, analyticsCount] = await Promise.all([
       accumulateSupplementalCounts("metaInsights"),
-      accumulateSupplementalCounts("costs"),
+      accumulateSupplementalCounts("globalCosts"),
       accumulateSupplementalCounts("sessions"),
       accumulateSupplementalCounts("analytics"),
     ]);
 
     counts.metaInsights = metaInsightCount;
-    counts.costs = costCount;
+    counts.globalCosts = costCount;
     counts.sessions = sessionCount;
     counts.analytics = analyticsCount;
 
@@ -250,7 +250,7 @@ export const calculateAnalytics = internalAction({
 
 const supplementalDatasetValidator = v.union(
   v.literal("metaInsights"),
-  v.literal("costs"),
+  v.literal("globalCosts"),
   v.literal("sessions"),
   v.literal("analytics"),
 );
@@ -273,7 +273,7 @@ export const gatherAnalyticsOrderChunk = internalQuery({
     products: v.array(v.any()),
     variants: v.array(v.any()),
     customers: v.array(v.any()),
-    productCostComponents: v.array(v.any()),
+    variantCosts: v.array(v.any()),
     cursor: v.optional(v.string()),
     isDone: v.boolean(),
   }),
@@ -343,8 +343,8 @@ export const gatherSupplementalAnalyticsChunk = internalQuery({
           isDone: result.isDone,
         };
       }
-      case "costs": {
-        const result = await fetchCostsPage(ctx, organizationId, timestamps, {
+      case "globalCosts": {
+        const result = await fetchGlobalCostsPage(ctx, organizationId, timestamps, {
           cursor: args.cursor ?? null,
           pageSize: args.pageSize,
         });
@@ -520,7 +520,7 @@ export const getAvailableDateBounds = internalQuery({
     }
 
     const earliestCost = await ctx.db
-      .query("costs")
+      .query("globalCosts")
       .withIndex("by_organization", (q) =>
         q.eq("organizationId", args.organizationId),
       )
@@ -531,7 +531,7 @@ export const getAvailableDateBounds = internalQuery({
     }
 
     const latestCost = await ctx.db
-      .query("costs")
+      .query("globalCosts")
       .withIndex("by_organization", (q) =>
         q.eq("organizationId", args.organizationId),
       )

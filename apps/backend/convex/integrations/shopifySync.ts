@@ -1038,7 +1038,7 @@ export const initial = internalAction({
                 });
                 
                 await ctx.runMutation(
-                  internal.core.costs.createProductCostComponents,
+                  internal.core.costs.createVariantCosts,
                   {
                     organizationId: args.organizationId as Id<"organizations">,
                     components: variantsToCreateCostComponents,

@@ -50,8 +50,8 @@ export interface AnalyticsSourceData {
   variants: Doc<"shopifyProductVariants">[];
   customers: Doc<"shopifyCustomers">[];
   metaInsights: Doc<"metaInsights">[];
-  costs: Doc<"costs">[];
-  productCostComponents: Doc<"productCostComponents">[];
+  globalCosts: Doc<"globalCosts">[];
+  variantCosts: Doc<"variantCosts">[];
   sessions: Doc<"shopifySessions">[];
   analytics: Doc<"shopifyAnalytics">[];
 }
@@ -166,7 +166,7 @@ export type AnalyticsOrderChunk = Pick<
   | "products"
   | "variants"
   | "customers"
-  | "productCostComponents"
+  | "variantCosts"
 >;
 
 export interface AnalyticsOrderChunkResult {
@@ -187,12 +187,12 @@ export async function fetchAnalyticsOrderChunk(
   const needCustomers = shouldFetch("customers");
   const needProducts = shouldFetch("products");
   const needVariants = shouldFetch("variants");
-  const needProductCostComponents = shouldFetch("productCostComponents");
+  const needVariantCosts = shouldFetch("variantCosts");
   const needTransactions = shouldFetch("transactions");
   const needRefunds = shouldFetch("refunds");
   const needFulfillments = shouldFetch("fulfillments");
   const needOrderItems =
-    shouldFetch("orderItems") || needProducts || needVariants || needProductCostComponents;
+    shouldFetch("orderItems") || needProducts || needVariants || needVariantCosts;
 
   const timestamps = toTimestampRange(dateRange);
   const orderPage = await fetchOrdersPage(ctx, organizationId, timestamps, options);
@@ -230,7 +230,7 @@ export async function fetchAnalyticsOrderChunk(
 
   const productIds = needProducts ? new Set<Id<"shopifyProducts">>() : null;
   const variantIds =
-    needVariants || needProductCostComponents ? new Set<Id<"shopifyProductVariants">>() : null;
+    needVariants || needVariantCosts ? new Set<Id<"shopifyProductVariants">>() : null;
 
   if ((productIds || variantIds) && orderItems.length > 0) {
     for (const item of orderItems) {
@@ -253,9 +253,9 @@ export async function fetchAnalyticsOrderChunk(
     products = await fetchProducts(ctx, productIds);
   }
 
-  let productCostComponents: Doc<"productCostComponents">[] = [];
-  if (variantIds && needProductCostComponents && variantIds.size > 0) {
-    productCostComponents = await fetchProductCostComponents(
+  let variantCosts: Doc<"variantCosts">[] = [];
+  if (variantIds && needVariantCosts && variantIds.size > 0) {
+    variantCosts = await fetchVariantCosts(
       ctx,
       organizationId,
       variantIds,
@@ -278,7 +278,7 @@ export async function fetchAnalyticsOrderChunk(
       products: shouldFetch("products") ? products : [],
       variants: shouldFetch("variants") ? variants : [],
       customers: shouldFetch("customers") ? customers : [],
-      productCostComponents: shouldFetch("productCostComponents") ? productCostComponents : [],
+      variantCosts: shouldFetch("variantCosts") ? variantCosts : [],
     },
     cursor: orderPage.cursor,
     isDone: orderPage.isDone,
@@ -450,20 +450,20 @@ async function fetchVariants(
   return docs.filter((doc): doc is Doc<"shopifyProductVariants"> => doc !== null);
 }
 
-async function fetchProductCostComponents(
+async function fetchVariantCosts(
   ctx: QueryCtx,
   organizationId: OrganizationId,
   variantIds: ReadonlySet<Id<"shopifyProductVariants">>,
   timestamps: TimestampRange,
-): Promise<Doc<"productCostComponents">[]> {
+): Promise<Doc<"variantCosts">[]> {
   if (variantIds.size === 0) {
     return [];
   }
 
-  const batches: Doc<"productCostComponents">[][] = await Promise.all(
+  const batches: Doc<"variantCosts">[][] = await Promise.all(
     Array.from(variantIds).map((variantId) =>
       ctx.db
-        .query("productCostComponents")
+        .query("variantCosts")
         .withIndex("by_org_variant", (q) =>
           q.eq("organizationId", organizationId).eq("variantId", variantId),
         )
@@ -475,18 +475,17 @@ async function fetchProductCostComponents(
     .flat()
     .filter((component) => {
       const from = component.effectiveFrom;
-      const to = component.effectiveTo ?? Number.POSITIVE_INFINITY;
-      return from <= timestamps.end && to >= timestamps.start;
+      return from <= timestamps.end;
     });
 }
 
-async function fetchCosts(
+async function fetchGlobalCosts(
   ctx: QueryCtx,
   organizationId: OrganizationId,
   timestamps: TimestampRange,
-): Promise<Doc<"costs">[]> {
+): Promise<Doc<"globalCosts">[]> {
   const costs = await ctx.db
-    .query("costs")
+    .query("globalCosts")
     .withIndex("by_organization", (q) => q.eq("organizationId", organizationId))
     .collect();
 
@@ -525,19 +524,19 @@ export async function fetchMetaInsightsPage(
   };
 }
 
-export async function fetchCostsPage(
+export async function fetchGlobalCostsPage(
   ctx: QueryCtx,
   organizationId: OrganizationId,
   timestamps: TimestampRange,
   options?: PaginationOptions,
-): Promise<PaginatedResult<Doc<"costs">>> {
+): Promise<PaginatedResult<Doc<"globalCosts">>> {
   const { cursor, pageSize } = normalizePageSize(options, {
     pageSize: DEFAULT_SUPPLEMENTAL_PAGE_SIZE,
     maxSize: MAX_SUPPLEMENTAL_PAGE_SIZE,
   });
 
   const page = await ctx.db
-    .query("costs")
+    .query("globalCosts")
     .withIndex("by_organization", (q) => q.eq("organizationId", organizationId))
     .paginate({ numItems: pageSize, cursor });
 
@@ -638,7 +637,7 @@ export async function fetchAnalyticsSourceData(
     customers: [],
     metaInsights: [],
     costs: [],
-    productCostComponents: [],
+    variantCosts: [],
     sessions: [],
     analytics: [],
   };
@@ -652,7 +651,7 @@ export async function fetchAnalyticsSourceData(
     shouldFetch("customers") ||
     shouldFetch("products") ||
     shouldFetch("variants") ||
-    shouldFetch("productCostComponents");
+    shouldFetch("variantCosts");
 
   let orders: Doc<"shopifyOrders">[] = [];
   if (needsOrders) {
@@ -684,7 +683,7 @@ export async function fetchAnalyticsSourceData(
     shouldFetch("orderItems") ||
     shouldFetch("products") ||
     shouldFetch("variants") ||
-    shouldFetch("productCostComponents");
+    shouldFetch("variantCosts");
 
   let orderItems: Doc<"shopifyOrderItems">[] = [];
   if (needsOrderItems && orderIds.length > 0) {
@@ -735,7 +734,7 @@ export async function fetchAnalyticsSourceData(
   }
 
   const shouldLoadProducts = shouldFetch("products");
-  const shouldLoadVariants = shouldFetch("variants") || shouldFetch("productCostComponents");
+  const shouldLoadVariants = shouldFetch("variants") || shouldFetch("variantCosts");
 
   const productIds = shouldLoadProducts ? new Set<Id<"shopifyProducts">>() : null;
   const variantIds = shouldLoadVariants ? new Set<Id<"shopifyProductVariants">>() : null;
@@ -755,25 +754,25 @@ export async function fetchAnalyticsSourceData(
     data.products = await fetchProducts(ctx, productIds);
   }
 
-  let productCostComponents: Doc<"productCostComponents">[] = [];
-  if (shouldFetch("productCostComponents") && variantIds && variantIds.size > 0) {
-    productCostComponents = await fetchProductCostComponents(
+  let variantCosts: Doc<"variantCosts">[] = [];
+  if (shouldFetch("variantCosts") && variantIds && variantIds.size > 0) {
+    variantCosts = await fetchVariantCosts(
       ctx,
       organizationId,
       variantIds,
       timestamps,
     );
-    data.productCostComponents = productCostComponents;
+    data.variantCosts = variantCosts;
   }
 
-  if (shouldFetch("productCostComponents") && !data.productCostComponents.length) {
-    data.productCostComponents = [];
+  if (shouldFetch("variantCosts") && !data.variantCosts.length) {
+    data.variantCosts = [];
   }
 
   if (variantIds && shouldFetch("variants")) {
     const remainingVariantIds = new Set(variantIds);
-    if (productCostComponents.length > 0) {
-      for (const component of productCostComponents) {
+    if (variantCosts.length > 0) {
+      for (const component of variantCosts) {
         const variantId = component.variantId as Id<"shopifyProductVariants">;
         remainingVariantIds.delete(variantId);
       }
@@ -782,16 +781,16 @@ export async function fetchAnalyticsSourceData(
     data.variants = remainingVariantIds.size > 0 ? await fetchVariants(ctx, remainingVariantIds) : [];
   }
 
-  if (!shouldFetch("productCostComponents")) {
-    data.productCostComponents = [];
+  if (!shouldFetch("variantCosts")) {
+    data.variantCosts = [];
   }
 
   if (shouldFetch("metaInsights")) {
     data.metaInsights = await fetchMetaInsights(ctx, organizationId, dateRange);
   }
 
-  if (shouldFetch("costs")) {
-    data.costs = await fetchCosts(ctx, organizationId, timestamps);
+  if (shouldFetch("globalCosts")) {
+    data.globalCosts = await fetchGlobalCosts(ctx, organizationId, timestamps);
   }
 
   if (shouldFetch("sessions")) {
@@ -820,8 +819,8 @@ export const ANALYTICS_SOURCE_KEYS = [
   "variants",
   "customers",
   "metaInsights",
-  "costs",
-  "productCostComponents",
+  "globalCosts",
+  "variantCosts",
   "sessions",
   "analytics",
 ] as const;

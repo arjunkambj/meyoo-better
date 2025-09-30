@@ -8,8 +8,8 @@ export const ANALYTICS_DATASET_KEYS = [
   "variants",
   "customers",
   "metaInsights",
-  "costs",
-  "productCostComponents",
+  "globalCosts",
+  "variantCosts",
   "sessions",
   "analytics",
 ] as const;

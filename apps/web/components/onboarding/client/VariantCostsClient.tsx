@@ -29,8 +29,8 @@ import { useRouter } from "next/navigation";
 
 import {
   useShopifyProductVariantsPaginated,
-  useUpsertProductCostComponents,
-  useSaveProductCostComponents,
+  useUpsertVariantCosts,
+  useSaveVariantCosts,
   useCurrentUser,
   useOnboarding,
 } from "@/hooks";
@@ -56,7 +56,6 @@ type TableCellElement = ReactElement<ComponentProps<typeof TableCell>>;
 type RowEdit = {
   cogs?: string;
   handling?: string;
-  shipping?: string;
   tax?: string;
 };
 
@@ -77,7 +76,6 @@ type VariantRow = {
 
 export default function VariantCostsClient({
   hideNavigation = false,
-  hideShipping = false,
   hideHandling = false,
   hideSearch = false,
   hideRowSave = false,
@@ -85,7 +83,6 @@ export default function VariantCostsClient({
   hideTitle = false,
 }: {
   hideNavigation?: boolean;
-  hideShipping?: boolean;
   hideHandling?: boolean;
   hideSearch?: boolean;
   hideRowSave?: boolean;
@@ -103,8 +100,8 @@ export default function VariantCostsClient({
     pageSize,
     hideSearch ? undefined : search
   );
-  const upsert = useUpsertProductCostComponents();
-  const saveAll = useSaveProductCostComponents();
+  const upsert = useUpsertVariantCosts();
+  const saveAll = useSaveVariantCosts();
 
   const [edits, setEdits] = useState<Record<string, RowEdit>>({});
 
@@ -143,11 +140,10 @@ export default function VariantCostsClient({
     cols.push({ key: "tax", label: "Tax" });
     if (!hideHandling)
       cols.push({ key: "handling", label: "Handling & Overheads" });
-    if (!hideShipping) cols.push({ key: "shipping", label: "Shipping" });
     cols.push({ key: "price", label: "Price" });
     if (!hideRowSave) cols.push({ key: "save", label: "Save" });
     return cols;
-  }, [hideRowSave, hideHandling, hideShipping]);
+  }, [hideRowSave, hideHandling]);
 
   // Analytics: step view
   useEffect(() => {
@@ -279,10 +275,6 @@ export default function VariantCostsClient({
         handlingPerUnit:
           !hideHandling && e.handling !== undefined && e.handling !== ""
             ? Number(e.handling)
-            : undefined,
-        shippingPerUnit:
-          !hideShipping && e.shipping !== undefined && e.shipping !== ""
-            ? Number(e.shipping)
             : undefined,
         // Payment and Shipping are global (single) and edited elsewhere
       });
@@ -436,7 +428,6 @@ export default function VariantCostsClient({
                 next[id] = {
                   cogs: "",
                   tax: "",
-                  shipping: "",
                   handling: "",
                 };
               });
@@ -572,16 +563,6 @@ export default function VariantCostsClient({
                       return undefined;
                     })
                   );
-                  const avgShippingStr = avgFrom(
-                    grp.items.map((v) => {
-                      const id = String(v._id);
-                      const e = edits[id];
-                      if (e && e.shipping !== undefined && e.shipping !== "")
-                        return Number(e.shipping);
-                      return undefined;
-                    })
-                  );
-
                   // Product header row renders the same columns
                   const headerCells: TableCellElement[] = [];
                   headerCells.push(
@@ -769,54 +750,6 @@ export default function VariantCostsClient({
                                 next[id] = {
                                   ...(next[id] || {}),
                                   handling: nextVal,
-                                };
-                              });
-                              return next;
-                            });
-                          }}
-                        />
-                      </TableCell>
-                    );
-                  }
-                  if (!hideShipping) {
-                    headerCells.push(
-                      <TableCell key="shipping">
-                        <NumericInput
-                          aria-label="Shipping (apply to all variants in product)"
-                          min={0}
-                          step="0.01"
-                          size={compact ? "sm" : "md"}
-                          classNames={{
-                            inputWrapper: DATA_TABLE_INPUT_WRAPPER_CLASS,
-                            input: DATA_TABLE_INPUT_CLASS,
-                          }}
-                          startContent={
-                            <span className="text-default-500">
-                              {currencySymbol}
-                            </span>
-                          }
-                          placeholder="0"
-                          value={
-                            groupEdits[grp.key]?.shipping ?? avgShippingStr
-                          }
-                          onValueChange={(nextVal) => {
-                            setGroupEdits((prev) => ({
-                              ...prev,
-                              [grp.key]: {
-                                ...(prev[grp.key] || {}),
-                                shipping: nextVal,
-                              },
-                            }));
-                            setEdits((prev) => {
-                              const next = { ...prev } as Record<
-                                string,
-                                RowEdit
-                              >;
-                              grp.items.forEach((v) => {
-                                const id = String(v._id);
-                                next[id] = {
-                                  ...(next[id] || {}),
-                                  shipping: nextVal,
                                 };
                               });
                               return next;
@@ -1025,46 +958,6 @@ export default function VariantCostsClient({
                               </TableCell>
                             );
                           }
-                          // Shipping
-                          if (!hideShipping) {
-                            cells.push(
-                              <TableCell key="shipping">
-                                <NumericInput
-                                  aria-label="Shipping"
-                                  min={0}
-                                  step="0.01"
-                                  size={compact ? "sm" : "md"}
-                                  classNames={{
-                                    inputWrapper: DATA_TABLE_INPUT_WRAPPER_CLASS,
-                                    input: DATA_TABLE_INPUT_CLASS,
-                                  }}
-                                  startContent={
-                                    <span className="text-default-500">
-                                      {currencySymbol}
-                                    </span>
-                                  }
-                                  placeholder="0"
-                                  value={e.shipping ?? ""}
-                                  onValueChange={(nextVal) => {
-                                    const id = String(v._id);
-                                    setEdits((prev) => {
-                                      if (
-                                        (prev[id]?.shipping ?? "") === nextVal
-                                      )
-                                        return prev;
-                                      return {
-                                        ...prev,
-                                        [id]: {
-                                          ...prev[id],
-                                          shipping: nextVal,
-                                        },
-                                      };
-                                    });
-                                  }}
-                                />
-                              </TableCell>
-                            );
-                          }
                           // Price
                           cells.push(
                             <TableCell key="price">
@@ -1132,12 +1025,6 @@ export default function VariantCostsClient({
                     e?.tax !== undefined && e.tax !== ""
                       ? Number(e.tax)
                       : undefined,
-                  shippingPerUnit:
-                    !hideShipping &&
-                    e?.shipping !== undefined &&
-                    e.shipping !== ""
-                      ? Number(e.shipping)
-                      : undefined,
                   handlingPerUnit:
                     !hideHandling &&
                     e?.handling !== undefined &&
@@ -1152,7 +1039,6 @@ export default function VariantCostsClient({
                 (c) =>
                   c.cogsPerUnit !== undefined ||
                   c.taxPercent !== undefined ||
-                  c.shippingPerUnit !== undefined ||
                   c.handlingPerUnit !== undefined
               );
               if (filtered.length > 0) {

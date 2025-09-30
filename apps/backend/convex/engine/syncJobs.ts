@@ -446,7 +446,7 @@ export const onInitialSyncComplete = internalMutation({
 
       // Determine if any costs exist for analytics
       const hasAnyCosts = (await ctx.db
-        .query("costs")
+        .query("globalCosts")
         .withIndex("by_organization", (q) => q.eq("organizationId", organizationId))
         .first())
         ? true

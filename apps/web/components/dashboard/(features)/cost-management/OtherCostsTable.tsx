@@ -50,7 +50,7 @@ const logger = createLogger("OtherCostsTable");
 
 // Type definitions based on the costs schema
 interface Cost {
-  _id: Id<"costs">;
+  _id: Id<"globalCosts">;
   organizationId: string;
   userId: Id<"users">;
   type:
@@ -95,7 +95,7 @@ interface Cost {
 }
 
 interface FormData {
-  _id?: Id<"costs">;
+  _id?: Id<"globalCosts">;
   name: string;
   // description, category, expenseType removed from UI
   amount: number;
@@ -311,7 +311,7 @@ export default function OtherCostsTable() {
 
     setIsDeleting(true);
     try {
-      await deleteOtherCost(itemToDelete as Id<"costs">);
+      await deleteOtherCost(itemToDelete as Id<"globalCosts">);
       addToast({
         title: "Operating cost deleted",
         color: "default",

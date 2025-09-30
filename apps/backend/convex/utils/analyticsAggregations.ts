@@ -280,8 +280,8 @@ export function computeOverviewMetrics(
   const transactions = (data.transactions || []) as AnyRecord[];
   const refunds = (data.refunds || []) as AnyRecord[];
   const metaInsights = (data.metaInsights || []) as AnyRecord[];
-  const costs = (data.costs || []) as AnyRecord[];
-  const productCostComponents = (data.productCostComponents || []) as AnyRecord[];
+  const costs = (data.globalCosts || []) as AnyRecord[];
+  const variantCosts = (data.variantCosts || []) as AnyRecord[];
   const variants = (data.variants || []) as AnyRecord[];
   const customers = (data.customers || []) as AnyRecord[];
   const analytics = (data.analytics || []) as AnyRecord[];
@@ -353,7 +353,7 @@ export function computeOverviewMetrics(
   }
 
   const componentMap = new Map<string, AnyRecord>();
-  for (const component of productCostComponents) {
+  for (const component of variantCosts) {
     const variantId = toStringId(component.variantId ?? component.variant_id);
     if (!variantId) continue;
     if (component.isActive === false) continue;
@@ -1079,7 +1079,7 @@ function deriveOrderDocuments(data: AnalyticsSourceData<any>): {
   orderItems: AnyRecord[];
   transactions: AnyRecord[];
   refunds: AnyRecord[];
-  productCostComponents: AnyRecord[];
+  variantCosts: AnyRecord[];
   variants: AnyRecord[];
 } {
   return {
@@ -1087,7 +1087,7 @@ function deriveOrderDocuments(data: AnalyticsSourceData<any>): {
     orderItems: (data.orderItems || []) as AnyRecord[],
     transactions: (data.transactions || []) as AnyRecord[],
     refunds: (data.refunds || []) as AnyRecord[],
-    productCostComponents: (data.productCostComponents || []) as AnyRecord[],
+    variantCosts: (data.variantCosts || []) as AnyRecord[],
     variants: (data.variants || []) as AnyRecord[],
   };
 }
@@ -1115,7 +1115,7 @@ export function computeOrdersAnalytics(
     } satisfies OrdersAnalyticsResult;
   }
 
-  const { orders, orderItems, transactions, refunds, productCostComponents, variants } =
+  const { orders, orderItems, transactions, refunds, variantCosts, variants } =
     deriveOrderDocuments(data);
 
   const variantMap = new Map<string, AnyRecord>();
@@ -1124,7 +1124,7 @@ export function computeOrdersAnalytics(
   }
 
   const componentMap = new Map<string, AnyRecord>();
-  for (const component of productCostComponents) {
+  for (const component of variantCosts) {
     const variantId = toStringId(component.variantId ?? component.variant_id);
     if (!variantId) continue;
     const current = componentMap.get(variantId);
@@ -1688,7 +1688,7 @@ export function computePnLAnalytics(
   }
 
   const orders = (data.orders || []) as AnyRecord[];
-  const costs = (data.costs || []) as AnyRecord[];
+  const costs = (data.globalCosts || []) as AnyRecord[];
   const metaInsights = (data.metaInsights || []) as AnyRecord[];
   const buckets = new Map<
     string,

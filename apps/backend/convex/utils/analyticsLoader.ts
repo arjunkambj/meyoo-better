@@ -13,7 +13,7 @@ const DEFAULT_SUPPLEMENTAL_CHUNK_SIZE = 200;
 const MIN_SUPPLEMENTAL_CHUNK_SIZE = 25;
 
 type DatasetCollector = {
-  key: "metaInsights" | "costs" | "sessions" | "analytics";
+  key: "metaInsights" | "globalCosts" | "sessions" | "analytics";
   collect: (items: Doc<any>[]) => void;
 };
 
@@ -21,9 +21,9 @@ type UniqueMaps = {
   customers: Map<string, Doc<"shopifyCustomers">>;
   products: Map<string, Doc<"shopifyProducts">>;
   variants: Map<string, Doc<"shopifyProductVariants">>;
-  productCostComponents: Map<string, Doc<"productCostComponents">>;
+  variantCosts: Map<string, Doc<"variantCosts">>;
   metaInsights: Map<string, Doc<"metaInsights">>;
-  costs: Map<string, Doc<"costs">>;
+  globalCosts: Map<string, Doc<"globalCosts">>;
   sessions: Map<string, Doc<"shopifySessions">>;
   analytics: Map<string, Doc<"shopifyAnalytics">>;
 };
@@ -50,8 +50,8 @@ function createEmptyAnalyticsData(): AnalyticsSourceData {
     variants: [],
     customers: [],
     metaInsights: [],
-    costs: [],
-    productCostComponents: [],
+    globalCosts: [],
+    variantCosts: [],
     sessions: [],
     analytics: [],
   };
@@ -62,9 +62,9 @@ function createUniqueMaps(): UniqueMaps {
     customers: new Map(),
     products: new Map(),
     variants: new Map(),
-    productCostComponents: new Map(),
+    variantCosts: new Map(),
     metaInsights: new Map(),
-    costs: new Map(),
+    globalCosts: new Map(),
     sessions: new Map(),
     analytics: new Map(),
   };
@@ -85,9 +85,9 @@ function buildSupplementalCollectors(
     }
   };
 
-  const collectCosts = (items: Doc<"costs">[]) => {
+  const collectGlobalCosts = (items: Doc<"globalCosts">[]) => {
     for (const item of items) {
-      uniqueMaps.costs.set(item._id as string, item);
+      uniqueMaps.globalCosts.set(item._id as string, item);
     }
   };
 
@@ -108,8 +108,8 @@ function buildSupplementalCollectors(
   if (shouldFetch("metaInsights")) {
     collectors.push({ key: "metaInsights", collect: collectMetaInsights });
   }
-  if (shouldFetch("costs")) {
-    collectors.push({ key: "costs", collect: collectCosts });
+  if (shouldFetch("globalCosts")) {
+    collectors.push({ key: "globalCosts", collect: collectGlobalCosts });
   }
   if (shouldFetch("sessions")) {
     collectors.push({ key: "sessions", collect: collectSessions });
@@ -179,7 +179,7 @@ export async function loadAnalyticsWithChunks(
       products: Doc<"shopifyProducts">[];
       variants: Doc<"shopifyProductVariants">[];
       customers: Doc<"shopifyCustomers">[];
-      productCostComponents: Doc<"productCostComponents">[];
+      variantCosts: Doc<"variantCosts">[];
       cursor?: string | null;
       isDone: boolean;
     };
@@ -232,9 +232,9 @@ export async function loadAnalyticsWithChunks(
         uniqueMaps.variants.set(variant._id as string, variant);
       }
     }
-    if (shouldFetch("productCostComponents")) {
-      for (const component of chunk.productCostComponents) {
-        uniqueMaps.productCostComponents.set(component._id as string, component);
+    if (shouldFetch("variantCosts")) {
+      for (const component of chunk.variantCosts) {
+        uniqueMaps.variantCosts.set(component._id as string, component);
       }
     }
 
@@ -270,8 +270,8 @@ export async function loadAnalyticsWithChunks(
   data.variants = shouldFetch("variants")
     ? Array.from(uniqueMaps.variants.values())
     : [];
-  data.productCostComponents = shouldFetch("productCostComponents")
-    ? Array.from(uniqueMaps.productCostComponents.values())
+  data.variantCosts = shouldFetch("variantCosts")
+    ? Array.from(uniqueMaps.variantCosts.values())
     : [];
 
   const supplementalCollectors = buildSupplementalCollectors(shouldFetch, uniqueMaps);
@@ -333,8 +333,8 @@ export async function loadAnalyticsWithChunks(
   data.metaInsights = shouldFetch("metaInsights")
     ? Array.from(uniqueMaps.metaInsights.values())
     : [];
-  data.costs = shouldFetch("costs")
-    ? Array.from(uniqueMaps.costs.values())
+  data.globalCosts = shouldFetch("globalCosts")
+    ? Array.from(uniqueMaps.globalCosts.values())
     : [];
   data.sessions = shouldFetch("sessions")
     ? Array.from(uniqueMaps.sessions.values())

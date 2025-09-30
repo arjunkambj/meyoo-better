@@ -58,11 +58,11 @@ export const getCosts = query({
     const orgId = auth.orgId as Id<'organizations'>;
 
     // Use proper index for type filtering
-    let costs: Doc<"costs">[];
+    let costs: Doc<"globalCosts">[];
 
     if (args.type) {
       costs = await ctx.db
-        .query("costs")
+        .query("globalCosts")
         .withIndex("by_org_and_type", (q) =>
           q
             .eq("organizationId", orgId)
@@ -81,7 +81,7 @@ export const getCosts = query({
         .collect();
     } else {
       costs = await ctx.db
-        .query("costs")
+        .query("globalCosts")
         .withIndex("by_organization", (q) =>
           q.eq("organizationId", orgId),
         )
@@ -94,7 +94,7 @@ export const getCosts = query({
       const endTime = new Date(args.dateRange.endDate).getTime();
 
       costs = costs.filter(
-        (cost: Doc<"costs">) =>
+        (cost: Doc<"globalCosts">) =>
           cost.effectiveFrom >= startTime &&
           (!cost.effectiveTo || cost.effectiveTo <= endTime),
       );
@@ -116,7 +116,7 @@ export const getShippingCosts = query({
     if (!auth) return [];
 
     return await ctx.db
-      .query("costs")
+      .query("globalCosts")
       .withIndex("by_org_and_type", (q) =>
         q
           .eq("organizationId", auth.orgId as Id<"organizations">)
@@ -138,7 +138,7 @@ export const getTaxRates = query({
 
     // Get tax rates from costs
     const taxCosts = await ctx.db
-      .query("costs")
+      .query("globalCosts")
       .withIndex("by_org_and_type", (q) =>
         q
           .eq("organizationId", auth.orgId as Id<"organizations">)
@@ -189,7 +189,7 @@ export const getCostSummary = query({
     };
 
     const costs = await ctx.db
-      .query("costs")
+      .query("globalCosts")
       .withIndex("by_organization", (q) =>
         q.eq("organizationId", auth.orgId as Id<"organizations">),
       )
@@ -253,11 +253,11 @@ export const addCost = mutation({
       ),
     ),
   },
-  returns: v.object({ id: v.id("costs"), success: v.boolean() }),
+  returns: v.object({ id: v.id("globalCosts"), success: v.boolean() }),
   handler: async (ctx, args) => {
     const { user } = await requireUserAndOrg(ctx);
 
-    const costId = await ctx.db.insert("costs", {
+    const costId = await ctx.db.insert("globalCosts", {
       organizationId: user.organizationId as Id<"organizations">,
       userId: user._id,
       type: args.type,
@@ -282,7 +282,7 @@ export const addCost = mutation({
  */
 export const updateCost = mutation({
   args: {
-    costId: v.id("costs"),
+    costId: v.id("globalCosts"),
     name: v.optional(v.string()),
     value: v.optional(v.number()),
     description: v.optional(v.string()),
@@ -311,7 +311,7 @@ export const updateCost = mutation({
       throw new Error("Cost not found or access denied");
     }
 
-    const updates: Partial<Doc<"costs">> & { updatedAt: number } = {
+    const updates: Partial<Doc<"globalCosts">> & { updatedAt: number } = {
       updatedAt: Date.now(),
     };
 
@@ -332,7 +332,7 @@ export const updateCost = mutation({
  */
 export const deleteCost = mutation({
   args: {
-    costId: v.id("costs"),
+    costId: v.id("globalCosts"),
   },
   returns: v.object({ success: v.boolean() }),
   handler: async (ctx, args) => {
@@ -350,12 +350,12 @@ export const deleteCost = mutation({
   },
 });
 
-// Removed legacy product cost mutations (use upsertProductCostComponents instead)
+// Removed legacy product cost mutations (use upsertVariantCosts instead)
 
 /**
  * Get product-level cost components for a variant
  */
-export const getProductCostComponents = query({
+export const getVariantCosts = query({
   args: {
     variantId: v.id("shopifyProductVariants"),
   },
@@ -364,7 +364,7 @@ export const getProductCostComponents = query({
     if (!auth) return null;
 
     const row = await ctx.db
-      .query("productCostComponents")
+      .query("variantCosts")
       .withIndex("by_org_variant", (q) =>
         q.eq("organizationId", auth.orgId as Id<"organizations">).eq("variantId", args.variantId),
       )
@@ -377,7 +377,7 @@ export const getProductCostComponents = query({
 /**
  * Upsert product-level cost components
  */
-export const upsertProductCostComponents = mutation({
+export const upsertVariantCosts = mutation({
   args: {
     variantId: v.id("shopifyProductVariants"),
     cogsPerUnit: v.optional(v.number()),
@@ -393,7 +393,7 @@ export const upsertProductCostComponents = mutation({
     const { user, orgId } = await requireUserAndOrg(ctx);
 
     const existing = await ctx.db
-      .query("productCostComponents")
+      .query("variantCosts")
       .withIndex("by_org_variant", (q) =>
         q.eq("organizationId", orgId as Id<"organizations">).eq("variantId", args.variantId),
       )
@@ -412,7 +412,7 @@ export const upsertProductCostComponents = mutation({
     if (existing) {
       await ctx.db.patch(existing._id, updates);
     } else {
-      await ctx.db.insert("productCostComponents", {
+      await ctx.db.insert("variantCosts", {
         organizationId: orgId,
         userId: user._id,
         variantId: args.variantId,
@@ -469,7 +469,7 @@ export const bulkImportCosts = mutation({
     const importedIds = [];
 
     for (const cost of args.costs) {
-      const costId = await ctx.db.insert("costs", {
+      const costId = await ctx.db.insert("globalCosts", {
         organizationId: orgId,
         userId: user._id,
         type: cost.type,
@@ -555,7 +555,7 @@ export const getProductsWithVariants = query({
 
     // Get all cost components for variants
     const allCostComponents = await ctx.db
-      .query("productCostComponents")
+      .query("variantCosts")
       .withIndex("by_org_and_active", (q) =>
         q.eq("organizationId", orgId).eq("isActive", true),
       )
@@ -648,7 +648,7 @@ export const getVariantCosts = query({
     const { orgId } = await requireUserAndOrg(ctx);
 
     const costs = await ctx.db
-      .query("costs")
+      .query("globalCosts")
       .withIndex("by_org_and_type", (q) =>
         q.eq("organizationId", orgId).eq("type", "product")
       )
@@ -679,7 +679,7 @@ export const setVariantCosts = mutation({
 
     // Delete existing variant costs
     const existingCosts = await ctx.db
-      .query("costs")
+      .query("globalCosts")
       .withIndex("by_org_and_type", (q) =>
         q.eq("organizationId", orgId).eq("type", "product")
       )
@@ -692,7 +692,7 @@ export const setVariantCosts = mutation({
     // Insert new variant costs
     for (const variantCost of args.costs) {
       if (variantCost.cost > 0) {
-        await ctx.db.insert("costs", {
+        await ctx.db.insert("globalCosts", {
           organizationId: orgId,
           userId: user._id,
           type: "product",
@@ -762,7 +762,7 @@ export const bulkUpdateProductCosts = mutation({
 
       // Get existing cost component if it exists
       const existing = await ctx.db
-        .query("productCostComponents")
+        .query("variantCosts")
         .withIndex("by_org_variant", (q) =>
           q.eq("organizationId", orgId).eq("variantId", variantId)
         )
@@ -799,7 +799,7 @@ export const bulkUpdateProductCosts = mutation({
           updatedAt: Date.now(),
         });
       } else {
-        await ctx.db.insert("productCostComponents", {
+        await ctx.db.insert("variantCosts", {
           organizationId: orgId,
           userId: user._id,
           variantId,
@@ -856,7 +856,7 @@ export const applyGlobalHandling = mutation({
       for (const variant of variants) {
         // existing component
         const existing = await ctx.db
-          .query('productCostComponents')
+          .query('variantCosts')
           .withIndex('by_org_variant', (q) => q.eq('organizationId', orgId).eq('variantId', variant._id))
           .first();
 
@@ -868,7 +868,7 @@ export const applyGlobalHandling = mutation({
             updatedAt: Date.now(),
           });
         } else {
-          await ctx.db.insert('productCostComponents', {
+          await ctx.db.insert('variantCosts', {
             organizationId: orgId,
             userId: user._id,
             variantId: variant._id,
@@ -885,7 +885,7 @@ export const applyGlobalHandling = mutation({
     } else {
       // Store as global overhead percent in costs (single source of truth)
       const existingOverhead = await ctx.db
-        .query('costs')
+        .query('globalCosts')
         .withIndex('by_org_and_type', (q) => q.eq('organizationId', orgId).eq('type', 'operational'))
         .first();
 
@@ -898,7 +898,7 @@ export const applyGlobalHandling = mutation({
           updatedAt: Date.now(),
         } as any);
       } else {
-        await ctx.db.insert('costs', {
+        await ctx.db.insert('globalCosts', {
           organizationId: orgId,
           userId: user._id,
           type: 'operational',
@@ -923,7 +923,7 @@ export const applyGlobalHandling = mutation({
 /**
  * Save all product cost components at once
  */
-export const saveProductCostComponents = mutation({
+export const saveVariantCosts = mutation({
   args: {
     costs: v.array(
       v.object({
@@ -958,7 +958,7 @@ export const saveProductCostComponents = mutation({
 
       // Get existing component
       const existing = await ctx.db
-        .query("productCostComponents")
+        .query("variantCosts")
         .withIndex("by_org_variant", (q) =>
           q.eq("organizationId", orgId).eq("variantId", cost.variantId)
         )
@@ -977,7 +977,7 @@ export const saveProductCostComponents = mutation({
       if (existing) {
         await ctx.db.patch(existing._id, updates);
       } else {
-        await ctx.db.insert("productCostComponents", {
+        await ctx.db.insert("variantCosts", {
           organizationId: orgId,
           userId: user._id,
           variantId: cost.variantId,
@@ -997,7 +997,7 @@ export const saveProductCostComponents = mutation({
     }
 
     // Persist per-variant taxPercent when provided (no global averages)
-    // Already handled above in per-variant loop and productCostComponents updates
+    // Already handled above in per-variant loop and variantCosts updates
 
     // Update onboarding step
     const onboarding = await ctx.db
@@ -1034,7 +1034,7 @@ export const updateHistoricalTaxRate = internalMutation({
   handler: async (ctx, args) => {
     // Single source of truth: update or create a tax cost entry only
     const existingTaxCost = await ctx.db
-      .query("costs")
+      .query("globalCosts")
       .withIndex("by_org_type_default", (q) =>
         q
           .eq("organizationId", args.organizationId)
@@ -1049,7 +1049,7 @@ export const updateHistoricalTaxRate = internalMutation({
         updatedAt: Date.now(),
       });
     } else {
-      await ctx.db.insert("costs", {
+      await ctx.db.insert("globalCosts", {
         organizationId: args.organizationId,
         type: "tax",
         name: "Calculated Sales Tax",
@@ -1068,7 +1068,7 @@ export const updateHistoricalTaxRate = internalMutation({
 /**
  * Create product cost components for synced variants
  */
-export const createProductCostComponents = internalMutation({
+export const createVariantCosts = internalMutation({
   args: {
     organizationId: v.id("organizations"),
     components: v.array(
@@ -1104,7 +1104,7 @@ export const createProductCostComponents = internalMutation({
       
       // Check if component already exists
       const existing = await ctx.db
-        .query("productCostComponents")
+        .query("variantCosts")
         .withIndex("by_variant_and_active", (q) =>
           q.eq("variantId", variantId).eq("isActive", true)
         )
@@ -1118,7 +1118,7 @@ export const createProductCostComponents = internalMutation({
         });
       } else {
         // Create new component
-        await ctx.db.insert("productCostComponents", {
+        await ctx.db.insert("variantCosts", {
           organizationId: args.organizationId,
           variantId,
           cogsPerUnit: component.cogsPerUnit,
@@ -1163,7 +1163,7 @@ export const validateCostDataCompleteness = internalQuery({
     
     // Check cost components
     const costComponents = await ctx.db
-      .query("productCostComponents")
+      .query("variantCosts")
       .withIndex("by_org_and_active", (q) =>
         q.eq("organizationId", args.organizationId).eq("isActive", true)
       )
@@ -1173,7 +1173,7 @@ export const validateCostDataCompleteness = internalQuery({
     
     // Check other cost types
     const costs = await ctx.db
-      .query("costs")
+      .query("globalCosts")
       .withIndex("by_org_and_active", (q) =>
         q.eq("organizationId", args.organizationId).eq("isActive", true)
       )
@@ -1265,7 +1265,7 @@ export const calculateShippingCost = internalMutation({
         ? `${descriptionBase} (${detailParts.join(", ")})`
         : descriptionBase;
 
-      await ctx.db.insert("costs", {
+      await ctx.db.insert("globalCosts", {
         organizationId: args.organizationId,
         userId: users._id,
         type: "shipping",
@@ -1317,7 +1317,7 @@ export const syncPlatformCosts = internalMutation({
         : cost.description;
       // Check if cost already exists (avoid duplicates)
       const allCosts = await ctx.db
-        .query("costs")
+        .query("globalCosts")
         .withIndex("by_organization", (q) =>
           q.eq("organizationId", args.organizationId as Id<"organizations">),
         )
@@ -1342,7 +1342,7 @@ export const syncPlatformCosts = internalMutation({
           .first();
 
         if (user) {
-          await ctx.db.insert("costs", {
+          await ctx.db.insert("globalCosts", {
             organizationId: args.organizationId,
             userId: user._id,
             type: cost.type,

@@ -44,13 +44,13 @@ const columns = [
 // Simplified: single flat shipping amount
 
 interface ShippingFormData {
-  _id?: Id<"costs">;
+  _id?: Id<"globalCosts">;
   name?: string;
   baseRate?: number;
 }
 
 interface ShippingCostItem {
-  _id: Id<"costs">;
+  _id: Id<"globalCosts">;
   name: string;
   type: "shipping";
   baseRate?: number;

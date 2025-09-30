@@ -10,3 +10,4 @@
 - [x] Update dashboard feature routes (`apps/web/app/(protected)/(dashboard)/(features)/**`) to reuse shared analytics hooks where possible (confirmed shared hook usage).
 - [x] Simplify remaining dashboard hooks (e.g. `apps/web/hooks/mainapp/useOrdersAnalytics.ts`, `usePnLAnalytics.ts`) to leverage `getOverviewData`/related summaries and remove redundant aggregations (reviewed and aligned).
 - [x] Review MCP and agent tools (`apps/backend/convex/agent/tools.ts`, `apps/backend/convex/agent/mcpActions.ts`) to ensure they call the consolidated overview/platform metrics queries.
+- [ ] Document onboarding cost storage mapping (operating/shipping/payment fees in `globalCosts`; per-variant COGS/handling/tax in `variantCosts` served dynamically to variant queries).

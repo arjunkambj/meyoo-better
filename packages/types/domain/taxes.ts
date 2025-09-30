@@ -4,7 +4,7 @@ import type { Id } from "@repo/convex/dataModel";
 export type TaxType = "sales_tax" | "vat" | "gst" | "hst" | "pst" | "custom";
 
 export interface TaxRate {
-  _id: Id<"costs">;
+  _id: Id<"globalCosts">;
   organizationId: string;
 
   // Tax info

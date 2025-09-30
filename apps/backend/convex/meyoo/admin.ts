@@ -38,7 +38,6 @@ export const populateMissingCostComponents = mutation({
   args: {
     organizationId: v.id("organizations"),
     defaults: v.optional(v.object({
-      shippingPerUnit: v.optional(v.number()),
       handlingPerUnit: v.optional(v.number()),
       taxPercent: v.optional(v.number()),
     })),
@@ -50,14 +49,13 @@ export const populateMissingCostComponents = mutation({
     const user = await ctx.db.get(userId);
     if (!user || !isAdmin(user)) {
       throw new Error("Not authorized");
-    }
+  }
 
-    // Default values
-    const defaults = {
-      shippingPerUnit: args.defaults?.shippingPerUnit ?? 0,
-      handlingPerUnit: args.defaults?.handlingPerUnit ?? 0,
-      taxPercent: args.defaults?.taxPercent ?? 0,
-    };
+  // Default values
+  const defaults = {
+    handlingPerUnit: args.defaults?.handlingPerUnit ?? 0,
+    taxPercent: args.defaults?.taxPercent ?? 0,
+  };
 
     // Get all variants for the organization
     const variants = await ctx.db
@@ -71,7 +69,7 @@ export const populateMissingCostComponents = mutation({
     for (const variant of variants) {
       // Check if component exists
       const existing = await ctx.db
-        .query("productCostComponents")
+        .query("variantCosts")
         .withIndex("by_org_variant", (q) =>
           q.eq("organizationId", args.organizationId)
            .eq("variantId", variant._id)
@@ -80,11 +78,9 @@ export const populateMissingCostComponents = mutation({
 
       if (!existing) {
         // Create new component with defaults
-        await ctx.db.insert("productCostComponents", {
+        await ctx.db.insert("variantCosts", {
           organizationId: args.organizationId,
           variantId: variant._id,
-          cogsPerUnit: variant.costPerItem ?? 0,
-          shippingPerUnit: defaults.shippingPerUnit,
           handlingPerUnit: defaults.handlingPerUnit,
           taxPercent: defaults.taxPercent,
           isActive: true,
@@ -93,14 +89,10 @@ export const populateMissingCostComponents = mutation({
         });
         created++;
       } else if (
-        (existing.shippingPerUnit === undefined || existing.shippingPerUnit === null) ||
         (existing.handlingPerUnit === undefined || existing.handlingPerUnit === null)
       ) {
         // Update missing fields
         const updates: any = {};
-        if (existing.shippingPerUnit === undefined || existing.shippingPerUnit === null) {
-          updates.shippingPerUnit = defaults.shippingPerUnit;
-        }
         if (existing.handlingPerUnit === undefined || existing.handlingPerUnit === null) {
           updates.handlingPerUnit = defaults.handlingPerUnit;
         }
@@ -138,13 +130,13 @@ export const debugCostComponents = query({
 
     // Get product cost components
     const costComponents = await ctx.db
-      .query("productCostComponents")
+      .query("variantCosts")
       .withIndex("by_organization", (q) => q.eq("organizationId", args.organizationId))
       .take(10);
 
     // Get costs table entries
     const costs = await ctx.db
-      .query("costs")
+      .query("globalCosts")
       .withIndex("by_organization", (q) => q.eq("organizationId", args.organizationId))
       .filter((q) => q.or(
         q.eq(q.field("type"), "shipping"),
@@ -175,7 +167,6 @@ export const debugCostComponents = query({
       costComponents: costComponents.map(c => ({
         variantId: c.variantId,
         cogsPerUnit: c.cogsPerUnit,
-        shippingPerUnit: c.shippingPerUnit,
         handlingPerUnit: c.handlingPerUnit,
         taxPercent: c.taxPercent,
       })),
@@ -215,9 +206,8 @@ const ORG_SCOPED_TABLES = [
   "metaInsights",
   "syncProfiles",
   "syncSessions",
-  "costs",
-  "costCategories",
-  "productCostComponents",
+  "globalCosts",
+  "variantCosts",
   "dashboards",
   "gdprRequests",
   "notifications",
@@ -1887,11 +1877,7 @@ export const resetEverything = action({
     }
 
     // Cost tracking tables
-    for (const table of [
-      "costs",
-      "costCategories",
-      "productCostComponents",
-    ] satisfies OrgScopedTable[]) {
+    for (const table of ["globalCosts", "variantCosts"] satisfies OrgScopedTable[]) {
       await deleteTable(table);
     }
 

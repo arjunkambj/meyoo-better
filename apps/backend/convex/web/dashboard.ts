@@ -53,9 +53,9 @@ const DASHBOARD_SUMMARY_DATASETS = [
   "transactions",
   "refunds",
   "variants",
-  "productCostComponents",
+  "variantCosts",
   "customers",
-  "costs",
+  "globalCosts",
   "metaInsights",
   "analytics",
 ] as const satisfies readonly AnalyticsSourceKey[];

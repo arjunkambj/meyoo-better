@@ -9,6 +9,45 @@ import { getUserAndOrg } from "../utils/auth";
  * Provides product inventory data, stock health metrics, and ABC analysis
  */
 
+type VariantCostSnapshot = {
+  cogsPerUnit?: number;
+  handlingPerUnit?: number;
+  taxPercent?: number;
+};
+
+let variantCostCache: Map<string, VariantCostSnapshot> | null = null;
+let variantCostCacheOrg: string | null = null;
+
+const toCacheKey = (id: Id<"shopifyProductVariants">): string => id.toString();
+
+const primeVariantCostComponents = async (
+  ctx: QueryCtx,
+  orgId: Id<"organizations">,
+): Promise<void> => {
+  const orgKey = orgId.toString();
+
+  const components = await ctx.db
+    .query("variantCosts")
+    .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
+    .collect();
+
+  variantCostCache = new Map();
+  for (const component of components) {
+    variantCostCache.set(toCacheKey(component.variantId), {
+      cogsPerUnit: component.cogsPerUnit,
+      handlingPerUnit: component.handlingPerUnit,
+      taxPercent: component.taxPercent,
+    });
+  }
+  variantCostCacheOrg = orgKey;
+};
+
+const getCachedComponent = (
+  variantId: Id<"shopifyProductVariants">,
+): VariantCostSnapshot | undefined => {
+  return variantCostCache?.get(toCacheKey(variantId));
+};
+
 const aggregateInventoryLevels = (
   levels: Array<Doc<"shopifyInventory">>,
   variants?: Array<Doc<"shopifyProductVariants">>,
@@ -168,8 +207,9 @@ const fetchOrdersWithItems = async (
 };
 
 const getVariantCost = (variant: Doc<"shopifyProductVariants">): number => {
-  if (typeof variant.costPerItem === "number") {
-    return variant.costPerItem;
+  const snapshot = getCachedComponent(variant._id);
+  if (snapshot && typeof snapshot.cogsPerUnit === "number") {
+    return snapshot.cogsPerUnit;
   }
 
   const price = typeof variant.price === "number" ? variant.price : 0;
@@ -453,6 +493,8 @@ export const getInventoryOverview = query({
     if (!auth) return null;
     const { user } = auth;
     const _orgId = auth.orgId as Id<"organizations">;
+
+    await primeVariantCostComponents(ctx, _orgId);
 
     // Get all products
     const products = await ctx.db
@@ -740,6 +782,8 @@ export const getProductsList = query({
       };
     const orgId = auth.orgId as Id<"organizations">;
 
+    await primeVariantCostComponents(ctx, orgId);
+
     const page = args.page || 1;
     const pageSize = args.pageSize || 50;
 
@@ -980,16 +1024,19 @@ export const getStockHealth = query({
   handler: async (ctx, _args) => {
     const auth = await getUserAndOrg(ctx);
     if (!auth) return [];
+    const orgId = auth.orgId as Id<"organizations">;
+
+    await primeVariantCostComponents(ctx, orgId);
 
     // Get variants and inventory
     const variants = await ctx.db
       .query("shopifyProductVariants")
-      .withIndex("by_organization", (q) => q.eq("organizationId", auth.orgId as Id<"organizations">))
+      .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
       .collect();
 
     const inventory = await ctx.db
       .query("shopifyInventory")
-      .withIndex("by_organization", (q) => q.eq("organizationId", auth.orgId as Id<"organizations">))
+      .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
       .collect();
 
     const inventoryTotals = aggregateInventoryLevels(inventory, variants);
@@ -1091,6 +1138,8 @@ export const getABCAnalysis = query({
     const auth = await getUserAndOrg(ctx);
     if (!auth) return [];
     const orgId = auth.orgId as Id<'organizations'>;
+
+    await primeVariantCostComponents(ctx, orgId);
 
     const [products, variants] = await Promise.all([
       ctx.db
@@ -1245,6 +1294,8 @@ export const getStockAlerts = query({
     const auth = await getUserAndOrg(ctx);
     if (!auth) return null;
     const orgId = auth.orgId as Id<'organizations'>;
+
+    await primeVariantCostComponents(ctx, orgId);
 
     const [products, variants, inventory] = await Promise.all([
       ctx.db
@@ -1498,6 +1549,8 @@ export const getTopPerformers = query({
 
     const orgId = auth.orgId as Id<'organizations'>;
 
+    await primeVariantCostComponents(ctx, orgId);
+
     const [products, variants] = await Promise.all([
       ctx.db
         .query("shopifyProducts")
@@ -1636,6 +1689,10 @@ export const getStockMovement = query({
     const auth = await getUserAndOrg(ctx);
     if (!auth) return [];
 
+    const orgId = auth.orgId as Id<'organizations'>;
+
+    await primeVariantCostComponents(ctx, orgId);
+
     const periods = args.periods || 7;
     const endDate = args.dateRange?.endDate
       ? new Date(args.dateRange.endDate)
@@ -1649,7 +1706,7 @@ export const getStockMovement = query({
       .query("shopifyOrders")
       .withIndex("by_organization_and_created", (q) =>
         q
-          .eq("organizationId", auth.orgId as Id<'organizations'>)
+          .eq("organizationId", orgId)
           .gte("shopifyCreatedAt", startDate.getTime())
           .lte("shopifyCreatedAt", endDate.getTime()),
       )
@@ -1658,14 +1715,14 @@ export const getStockMovement = query({
     const orderItems = await ctx.db
       .query("shopifyOrderItems")
       .withIndex("by_organization", (q) =>
-        q.eq("organizationId", auth.orgId as Id<'organizations'>),
+        q.eq("organizationId", orgId),
       )
       .collect();
 
     const inventory = await ctx.db
       .query("shopifyInventory")
       .withIndex("by_organization", (q) =>
-        q.eq("organizationId", auth.orgId as Id<'organizations'>),
+        q.eq("organizationId", orgId),
       )
       .collect();
 
@@ -1778,6 +1835,7 @@ export const getInventoryTurnover = query({
     const auth = await getUserAndOrg(ctx);
     if (!auth) return [];
     const orgId = auth.orgId as Id<'organizations'>;
+    await primeVariantCostComponents(ctx, orgId);
     const periods = args.periods || 6;
 
     const fallbackWindowDays = Math.max(30, periods * 30);

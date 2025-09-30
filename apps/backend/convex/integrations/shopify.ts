@@ -99,13 +99,6 @@ const ORDER_COMPARE_FIELDS: ReadonlyArray<keyof Doc<"shopifyOrders">> = [
   "totalWeight",
   "tags",
   "note",
-  "riskLevel",
-  "sourceUrl",
-  "landingSite",
-  "referringSite",
-  "utmSource",
-  "utmMedium",
-  "utmCampaign",
   "shippingAddress",
 ];
 
@@ -156,7 +149,6 @@ const ORGANIZATION_TABLES = [
   "metaInsights",
   "shopifyAnalytics",
   "costs",
-  "costCategories",
   "productCostComponents",
   "integrationSessions",
   "syncSessions",
@@ -186,7 +178,6 @@ const organizationTableValidator = v.union(
   v.literal("metaInsights"),
   v.literal("shopifyAnalytics"),
   v.literal("costs"),
-  v.literal("costCategories"),
   v.literal("productCostComponents"),
   v.literal("integrationSessions"),
   v.literal("syncSessions"),
@@ -1422,7 +1413,6 @@ export const getOrders = query({
       totalTip: v.optional(v.number()),
       financialStatus: v.optional(v.string()),
       fulfillmentStatus: v.optional(v.string()),
-      orderStatus: v.optional(v.string()),
       totalItems: v.number(),
       totalQuantity: v.number(),
       totalWeight: v.optional(v.number()),
@@ -1435,15 +1425,8 @@ export const getOrders = query({
           zip: v.optional(v.string()),
         })
       ),
-      sourceUrl: v.optional(v.string()),
-      landingSite: v.optional(v.string()),
-      referringSite: v.optional(v.string()),
-      utmSource: v.optional(v.string()),
-      utmMedium: v.optional(v.string()),
-      utmCampaign: v.optional(v.string()),
       tags: v.optional(v.array(v.string())),
       note: v.optional(v.string()),
-      riskLevel: v.optional(v.string()),
       syncedAt: v.number(),
     })
   ),
@@ -1849,6 +1832,7 @@ export const storeProductsInternal = internalMutation({
 
     // Step 4: Process variants and collect inventory data
     const inventoryToStore = [];
+    const touchedVariantIds = new Set<Id<"shopifyProductVariants">>();
     const variantIdMap = new Map();
 
     for (const variant of allVariants) {
@@ -1896,8 +1880,14 @@ export const storeProductsInternal = internalMutation({
       variantIdMap.set(variant.shopifyId, variantId);
 
       // Collect inventory levels for this variant
-      if (variant.inventoryLevels && variant.inventoryLevels.length > 0) {
-        for (const invLevel of variant.inventoryLevels) {
+      touchedVariantIds.add(variantId);
+
+      const inventoryLevels = Array.isArray(variant.inventoryLevels)
+        ? variant.inventoryLevels
+        : [];
+
+      if (inventoryLevels.length > 0) {
+        for (const invLevel of inventoryLevels) {
           inventoryToStore.push({
             organizationId: variant.organizationId,
             variantId,
@@ -1917,6 +1907,19 @@ export const storeProductsInternal = internalMutation({
                 : 0,
           });
         }
+      } else {
+        inventoryToStore.push({
+          organizationId: variant.organizationId,
+          variantId,
+          locationId: "default",
+          locationName: "Default Location",
+          available:
+            typeof variant.inventoryQuantity === "number"
+              ? variant.inventoryQuantity
+              : 0,
+          incoming: 0,
+          committed: 0,
+        });
       }
     }
 
@@ -1926,6 +1929,7 @@ export const storeProductsInternal = internalMutation({
       const inventoryKeys = inventoryToStore.map(
         (inv) => `${inv.variantId}-${inv.locationId}`
       );
+      const inventoryKeySet = new Set(inventoryKeys);
 
       // Fetch all relevant inventory records at once
       const existingInventory = await ctx.db
@@ -1940,7 +1944,7 @@ export const storeProductsInternal = internalMutation({
       for (const inv of existingInventory) {
         const key = `${inv.variantId}-${inv.locationId}`;
 
-        if (inventoryKeys.includes(key)) {
+        if (inventoryKeySet.has(key)) {
           existingInventoryMap.set(key, inv);
         }
       }
@@ -1960,6 +1964,16 @@ export const storeProductsInternal = internalMutation({
           await ctx.db.patch(existing._id, inventoryData);
         } else {
           await (ctx.db.insert as any)("shopifyInventory", inventoryData);
+        }
+      }
+
+      for (const existing of existingInventory) {
+        if (!touchedVariantIds.has(existing.variantId)) continue;
+
+        const key = `${existing.variantId}-${existing.locationId}`;
+
+        if (!inventoryKeySet.has(key)) {
+          await ctx.db.delete(existing._id);
         }
       }
     }
@@ -2035,13 +2049,6 @@ export const storeOrdersInternal = internalMutation({
         totalWeight: v.optional(v.number()),
         tags: v.optional(v.array(v.string())),
         note: v.optional(v.string()),
-        riskLevel: v.optional(v.string()),
-        sourceUrl: v.optional(v.string()),
-        landingSite: v.optional(v.string()),
-        referringSite: v.optional(v.string()),
-        utmSource: v.optional(v.string()),
-        utmMedium: v.optional(v.string()),
-        utmCampaign: v.optional(v.string()),
         syncedAt: v.optional(v.number()),
         shippingAddress: v.optional(
           v.object({
@@ -2249,13 +2256,6 @@ export const storeOrdersInternal = internalMutation({
         totalWeight: orderData.totalWeight,
         tags,
         note: toOptionalString(orderData.note),
-        riskLevel: toOptionalString(orderData.riskLevel),
-        sourceUrl: toOptionalString(orderData.sourceUrl),
-        landingSite: toOptionalString(orderData.landingSite),
-        referringSite: toOptionalString(orderData.referringSite),
-        utmSource: toOptionalString(orderData.utmSource),
-        utmMedium: toOptionalString(orderData.utmMedium),
-        utmCampaign: toOptionalString(orderData.utmCampaign),
         shippingAddress,
         syncedAt: orderData.syncedAt ?? Date.now(),
       };
@@ -2366,10 +2366,9 @@ export const storeOrdersInternal = internalMutation({
 
       // Process line items
       for (const item of allLineItems) {
-        const perUnitDiscount =
-          item.discountedPrice !== undefined
-            ? Math.max(0, item.price - item.discountedPrice)
-            : 0;
+        const totalDiscount = roundMoney(
+          typeof item.totalDiscount === "number" ? item.totalDiscount : 0,
+        );
 
         const itemToStore = {
           organizationId: args.organizationId as Id<"organizations">,
@@ -2388,7 +2387,7 @@ export const storeOrdersInternal = internalMutation({
           sku: toOptionalString(item.sku),
           quantity: item.quantity,
           price: item.price,
-          totalDiscount: roundMoney(perUnitDiscount * item.quantity),
+          totalDiscount,
           fulfillableQuantity: item.fulfillableQuantity ?? item.quantity ?? 0,
           fulfillmentStatus: toOptionalString(item.fulfillmentStatus),
         };
@@ -2485,8 +2484,6 @@ type NormalizedCustomer = {
   totalSpent: number;
   state?: string;
   verifiedEmail?: boolean;
-  acceptsMarketing?: boolean;
-  acceptsMarketingUpdatedAt?: number;
   taxExempt?: boolean;
   defaultAddress?: CustomerAddress;
   tags?: string[];
@@ -2549,14 +2546,6 @@ const normalizeCustomerPayload = (
     state: toOptionalString(raw.state),
     verifiedEmail:
       typeof raw.verifiedEmail === "boolean" ? raw.verifiedEmail : undefined,
-    acceptsMarketing:
-      typeof raw.acceptsMarketing === "boolean"
-        ? raw.acceptsMarketing
-        : undefined,
-    acceptsMarketingUpdatedAt:
-      typeof raw.acceptsMarketingUpdatedAt === "number"
-        ? raw.acceptsMarketingUpdatedAt
-        : undefined,
     taxExempt:
       typeof raw.taxExempt === "boolean" ? raw.taxExempt : undefined,
     defaultAddress: normalizeCustomerAddress(raw.defaultAddress),
@@ -2610,8 +2599,6 @@ const hasCustomerChanges = (
     existing.totalSpent !== next.totalSpent ||
     existing.state !== next.state ||
     existing.verifiedEmail !== next.verifiedEmail ||
-    existing.acceptsMarketing !== next.acceptsMarketing ||
-    existing.acceptsMarketingUpdatedAt !== next.acceptsMarketingUpdatedAt ||
     existing.taxExempt !== next.taxExempt ||
     !addressesEqual(existing.defaultAddress, next.defaultAddress) ||
     !arraysEqual(existing.tags, next.tags) ||
@@ -2777,7 +2764,6 @@ export const storeTransactionsInternal = internalMutation({
         amount: transaction.amount,
         fee: transaction.fee,
         paymentId: transaction.paymentId,
-        paymentDetails: transaction.paymentDetails,
         shopifyCreatedAt: transaction.shopifyCreatedAt,
         processedAt: transaction.processedAt,
       };
@@ -4039,37 +4025,6 @@ export const createSessionInternal = internalMutation({
 });
 
 /**
- * Internal helper to update order with session data
- */
-export const updateOrderSessionInternal = internalMutation({
-  args: {
-    orderId: v.string(),
-    sessionId: v.string(),
-    visitorToken: v.optional(v.string()),
-    sessionSource: v.optional(v.string()),
-    sessionLandingPage: v.optional(v.string()),
-    sessionPageViews: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
-    // Find the order by Shopify ID
-    const order = await ctx.db
-      .query("shopifyOrders")
-      .withIndex("by_shopify_id", (q) => q.eq("shopifyId", args.orderId))
-      .first();
-
-    if (order) {
-      await ctx.db.patch(order._id, {
-        sessionId: args.sessionId,
-        visitorToken: args.visitorToken,
-        sessionSource: args.sessionSource,
-        sessionLandingPage: args.sessionLandingPage,
-        sessionPageViews: args.sessionPageViews,
-      });
-    }
-  },
-});
-
-/**
  * Upsert Shopify analytics aggregates (sessions, traffic sources, etc.)
  */
 export const storeAnalyticsInternal = internalMutation({
@@ -4176,11 +4131,6 @@ export const getOrdersWithAttribution = internalQuery({
       _id: o._id,
       shopifyCreatedAt: o.shopifyCreatedAt,
       totalPrice: o.totalPrice,
-      sourceUrl: o.sourceUrl,
-      landingSite: o.landingSite,
-      utmSource: o.utmSource,
-      utmMedium: o.utmMedium,
-      utmCampaign: o.utmCampaign,
       shippingAddress: o.shippingAddress,
     }));
   },
@@ -4569,12 +4519,7 @@ export const handleAppUninstalled = internalMutation({
       const organization = await ctx.db.get(organizationId);
       if (organization) {
         await ctx.db.patch(organization._id, {
-          // Reset organization trial flags when app is uninstalled
-          isTrialActive: false,
-          hasTrialExpired: false,
           isPremium: false,
-
-          // Update timestamp
           updatedAt: Date.now(),
         });
 

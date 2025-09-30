@@ -119,9 +119,6 @@ function useOnboardingInternal() {
   // Update business profile
   const updateBusinessProfile = async (data: {
     organizationName?: string;
-    businessType?: string;
-    businessCategory?: string;
-    industry?: string;
     mobileNumber?: string;
     mobileCountryCode?: string;
     referralSource?: string;

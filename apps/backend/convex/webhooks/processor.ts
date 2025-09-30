@@ -63,9 +63,21 @@ export const updateOrganizationTrialDates = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.organizationId, {
-      trialEndDate: args.trialEndDate,
+    const billing = await ctx.db
+      .query("billing")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", args.organizationId),
+      )
+      .first();
+
+    if (!billing) {
+      return null;
+    }
+
+    await ctx.db.patch(billing._id, {
       trialStartDate: args.trialStartDate || Date.now(),
+      trialEndDate: args.trialEndDate,
+      trialEndsAt: args.trialEndDate,
       isTrialActive: args.trialEndDate > Date.now(),
       hasTrialExpired: args.trialEndDate <= Date.now(),
       updatedAt: Date.now(),

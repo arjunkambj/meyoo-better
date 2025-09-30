@@ -41,9 +41,6 @@ export function useUser() {
 
   // Update business profile function - for business-specific info
   const updateBusinessProfile = async (data: {
-    businessType?: string;
-    businessCategory?: string;
-    industry?: string;
     mobileNumber?: string;
   }) => {
     return await updateBusinessProfileMutation(data);

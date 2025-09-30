@@ -72,9 +72,9 @@ export const getCurrentOrganization = query({
       createdAt: createdAtStr,
       plan: billing?.shopifyBilling?.plan ?? null,
       status: user.status,
-      isTrialActive: org?.isTrialActive,
-      hasTrialExpired: org?.hasTrialExpired,
-      trialEndDate: org?.trialEndDate,
+      isTrialActive: billing?.isTrialActive,
+      hasTrialExpired: billing?.hasTrialExpired,
+      trialEndDate: billing?.trialEndDate ?? billing?.trialEndsAt,
       hasShopifyConnection: false, // This is now tracked in onboarding table
       hasShopifySubscription: billing?.shopifyBilling?.isActive || false,
     };
@@ -236,8 +236,6 @@ export const getOrganizationUsage = query({
 export const updateOrganization = mutation({
   args: {
     name: v.optional(v.string()),
-    businessType: v.optional(v.string()),
-    industry: v.optional(v.string()),
     currency: v.optional(v.string()),
     fiscalYearStart: v.optional(v.string()),
     timezone: v.optional(v.string()),
@@ -285,8 +283,6 @@ export const updateOrganization = mutation({
     // Prepare organization updates
     const orgUpdates: Partial<{
       name: string;
-      businessType: string;
-      industry: string;
       locale: string;
       timezone: string;
       updatedAt: number;
@@ -295,9 +291,6 @@ export const updateOrganization = mutation({
     };
 
     if (args.name !== undefined) orgUpdates.name = args.name;
-    if (args.businessType !== undefined)
-      orgUpdates.businessType = args.businessType;
-    if (args.industry !== undefined) orgUpdates.industry = args.industry;
     if (args.currency !== undefined) orgUpdates.locale = args.currency; // Map currency to locale
     if (args.timezone !== undefined) orgUpdates.timezone = args.timezone;
 

@@ -144,7 +144,6 @@ export const SHOPIFY_CONFIG = {
       first_name: "firstName",
       last_name: "lastName",
       phone: "phone",
-      accepts_marketing: "acceptsMarketing",
       created_at: "createdAt",
       updated_at: "updatedAt",
     },

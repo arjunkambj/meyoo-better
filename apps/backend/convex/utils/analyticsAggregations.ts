@@ -292,7 +292,6 @@ export function computeOverviewMetrics(
   const isCancelledOrder = (order: AnyRecord): boolean => {
     const candidates = [
       order.status,
-      order.orderStatus,
       order.financialStatus,
       order.fulfillmentStatus,
       order.financial_status,
@@ -957,9 +956,6 @@ export function computeChannelRevenue(
     const rawSource =
       order.utmSource ??
       order.utm_source ??
-      order.sessionSource ??
-      order.referringSite ??
-      order.source ??
       "Direct";
     const channel = String(rawSource || "Direct").trim() || "Direct";
     const stats = channelMap.get(channel) ?? { revenue: 0, orders: 0 };
@@ -1234,7 +1230,7 @@ export function computeOrdersAnalytics(
         name: String(resolvedCustomerName),
         email: String(resolvedCustomerEmail),
       },
-      status: String(orderRaw.orderStatus ?? orderRaw.status ?? ""),
+      status: String(orderRaw.status ?? ""),
       fulfillmentStatus: String(orderRaw.fulfillmentStatus ?? ""),
       financialStatus: String(orderRaw.financialStatus ?? ""),
       items: itemCount,

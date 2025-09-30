@@ -31,8 +31,6 @@ export function useOrganization() {
   // Update organization details
   const updateOrganization = async (data: {
     name?: string;
-    businessType?: string;
-    industry?: string;
     currency?: string;
     fiscalYearStart?: string;
   }) => {
@@ -50,4 +48,3 @@ export function useOrganization() {
     updateOrganization,
   };
 }
-

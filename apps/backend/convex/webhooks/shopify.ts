@@ -314,9 +314,6 @@ async function handleTopicInline(
             ? (order.tags as string).split(",").map((t: string) => t.trim()).filter(Boolean)
             : undefined,
           note: toOptionalString(order.note),
-          riskLevel: Array.isArray(order.risks) && order.risks[0]?.level
-            ? toOptionalString(order.risks[0].level)
-            : undefined,
           lineItems: li.map((x: any) => {
             const title =
               toOptionalString(x.title) ??
@@ -703,7 +700,6 @@ async function handleTopicInline(
           amount: toMoney(t.amount ?? 0),
           fee: undefined,
           paymentId: t.payment_id ? String(t.payment_id) : undefined,
-          paymentDetails: undefined,
           shopifyCreatedAt: toNum(toTs(t.created_at) ?? Date.now()),
           processedAt: toTs(t.processed_at),
         },

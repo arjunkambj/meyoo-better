@@ -700,7 +700,6 @@ function buildDailyMetricsFromResponse(
   const isCancelledOrder = (order: GenericRecord): boolean => {
     const candidates = [
       order.status,
-      order.orderStatus,
       order.financialStatus,
       order.fulfillmentStatus,
       order.financial_status,

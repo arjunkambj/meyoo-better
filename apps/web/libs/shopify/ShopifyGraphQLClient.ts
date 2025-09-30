@@ -838,6 +838,7 @@ export class ShopifyGraphQLClient {
                 sku
                 variant {
                   id
+                  sku
                   product {
                     id
                   }
@@ -852,12 +853,13 @@ export class ShopifyGraphQLClient {
                     amount
                   }
                 }
+                totalDiscountSet {
+                  shopMoney {
+                    amount
+                  }
+                }
                 fulfillableQuantity
                 fulfillmentStatus
-                customAttributes {
-                  key
-                  value
-                }
               }
             }
           }
@@ -986,6 +988,7 @@ export class ShopifyGraphQLClient {
                     sku
                     variant {
                       id
+                      sku
                       product {
                         id
                       }
@@ -996,6 +999,11 @@ export class ShopifyGraphQLClient {
                       }
                     }
                     discountedUnitPriceSet {
+                      shopMoney {
+                        amount
+                      }
+                    }
+                    totalDiscountSet {
                       shopMoney {
                         amount
                       }
@@ -1465,11 +1473,6 @@ export class ShopifyGraphQLClient {
                 province
                 city
               }
-              sourceUrl
-              landingSite
-              utmSource
-              utmMedium
-              utmCampaign
             }
           }
         }

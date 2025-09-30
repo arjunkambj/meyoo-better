@@ -71,20 +71,8 @@ export const organizations = defineTable({
   ownerId: v.id("users"),
 
   // Business info (common for both)
-  businessType: v.optional(v.string()),
-  businessCategory: v.optional(v.string()),
-  industry: v.optional(v.string()),
   locale: v.optional(v.string()),
   timezone: v.optional(v.string()),
-  // Trial management - 14-day trial for new users
-  trialStartDate: v.optional(v.number()),
-  trialEndDate: v.optional(v.number()),
-  isTrialActive: v.optional(v.boolean()),
-  hasTrialExpired: v.optional(v.boolean()),
-
-  // Resource limits (simplified)
-  apiCallLimit: v.optional(v.number()),
-  storageLimit: v.optional(v.number()),
 
   // Quick status checks
   isPremium: v.optional(v.boolean()),
@@ -94,8 +82,7 @@ export const organizations = defineTable({
   createdAt: v.optional(v.number()),
   updatedAt: v.optional(v.number()),
 })
-  .index("by_owner", ["ownerId"])
-  .index("by_trial_status", ["isTrialActive", "hasTrialExpired"]);
+  .index("by_owner", ["ownerId"]);
 
 // Memberships: user ↔ organization link with role + seat info
 export const memberships = defineTable({
@@ -402,6 +389,7 @@ export const onboarding = defineTable({
   onboardingData: v.optional(
     v.object({
       referralSource: v.optional(v.string()),
+      mobileCountryCode: v.optional(v.string()),
       setupDate: v.optional(v.string()),
       completedSteps: v.optional(v.array(v.string())),
       firecrawlSeededAt: v.optional(v.string()),
@@ -485,12 +473,13 @@ export const billing = defineTable({
     ),
   ),
 
-  // Dates
+  // Trial & billing dates
+  trialStartDate: v.optional(v.number()),
+  trialEndDate: v.optional(v.number()),
+  isTrialActive: v.optional(v.boolean()),
+  hasTrialExpired: v.optional(v.boolean()),
   trialEndsAt: v.optional(v.number()),
   nextBillingDate: v.optional(v.number()),
-
-  // Payment method details
-  paymentMethod: v.optional(v.string()), // last 4 digits of card
 
   // Metadata
   createdAt: v.number(),

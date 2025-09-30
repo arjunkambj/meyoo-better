@@ -35,40 +35,23 @@ import {
 type TransactionCost = {
   _id?: string;
   name?: string;
-  provider?: string;
   description?: string;
   calculation?: string;
   value?: number;
   isActive?: boolean;
   effectiveFrom?: number;
-  config?: {
-    percentageFee?: number;
-    fixedFee?: number;
-    chargebackFee?: number;
-    refundFee?: number;
-    disputeFee?: number;
-    volumeTiers?: Array<{
-      minVolume: number;
-      maxVolume?: number;
-      percentageFee: number;
-      fixedFee: number;
-    }>;
-  };
 };
 // Note: using loose runtime typing from Convex, but state uses TransactionCost
 
 const columns = [
-  { name: "Name", uid: "provider" },
+  { name: "Name", uid: "name" },
   { name: "Processing Fee", uid: "fees" },
   { name: "Actions", uid: "actions" },
 ];
 
 // Simplified: a single provider name and a single percentage fee
 
-interface PaymentFormData extends Partial<TransactionCost> {
-  percentageFee?: number;
-  fixedFee?: number;
-}
+type PaymentFormData = Partial<TransactionCost>;
 
 export default function PaymentFeesTable() {
   
@@ -83,32 +66,25 @@ export default function PaymentFeesTable() {
   const upsertTransactionCost = useCreateTransactionFee();
 
   const handleEdit = (item: TransactionCost) => {
-    // Extract data from item including config
-    const formDataToSet: PaymentFormData = {
+    setFormData({
       ...item,
-      config: {
-        ...item.config,
-        percentageFee: item.config?.percentageFee || item.value || 0,
-        fixedFee: item.config?.fixedFee || 0,
-      },
-    };
-
-    setFormData(formDataToSet);
+      value: item.value ?? 0,
+    });
     onOpen();
   };
 
   const handleAdd = () => {
-    setFormData({ provider: "Stripe", config: { percentageFee: 2.9 } });
+    setFormData({ name: "Stripe", value: 2.9 });
     onOpen();
   };
 
   const handleSave = async () => {
     try {
       await upsertTransactionCost({
-        name: formData.provider || "",
-        value: formData.config?.percentageFee || formData.percentageFee || 0,
+        name: formData.name || "",
+        value: formData.value || 0,
         calculation: "PERCENTAGE",
-        provider: formData.provider,
+        description: formData.description,
       });
       addToast({
         title: formData._id ? "Payment fee updated" : "Payment fee added",
@@ -129,20 +105,23 @@ export default function PaymentFeesTable() {
 
   const renderCell = (item: TransactionCost, columnKey: React.Key) => {
     switch (columnKey) {
-      case "provider":
+      case "name":
         return (
           <div className="min-w-0">
             <p className="truncate text-sm font-medium text-default-900">
-              {item.provider || item.name || "Payment Processor"}
+              {item.name || "Payment Processor"}
             </p>
-            <p className="truncate text-xs text-default-500">{item.name}</p>
+            {item.description ? (
+              <p className="truncate text-xs text-default-500">
+                {item.description}
+              </p>
+            ) : null}
           </div>
         );
 
       case "fees": {
         const percentageFee =
-          item.config?.percentageFee ??
-          (item.calculation?.toLowerCase() === "percentage" ? item.value : undefined);
+          item.calculation?.toLowerCase() === "percentage" ? item.value : undefined;
         return (
           <span className="font-medium">
             {percentageFee != null ? `${percentageFee}%` : "-"}
@@ -263,9 +242,9 @@ export default function PaymentFeesTable() {
                     label="Provider Name"
                     labelPlacement="outside"
                     size="sm"
-                    value={formData.provider || ""}
+                    value={formData.name || ""}
                     onValueChange={(value) =>
-                      setFormData({ ...formData, provider: value })
+                      setFormData({ ...formData, name: value })
                     }
                   />
                   <Input
@@ -275,14 +254,11 @@ export default function PaymentFeesTable() {
                     labelPlacement="outside"
                     step="0.01"
                     type="number"
-                    value={(formData.config?.percentageFee || "").toString()}
+                    value={formData.value != null ? formData.value.toString() : ""}
                     onValueChange={(value) =>
                       setFormData({
                         ...formData,
-                        config: {
-                          ...formData.config,
-                          percentageFee: parseFloat(value) || 0,
-                        },
+                        value: parseFloat(value) || 0,
                       })
                     }
                   />
@@ -294,7 +270,7 @@ export default function PaymentFeesTable() {
                 </Button>
                 <Button
                   color="primary"
-                  isDisabled={!formData.provider || !((formData.config?.percentageFee ?? 0) > 0)}
+                  isDisabled={!formData.name || !((formData.value ?? 0) > 0)}
                   onPress={handleSave}
                 >
                   {formData._id ? "Update" : "Add"}

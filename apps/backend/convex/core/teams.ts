@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { mutation, query } from "../_generated/server";
-import { createNewUserData, normalizeEmail } from "../authHelpers";
+import { createNewUserData, ensureActiveMembership, normalizeEmail } from "../authHelpers";
 import { getUserAndOrg, requireUserAndOrg } from "../utils/auth";
 
 /**
@@ -284,23 +284,15 @@ export const inviteTeamMember = mutation({
                 .eq("userId", existingUser._id),
             )
             .first();
-          if (existingMembership) {
-            await ctx.db.patch(existingMembership._id, {
-              role: args.role,
-              status: "active",
-              updatedAt: Date.now(),
-            });
-          } else {
-            await ctx.db.insert("memberships", {
-              organizationId: inviter.organizationId as Id<"organizations">,
-              userId: existingUser._id,
-              role: args.role,
-              status: "active",
-              seatType: "free",
-              hasAiAddOn: false,
-              createdAt: Date.now(),
-            });
-          }
+
+          const now = Date.now();
+          const orgId = inviter.organizationId as Id<"organizations">;
+          await ensureActiveMembership(ctx, orgId, existingUser._id, args.role, {
+            seatType: existingMembership?.seatType ?? "free",
+            hasAiAddOn: existingMembership?.hasAiAddOn ?? false,
+            assignedAt: existingMembership?.assignedAt ?? now,
+            assignedBy: existingMembership?.assignedBy ?? inviter._id,
+          });
 
           return {
             success: true,
@@ -318,14 +310,13 @@ export const inviteTeamMember = mutation({
         status: "invited",
         updatedAt: Date.now(),
       });
-      await ctx.db.insert("memberships", {
-        organizationId: inviter.organizationId as Id<"organizations">,
-        userId: existingUser._id,
-        role: args.role,
-        status: "active",
+      const now = Date.now();
+      const orgId = inviter.organizationId as Id<"organizations">;
+      await ensureActiveMembership(ctx, orgId, existingUser._id, args.role, {
         seatType: "free",
         hasAiAddOn: false,
-        createdAt: Date.now(),
+        assignedAt: now,
+        assignedBy: inviter._id,
       });
 
       return {
@@ -350,14 +341,12 @@ export const inviteTeamMember = mutation({
       primaryCurrency: inviter.primaryCurrency || "USD",
     });
 
-    await ctx.db.insert("memberships", {
-      organizationId: inviter.organizationId as Id<"organizations">,
-      userId: newUserId,
-      role: args.role,
-      status: "active",
+    const orgId = inviter.organizationId as Id<"organizations">;
+    await ensureActiveMembership(ctx, orgId, newUserId, args.role, {
       seatType: "free",
       hasAiAddOn: false,
-      createdAt: now,
+      assignedAt: now,
+      assignedBy: inviter._id,
     });
 
     // production: avoid logging invitations with emails/PII

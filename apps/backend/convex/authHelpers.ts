@@ -17,7 +17,7 @@ function resolveMembershipRole(
   return role === "StoreOwner" ? "StoreOwner" : "StoreTeam";
 }
 
-async function ensureActiveMembership(
+export async function ensureActiveMembership(
   ctx: MutationCtx,
   organizationId: Id<"organizations">,
   userId: Id<"users">,
@@ -36,6 +36,7 @@ async function ensureActiveMembership(
     ?? options.seatType
     ?? "free";
   const hasAiAddOn = existing?.hasAiAddOn ?? options.hasAiAddOn ?? false;
+  const hasAIAccess = seatType === "paid" || hasAiAddOn;
   const assignedAt = existing?.assignedAt ?? options.assignedAt ?? now;
   const assignedBy = existing?.assignedBy ?? options.assignedBy ?? userId;
 
@@ -45,6 +46,7 @@ async function ensureActiveMembership(
       status: "active",
       seatType,
       hasAiAddOn,
+      hasAIAccess,
       assignedAt,
       assignedBy,
       updatedAt: now,
@@ -59,6 +61,7 @@ async function ensureActiveMembership(
     status: "active",
     seatType,
     hasAiAddOn,
+    hasAIAccess,
     assignedAt,
     assignedBy,
     createdAt: now,
@@ -91,11 +94,15 @@ async function transferMembership(
   const now = Date.now();
 
   if (source && target && source._id !== target._id) {
+    const seatType = target.seatType ?? source.seatType ?? "free";
+    const hasAiAddOn = target.hasAiAddOn ?? source.hasAiAddOn ?? false;
+    const hasAIAccess = seatType === "paid" || hasAiAddOn;
     await ctx.db.patch(target._id, {
       role: target.role ?? source.role ?? roleFallback,
       status: "active",
-      seatType: target.seatType ?? source.seatType ?? "free",
-      hasAiAddOn: target.hasAiAddOn ?? source.hasAiAddOn ?? false,
+      seatType,
+      hasAiAddOn,
+      hasAIAccess,
       assignedAt: target.assignedAt ?? source.assignedAt ?? now,
       assignedBy: target.assignedBy ?? source.assignedBy ?? toUserId,
       updatedAt: now,
@@ -105,12 +112,16 @@ async function transferMembership(
   }
 
   if (source) {
+    const seatType = source.seatType ?? "free";
+    const hasAiAddOn = source.hasAiAddOn ?? false;
+    const hasAIAccess = seatType === "paid" || hasAiAddOn;
     await ctx.db.patch(source._id, {
       userId: toUserId,
       role: source.role ?? roleFallback,
       status: "active",
-      seatType: source.seatType ?? "free",
-      hasAiAddOn: source.hasAiAddOn ?? false,
+      seatType,
+      hasAiAddOn,
+      hasAIAccess,
       assignedAt: source.assignedAt ?? now,
       assignedBy: source.assignedBy ?? toUserId,
       updatedAt: now,
@@ -119,11 +130,15 @@ async function transferMembership(
   }
 
   if (target) {
+    const seatType = target.seatType ?? "free";
+    const hasAiAddOn = target.hasAiAddOn ?? false;
+    const hasAIAccess = seatType === "paid" || hasAiAddOn;
     await ctx.db.patch(target._id, {
       role: target.role ?? roleFallback,
       status: "active",
-      seatType: target.seatType ?? "free",
-      hasAiAddOn: target.hasAiAddOn ?? false,
+      seatType,
+      hasAiAddOn,
+      hasAIAccess,
       assignedAt: target.assignedAt ?? now,
       assignedBy: target.assignedBy ?? toUserId,
       updatedAt: now,
@@ -283,8 +298,6 @@ export async function handleExistingUser(
       ownerId: authUserId,
       isPremium: false,
       requiresUpgrade: false,
-      apiCallLimit: 1000,
-      storageLimit: 500,
       locale: "en-US",
       timezone: "America/New_York",
       createdAt: now,
@@ -371,8 +384,6 @@ export async function createNewUserData(
     ownerId: userId,
     isPremium: false,
     requiresUpgrade: false,
-    apiCallLimit: 1000,
-    storageLimit: 500,
     locale: "en-US",
     timezone: "America/New_York",
     createdAt: now,
@@ -463,6 +474,18 @@ export async function updateLoginTracking(
     loginCount: (user.loginCount || 0) + 1,
     updatedAt: Date.now(),
   });
+
+  if (user.organizationId) {
+    await ensureActiveMembership(
+      ctx,
+      user.organizationId as Id<"organizations">,
+      userId,
+      resolveMembershipRole(user.role),
+      {
+        assignedBy: userId,
+      },
+    );
+  }
 }
 
 export function normalizeEmail(email: string): string {

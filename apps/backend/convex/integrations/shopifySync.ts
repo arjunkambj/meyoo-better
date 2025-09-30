@@ -53,9 +53,10 @@ type ShopifyLineItem = {
   name?: string;
   quantity?: number;
   sku?: string;
-  variant?: { id?: string; product?: { id?: string } };
+  variant?: { id?: string; sku?: string; product?: { id?: string } };
   originalUnitPriceSet?: { shopMoney?: ShopifyMoney };
   discountedUnitPriceSet?: { shopMoney?: ShopifyMoney };
+  totalDiscountSet?: { shopMoney?: ShopifyMoney };
   fulfillableQuantity?: number;
   fulfillmentStatus?: string;
 };
@@ -67,11 +68,6 @@ type ShopifyTransaction = {
   amountSet?: { shopMoney?: ShopifyMoney };
   fees?: Array<{ amount?: { amount?: string } }>;
   paymentId?: string;
-  paymentDetails?: {
-    creditCardBin?: string;
-    creditCardCompany?: string;
-    creditCardNumber?: string;
-  };
   createdAt: string;
   processedAt?: string;
 };
@@ -95,12 +91,37 @@ type ShopifyRefund = {
 type ShopifyFulfillment = {
   id: string;
   status: string;
+  shipmentStatus?: string;
   trackingInfo?: Array<{ company?: string; number?: string; url?: string }>;
+  location?: { id?: string | null; name?: string | null } | null;
+  service?: { serviceName?: string | null } | string | null;
   fulfillmentLineItems?: {
-    edges?: Array<{ node: { id?: string; quantity?: number } }>;
+    edges?: Array<{
+      node: {
+        id?: string;
+        quantity?: number;
+        lineItem?: { id?: string | null } | null;
+      };
+    }>;
   };
   createdAt?: string;
   updatedAt?: string;
+};
+type ShopifyFulfillmentOrder = {
+  id: string;
+  status?: string;
+  assignedLocation?: {
+    location?: { id?: string | null; name?: string | null } | null;
+  } | null;
+  deliveryMethod?: { methodType?: string | null; serviceName?: string | null } | null;
+  lineItems?: {
+    edges?: Array<{
+      node?: {
+        id?: string | null;
+        lineItem?: { id?: string | null } | null;
+      } | null;
+    }>;
+  };
 };
 type ShopifyOrderNode = {
   id: string;
@@ -140,6 +161,7 @@ type ShopifyOrderNode = {
   transactions?: Array<ShopifyTransaction>;
   refunds?: Array<ShopifyRefund>;
   fulfillments?: Array<ShopifyFulfillment>;
+  fulfillmentOrders?: { edges?: Array<{ node: ShopifyFulfillmentOrder }> };
   customerJourneySummary?: {
     firstVisit?: {
       source?: string;
@@ -165,11 +187,6 @@ type AttributedOrder = {
   _id: Id<"shopifyOrders">;
   shopifyCreatedAt: number | string;
   totalPrice?: number;
-  sourceUrl?: string;
-  landingSite?: string;
-  utmSource?: string;
-  utmMedium?: string;
-  utmCampaign?: string;
   shippingAddress?: { country?: string; province?: string; city?: string };
   customerJourneySummary?: {
     firstVisit?: {
@@ -246,7 +263,6 @@ type ShopifyOrderInput = {
   totalWeight?: number;
   tags?: string[];
   note?: string;
-  riskLevel?: string;
   shippingAddress?: {
     country?: string;
     province?: string;
@@ -261,12 +277,6 @@ type ShopifyOrderInput = {
     phone?: string;
   };
   lineItems: ShopifyOrderLineItemInput[];
-  sourceUrl?: string;
-  landingSite?: string;
-  referringSite?: string;
-  utmSource?: string;
-  utmMedium?: string;
-  utmCampaign?: string;
   syncedAt?: number;
 };
 
@@ -275,25 +285,6 @@ function mapOrderNodeToPersistence(
   organizationId: Id<"organizations">,
 ): OrderPersistencePayload {
   const orderId = String(order.id).replace("gid://shopify/Order/", "");
-
-  let sourceUrl: string | undefined;
-  let landingSite: string | undefined;
-  let referringSite: string | undefined;
-  let utmSource: string | undefined;
-  let utmMedium: string | undefined;
-  let utmCampaign: string | undefined;
-
-  if (order.customerJourneySummary?.firstVisit) {
-    const journey = order.customerJourneySummary.firstVisit;
-    sourceUrl = toOptional(journey.source);
-    landingSite = toOptional(journey.landingPage);
-    referringSite = toOptional(journey.referrerUrl);
-    if (journey.utmParameters) {
-      utmSource = toOptional(journey.utmParameters.source);
-      utmMedium = toOptional(journey.utmParameters.medium);
-      utmCampaign = toOptional(journey.utmParameters.campaign);
-    }
-  }
 
   const orderData: ShopifyOrderInput = {
     shopifyId: orderId,
@@ -329,7 +320,6 @@ function mapOrderNodeToPersistence(
       ? order.tags.filter((tag) => Boolean(toOptional(tag)))
       : [],
     note: toOptional(order.note),
-    riskLevel: toOptional(order.risks?.[0]?.level),
     shippingAddress: order.shippingAddress
       ? {
           country: toOptional(order.shippingAddress.country),
@@ -357,13 +347,21 @@ function mapOrderNodeToPersistence(
         const discounted = item.discountedUnitPriceSet
           ? parseMoney(item.discountedUnitPriceSet.shopMoney?.amount)
           : undefined;
+        const quantity = item.quantity ?? 0;
+        const rawDiscount = parseMoney(item.totalDiscountSet?.shopMoney?.amount);
+        const perUnitDiscount =
+          discounted !== undefined ? Math.max(0, basePrice - discounted) : 0;
+        const computedDiscount =
+          quantity > 0 ? roundMoney(perUnitDiscount * quantity) : 0;
+        const totalDiscount = rawDiscount > 0 ? rawDiscount : computedDiscount;
+        const sku = toOptional(item.sku) ?? toOptional(item.variant?.sku);
 
         return {
           shopifyId: String(item.id).replace("gid://shopify/LineItem/", ""),
           title: toOptional(item.title) ?? toOptional((item as any).name) ?? "",
           name: toOptional((item as any).name),
-          quantity: item.quantity ?? 0,
-          sku: toOptional(item.sku),
+          quantity,
+          sku,
           shopifyVariantId: item.variant?.id
             ? String(item.variant.id).replace("gid://shopify/ProductVariant/", "")
             : undefined,
@@ -374,19 +372,12 @@ function mapOrderNodeToPersistence(
               )
             : undefined,
           price: basePrice,
-          totalDiscount:
-            discounted !== undefined ? Math.max(0, basePrice - discounted) : 0,
+          totalDiscount,
           discountedPrice: discounted,
           fulfillableQuantity: item.fulfillableQuantity ?? item.quantity ?? 0,
           fulfillmentStatus: toOptional(item.fulfillmentStatus),
         };
       }) || [],
-    sourceUrl,
-    landingSite,
-    referringSite,
-    utmSource,
-    utmMedium,
-    utmCampaign,
     syncedAt: Date.now(),
   };
 
@@ -412,13 +403,6 @@ function mapOrderNodeToPersistence(
             ? parseMoney(String(transaction.fees[0]?.amount?.amount))
             : undefined,
         paymentId: transaction.paymentId,
-        paymentDetails: transaction.paymentDetails
-          ? {
-              creditCardBin: transaction.paymentDetails.creditCardBin,
-              creditCardCompany: transaction.paymentDetails.creditCardCompany,
-              creditCardNumber: transaction.paymentDetails.creditCardNumber,
-            }
-          : undefined,
         shopifyCreatedAt: Date.parse(transaction.createdAt),
         processedAt: transaction.processedAt
           ? Date.parse(transaction.processedAt)
@@ -459,6 +443,61 @@ function mapOrderNodeToPersistence(
     }
   }
 
+  const fulfillmentOrderLineInfo = new Map<
+    string,
+    {
+      locationId?: string;
+      locationName?: string;
+      serviceName?: string;
+      methodType?: string;
+      status?: string;
+    }
+  >();
+
+  if (order.fulfillmentOrders?.edges) {
+    for (const edge of order.fulfillmentOrders.edges) {
+      const fulfillmentOrder = edge?.node;
+      if (!fulfillmentOrder) continue;
+
+      const locationId = fulfillmentOrder.assignedLocation?.location?.id
+        ? String(fulfillmentOrder.assignedLocation.location.id).replace(
+            "gid://shopify/Location/",
+            "",
+          )
+        : undefined;
+      const locationName = fulfillmentOrder.assignedLocation?.location?.name
+        ? String(fulfillmentOrder.assignedLocation.location.name)
+        : undefined;
+      const serviceName = fulfillmentOrder.deliveryMethod?.serviceName
+        ? String(fulfillmentOrder.deliveryMethod.serviceName)
+        : undefined;
+      const methodType = fulfillmentOrder.deliveryMethod?.methodType
+        ? String(fulfillmentOrder.deliveryMethod.methodType)
+        : undefined;
+
+      if (fulfillmentOrder.lineItems?.edges) {
+        for (const lineEdge of fulfillmentOrder.lineItems.edges) {
+          const lineNode = lineEdge?.node;
+          const orderLineId = lineNode?.lineItem?.id
+            ? String(lineNode.lineItem.id).replace(
+                "gid://shopify/LineItem/",
+                "",
+              )
+            : undefined;
+          if (!orderLineId) continue;
+
+          fulfillmentOrderLineInfo.set(orderLineId, {
+            locationId,
+            locationName,
+            serviceName,
+            methodType,
+            status: fulfillmentOrder.status ? String(fulfillmentOrder.status) : undefined,
+          });
+        }
+      }
+    }
+  }
+
   const fulfillments: Array<Record<string, unknown>> = [];
 
   if (order.fulfillments && Array.isArray(order.fulfillments)) {
@@ -469,26 +508,68 @@ function mapOrderNodeToPersistence(
       const trackingUrls = toStringArray(
         fulfillment.trackingInfo?.map((t) => t.url),
       );
+      const locationId =
+        typeof fulfillment.location?.id === "string"
+          ? fulfillment.location.id.replace("gid://shopify/Location/", "")
+          : undefined;
+      const serviceName =
+        typeof fulfillment.service === "object" && fulfillment.service !== null
+          ? ((fulfillment.service as { serviceName?: string | null }).serviceName || undefined)
+          : fulfillment.service ?? undefined;
+      const trackingCompany = toOptional(
+        fulfillment.trackingInfo?.[0]?.company,
+      );
+      let derivedLocationId = locationId;
+      let derivedServiceName = serviceName;
+      let derivedShipmentStatus = fulfillment.shipmentStatus
+        ? String(fulfillment.shipmentStatus)
+        : undefined;
+
+      const fulfillmentLineItems = fulfillment.fulfillmentLineItems?.edges ?? [];
+      const normalizedLineItems = fulfillmentLineItems.map((edge) => {
+        const item = edge.node;
+        const quantity = item?.quantity || 0;
+        const id = item?.id || "";
+        const orderLineId = item?.lineItem?.id
+          ? String(item.lineItem.id).replace("gid://shopify/LineItem/", "")
+          : undefined;
+
+        if (orderLineId) {
+          const info = fulfillmentOrderLineInfo.get(orderLineId);
+          if (info) {
+            if (!derivedLocationId && info.locationId) {
+              derivedLocationId = info.locationId;
+            }
+            if (!derivedServiceName && info.serviceName) {
+              derivedServiceName = info.serviceName;
+            }
+            if (!derivedServiceName && info.methodType) {
+              derivedServiceName = info.methodType;
+            }
+            if (!derivedShipmentStatus && info.status) {
+              derivedShipmentStatus = info.status;
+            }
+          }
+        }
+
+        return {
+          id,
+          quantity,
+        };
+      });
 
       fulfillments.push({
         organizationId,
         shopifyOrderId: orderId,
         shopifyId: fulfillment.id.replace("gid://shopify/Fulfillment/", ""),
         status: fulfillment.status,
-        shipmentStatus: undefined,
-        trackingCompany: fulfillment.trackingInfo?.[0]?.company || undefined,
+        shipmentStatus: toOptional(derivedShipmentStatus),
+        trackingCompany,
         trackingNumbers: trackingNumbers ?? [],
         trackingUrls: trackingUrls ?? [],
-        locationId: undefined,
-        service: undefined,
-        lineItems:
-          fulfillment.fulfillmentLineItems?.edges?.map((edge) => {
-            const item = edge.node;
-            return {
-              id: item.id,
-              quantity: item.quantity || 0,
-            };
-          }) || [],
+        locationId: derivedLocationId,
+        service: toOptional(derivedServiceName),
+        lineItems: normalizedLineItems,
         shopifyCreatedAt: Date.parse(
           String(fulfillment.createdAt || new Date().toISOString()),
         ),
@@ -1264,13 +1345,6 @@ export const initial = internalAction({
                       ),
                       state: customer.state || undefined,
                       verifiedEmail: customer.verifiedEmail || false,
-                      acceptsMarketing: customer.acceptsMarketing || false,
-                      acceptsMarketingUpdatedAt:
-                        customer.acceptsMarketingUpdatedAt
-                          ? Date.parse(
-                              String(customer.acceptsMarketingUpdatedAt)
-                            )
-                          : undefined,
                       taxExempt: customer.taxExempt || false,
                       defaultAddress: (customer as any).addresses?.[0]
                         ? {
@@ -1769,6 +1843,17 @@ export const syncSessions = internalAction({
       )) as Array<AttributedOrder>;
 
       let sessionsProcessed = 0;
+      const fallbackAnalytics = new Map<
+        string,
+        {
+          date: string;
+          source: string;
+          sessions: number;
+          visitors: number;
+          pageViews: number;
+          conversions: number;
+        }
+      >();
 
       // Process orders to extract session information
       for (const order of ordersWithAttribution) {
@@ -1784,16 +1869,12 @@ export const syncSessions = internalAction({
               ? new Date(journey.firstVisit.occurredAt).getTime()
               : new Date(order.shopifyCreatedAt).getTime(),
             endTime: new Date(order.shopifyCreatedAt).getTime(),
-            referrerSource:
-              journey.firstVisit?.referrerInfo?.source || order.sourceUrl,
+            referrerSource: journey.firstVisit?.referrerInfo?.source,
             referrerDomain: journey.firstVisit?.referrerInfo?.domain,
-            landingPage: journey.firstVisit?.landingPage || order.landingSite,
-            utmSource:
-              journey.firstVisit?.utmParameters?.source || order.utmSource,
-            utmMedium:
-              journey.firstVisit?.utmParameters?.medium || order.utmMedium,
-            utmCampaign:
-              journey.firstVisit?.utmParameters?.campaign || order.utmCampaign,
+            landingPage: journey.firstVisit?.landingPage,
+            utmSource: journey.firstVisit?.utmParameters?.source,
+            utmMedium: journey.firstVisit?.utmParameters?.medium,
+            utmCampaign: journey.firstVisit?.utmParameters?.campaign,
             utmContent: journey.firstVisit?.utmParameters?.content,
             utmTerm: journey.firstVisit?.utmParameters?.term,
             pageViews: journey.momentsCount || 1,
@@ -1822,19 +1903,81 @@ export const syncSessions = internalAction({
             sessionsProcessed++;
           }
 
-          // Link order to session
-          await ctx.runMutation(
-            internal.integrations.shopify.updateOrderSessionInternal,
-            {
-              orderId: order._id,
-              sessionId: sessionData.sessionId,
-              visitorToken: sessionData.visitorToken,
-              sessionSource: sessionData.referrerSource,
-              sessionLandingPage: sessionData.landingPage,
-              sessionPageViews: sessionData.pageViews,
-            }
-          );
+          const analyticsDate = new Date(order.shopifyCreatedAt)
+            .toISOString()
+            .substring(0, 10);
+          const analyticsSourceRaw =
+            journey.firstVisit?.referrerInfo?.source ||
+            journey.firstVisit?.utmParameters?.source ||
+            "unknown";
+          const analyticsSource = analyticsSourceRaw.toLowerCase() || "unknown";
+
+          const analyticsKey = `${analyticsDate}::${analyticsSource}`;
+          const entry = fallbackAnalytics.get(analyticsKey) ?? {
+            date: analyticsDate,
+            source: analyticsSource,
+            sessions: 0,
+            visitors: 0,
+            pageViews: 0,
+            conversions: 0,
+          };
+
+          entry.sessions += 1;
+          entry.visitors += 1;
+          entry.pageViews += sessionData.pageViews || 0;
+          entry.conversions += 1;
+
+          fallbackAnalytics.set(analyticsKey, entry);
+
+          continue;
         }
+
+        const fallbackDate = new Date(order.shopifyCreatedAt)
+          .toISOString()
+          .substring(0, 10);
+        const fallbackSource = "unknown";
+
+        const fallbackKey = `${fallbackDate}::${fallbackSource}`;
+        const fallbackEntry = fallbackAnalytics.get(fallbackKey) ?? {
+          date: fallbackDate,
+          source: fallbackSource,
+          sessions: 0,
+          visitors: 0,
+          pageViews: 0,
+          conversions: 0,
+        };
+
+        fallbackEntry.sessions += 1;
+        fallbackEntry.visitors += 1;
+        fallbackEntry.pageViews += 1;
+        fallbackEntry.conversions += 1;
+
+        fallbackAnalytics.set(fallbackKey, fallbackEntry);
+      }
+
+      if (analyticsEntriesProcessed === 0 && fallbackAnalytics.size > 0) {
+        const fallbackEntries = Array.from(fallbackAnalytics.values()).map(
+          (entry) => ({
+            date: entry.date,
+            trafficSource: entry.source,
+            sessions: entry.sessions,
+            visitors: entry.visitors || undefined,
+            pageViews: entry.pageViews || undefined,
+            conversions: entry.conversions || undefined,
+            dataSource: "orders_fallback",
+          })
+        );
+
+        await ctx.runMutation(
+          internal.integrations.shopify.storeAnalyticsInternal,
+          {
+            organizationId: args.organizationId,
+            storeId: args.storeId,
+            entries: fallbackEntries,
+          }
+        );
+
+        analyticsEntriesProcessed = fallbackEntries.length;
       }
 
       logger.info("Session sync completed", {

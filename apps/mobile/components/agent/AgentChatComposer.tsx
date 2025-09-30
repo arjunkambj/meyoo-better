@@ -56,8 +56,7 @@ export function AgentChatComposer({
             <Text className="text-xs text-default-400 mr-1">↵ to send</Text>
           )}
           <Button
-            variant="flat"
-            color="primary"
+            variant="primary"
             size="md"
             isIconOnly
             onPress={onSend}

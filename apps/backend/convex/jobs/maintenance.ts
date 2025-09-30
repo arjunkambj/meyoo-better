@@ -340,11 +340,11 @@ export const checkExpiredTrials = internalAction({
 
     // Checking active trials
 
-    for (const org of activeTrials) {
+    for (const record of activeTrials) {
       // Check if trial has expired
-      if (org.trialEndDate && org.trialEndDate <= now) {
+      if (record.trialEndDate && record.trialEndDate <= now) {
         await ctx.runMutation(internal.jobs.maintenance.expireTrial, {
-          organizationId: org._id,
+          organizationId: record.organizationId,
         });
 
         // Expired trial for organization
@@ -504,28 +504,25 @@ export const getActiveTrials = internalQuery({
   args: {},
   returns: v.array(
     v.object({
-      _id: v.id("organizations"),
+      _id: v.id("billing"),
+      organizationId: v.id("organizations"),
       isTrialActive: v.optional(v.boolean()),
       hasTrialExpired: v.optional(v.boolean()),
       trialEndDate: v.optional(v.number()),
     }),
   ),
   handler: async (ctx) => {
-    // Get organizations with active trials using index to avoid table scans
-    const trialingOrgs = await ctx.db
-      .query("organizations")
-      .withIndex("by_trial_status", (q) =>
-        q.eq("isTrialActive", true).eq("hasTrialExpired", false),
-      )
-      .collect();
+    const billingRecords = await ctx.db.query("billing").collect();
 
-    return trialingOrgs
-      .filter((org) => org.trialEndDate)
-      .map((org) => ({
-        _id: org._id,
-        isTrialActive: org.isTrialActive,
-        hasTrialExpired: org.hasTrialExpired,
-        trialEndDate: org.trialEndDate,
+    return billingRecords
+      .filter((billing) => billing.isTrialActive && !billing.hasTrialExpired)
+      .filter((billing) => billing.trialEndDate || billing.trialEndsAt)
+      .map((billing) => ({
+        _id: billing._id,
+        organizationId: billing.organizationId,
+        isTrialActive: billing.isTrialActive,
+        hasTrialExpired: billing.hasTrialExpired,
+        trialEndDate: billing.trialEndDate ?? billing.trialEndsAt,
       }));
   },
 });
@@ -610,11 +607,20 @@ export const expireTrial = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.organizationId, {
-      isTrialActive: false,
-      hasTrialExpired: true,
-      updatedAt: Date.now(),
-    });
+    const billing = await ctx.db
+      .query("billing")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", args.organizationId),
+      )
+      .first();
+
+    if (billing) {
+      await ctx.db.patch(billing._id, {
+        isTrialActive: false,
+        hasTrialExpired: true,
+        updatedAt: Date.now(),
+      });
+    }
 
     // Also update onboarding record to reset billing step
     const users = await ctx.db

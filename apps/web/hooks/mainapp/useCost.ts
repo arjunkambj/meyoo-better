@@ -131,39 +131,39 @@ export function useExpenses() {
 export function useCreateExpense() {
   const mutation = useMutation(api.core.costs.addCost);
 
-      return async (data: {
-        type: keyof typeof COST_TYPES;
-        name: string;
-        value: number;
-        calculation: keyof typeof CALCULATION_METHODS;
-        effectiveFrom: string | Date;
-        description?: string;
-        provider?: string;
-        frequency?: keyof typeof COST_FREQUENCY;
-        config?: Record<string, unknown>;
-      }) => {
+  return async (data: {
+    type: keyof typeof COST_TYPES;
+    name: string;
+    value: number;
+    calculation: keyof typeof CALCULATION_METHODS;
+    effectiveFrom: string | Date;
+    description?: string;
+    frequency?: keyof typeof COST_FREQUENCY;
+  }) => {
     try {
+      const costType =
+        COST_TYPES[data.type] as (typeof COST_TYPES)[keyof typeof COST_TYPES];
+      const calculation =
+        CALCULATION_METHODS[
+          data.calculation
+        ] as (typeof CALCULATION_METHODS)[keyof typeof CALCULATION_METHODS];
+      const frequency = data.frequency
+        ? (COST_FREQUENCY[
+            data.frequency
+          ] as (typeof COST_FREQUENCY)[keyof typeof COST_FREQUENCY])
+        : undefined;
+
       const result = await mutation({
-        type: COST_TYPES[
-          data.type
-        ] as (typeof COST_TYPES)[keyof typeof COST_TYPES],
+        type: costType,
         name: data.name,
         value: data.value,
-        calculation: CALCULATION_METHODS[
-          data.calculation
-        ] as (typeof CALCULATION_METHODS)[keyof typeof CALCULATION_METHODS],
+        calculation,
         effectiveFrom:
           typeof data.effectiveFrom === "string"
             ? new Date(data.effectiveFrom).getTime()
             : data.effectiveFrom?.getTime?.() ?? Date.now(),
         description: data.description,
-        provider: data.provider,
-        frequency: data.frequency
-          ? (COST_FREQUENCY[
-              data.frequency
-            ] as (typeof COST_FREQUENCY)[keyof typeof COST_FREQUENCY])
-          : undefined,
-        config: data.config,
+        frequency,
       });
 
       return { success: true, id: result.id };
@@ -187,14 +187,27 @@ export function useUpdateExpense() {
 
   return async (data: {
     costId: Id<"costs">;
+    name?: string;
     value?: number;
     description?: string;
-    provider?: string;
     isActive?: boolean;
-    config?: Record<string, unknown>;
+    frequency?: keyof typeof COST_FREQUENCY;
   }) => {
     try {
-      await mutation(data);
+      const payload = {
+        costId: data.costId,
+        name: data.name,
+        value: data.value,
+        description: data.description,
+        isActive: data.isActive,
+        frequency: data.frequency
+          ? (COST_FREQUENCY[
+              data.frequency
+            ] as (typeof COST_FREQUENCY)[keyof typeof COST_FREQUENCY])
+          : undefined,
+      };
+
+      await mutation(payload);
 
       return { success: true };
     } catch (error) {
@@ -244,9 +257,7 @@ export function useCreateShippingCost() {
     name: string;
     value: number;
     calculation: keyof typeof CALCULATION_METHODS;
-    provider?: string;
     description?: string;
-    config?: Record<string, unknown>;
   }) => {
     return await createExpense({
       ...data,
@@ -270,9 +281,7 @@ export function useCreateTransactionFee() {
     name: string;
     value: number;
     calculation: keyof typeof CALCULATION_METHODS;
-    provider?: string;
     description?: string;
-    config?: Record<string, unknown>;
   }) => {
     return await createExpense({
       ...data,

@@ -98,18 +98,9 @@ export interface ShopifyOrder {
     | "refunded"
     | "voided";
   fulfillmentStatus?: "unfulfilled" | "partial" | "fulfilled" | "restocked";
-  orderStatus: string;
 
   // Items
   itemCount: number;
-
-  // Attribution
-  landingSite?: string;
-  referringSite?: string;
-  sourceUrl?: string;
-  utmSource?: string;
-  utmMedium?: string;
-  utmCampaign?: string;
 
   // Dates
   shopifyCreatedAt: string;
@@ -146,7 +137,6 @@ export interface ShopifyCustomer {
   // Status
   state?: string;
   verifiedEmail?: boolean;
-  acceptsMarketing?: boolean;
 
   // Location
   defaultAddress?: {

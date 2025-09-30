@@ -77,7 +77,6 @@ export const shopifyOrders = defineTable({
   // Status
   financialStatus: v.optional(v.string()),
   fulfillmentStatus: v.optional(v.string()),
-  orderStatus: v.optional(v.string()),
 
   // Items
   totalItems: v.number(),
@@ -95,27 +94,9 @@ export const shopifyOrders = defineTable({
     }),
   ),
 
-  // Attribution
-  sourceUrl: v.optional(v.string()),
-  landingSite: v.optional(v.string()),
-  referringSite: v.optional(v.string()),
-  utmSource: v.optional(v.string()),
-  utmMedium: v.optional(v.string()),
-  utmCampaign: v.optional(v.string()),
-
-  // Session tracking
-  sessionId: v.optional(v.string()), // Link to shopifySessions
-  visitorToken: v.optional(v.string()), // Browser visitor token
-  sessionSource: v.optional(v.string()), // Session referrer source
-  sessionLandingPage: v.optional(v.string()), // Session landing page
-  sessionPageViews: v.optional(v.number()), // Pages viewed in session
-
   // Tags and notes
   tags: v.optional(v.array(v.string())),
   note: v.optional(v.string()),
-
-  // Risk
-  riskLevel: v.optional(v.string()),
 
   // Metadata
   syncedAt: v.number(),
@@ -128,13 +109,7 @@ export const shopifyOrders = defineTable({
   .index("by_created", ["shopifyCreatedAt"])
   .index("by_financial_status", ["financialStatus"])
   .index("by_fulfillment_status", ["fulfillmentStatus"])
-  .index("by_shopify_id_store", ["shopifyId", "storeId"])
-  .index("by_utm_attribution", [
-    "storeId",
-    "utmSource",
-    "utmMedium",
-    "utmCampaign",
-  ]);
+  .index("by_shopify_id_store", ["shopifyId", "storeId"]);
 
 // Shopify order items
 export const shopifyOrderItems = defineTable({
@@ -161,16 +136,6 @@ export const shopifyOrderItems = defineTable({
   // Fulfillment
   fulfillableQuantity: v.number(),
   fulfillmentStatus: v.optional(v.string()),
-
-  // Metadata
-  properties: v.optional(
-    v.array(
-      v.object({
-        name: v.string(),
-        value: v.string(),
-      }),
-    ),
-  ),
 })
   .index("by_order", ["orderId"])
   .index("by_product", ["productId"])
@@ -293,8 +258,6 @@ export const shopifyCustomers = defineTable({
   // Status
   state: v.optional(v.string()),
   verifiedEmail: v.optional(v.boolean()),
-  acceptsMarketing: v.optional(v.boolean()),
-  acceptsMarketingUpdatedAt: v.optional(v.number()),
   taxExempt: v.optional(v.boolean()),
 
   // Location
@@ -344,15 +307,8 @@ export const shopifyTransactions = defineTable({
   // Fees
   fee: v.optional(v.number()),
 
-  // Payment details
+  // Payment reference
   paymentId: v.optional(v.string()),
-  paymentDetails: v.optional(
-    v.object({
-      creditCardBin: v.optional(v.string()),
-      creditCardCompany: v.optional(v.string()),
-      creditCardNumber: v.optional(v.string()),
-    }),
-  ),
 
   // Timestamps
   shopifyCreatedAt: v.number(),

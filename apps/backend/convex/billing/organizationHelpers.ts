@@ -23,8 +23,6 @@ export const upsertOrganization = mutation({
     organizationId: v.optional(v.string()),
     name: v.string(),
     ownerId: v.optional(v.id("users")),
-    apiCallLimit: v.optional(v.number()),
-    storageLimit: v.optional(v.number()),
     locale: v.optional(v.string()),
     timezone: v.optional(v.string()),
     isInitialSyncComplete: v.optional(v.boolean()),

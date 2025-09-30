@@ -202,6 +202,7 @@ export const validateApiKey = query({
         locale: v.optional(v.string()),
         isPremium: v.optional(v.boolean()),
         trialEndDate: v.optional(v.number()),
+        isTrialActive: v.optional(v.boolean()),
       }),
     }),
     v.object({
@@ -232,6 +233,12 @@ export const validateApiKey = query({
     }
 
     const organization = await ctx.db.get(apiKey.organizationId);
+    const billing = await ctx.db
+      .query("billing")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", apiKey.organizationId),
+      )
+      .first();
 
     if (!organization) {
       return {
@@ -251,7 +258,8 @@ export const validateApiKey = query({
         timezone: organization.timezone,
         locale: organization.locale,
         isPremium: organization.isPremium,
-        trialEndDate: organization.trialEndDate,
+        trialEndDate: billing?.trialEndDate ?? billing?.trialEndsAt,
+        isTrialActive: billing?.isTrialActive,
       },
     };
   },

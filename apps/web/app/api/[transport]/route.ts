@@ -414,6 +414,273 @@ Video Performance:
         }
       }
     );
+
+    // Products Inventory Tool
+    server.tool(
+      "products_inventory",
+      "List all products with inventory details, variants, and stock status (paginated)",
+      {
+        apiKey: z
+          .string()
+          .describe("API key for authentication (optional when Authorization header is present)")
+          .optional(),
+        page: z
+          .number()
+          .int()
+          .positive()
+          .optional()
+          .describe("Page number (default: 1)"),
+        pageSize: z
+          .number()
+          .int()
+          .positive()
+          .max(200)
+          .optional()
+          .describe("Items per page (default: 50, max: 200)"),
+        stockLevel: z
+          .enum(["all", "healthy", "low", "critical", "out"])
+          .optional()
+          .describe("Filter by stock level"),
+        search: z
+          .string()
+          .optional()
+          .describe("Search term for product name or SKU"),
+        sortBy: z
+          .string()
+          .optional()
+          .describe("Field to sort by"),
+        sortOrder: z
+          .enum(["asc", "desc"])
+          .optional()
+          .describe("Sort direction"),
+      },
+      async ({ apiKey, page, pageSize, stockLevel, search, sortBy, sortOrder }, extra) => {
+        try {
+          const token = resolveApiToken(extra, apiKey);
+
+          const result = await convexClient.action(api.agent.mcpActions.productsInventory, {
+            apiKey: token,
+            page,
+            pageSize,
+            stockLevel,
+            search,
+            sortBy,
+            sortOrder,
+          });
+
+          const lines = [
+            result.summary,
+            "",
+            ...result.items.slice(0, 10).map((item, index) =>
+              `${index + 1}. ${item.name} (SKU: ${item.sku})\n` +
+              `   Stock: ${item.stock} (${item.available} available, ${item.reserved} reserved) | Status: ${item.stockStatus.toUpperCase()}\n` +
+              `   Price: $${item.price.toFixed(2)} | Cost: $${item.cost.toFixed(2)} | Margin: ${item.margin.toFixed(1)}%\n` +
+              `   Category: ${item.category} | Vendor: ${item.vendor}${item.variants ? ` | Variants: ${item.variants.length}` : ""}`
+            ),
+          ];
+
+          if (result.items.length > 10) {
+            lines.push(`\n... and ${result.items.length - 10} more items`);
+          }
+
+          return {
+            content: [{ type: "text", text: lines.join("\n\n") }],
+          };
+        } catch (error: unknown) {
+          return {
+            content: [{
+              type: "text",
+              text: `Error fetching products inventory: ${formatError(error)}`,
+            }],
+            isError: true,
+          };
+        }
+      }
+    );
+
+    // Organization Members Tool
+    server.tool(
+      "org_members",
+      "List organization members with their email, role, status, and onboarding details. Supports optional filtering by role or status",
+      {
+        apiKey: z
+          .string()
+          .describe("API key for authentication (optional when Authorization header is present)")
+          .optional(),
+        role: z
+          .enum(["StoreOwner", "StoreTeam"])
+          .optional()
+          .describe("Filter to a specific membership role"),
+        status: z
+          .enum(["active", "suspended", "removed"])
+          .optional()
+          .describe("Filter to members with a specific status"),
+        includeRemoved: z
+          .boolean()
+          .optional()
+          .describe("Set to true to include removed members (default: false)"),
+      },
+      async ({ apiKey, role, status, includeRemoved }, extra) => {
+        try {
+          const token = resolveApiToken(extra, apiKey);
+
+          const result = await convexClient.action(api.agent.mcpActions.orgMembers, {
+            apiKey: token,
+            role,
+            status,
+            includeRemoved,
+          });
+
+          const lines = [
+            result.summary,
+            "",
+            `Total Members: ${result.counts.total} | Active: ${result.counts.active} | Suspended: ${result.counts.suspended} | Removed: ${result.counts.removed}`,
+            `Owners: ${result.counts.owners} | Team: ${result.counts.team}`,
+          ];
+
+          if (result.owner) {
+            lines.push(
+              "",
+              "Primary Owner:",
+              `  ${result.owner.name || "Unnamed"} (${result.owner.email || "No email"})`,
+              `  Status: ${result.owner.status} | Joined: ${result.owner.joinedAt || "Unknown"}`
+            );
+          }
+
+          if (result.members.length > 0) {
+            lines.push(
+              "",
+              "Members:",
+              ...result.members.map((member, index) =>
+                `${index + 1}. ${member.name || "Unnamed"} (${member.email || "No email"})\n` +
+                `   Role: ${member.role} | Status: ${member.status}${member.isOnboarded !== undefined ? ` | Onboarded: ${member.isOnboarded}` : ""}\n` +
+                `   Joined: ${member.joinedAt || "Unknown"}`
+              )
+            );
+          }
+
+          return {
+            content: [{ type: "text", text: lines.join("\n") }],
+          };
+        } catch (error: unknown) {
+          return {
+            content: [{
+              type: "text",
+              text: `Error fetching organization members: ${formatError(error)}`,
+            }],
+            isError: true,
+          };
+        }
+      }
+    );
+
+    // Send Email Tool
+    server.tool(
+      "send_email",
+      "Send an email via the Resend component. Confirm the exact recipient email with the user before invoking this tool. Supports dry-run previews",
+      {
+        apiKey: z
+          .string()
+          .describe("API key for authentication (optional when Authorization header is present)")
+          .optional(),
+        memberId: z
+          .string()
+          .optional()
+          .describe("Optional organization member ID to resolve the recipient email"),
+        toEmail: z
+          .string()
+          .email()
+          .optional()
+          .describe("Explicit recipient email (provide this when not referencing a memberId)"),
+        subject: z
+          .string()
+          .min(3)
+          .max(160)
+          .describe("Email subject - keep it concise and professional"),
+        html: z
+          .string()
+          .optional()
+          .describe("HTML body of the email"),
+        text: z
+          .string()
+          .optional()
+          .describe("Plain-text body of the email"),
+        replyTo: z
+          .array(z.string().email())
+          .max(4)
+          .optional()
+          .describe("Optional reply-to addresses"),
+        from: z
+          .string()
+          .optional()
+          .describe("Override the default from address (defaults to Meyoo no-reply)"),
+        previewOnly: z
+          .boolean()
+          .optional()
+          .describe("If true, return a preview without sending the email"),
+      },
+      async ({ apiKey, memberId, toEmail, subject, html, text, replyTo, from, previewOnly }, extra) => {
+        try {
+          const token = resolveApiToken(extra, apiKey);
+
+          const result = await convexClient.action(api.agent.mcpActions.sendEmail, {
+            apiKey: token,
+            memberId,
+            toEmail,
+            subject,
+            html,
+            text,
+            replyTo,
+            from,
+            previewOnly,
+          });
+
+          const lines = [result.summary];
+
+          if (result.status === "error") {
+            lines.push("", `Error: ${result.error || "Unknown error"}`);
+          } else {
+            if (result.to) {
+              lines.push("", `To: ${result.to}`);
+            }
+            if (result.recipientName) {
+              lines.push(`Recipient: ${result.recipientName}`);
+            }
+            if (result.subject) {
+              lines.push(`Subject: ${result.subject}`);
+            }
+            if (result.emailId) {
+              lines.push(`Email ID: ${result.emailId}`);
+            }
+            if (result.testMode !== undefined) {
+              lines.push(`Test Mode: ${result.testMode}`);
+            }
+            if (result.preview && result.status === "preview") {
+              lines.push("", "Preview:");
+              if (result.preview.html) {
+                lines.push("", "HTML Body:", result.preview.html);
+              }
+              if (result.preview.text) {
+                lines.push("", "Text Body:", result.preview.text);
+              }
+            }
+          }
+
+          return {
+            content: [{ type: "text", text: lines.join("\n") }],
+            isError: result.status === "error",
+          };
+        } catch (error: unknown) {
+          return {
+            content: [{
+              type: "text",
+              text: `Error sending email: ${formatError(error)}`,
+            }],
+            isError: true,
+          };
+        }
+      }
+    );
   },
   {
     serverInfo: {

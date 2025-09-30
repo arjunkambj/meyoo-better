@@ -518,9 +518,6 @@ export const getOrCreateOnboarding = async (
 export const updateBusinessProfile = mutation({
   args: {
     organizationName: v.optional(v.string()),
-    businessType: v.optional(v.string()),
-    businessCategory: v.optional(v.string()),
-    industry: v.optional(v.string()),
     mobileNumber: v.optional(v.string()),
     mobileCountryCode: v.optional(v.string()),
     referralSource: v.optional(v.string()),
@@ -531,36 +528,23 @@ export const updateBusinessProfile = mutation({
 
     // production: avoid noisy onboarding logs
 
-    interface ProfileUpdates {
-      updatedAt: number;
-      organizationName?: string;
-      businessType?: string;
-      businessCategory?: string;
-      industry?: string;
-      mobileNumber?: string;
-      mobileCountryCode?: string;
-    }
-
-    const updates: ProfileUpdates = {
+    const userUpdates: { updatedAt: number; phone?: string } = {
       updatedAt: Date.now(),
     };
 
-    // Update fields if provided
-    if (args.organizationName !== undefined)
-      updates.organizationName = args.organizationName;
-    if (args.businessType !== undefined)
-      updates.businessType = args.businessType;
-    if (args.businessCategory !== undefined)
-      updates.businessCategory = args.businessCategory;
-    if (args.industry !== undefined) updates.industry = args.industry;
-    if (args.mobileNumber !== undefined)
-      updates.mobileNumber = args.mobileNumber;
-    if (args.mobileCountryCode !== undefined)
-      updates.mobileCountryCode = args.mobileCountryCode;
+    if (args.mobileNumber !== undefined) {
+      userUpdates.phone = args.mobileNumber;
+    }
 
-    // Update onboarding record with business profile data
     if (!user.organizationId) {
       throw new Error("User has no organization");
+    }
+
+    if (args.organizationName !== undefined) {
+      await ctx.db.patch(user.organizationId, {
+        name: args.organizationName,
+        updatedAt: Date.now(),
+      });
     }
 
     const onboarding = await getOrCreateOnboarding(
@@ -577,12 +561,13 @@ export const updateBusinessProfile = mutation({
           setupDate:
             onboarding.onboardingData?.setupDate || new Date().toISOString(),
           completedSteps: onboarding.onboardingData?.completedSteps || [],
+          mobileCountryCode: args.mobileCountryCode ?? onboarding.onboardingData?.mobileCountryCode,
         },
         updatedAt: Date.now(),
       });
     }
 
-    await ctx.db.patch(user._id, updates);
+    await ctx.db.patch(user._id, userUpdates);
 
     return { success: true };
   },
@@ -1413,13 +1398,14 @@ export const saveInitialCosts = mutation({
           calculation: "fixed",
           value: args.shippingCost,
           frequency: "per_order",
-          isActive: true,
-          isDefault: true,
-          effectiveFrom: retroactiveEffectiveFrom,
-          createdAt: now,
-        } as any);
-        analyticsNeedsRefresh = true;
-      }
+        isActive: true,
+        isDefault: true,
+        effectiveFrom: retroactiveEffectiveFrom,
+        createdAt: now,
+        updatedAt: now,
+      } as any);
+      analyticsNeedsRefresh = true;
+    }
     }
 
     // Create payment fee record if provided
@@ -1465,13 +1451,14 @@ export const saveInitialCosts = mutation({
           calculation: "percentage",
           value: args.paymentFeePercent,
           frequency: "percentage",
-          isActive: true,
-          isDefault: true,
-          effectiveFrom: retroactiveEffectiveFrom,
-          createdAt: now,
-        } as any);
-        analyticsNeedsRefresh = true;
-      }
+        isActive: true,
+        isDefault: true,
+        effectiveFrom: retroactiveEffectiveFrom,
+        createdAt: now,
+        updatedAt: now,
+      } as any);
+      analyticsNeedsRefresh = true;
+    }
     }
 
     // Create operating costs record if provided
@@ -1520,13 +1507,14 @@ export const saveInitialCosts = mutation({
           calculation: "fixed",
           value: args.operatingCosts,
           frequency: "monthly",
-          isActive: true,
-          isDefault: true,
-          effectiveFrom: retroactiveEffectiveFrom,
-          createdAt: now,
-        } as any);
-        analyticsNeedsRefresh = true;
-      }
+        isActive: true,
+        isDefault: true,
+        effectiveFrom: retroactiveEffectiveFrom,
+        createdAt: now,
+        updatedAt: now,
+      } as any);
+      analyticsNeedsRefresh = true;
+    }
     }
 
     // Update onboarding record without moving backwards.
@@ -1728,23 +1716,26 @@ export const connectShopifyStore = mutation({
     }
 
     // Initialize trial for store organizations if needed
-    const organization = await ctx.db.get(
-      user.organizationId as Id<"organizations">,
-    );
+    const billingRecord = await ctx.db
+      .query("billing")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", user.organizationId as Id<"organizations">),
+      )
+      .first();
 
-    if (organization) {
-      // Initialize trial for store organizations
+    if (billingRecord) {
       const now = Date.now();
       const needsTrialInit =
-        !organization.trialStartDate ||
-        (organization.trialStartDate && organization.hasTrialExpired);
+        !billingRecord.trialStartDate ||
+        billingRecord.hasTrialExpired;
 
       if (needsTrialInit) {
-        const trialEndDate = now + 14 * 24 * 60 * 60 * 1000; // 14 days from now
+        const trialEndDate = now + 14 * 24 * 60 * 60 * 1000;
 
-        await ctx.db.patch(user.organizationId as Id<"organizations">, {
+        await ctx.db.patch(billingRecord._id, {
           trialStartDate: now,
-          trialEndDate: trialEndDate,
+          trialEndDate,
+          trialEndsAt: trialEndDate,
           isTrialActive: true,
           hasTrialExpired: false,
           updatedAt: Date.now(),

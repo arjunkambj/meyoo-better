@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text } from 'react-native';
+import React, { type ComponentProps } from 'react';
+import { View, Text, type ColorValue } from 'react-native';
 import { Card, Skeleton } from 'heroui-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -29,6 +29,8 @@ export function KPICard({
   currencySymbol = '$',
   isPrimary = false,
 }: KPICardProps) {
+  type IoniconName = ComponentProps<typeof Ionicons>['name'];
+
   const formatValue = (val: string | number): string => {
     if (typeof val === 'string') return val;
 
@@ -57,7 +59,7 @@ export function KPICard({
     }
   };
 
-  const getChangeColor = () => {
+  const resolveChangeColor = () => {
     if (!changeType && change !== undefined) {
       return change >= 0 ? '#10b981' : '#ef4444';
     }
@@ -73,19 +75,31 @@ export function KPICard({
     }
   };
 
-  const getChangeIcon = () => {
-    if (!change) return null;
+  const resolveChangeIcon = (): IoniconName | null => {
+    if (change === undefined) return null;
     return change >= 0 ? 'arrow-up' : 'arrow-down';
   };
 
-  const getGradientColors = () => {
+  const getGradientColors = (): readonly [ColorValue, ColorValue] => {
     if (isPrimary) {
-      return ['#6366f1', '#8b5cf6'];
+      return ['#6366f1', '#8b5cf6'] as const;
     }
     // Use icon color to create a subtle gradient
     const baseColor = iconColor || '#6366f1';
-    return [baseColor + '15', baseColor + '08'];
+    return [`${baseColor}15`, `${baseColor}08`] as const;
   };
+
+  const changeDisplay =
+    change === undefined
+      ? null
+      : {
+          color: resolveChangeColor(),
+          icon: resolveChangeIcon(),
+          label:
+            format === 'percent'
+              ? `${change >= 0 ? '+' : ''}${change.toFixed(1)}%`
+              : `${change >= 0 ? '+' : ''}${change.toLocaleString('en-US')}`,
+        };
 
   if (loading) {
     return (
@@ -129,6 +143,23 @@ export function KPICard({
           <Text className={`${isPrimary ? 'text-4xl text-white' : 'text-3xl text-foreground'} font-black tracking-tight`}>
             {formatValue(value)}
           </Text>
+          {changeDisplay && (
+            <View className="flex-row items-center gap-1">
+              {changeDisplay.icon && (
+                <Ionicons
+                  name={changeDisplay.icon}
+                  size={14}
+                  color={isPrimary ? '#ffffff' : changeDisplay.color}
+                />
+              )}
+              <Text
+                className={`${isPrimary ? 'text-sm text-white/80' : 'text-sm'}`}
+                style={{ color: isPrimary ? undefined : changeDisplay.color }}
+              >
+                {changeDisplay.label}
+              </Text>
+            </View>
+          )}
         </View>
       </Card.Body>
     </Card>

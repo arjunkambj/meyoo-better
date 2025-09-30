@@ -81,8 +81,6 @@ interface Cost {
     | "quarterly"
     | "yearly"
     | "percentage";
-  config?: unknown;
-  provider?: string;
   isActive: boolean;
   isDefault: boolean;
   effectiveFrom: number;
@@ -96,36 +94,16 @@ interface Cost {
   status?: string;
 }
 
-// Category model removed from this UI
-
-interface ExpenseConfig {
-  frequency?:
-    | "one_time"
-    | "per_order"
-    | "per_item"
-    | "daily"
-    | "weekly"
-    | "monthly"
-    | "quarterly"
-    | "yearly"
-    | "percentage";
-  paymentStatus?: "paid" | "pending" | "overdue";
-  vendorName?: string;
-  categoryId?: Id<"costCategories">;
-  isRecurring?: boolean;
-}
-
 interface FormData {
   _id?: Id<"costs">;
   name: string;
   // description, category, expenseType removed from UI
   amount: number;
   value?: number;
-  frequency: string;
+  frequency: CostFrequency;
   effectiveFrom?: string;
   effectiveTo?: string;
   paymentStatus?: "paid" | "pending" | "overdue";
-  isRecurring?: boolean;
   vendorName?: string;
   isActive?: boolean;
 }
@@ -136,13 +114,37 @@ const columns = [
   { name: "Actions", uid: "actions" },
 ];
 
+type CostFrequency = NonNullable<Cost["frequency"]>;
+type CostFrequencyKey =
+  | "ONE_TIME"
+  | "PER_ORDER"
+  | "PER_ITEM"
+  | "DAILY"
+  | "WEEKLY"
+  | "MONTHLY"
+  | "QUARTERLY"
+  | "YEARLY"
+  | "PERCENTAGE";
+
 // Expense types removed from UI
 
-const frequencies = [
+const frequencies: Array<{ key: CostFrequency; label: string }> = [
   { key: "monthly", label: "Monthly" },
   { key: "weekly", label: "Weekly" },
   { key: "one_time", label: "One Time" },
 ];
+
+const FREQUENCY_VALUE_TO_KEY: Record<CostFrequency, CostFrequencyKey> = {
+  one_time: "ONE_TIME",
+  per_order: "PER_ORDER",
+  per_item: "PER_ITEM",
+  daily: "DAILY",
+  weekly: "WEEKLY",
+  monthly: "MONTHLY",
+  quarterly: "QUARTERLY",
+  yearly: "YEARLY",
+  percentage: "PERCENTAGE",
+};
 
 // Payment status options removed from Other Expenses
 
@@ -207,13 +209,12 @@ export default function OtherCostsTable() {
   // Categories are not used in this simplified UI
 
   const handleEdit = (item: Cost) => {
-    const cfg = (item.config as ExpenseConfig) || {};
     setFormData({
       _id: item._id,
       name: item.name,
       amount: item.value || 0,
       value: item.value,
-      frequency: (cfg.frequency as string) || item.frequency || "monthly",
+      frequency: item.frequency || "monthly",
       effectiveFrom: item.effectiveFrom
         ? new Date(item.effectiveFrom).toISOString().split("T")[0]
         : undefined,
@@ -221,7 +222,6 @@ export default function OtherCostsTable() {
         ? new Date(item.effectiveTo).toISOString().split("T")[0]
         : undefined,
       isActive: typeof item.isActive === "boolean" ? item.isActive : true,
-      isRecurring: cfg.isRecurring ?? true,
     });
     onOpen();
   };
@@ -233,7 +233,6 @@ export default function OtherCostsTable() {
       frequency: "monthly",
       effectiveFrom: new Date().toISOString().split("T")[0],
       isActive: true,
-      isRecurring: true,
     });
     onOpen();
   };
@@ -242,17 +241,18 @@ export default function OtherCostsTable() {
     try {
       if (formData._id) {
         // Update existing expense
+        const frequencyKey = formData.frequency
+          ? FREQUENCY_VALUE_TO_KEY[formData.frequency]
+          : undefined;
         const result = await updateExpense({
           costId: formData._id,
+          name: formData.name,
           value:
             typeof formData.amount === "number"
               ? formData.amount
               : formData.value || 0,
-          config: {
-            isRecurring: formData.isRecurring ?? true,
-            // Persist UI frequency hint in config (engine reads this if top-level is unchanged)
-            frequency: formData.frequency,
-          },
+          frequency: frequencyKey,
+          isActive: formData.isActive,
         });
 
         if (result.success) {
@@ -272,6 +272,7 @@ export default function OtherCostsTable() {
         }
       } else {
         // For new expense, use addCompleteExpense
+        const newFrequency = FREQUENCY_VALUE_TO_KEY[formData.frequency];
         await addCompleteExpense({
           type: "OPERATIONAL",
           name: formData.name,
@@ -280,15 +281,7 @@ export default function OtherCostsTable() {
           effectiveFrom: formData.effectiveFrom
             ? new Date(formData.effectiveFrom).toISOString()
             : new Date().toISOString(),
-          frequency:
-            formData.frequency === "monthly"
-              ? "MONTHLY"
-              : formData.frequency === "weekly"
-                ? "WEEKLY"
-                : "ONE_TIME",
-          config: {
-            isRecurring: formData.isRecurring ?? true,
-          },
+          frequency: newFrequency,
         });
         addToast({
           title: "Operating cost added successfully",
@@ -358,9 +351,7 @@ export default function OtherCostsTable() {
         );
 
       case "frequency": {
-        const cfg = (item.config as ExpenseConfig) || {};
-        const cfgFreq = cfg.frequency as string | undefined;
-        const effectiveFreq = cfgFreq || item.frequency || "monthly";
+        const effectiveFreq = item.frequency || "monthly";
         const freq =
           frequencies.find((f) => f.key === effectiveFreq) ||
           frequencies.find((f) => f.key === "monthly");
@@ -546,12 +537,15 @@ export default function OtherCostsTable() {
                     size="sm"
                     labelPlacement="outside"
                     selectedKeys={[formData.frequency]}
-                    onSelectionChange={(keys) =>
-                      setFormData({
-                        ...formData,
-                        frequency: Array.from(keys)[0] as string,
-                      })
-                    }
+                    onSelectionChange={(keys) => {
+                      if (keys === 'all') return;
+                      const [nextFrequency] = Array.from(keys) as (CostFrequency | undefined)[];
+                      if (!nextFrequency) return;
+                      setFormData((prev) => ({
+                        ...prev,
+                        frequency: nextFrequency,
+                      }));
+                    }}
                   >
                     {frequencies.map((freq) => (
                       <SelectItem key={freq.key}>{freq.label}</SelectItem>

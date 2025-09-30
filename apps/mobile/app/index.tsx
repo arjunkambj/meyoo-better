@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { Button, Spinner } from "heroui-native";
+import { Spinner } from "heroui-native";
 import { View } from "react-native";
 import { useQuery } from "convex/react";
 import { useEffect } from "react";

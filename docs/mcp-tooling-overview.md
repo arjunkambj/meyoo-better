@@ -16,7 +16,7 @@ Both routes are powered by `mcp-handler`.
 1. MCP clients send `Authorization: Bearer <Meyoo API key>` with each request (tools keep an optional `apiKey` argument for backwards compatibility).
 2. `withMcpAuth` calls the Convex query `api.web.security.validateApiKey`, which now returns:
    - `userId` and `organizationId` for the key owner,
-   - a lightweight organization profile (`name`, `timezone`, `locale`, `isPremium`, `trialEndDate`).
+   - a lightweight organization profile (`name`, `timezone`, `locale`, `isPremium`, `trialEndDate`, `isTrialActive`).
 3. The validated context is attached to `extra.authInfo` so tools can personalize responses without more queries.
 4. `internal.agent.mcpActions.updateApiKeyUsage` increments usage metrics on every successful call.
 

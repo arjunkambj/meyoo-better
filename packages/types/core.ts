@@ -12,10 +12,6 @@ export interface User {
   name?: string;
   image?: string;
 
-  // Business profile
-  businessType?: string;
-  businessCategory?: string;
-
   // Contact information
   mobileNumber?: string;
   mobileCountryCode?: string;
@@ -81,8 +77,6 @@ export interface Onboarding {
 }
 
 export interface BusinessProfile {
-  businessType?: string;
-  businessCategory?: string;
   mobileNumber?: string;
   mobileCountryCode?: string;
   referralSource?: string;

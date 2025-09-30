@@ -4,6 +4,7 @@ import type { ActionCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { api, internal } from "../_generated/api";
 import { rag } from "../rag";
+import { resend } from "../integrations/resend";
 import type {
   OrdersAnalyticsResult,
   PlatformMetrics as AggregatedPlatformMetrics,
@@ -737,6 +738,490 @@ export const getBrandSummary = action({
       summary,
       generatedAt: typeof metadata.generatedAt === "string" ? metadata.generatedAt : undefined,
       source: typeof metadata.shopDomain === "string" ? metadata.shopDomain : undefined,
+    };
+  },
+});
+
+export const productsInventory = action({
+  args: {
+    apiKey: v.string(),
+    page: v.optional(v.number()),
+    pageSize: v.optional(v.number()),
+    stockLevel: v.optional(v.union(v.literal("all"), v.literal("healthy"), v.literal("low"), v.literal("critical"), v.literal("out"))),
+    search: v.optional(v.string()),
+    sortBy: v.optional(v.string()),
+    sortOrder: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
+  },
+  returns: v.object({
+    summary: v.string(),
+    page: v.number(),
+    pageSize: v.number(),
+    total: v.number(),
+    totalPages: v.number(),
+    items: v.array(v.object({
+      id: v.string(),
+      name: v.string(),
+      sku: v.string(),
+      category: v.string(),
+      vendor: v.string(),
+      stock: v.number(),
+      reserved: v.number(),
+      available: v.number(),
+      reorderPoint: v.number(),
+      stockStatus: v.union(v.literal("healthy"), v.literal("low"), v.literal("critical"), v.literal("out")),
+      price: v.number(),
+      cost: v.number(),
+      margin: v.number(),
+      turnoverRate: v.number(),
+      unitsSold: v.optional(v.number()),
+      lastSold: v.optional(v.string()),
+      abcCategory: v.union(v.literal("A"), v.literal("B"), v.literal("C")),
+      variants: v.optional(v.array(v.object({
+        id: v.string(),
+        sku: v.string(),
+        title: v.string(),
+        price: v.number(),
+        stock: v.number(),
+        reserved: v.number(),
+        available: v.number(),
+      }))),
+    })),
+  }),
+  handler: async (ctx, args) => {
+    await validateAndGetOrgContext(ctx, args.apiKey);
+
+    const page = args.page && args.page > 0 ? args.page : 1;
+    const pageSize = args.pageSize && args.pageSize > 0 ? Math.min(args.pageSize, 200) : 50;
+
+    type ProductListResult = {
+      data: Array<{
+        id: string;
+        name: string;
+        sku: string;
+        category: string;
+        vendor: string;
+        stock: number;
+        reserved: number;
+        available: number;
+        reorderPoint: number;
+        stockStatus: 'healthy' | 'low' | 'critical' | 'out';
+        price: number;
+        cost: number;
+        margin: number;
+        turnoverRate: number;
+        unitsSold?: number;
+        lastSold?: string;
+        abcCategory: 'A' | 'B' | 'C';
+        variants?: Array<{
+          id: string;
+          sku: string;
+          title: string;
+          price: number;
+          stock: number;
+          reserved: number;
+          available: number;
+        }>;
+      }>;
+      pagination: {
+        page: number;
+        pageSize: number;
+        total: number;
+        totalPages: number;
+      };
+    };
+
+    const result: ProductListResult = await ctx.runQuery(api.web.inventory.getProductsList, {
+      page,
+      pageSize,
+      stockLevel: args.stockLevel && args.stockLevel !== "all" ? args.stockLevel : undefined,
+      searchTerm: args.search,
+      sortBy: args.sortBy,
+      sortOrder: args.sortOrder as any,
+    });
+
+    const items = result.data.map((p: any) => ({
+      id: String(p.id),
+      name: String(p.name ?? ""),
+      sku: String(p.sku ?? ""),
+      category: String(p.category ?? ""),
+      vendor: String(p.vendor ?? ""),
+      stock: Number(p.stock ?? 0),
+      reserved: Number(p.reserved ?? 0),
+      available: Number(p.available ?? 0),
+      reorderPoint: Number(p.reorderPoint ?? 0),
+      stockStatus: p.stockStatus as 'healthy' | 'low' | 'critical' | 'out',
+      price: Number(p.price ?? 0),
+      cost: Number(p.cost ?? 0),
+      margin: Number(p.margin ?? 0),
+      turnoverRate: Number(p.turnoverRate ?? 0),
+      unitsSold: typeof p.unitsSold === "number" ? p.unitsSold : undefined,
+      lastSold: typeof p.lastSold === "string" ? p.lastSold : undefined,
+      abcCategory: (p.abcCategory ?? "C") as 'A' | 'B' | 'C',
+      variants: Array.isArray(p.variants)
+        ? p.variants.map((v: any) => ({
+            id: String(v.id),
+            sku: String(v.sku ?? ""),
+            title: String(v.title ?? ""),
+            price: Number(v.price ?? 0),
+            stock: Number(v.stock ?? 0),
+            reserved: Number(v.reserved ?? 0),
+            available: Number(v.available ?? 0),
+          }))
+        : undefined,
+    }));
+
+    const summary = `Found ${result.pagination.total} products (${result.pagination.totalPages} pages). Page ${result.pagination.page} of ${result.pagination.totalPages}.`;
+
+    return {
+      summary,
+      page: result.pagination.page,
+      pageSize: result.pagination.pageSize,
+      total: result.pagination.total,
+      totalPages: result.pagination.totalPages,
+      items,
+    };
+  },
+});
+
+type OrgMemberRole = "StoreOwner" | "StoreTeam";
+type OrgMemberStatus = "active" | "suspended" | "removed";
+
+type OrgMemberRecord = {
+  _id: string;
+  _creationTime?: number;
+  email?: string;
+  name?: string;
+  image?: string;
+  role: OrgMemberRole;
+  status: OrgMemberStatus;
+  isOnboarded?: boolean;
+  createdAt?: number | null;
+  updatedAt?: number | null;
+};
+
+export const orgMembers = action({
+  args: {
+    apiKey: v.string(),
+    role: v.optional(v.union(v.literal("StoreOwner"), v.literal("StoreTeam"))),
+    status: v.optional(v.union(v.literal("active"), v.literal("suspended"), v.literal("removed"))),
+    includeRemoved: v.optional(v.boolean()),
+  },
+  returns: v.object({
+    summary: v.string(),
+    counts: v.object({
+      total: v.number(),
+      active: v.number(),
+      suspended: v.number(),
+      owners: v.number(),
+      team: v.number(),
+      removed: v.number(),
+    }),
+    filtered: v.object({
+      total: v.number(),
+      active: v.number(),
+      suspended: v.number(),
+      owners: v.number(),
+      team: v.number(),
+      removed: v.number(),
+      appliedFilters: v.array(v.string()),
+    }),
+    owner: v.union(
+      v.null(),
+      v.object({
+        id: v.string(),
+        name: v.optional(v.string()),
+        email: v.optional(v.string()),
+        image: v.optional(v.string()),
+        role: v.union(v.literal("StoreOwner"), v.literal("StoreTeam")),
+        status: v.union(v.literal("active"), v.literal("suspended"), v.literal("removed")),
+        joinedAt: v.optional(v.string()),
+      })
+    ),
+    members: v.array(v.object({
+      id: v.string(),
+      name: v.optional(v.string()),
+      email: v.optional(v.string()),
+      image: v.optional(v.string()),
+      role: v.union(v.literal("StoreOwner"), v.literal("StoreTeam")),
+      status: v.union(v.literal("active"), v.literal("suspended"), v.literal("removed")),
+      isOwner: v.boolean(),
+      isOnboarded: v.optional(v.boolean()),
+      joinedAt: v.optional(v.string()),
+      lastUpdatedAt: v.optional(v.string()),
+    })),
+  }),
+  handler: async (ctx, args) => {
+    await validateAndGetOrgContext(ctx, args.apiKey);
+
+    const { role, status, includeRemoved = false } = args;
+
+    const team = (await ctx.runQuery(api.core.teams.getTeamMembers, {})) as OrgMemberRecord[];
+
+    const toIsoString = (timestamp?: number | null) =>
+      typeof timestamp === "number" && Number.isFinite(timestamp)
+        ? new Date(timestamp).toISOString()
+        : undefined;
+
+    const members = team.map((member) => {
+      const joinedTimestamp = typeof member.createdAt === "number"
+        ? member.createdAt
+        : member._creationTime;
+      const updatedTimestamp = typeof member.updatedAt === "number"
+        ? member.updatedAt
+        : null;
+
+      return {
+        id: String(member._id),
+        name: member.name,
+        email: member.email,
+        image: member.image,
+        role: member.role,
+        status: member.status,
+        isOwner: member.role === "StoreOwner",
+        isOnboarded:
+          typeof member.isOnboarded === "boolean" ? member.isOnboarded : undefined,
+        joinedAt: toIsoString(joinedTimestamp),
+        lastUpdatedAt: toIsoString(updatedTimestamp),
+      };
+    });
+
+    const counts = {
+      total: members.length,
+      active: members.filter((m) => m.status === "active").length,
+      suspended: members.filter((m) => m.status === "suspended").length,
+      owners: members.filter((m) => m.isOwner).length,
+      team: members.filter((m) => m.role === "StoreTeam").length,
+      removed: members.filter((m) => m.status === "removed").length,
+    };
+
+    let filteredMembers = members;
+    const appliedFilters: string[] = [];
+
+    if (role) {
+      filteredMembers = filteredMembers.filter((m) => m.role === role);
+      appliedFilters.push(`role=${role}`);
+    }
+
+    if (status) {
+      filteredMembers = filteredMembers.filter((m) => m.status === status);
+      appliedFilters.push(`status=${status}`);
+    }
+
+    const shouldExcludeRemoved = !includeRemoved && status !== "removed";
+
+    if (shouldExcludeRemoved) {
+      filteredMembers = filteredMembers.filter((m) => m.status !== "removed");
+    }
+
+    appliedFilters.push(
+      shouldExcludeRemoved ? "removed=excluded" : "removed=included",
+    );
+
+    const filteredCounts = {
+      total: filteredMembers.length,
+      active: filteredMembers.filter((m) => m.status === "active").length,
+      suspended: filteredMembers.filter((m) => m.status === "suspended").length,
+      owners: filteredMembers.filter((m) => m.isOwner).length,
+      team: filteredMembers.filter((m) => m.role === "StoreTeam").length,
+      removed: filteredMembers.filter((m) => m.status === "removed").length,
+      appliedFilters,
+    };
+
+    const primaryOwner = members.find((m) => m.isOwner) ?? null;
+    const owner = primaryOwner
+      ? {
+          id: primaryOwner.id,
+          name: primaryOwner.name,
+          email: primaryOwner.email,
+          image: primaryOwner.image,
+          role: primaryOwner.role,
+          status: primaryOwner.status,
+          joinedAt: primaryOwner.joinedAt,
+        }
+      : null;
+
+    const summarySegments: string[] = [];
+
+    summarySegments.push(
+      counts.total === 0
+        ? "No members found for this organization."
+        : `Organization has ${counts.total} members (${counts.owners} owner, ${counts.team} team). ${counts.active} active, ${counts.suspended} suspended, ${counts.removed} removed.`,
+    );
+
+    if (filteredMembers.length !== counts.total || role || status || includeRemoved) {
+      summarySegments.push(
+        filteredMembers.length === 0
+          ? "No members match the provided filters."
+          : `Returning ${filteredMembers.length} member${filteredMembers.length === 1 ? "" : "s"} after applying filters.`,
+      );
+    }
+
+    if (appliedFilters.length > 0) {
+      summarySegments.push(`Filters: ${appliedFilters.join(", ")}.`);
+    }
+
+    const summary = summarySegments.filter(Boolean).join(" ");
+
+    return {
+      summary,
+      counts,
+      filtered: filteredCounts,
+      owner,
+      members: filteredMembers,
+    };
+  },
+});
+
+const DEFAULT_FROM_EMAIL = "Meyoo <noreply@meyoo.io>";
+
+export const sendEmail = action({
+  args: {
+    apiKey: v.string(),
+    memberId: v.optional(v.string()),
+    toEmail: v.optional(v.string()),
+    subject: v.string(),
+    html: v.optional(v.string()),
+    text: v.optional(v.string()),
+    replyTo: v.optional(v.array(v.string())),
+    from: v.optional(v.string()),
+    previewOnly: v.optional(v.boolean()),
+  },
+  returns: v.object({
+    status: v.union(v.literal("queued"), v.literal("preview"), v.literal("error")),
+    summary: v.string(),
+    to: v.optional(v.string()),
+    subject: v.optional(v.string()),
+    emailId: v.optional(v.string()),
+    recipientName: v.optional(v.string()),
+    memberId: v.optional(v.string()),
+    testMode: v.optional(v.boolean()),
+    preview: v.optional(v.union(
+      v.null(),
+      v.object({
+        html: v.optional(v.string()),
+        text: v.optional(v.string()),
+      })
+    )),
+    error: v.optional(v.string()),
+  }),
+  handler: async (ctx, args) => {
+    await validateAndGetOrgContext(ctx, args.apiKey);
+
+    if (!args.memberId && !args.toEmail) {
+      return {
+        status: "error" as const,
+        summary: "Provide either memberId or toEmail to resolve the recipient.",
+        error: "missing_recipient",
+      };
+    }
+
+    if ((!args.html || args.html.trim().length === 0) && (!args.text || args.text.trim().length === 0)) {
+      return {
+        status: "error" as const,
+        summary: "Provide email content in html and/or text.",
+        error: "missing_body",
+      };
+    }
+
+    const normalizedSubject = args.subject.replace(/[\r\n]+/g, " ").trim();
+    const htmlBody = typeof args.html === "string" ? args.html.trim() : undefined;
+    const textBody = typeof args.text === "string" ? args.text.trim() : undefined;
+    const replyToList = args.replyTo
+      ?.map((address) => address.trim())
+      .filter((address) => address.length > 0);
+
+    let recipientEmail: string | undefined;
+    let recipientName: string | undefined;
+    let resolvedMemberId: string | undefined;
+
+    if (args.memberId) {
+      resolvedMemberId = args.memberId;
+      const members = (await ctx.runQuery(api.core.teams.getTeamMembers, {})) as OrgMemberRecord[];
+      const match = members.find((member) => String(member._id) === args.memberId);
+      if (!match) {
+        return {
+          status: "error" as const,
+          summary: `No organization member found for id ${args.memberId}. Confirm the recipient before retrying.`,
+          memberId: args.memberId,
+          error: "member_not_found",
+        };
+      }
+      if (!match.email) {
+        return {
+          status: "error" as const,
+          summary: `Member ${match.name ?? args.memberId} does not have an email address on file.`,
+          memberId: args.memberId,
+          error: "missing_email",
+        };
+      }
+      recipientEmail = match.email.trim();
+      recipientName = match.name ?? undefined;
+    }
+
+    if (!recipientEmail && args.toEmail) {
+      recipientEmail = args.toEmail.trim();
+    }
+
+    if (!recipientEmail) {
+      return {
+        status: "error" as const,
+        summary:
+          "No recipient email could be resolved. Confirm the address with the user before invoking this tool again.",
+        error: "missing_recipient",
+      };
+    }
+
+    const sanitizedHtml = htmlBody && htmlBody.length > 0 ? htmlBody : undefined;
+    const sanitizedText = textBody && textBody.length > 0 ? textBody : undefined;
+
+    if (!sanitizedHtml && !sanitizedText) {
+      return {
+        status: "error" as const,
+        summary: "Email content is empty after trimming. Provide html or text content.",
+        to: recipientEmail,
+        subject: normalizedSubject,
+        error: "missing_body",
+      };
+    }
+
+    const from = args.from?.trim() && args.from.trim().length > 0
+      ? args.from.trim()
+      : DEFAULT_FROM_EMAIL;
+
+    const preview = sanitizedHtml || sanitizedText ? { html: sanitizedHtml, text: sanitizedText } : null;
+
+    if (args.previewOnly) {
+      return {
+        status: "preview" as const,
+        summary: `Generated preview for email to ${recipientEmail}. No email was sent.`,
+        to: recipientEmail,
+        subject: normalizedSubject,
+        recipientName,
+        memberId: resolvedMemberId,
+        testMode: resend.config.testMode ?? true,
+        preview,
+      };
+    }
+
+    const emailId = await resend.sendEmail(ctx, {
+      from,
+      to: recipientEmail,
+      subject: normalizedSubject,
+      html: sanitizedHtml,
+      text: sanitizedText,
+      replyTo: replyToList && replyToList.length > 0 ? replyToList : undefined,
+    });
+
+    return {
+      status: "queued" as const,
+      summary: `Email queued via Resend for ${recipientEmail}.`,
+      to: recipientEmail,
+      subject: normalizedSubject,
+      emailId,
+      recipientName,
+      memberId: resolvedMemberId,
+      testMode: resend.config.testMode ?? true,
+      preview,
     };
   },
 });

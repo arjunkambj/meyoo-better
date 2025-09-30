@@ -108,8 +108,6 @@ export const createOrAttachFromShopifyOAuth = mutation({
           ownerId: user._id,
           isPremium: false,
           requiresUpgrade: false,
-          apiCallLimit: 1000,
-          storageLimit: 500,
           locale: "en-US",
           timezone:
             isIanaTimeZone(args.shopData?.timezone)

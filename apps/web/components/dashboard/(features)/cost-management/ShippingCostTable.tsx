@@ -88,7 +88,6 @@ export default function ShippingCostTable() {
         name: formData.name || "Shipping",
         value: formData.baseRate || 0,
         calculation: "FIXED",
-        provider: formData.name || "Shipping",
       });
       addToast({
         title: formData._id ? "Shipping cost updated" : "Shipping cost added",

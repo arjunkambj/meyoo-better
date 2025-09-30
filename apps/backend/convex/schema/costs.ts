@@ -49,12 +49,6 @@ export const costs = defineTable({
     ),
   ),
 
-  // Advanced configuration (JSON for flexibility)
-  config: v.optional(v.any()), // Store complex configs like tiers, weight ranges, etc.
-
-  // Provider info (for payment fees, shipping, etc.)
-  provider: v.optional(v.string()), // Stripe, PayPal, FedEx, etc.
-
   // Status
   isActive: v.boolean(),
   isDefault: v.boolean(),
@@ -75,8 +69,7 @@ export const costs = defineTable({
   .index("by_org_type_frequency", ["organizationId", "type", "frequency"])
   .index("by_org_and_active", ["organizationId", "isActive"])
   .index("by_type", ["type"])
-  .index("by_effective_from", ["effectiveFrom"])
-  .index("by_provider", ["provider"]);
+  .index("by_effective_from", ["effectiveFrom"]);
 
 // Cost categories for grouping and organization
 export const costCategories = defineTable({

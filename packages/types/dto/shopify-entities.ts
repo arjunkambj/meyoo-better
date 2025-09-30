@@ -105,8 +105,6 @@ export interface ShopifyCustomerDTO {
   firstName?: string;
   lastName?: string;
   phone?: string;
-  acceptsMarketing: boolean;
-  acceptsMarketingUpdatedAt?: string;
   marketingOptInLevel?: string;
   state: "disabled" | "invited" | "enabled" | "declined";
   taxExempt: boolean;

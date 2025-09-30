@@ -105,24 +105,6 @@ export const getCosts = query({
 });
 
 /**
- * Get cost categories
- */
-export const getCostCategories = query({
-  args: {},
-  handler: async (ctx) => {
-    const auth = await getUserAndOrg(ctx);
-    if (!auth) return [];
-
-    return await ctx.db
-      .query("costCategories")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", auth.orgId as Id<"organizations">),
-      )
-      .collect();
-  },
-});
-
-/**
  * Get shipping costs
  */
 export const getShippingCosts = query({
@@ -171,7 +153,6 @@ export const getTaxRates = query({
       amount: tax.calculation !== "percentage" ? tax.value : undefined,
       calculation: tax.calculation,
       frequency: tax.frequency,
-      provider: tax.provider,
       isActive: tax.isActive,
     }));
   },
@@ -258,7 +239,6 @@ export const addCost = mutation({
     ),
     effectiveFrom: v.number(),
     description: v.optional(v.string()),
-    provider: v.optional(v.string()),
     frequency: v.optional(
       v.union(
         v.literal("one_time"),
@@ -272,7 +252,6 @@ export const addCost = mutation({
         v.literal("percentage"),
       ),
     ),
-    config: v.optional(v.any()),
   },
   returns: v.object({ id: v.id("costs"), success: v.boolean() }),
   handler: async (ctx, args) => {
@@ -287,9 +266,7 @@ export const addCost = mutation({
       calculation: args.calculation,
       effectiveFrom: args.effectiveFrom,
       description: args.description,
-      provider: args.provider,
       frequency: args.frequency,
-      config: args.config,
       isActive: true,
       isDefault: false,
       createdAt: Date.now(),
@@ -306,11 +283,23 @@ export const addCost = mutation({
 export const updateCost = mutation({
   args: {
     costId: v.id("costs"),
+    name: v.optional(v.string()),
     value: v.optional(v.number()),
     description: v.optional(v.string()),
-    provider: v.optional(v.string()),
     isActive: v.optional(v.boolean()),
-    config: v.optional(v.any()),
+    frequency: v.optional(
+      v.union(
+        v.literal("one_time"),
+        v.literal("per_order"),
+        v.literal("per_item"),
+        v.literal("daily"),
+        v.literal("weekly"),
+        v.literal("monthly"),
+        v.literal("quarterly"),
+        v.literal("yearly"),
+        v.literal("percentage"),
+      ),
+    ),
   },
   returns: v.object({ success: v.boolean() }),
   handler: async (ctx, args) => {
@@ -326,11 +315,11 @@ export const updateCost = mutation({
       updatedAt: Date.now(),
     };
 
+    if (args.name !== undefined) updates.name = args.name;
     if (args.value !== undefined) updates.value = roundMoney(args.value);
     if (args.description !== undefined) updates.description = args.description;
-    if (args.provider !== undefined) updates.provider = args.provider;
     if (args.isActive !== undefined) updates.isActive = args.isActive;
-    if (args.config !== undefined) updates.config = args.config;
+    if (args.frequency !== undefined) updates.frequency = args.frequency;
 
     await ctx.db.patch(args.costId, updates);
 
@@ -358,70 +347,6 @@ export const deleteCost = mutation({
     await ctx.db.delete(args.costId);
 
     return { success: true };
-  },
-});
-
-/**
- * Add or update cost category
- */
-export const upsertCostCategory = mutation({
-  args: {
-    categoryId: v.optional(v.id("costCategories")),
-    name: v.string(),
-    type: v.string(),
-    defaultValue: v.optional(v.number()),
-    isActive: v.optional(v.boolean()),
-  },
-  returns: v.object({ id: v.id("costCategories"), success: v.boolean() }),
-  handler: async (ctx, args) => {
-    const { user, orgId } = await requireUserAndOrg(ctx);
-
-    if (args.categoryId) {
-      // Update existing
-      const category = await ctx.db.get(args.categoryId);
-
-      if (!category || category.organizationId !== orgId) {
-        throw new Error("Category not found or access denied");
-      }
-
-      await ctx.db.patch(args.categoryId, {
-        name: args.name,
-        costType: args.type as
-          | "product"
-          | "shipping"
-          | "payment"
-          | "operational"
-          | "tax"
-          | "handling"
-          | "marketing",
-        isActive:
-          args.isActive !== undefined ? args.isActive : category.isActive,
-        updatedAt: Date.now(),
-      });
-
-      return { id: args.categoryId, success: true };
-    } else {
-      // Create new
-      const categoryId = await ctx.db.insert("costCategories", {
-        organizationId: orgId,
-        userId: user._id,
-        name: args.name,
-        costType: args.type as
-          | "product"
-          | "shipping"
-          | "payment"
-          | "operational"
-          | "tax"
-          | "handling"
-          | "marketing",
-        isActive: args.isActive !== undefined ? args.isActive : true,
-        isDefault: false,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      });
-
-      return { id: categoryId, success: true };
-    }
   },
 });
 
@@ -534,7 +459,6 @@ export const bulkImportCosts = mutation({
         value: v.number(),
         effectiveFrom: v.number(),
         description: v.optional(v.string()),
-        provider: v.optional(v.string()),
       }),
     ),
   },
@@ -553,13 +477,12 @@ export const bulkImportCosts = mutation({
         value: roundMoney(cost.value),
         calculation: "fixed" as const,
         effectiveFrom: cost.effectiveFrom,
-      description: cost.description,
-      provider: cost.provider,
-      isActive: true,
-      isDefault: false,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    });
+        description: cost.description,
+        isActive: true,
+        isDefault: false,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
 
       importedIds.push(costId);
     }
@@ -1314,21 +1237,6 @@ export const calculateShippingCost = internalMutation({
   },
   returns: v.number(),
   handler: async (ctx, args) => {
-    // Get shipping rate configuration for this organization
-    // First get all categories for the organization, then filter by type in memory
-    // This is necessary because we don't have a composite index for [organizationId, costType]
-    const allOrgCategories = await ctx.db
-      .query("costCategories")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId as Id<"organizations">),
-      )
-      .collect();
-
-    // Filter for shipping type in memory (acceptable since we've already filtered by org)
-    const _orgShippingRates = allOrgCategories.filter(
-      (rate) => rate.costType === "shipping",
-    );
-
     // Simple calculation - would be more complex in production
     let shippingCost = 10; // Base cost
 
@@ -1345,6 +1253,18 @@ export const calculateShippingCost = internalMutation({
       .first();
 
     if (users) {
+      const detailParts: string[] = [];
+      if (args.weight !== undefined) {
+        detailParts.push(`weight=${args.weight}`);
+      }
+      if (args.destination) {
+        detailParts.push(`destination=${args.destination}`);
+      }
+      const descriptionBase = `Shipping for order ${args.orderId}`;
+      const description = detailParts.length
+        ? `${descriptionBase} (${detailParts.join(", ")})`
+        : descriptionBase;
+
       await ctx.db.insert("costs", {
         organizationId: args.organizationId,
         userId: users._id,
@@ -1353,12 +1273,7 @@ export const calculateShippingCost = internalMutation({
         value: roundMoney(shippingCost),
         calculation: "weight_based" as const,
         effectiveFrom: Date.now(),
-        description: `Shipping for order ${args.orderId}`,
-        config: {
-          weight: args.weight,
-          destination: args.destination,
-          calculated: true,
-        },
+        description,
         isActive: true,
         isDefault: false,
         createdAt: Date.now(),
@@ -1397,6 +1312,9 @@ export const syncPlatformCosts = internalMutation({
   returns: v.object({ success: v.boolean() }),
   handler: async (ctx, args) => {
     for (const cost of args.costs) {
+      const normalizedDescription = args.platform
+        ? `${cost.description} (source: ${args.platform})`
+        : cost.description;
       // Check if cost already exists (avoid duplicates)
       const allCosts = await ctx.db
         .query("costs")
@@ -1411,7 +1329,7 @@ export const syncPlatformCosts = internalMutation({
           c.effectiveFrom === cost.effectiveFrom &&
           c.type === cost.type &&
           c.value === cost.value &&
-          c.description === cost.description,
+          c.description === normalizedDescription,
       );
 
       if (!existing) {
@@ -1432,16 +1350,12 @@ export const syncPlatformCosts = internalMutation({
             value: roundMoney(cost.value),
             calculation: "fixed" as const,
             effectiveFrom: cost.effectiveFrom,
-            description: cost.description,
-          config: {
-            source: args.platform,
-            synced: true,
-          },
-          isActive: true,
-          isDefault: false,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        });
+            description: normalizedDescription,
+            isActive: true,
+            isDefault: false,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          });
         }
       }
     }

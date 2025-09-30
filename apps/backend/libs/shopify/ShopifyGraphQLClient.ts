@@ -159,6 +159,9 @@ export interface ShopifyOrder {
     pageInfo: PageInfo;
   };
   fulfillments?: ShopifyFulfillment[];
+  fulfillmentOrders?: {
+    edges?: Array<{ node: ShopifyFulfillmentOrder }>;
+  };
   customer?: ShopifyCustomer;
   shippingAddress?: {
     address1?: string;
@@ -216,14 +219,58 @@ export interface ShopifyLineItem {
 export interface ShopifyFulfillment {
   id: string;
   status?: string;
+  shipmentStatus?: string;
   createdAt?: string;
   updatedAt?: string;
   deliveredAt?: string;
+  location?: {
+    id?: string | null;
+    name?: string | null;
+  } | null;
+  service?: {
+    serviceName?: string | null;
+  } | null;
   trackingInfo?: Array<{
     number?: string;
     url?: string;
     company?: string;
   }>;
+  fulfillmentLineItems?: {
+    edges?: Array<{
+      node: {
+        id?: string;
+        quantity?: number;
+        lineItem?: {
+          id?: string | null;
+        } | null;
+      };
+    }>;
+  };
+}
+
+export interface ShopifyFulfillmentOrder {
+  id: string;
+  status?: string;
+  assignedLocation?: {
+    location?: {
+      id?: string | null;
+      name?: string | null;
+    } | null;
+  } | null;
+  deliveryMethod?: {
+    methodType?: string | null;
+    serviceName?: string | null;
+  } | null;
+  lineItems?: {
+    edges?: Array<{
+      node?: {
+        id?: string | null;
+        lineItem?: {
+          id?: string | null;
+        } | null;
+      } | null;
+    }>;
+  };
 }
 
 export interface GraphQLResponse<T> {
@@ -831,6 +878,7 @@ export class ShopifyGraphQLClient {
                 sku
                 variant {
                   id
+                  sku
                   product {
                     id
                   }
@@ -845,12 +893,13 @@ export class ShopifyGraphQLClient {
                     amount
                   }
                 }
+                totalDiscountSet {
+                  shopMoney {
+                    amount
+                  }
+                }
                 fulfillableQuantity
                 fulfillmentStatus
-                customAttributes {
-                  key
-                  value
-                }
               }
             }
           }
@@ -979,6 +1028,7 @@ export class ShopifyGraphQLClient {
                     sku
                     variant {
                       id
+                      sku
                       product {
                         id
                       }
@@ -989,6 +1039,11 @@ export class ShopifyGraphQLClient {
                       }
                     }
                     discountedUnitPriceSet {
+                      shopMoney {
+                        amount
+                      }
+                    }
+                    totalDiscountSet {
                       shopMoney {
                         amount
                       }
@@ -1048,6 +1103,7 @@ export class ShopifyGraphQLClient {
               fulfillments(first: 10) {
                 id
                 status
+                shipmentStatus
                 trackingInfo {
                   company
                   number
@@ -1055,6 +1111,7 @@ export class ShopifyGraphQLClient {
                 }
                 location {
                   id
+                  name
                 }
                 service {
                   serviceName
@@ -1066,6 +1123,37 @@ export class ShopifyGraphQLClient {
                     node {
                       id
                       quantity
+                      lineItem {
+                        id
+                      }
+                    }
+                  }
+                }
+              }
+              fulfillmentOrders(first: 20) {
+                edges {
+                  node {
+                    id
+                    status
+                    assignedLocation {
+                      location {
+                        id
+                        name
+                      }
+                    }
+                    deliveryMethod {
+                      methodType
+                      serviceName
+                    }
+                    lineItems(first: 50) {
+                      edges {
+                        node {
+                          id
+                          lineItem {
+                            id
+                          }
+                        }
+                      }
                     }
                   }
                 }
@@ -1523,11 +1611,6 @@ export class ShopifyGraphQLClient {
                 province
                 city
               }
-              sourceUrl
-              landingSite
-              utmSource
-              utmMedium
-              utmCampaign
             }
           }
         }

@@ -43,11 +43,7 @@ const _userValidator = v.object({
       v.literal("business"),
     ),
   ),
-  businessType: v.optional(v.string()),
-  businessCategory: v.optional(v.string()),
-  industry: v.optional(v.string()),
   mobileNumber: v.optional(v.string()),
-  mobileCountryCode: v.optional(v.string()),
   onboardingStep: v.optional(v.number()),
   isOnboarded: v.optional(v.boolean()),
   onboardingData: v.optional(
@@ -309,9 +305,6 @@ export const updateOrganizationName = mutation({
  */
 export const updateBusinessProfile = mutation({
   args: {
-    businessType: v.optional(v.string()),
-    businessCategory: v.optional(v.string()),
-    industry: v.optional(v.string()),
     mobileNumber: v.optional(v.string()),
   },
   returns: v.object({ success: v.boolean() }),
@@ -320,30 +313,16 @@ export const updateBusinessProfile = mutation({
 
     const updates: Partial<{
       updatedAt: number;
-      name: string;
-      email: string;
       phone: string;
-      timezone: string;
-      businessType?: string;
-      businessCategory?: string;
-      industry?: string;
       mobileNumber?: string;
-      notificationPreferences: {
-        email: boolean;
-        push: boolean;
-        sms: boolean;
-      };
     }> = {
       updatedAt: Date.now(),
     };
 
-    if (args.businessType !== undefined)
-      updates.businessType = args.businessType;
-    if (args.businessCategory !== undefined)
-      updates.businessCategory = args.businessCategory;
-    if (args.industry !== undefined) updates.industry = args.industry;
-    if (args.mobileNumber !== undefined)
+    if (args.mobileNumber !== undefined) {
       updates.mobileNumber = args.mobileNumber;
+      updates.phone = args.mobileNumber;
+    }
 
     await ctx.db.patch(user._id, updates);
 

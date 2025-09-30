@@ -57,34 +57,6 @@ export type ExpenseFrequency =
   | "monthly"
   | "quarterly"
   | "yearly";
-export type ExpenseCategoryType =
-  | "cogs"
-  | "shipping"
-  | "marketing"
-  | "operations"
-  | "taxes"
-  | "fees"
-  | "other";
-
-export interface ExpenseCategory {
-  _id: Id<"costCategories">;
-  organizationId: string;
-
-  // Category info
-  name: string;
-
-  // Type
-  type: ExpenseCategoryType;
-
-  // Status
-  isActive: boolean;
-  isDefault: boolean;
-
-  // Metadata
-  createdAt?: number;
-  updatedAt?: number;
-}
-
 export interface Expense {
   _id: Id<"costs">;
   organizationId: string;
@@ -92,7 +64,6 @@ export interface Expense {
   // Expense details
   name: string;
   description?: string;
-  categoryId: Id<"costCategories">;
 
   // Amount
   amount: number;

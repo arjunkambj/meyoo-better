@@ -26,6 +26,8 @@ export const dailyMetrics = defineTable({
   totalCogs: v.optional(v.number()),
   totalHandlingFee: v.optional(v.number()),
   totalShippingCost: v.optional(v.number()),
+  totalTransactionFees: v.optional(v.number()),
+  totalMarketingCost: v.optional(v.number()),
   dailyOperatingCost: v.optional(v.number()),
   totalTaxes: v.optional(v.number()),
   blendedRoas: v.optional(v.number()),

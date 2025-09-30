@@ -409,10 +409,7 @@ export function computeOverviewMetrics(
     unitsSold += quantity;
     const variantId = resolveVariantIdForItem(item);
     const component = componentMap.get(variantId);
-    const variant = variantMap.get(variantId);
-    const perUnit = safeNumber(
-      component?.cogsPerUnit ?? component?.costPerUnit ?? variant?.costPerItem ?? 0,
-    );
+    const perUnit = safeNumber(component?.cogsPerUnit ?? 0);
     let itemCogs = perUnit * quantity;
     if (itemCogs <= 0) {
       const lineCogs = safeNumber(
@@ -1159,10 +1156,7 @@ export function computeOrdersAnalytics(
     const lineItems = items.map((item) => {
       const variantId = toStringId(item.variantId ?? item.variant_id);
       const component = componentMap.get(variantId);
-      const variant = variantMap.get(variantId);
-      const perUnit = safeNumber(
-        component?.cogsPerUnit ?? component?.costPerUnit ?? variant?.costPerItem ?? 0,
-      );
+      const perUnit = safeNumber(component?.cogsPerUnit ?? 0);
       return {
         id: toStringId(item._id ?? item.id ?? `${orderId}-${item.sku ?? item.title}`),
         name: String(item.title ?? item.productTitle ?? "Item"),

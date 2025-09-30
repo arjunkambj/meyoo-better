@@ -708,6 +708,12 @@ export const initial = internalAction({
               apiVersion: store.apiVersion,
             });
             const products: Array<Record<string, unknown>> = [];
+            const variantsToCreateCostComponents: Array<{
+              variantId: string;
+              cogsPerUnit: number;
+            }> = [];
+            let totalVariants = 0;
+            let variantsWithCogs = 0;
             let hasNextPage = true;
             let cursor = null;
             let pageCount = 0;
@@ -782,6 +788,10 @@ export const initial = internalAction({
                       for (const variantEdge of variantsEdges) {
                         const variant = variantEdge.node;
 
+                        const unitCost = variant.inventoryItem?.unitCost?.amount
+                          ? parseMoney(String(variant.inventoryItem.unitCost.amount))
+                          : undefined;
+
                         const variantData = {
                           shopifyId: String(variant.id).replace(
                             "gid://shopify/ProductVariant/",
@@ -803,11 +813,6 @@ export const initial = internalAction({
                               "gid://shopify/InventoryItem/",
                               ""
                             ) || undefined,
-                          costPerItem: variant.inventoryItem?.unitCost?.amount
-                            ? parseMoney(
-                                String(variant.inventoryItem.unitCost.amount)
-                              )
-                            : undefined,
                           weight:
                             variant.inventoryItem?.measurement?.weight?.value ||
                             undefined,
@@ -823,6 +828,14 @@ export const initial = internalAction({
                         };
 
                         variants.push(variantData);
+                        totalVariants += 1;
+                        if (typeof unitCost === "number" && unitCost > 0) {
+                          variantsToCreateCostComponents.push({
+                            variantId: variantData.shopifyId,
+                            cogsPerUnit: unitCost,
+                          });
+                          variantsWithCogs += 1;
+                        }
                       }
                     }
 
@@ -995,14 +1008,6 @@ export const initial = internalAction({
               );
               
               // Calculate COGS coverage statistics
-              const variantsWithCogs = products.reduce((acc, p) => {
-                const variants = (p.variants as any[]) || [];
-                return acc + variants.filter(v => v.costPerItem !== undefined).length;
-              }, 0);
-              const totalVariants = products.reduce((acc, p) => {
-                const variants = (p.variants as any[]) || [];
-                return acc + variants.length;
-              }, 0);
               const cogsPercentage = totalVariants > 0 
                 ? Math.round((variantsWithCogs / totalVariants) * 100)
                 : 0;
@@ -1015,23 +1020,6 @@ export const initial = internalAction({
               });
               
               // Create product cost components for variants with COGS
-              const variantsToCreateCostComponents: Array<{
-                variantId: string;
-                cogsPerUnit: number;
-              }> = [];
-              
-              for (const product of products) {
-                const variants = (product.variants as any[]) || [];
-                for (const variant of variants) {
-                  if (variant.costPerItem !== undefined && variant.costPerItem > 0) {
-                    variantsToCreateCostComponents.push({
-                      variantId: variant.shopifyId,
-                      cogsPerUnit: variant.costPerItem,
-                    });
-                  }
-                }
-              }
-              
               if (variantsToCreateCostComponents.length > 0) {
                 logger.info("Creating product cost components", {
                   count: variantsToCreateCostComponents.length,

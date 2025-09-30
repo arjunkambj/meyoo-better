@@ -636,7 +636,7 @@ export async function fetchAnalyticsSourceData(
     variants: [],
     customers: [],
     metaInsights: [],
-    costs: [],
+    globalCosts: [],
     variantCosts: [],
     sessions: [],
     analytics: [],

@@ -1118,7 +1118,6 @@ export const getProductVariantsPaginated = query({
         option2: v.optional(v.string()),
         option3: v.optional(v.string()),
         available: v.optional(v.boolean()),
-        costPerItem: v.optional(v.number()),
         cogsPerUnit: v.optional(v.number()),
         inventoryItemId: v.optional(v.string()),
         taxable: v.optional(v.boolean()),
@@ -1227,7 +1226,6 @@ export const getProductVariantsPaginated = query({
 
       return {
         ...variant,
-        costPerItem: cogsPerUnit,
         cogsPerUnit,
         taxPercent,
         taxRate: taxPercent,
@@ -1280,7 +1278,6 @@ export const getProductVariants = query({
       option2: v.optional(v.string()),
       option3: v.optional(v.string()),
       available: v.optional(v.boolean()),
-      costPerItem: v.optional(v.number()),
       cogsPerUnit: v.optional(v.number()),
       inventoryItemId: v.optional(v.string()),
       taxable: v.optional(v.boolean()),
@@ -1359,7 +1356,6 @@ export const getProductVariants = query({
 
       return {
         ...variant,
-        costPerItem: cogsPerUnit,
         cogsPerUnit,
         handlingPerUnit,
         taxPercent,

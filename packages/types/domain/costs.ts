@@ -1,45 +1,43 @@
-import type { Id } from "@repo/convex/dataModel";
+import type { Id } from '@repo/convex/dataModel';
 
-// Cost type (based on costs table schema)
+export type CostType =
+  | 'product'
+  | 'shipping'
+  | 'payment'
+  | 'operational'
+  | 'tax'
+  | 'handling'
+  | 'marketing';
+
+export type CostCalculation =
+  | 'fixed'
+  | 'percentage'
+  | 'per_unit'
+  | 'tiered'
+  | 'weight_based'
+  | 'formula';
+
+export type CostFrequency =
+  | 'one_time'
+  | 'per_order'
+  | 'per_item'
+  | 'daily'
+  | 'weekly'
+  | 'monthly'
+  | 'quarterly'
+  | 'yearly'
+  | 'percentage';
+
 export interface Cost {
-  _id: Id<"globalCosts">;
+  _id: Id<'globalCosts'>;
   organizationId: string;
-  userId: Id<"users">;
-  type:
-    | "product"
-    | "shipping"
-    | "payment"
-    | "operational"
-    | "tax"
-    | "handling"
-    | "marketing";
+  userId?: Id<'users'>;
+  type: CostType;
   name: string;
   description?: string;
-  calculation:
-    | "fixed"
-    | "percentage"
-    | "per_unit"
-    | "tiered"
-    | "weight_based"
-    | "formula";
+  calculation: CostCalculation;
   value: number;
-  frequency?:
-    | "one_time"
-    | "per_order"
-    | "per_item"
-    | "daily"
-    | "weekly"
-    | "monthly"
-    | "quarterly"
-    | "yearly"
-    | "percentage";
-  config?: {
-    percentageFee?: number;
-    fixedFee?: number;
-    providerType?: string;
-    [key: string]: unknown;
-  };
-  provider?: string;
+  frequency?: CostFrequency;
   isActive: boolean;
   isDefault: boolean;
   effectiveFrom: number;
@@ -48,115 +46,28 @@ export interface Cost {
   updatedAt?: number;
 }
 
-// Expense types
-export type ExpenseType = "fixed" | "variable" | "percentage" | "tiered";
-export type ExpenseFrequency =
-  | "one_time"
-  | "daily"
-  | "weekly"
-  | "monthly"
-  | "quarterly"
-  | "yearly";
-export interface Expense {
-  _id: Id<"globalCosts">;
-  organizationId: string;
+export type ShippingCost = Cost & {
+  type: 'shipping';
+};
 
-  // Expense details
-  name: string;
-  description?: string;
+export type PaymentFee = Cost & {
+  type: 'payment';
+};
 
-  // Amount
-  amount: number;
-  currency: string;
+export type OperationalExpense = Cost & {
+  type: 'operational';
+};
 
-  // Type
-  expenseType: ExpenseType;
+export type MarketingCost = Cost & {
+  type: 'marketing';
+};
 
-  // Frequency
-  frequency?: ExpenseFrequency;
+export type TaxCost = Cost & {
+  type: 'tax';
+  calculation: 'percentage';
+  frequency?: Extract<CostFrequency, 'percentage'>;
+};
 
-  // Variable cost configuration
-  variableConfig?: {
-    perUnit?: number;
-    percentage?: number;
-    minimumCharge?: number;
-    maximumCharge?: number;
-  };
-
-  // Date range
-  effectiveFrom: number;
-  effectiveTo?: number;
-
-  // Invoice/receipt
-  invoiceNumber?: string;
-  receiptUrl?: string;
-
-  // Payment
-  paymentStatus: "pending" | "paid" | "overdue" | "cancelled";
-  paidAt?: string;
-  dueDate?: string;
-
-  // Vendor
-  vendorName?: string;
-  vendorId?: string;
-
-  // Status
-  isActive: boolean;
-  isRecurring: boolean;
-
-  // Metadata
-  createdBy: Id<"users">;
-  updatedAt?: string;
-}
-
-// Transaction fee types
-export interface TransactionFee {
-  _id: Id<"globalCosts">;
-  organizationId: string;
-
-  // Provider info
-  provider: string;
-
-  // Fee structure
-  percentageFee: number;
-  fixedFee: number;
-  currency: string;
-
-  // International fees
-  internationalPercentageFee?: number;
-  internationalFixedFee?: number;
-
-  // Additional fees
-  chargebackFee?: number;
-  refundFee?: number;
-  disputeFee?: number;
-
-  // Volume discounts
-  volumeTiers?: VolumeTier[];
-
-  // Application
-  paymentMethods?: string[];
-
-  // Status
-  isActive: boolean;
-  effectiveFrom: number;
-  effectiveTo?: number;
-
-  // Metadata
-  updatedAt?: string;
-}
-
-export interface VolumeTier {
-  minVolume: number;
-  maxVolume?: number;
-  percentageFee: number;
-  fixedFee: number;
-}
-
-export interface CostBreakdown {
-  materials?: number;
-  labor?: number;
-  overhead?: number;
-  packaging?: number;
-  other?: number;
-}
+export type ProductCost = Cost & {
+  type: 'product';
+};

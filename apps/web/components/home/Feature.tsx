@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { Icon } from "@iconify/react";
 import { designSystem } from "@/libs/design-system";
 
@@ -84,7 +83,7 @@ const Feature = () => {
         </p>
 
         <div className="mx-auto mt-16 grid w-full max-w-7xl grid-cols-1 gap-8 px-4 sm:px-6 md:grid-cols-2 lg:grid-cols-3">
-          {featureData.map((item, index) => (
+          {featureData.map((item) => (
             <article
               key={item.id}
               className={`${designSystem.card.base} group relative flex h-full flex-col rounded-3xl p-1.5 transition-all duration-300 hover:scale-[1.02]`}

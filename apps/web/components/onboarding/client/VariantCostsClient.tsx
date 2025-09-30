@@ -69,7 +69,7 @@ type VariantRow = {
   title?: string;
   sku?: string;
   price?: number;
-  costPerItem?: number;
+  cogsPerUnit?: number;
   taxRate?: number;
   handlingPerUnit?: number;
 };
@@ -341,7 +341,7 @@ export default function VariantCostsClient({
                 const id = String(v._id);
                 const original = (
                   prev[id]?.cogs ??
-                  v.costPerItem ??
+                  v.cogsPerUnit ??
                   ""
                 ).toString();
                 const originalVal = Number(original || 0);
@@ -536,8 +536,8 @@ export default function VariantCostsClient({
                       const e = edits[id];
                       if (e && e.cogs !== undefined && e.cogs !== "")
                         return Number(e.cogs);
-                      if (typeof v.costPerItem === "number")
-                        return Number(v.costPerItem);
+                      if (typeof v.cogsPerUnit === "number")
+                        return Number(v.cogsPerUnit);
                       return undefined;
                     })
                   );
@@ -852,8 +852,8 @@ export default function VariantCostsClient({
                                 placeholder="0.00"
                                 value={
                                   e.cogs ??
-                                  (typeof v.costPerItem === "number"
-                                    ? String(v.costPerItem)
+                                  (typeof v.cogsPerUnit === "number"
+                                    ? String(v.cogsPerUnit)
                                     : "")
                                 }
                                 onValueChange={(nextVal) => {

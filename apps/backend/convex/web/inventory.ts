@@ -16,7 +16,6 @@ type VariantCostSnapshot = {
 };
 
 let variantCostCache: Map<string, VariantCostSnapshot> | null = null;
-let variantCostCacheOrg: string | null = null;
 
 const toCacheKey = (id: Id<"shopifyProductVariants">): string => id.toString();
 
@@ -24,8 +23,6 @@ const primeVariantCostComponents = async (
   ctx: QueryCtx,
   orgId: Id<"organizations">,
 ): Promise<void> => {
-  const orgKey = orgId.toString();
-
   const components = await ctx.db
     .query("variantCosts")
     .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
@@ -39,7 +36,6 @@ const primeVariantCostComponents = async (
       taxPercent: component.taxPercent,
     });
   }
-  variantCostCacheOrg = orgKey;
 };
 
 const getCachedComponent = (

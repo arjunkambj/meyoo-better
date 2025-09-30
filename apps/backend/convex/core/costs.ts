@@ -423,19 +423,6 @@ export const upsertVariantCosts = mutation({
       });
     }
 
-    // Keep variant doc cogs in sync when provided
-    if (args.cogsPerUnit !== undefined) {
-      try {
-        await ctx.db.patch(args.variantId, {
-          costPerItem: roundMoney(args.cogsPerUnit),
-          updatedAt: Date.now(),
-        } as any);
-      } catch (error) {
-        // Ignore variant patch failures; variant might have been deleted concurrently.
-        void error;
-      }
-    }
-
     return { success: true };
   },
 });
@@ -584,7 +571,7 @@ export const getProductsWithVariants = query({
         variants: variants.map((variant) => {
           const costComponent = costComponentsByVariant.get(variant._id);
           const price = variant.price || 0;
-          const cogs = costComponent?.cogsPerUnit || variant.costPerItem || 0;
+          const cogs = costComponent?.cogsPerUnit ?? 0;
           const overhead = 0;
           const taxRate = costComponent?.taxPercent || 0;
           const shipping = costComponent?.shippingPerUnit || 0;
@@ -636,94 +623,6 @@ export const getProductsWithVariants = query({
     }
 
     return result;
-  },
-});
-
-/**
- * Get variant costs
- */
-export const getVariantCosts = query({
-  args: {},
-  handler: async (ctx) => {
-    const { orgId } = await requireUserAndOrg(ctx);
-
-    const costs = await ctx.db
-      .query("globalCosts")
-      .withIndex("by_org_and_type", (q) =>
-        q.eq("organizationId", orgId).eq("type", "product")
-      )
-      .collect();
-
-    return costs.map((cost) => ({
-      variantId: cost.name.replace("Variant ", ""),
-      cost: cost.value,
-    }));
-  },
-});
-
-/**
- * Set variant costs
- */
-export const setVariantCosts = mutation({
-  args: {
-    costs: v.array(
-      v.object({
-        variantId: v.string(),
-        cost: v.number(),
-      })
-    ),
-  },
-  returns: v.object({ success: v.boolean() }),
-  handler: async (ctx, args) => {
-    const { user, orgId } = await requireUserAndOrg(ctx);
-
-    // Delete existing variant costs
-    const existingCosts = await ctx.db
-      .query("globalCosts")
-      .withIndex("by_org_and_type", (q) =>
-        q.eq("organizationId", orgId).eq("type", "product")
-      )
-      .collect();
-
-    for (const cost of existingCosts) {
-      await ctx.db.delete(cost._id);
-    }
-
-    // Insert new variant costs
-    for (const variantCost of args.costs) {
-      if (variantCost.cost > 0) {
-        await ctx.db.insert("globalCosts", {
-          organizationId: orgId,
-          userId: user._id,
-          type: "product",
-          name: `Variant ${variantCost.variantId}`,
-          value: roundMoney(variantCost.cost),
-          calculation: "fixed" as const,
-          effectiveFrom: Date.now(),
-          isActive: true,
-          isDefault: false,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        });
-      }
-    }
-
-    // Update onboarding step from 5 (products) to 6 (cost)
-    const onboarding = await ctx.db
-      .query("onboarding")
-      .withIndex("by_user_organization", (q) =>
-        q.eq("userId", user._id).eq("organizationId", orgId),
-      )
-      .first();
-
-    if (onboarding && onboarding.onboardingStep === 5) {
-      await ctx.db.patch(onboarding._id, {
-        onboardingStep: 6, // Move to cost step
-        updatedAt: Date.now(),
-      });
-    }
-
-    return { success: true };
   },
 });
 
@@ -809,13 +708,6 @@ export const bulkUpdateProductCosts = mutation({
           createdAt: Date.now(),
           updatedAt: Date.now(),
         });
-      }
-
-      // Sync COGS to variant if provided
-      if (updates.cogsPerUnit !== undefined) {
-        await ctx.db.patch(variantId, {
-          costPerItem: updates.cogsPerUnit,
-        } as any);
       }
 
       updatedCount++;
@@ -989,11 +881,6 @@ export const saveVariantCosts = mutation({
       }
 
       // Sync COGS to variant
-      if (cost.cogsPerUnit !== undefined) {
-        await ctx.db.patch(cost.variantId, {
-          costPerItem: roundMoney(cost.cogsPerUnit),
-        } as any);
-      }
     }
 
     // Persist per-variant taxPercent when provided (no global averages)
@@ -1046,15 +933,21 @@ export const updateHistoricalTaxRate = internalMutation({
     if (existingTaxCost) {
       await ctx.db.patch(existingTaxCost._id, {
         value: args.taxPercent,
+        calculation: "percentage",
+        frequency: "percentage",
+        isActive: true,
+        isDefault: true,
         updatedAt: Date.now(),
-      });
+      } as Partial<Doc<"globalCosts">>);
     } else {
       await ctx.db.insert("globalCosts", {
         organizationId: args.organizationId,
         type: "tax",
         name: "Calculated Sales Tax",
+        description: "Auto-generated tax rate synced from Shopify variants",
         value: args.taxPercent,
         calculation: "percentage",
+        frequency: "percentage",
         isActive: true,
         isDefault: true,
         effectiveFrom: Date.now(),
@@ -1159,8 +1052,7 @@ export const validateCostDataCompleteness = internalQuery({
       .collect();
     
     const totalVariants = variants.length;
-    const variantsWithCOGS = variants.filter(v => v.costPerItem && v.costPerItem > 0).length;
-    
+
     // Check cost components
     const costComponents = await ctx.db
       .query("variantCosts")
@@ -1168,8 +1060,17 @@ export const validateCostDataCompleteness = internalQuery({
         q.eq("organizationId", args.organizationId).eq("isActive", true)
       )
       .collect();
-    
-    const variantsWithCostComponents = new Set(costComponents.map(c => c.variantId)).size;
+
+    const variantsWithCostComponentsIds = new Set<string>();
+    const variantsWithCogsIds = new Set<string>();
+    for (const component of costComponents) {
+      variantsWithCostComponentsIds.add(component.variantId as string);
+      if (component.cogsPerUnit && component.cogsPerUnit > 0) {
+        variantsWithCogsIds.add(component.variantId as string);
+      }
+    }
+    const variantsWithCostComponents = variantsWithCostComponentsIds.size;
+    const variantsWithCOGS = variantsWithCogsIds.size;
     
     // Check other cost types
     const costs = await ctx.db

@@ -43,6 +43,9 @@ export interface OverviewMetrics {
   netProfit: AnalyticsMetric;
   grossProfit: AnalyticsMetric;
   profitMargin: AnalyticsMetric;
+  moMRevenueGrowth: AnalyticsMetric;
+  ncRoas?: AnalyticsMetric;
+  poas?: AnalyticsMetric;
 }
 
 export interface CostBreakdownTotals {
@@ -225,6 +228,12 @@ export function useOverviewAnalytics() {
         overviewSummary.profitMargin,
         overviewSummary.profitMarginChange,
       ),
+      moMRevenueGrowth: createMetric(overviewSummary.moMRevenueGrowth ?? 0),
+      ncRoas: createMetric(
+        overviewSummary.ncROAS ?? 0,
+        overviewSummary.ncROASChange,
+      ),
+      poas: createMetric(overviewSummary.poas ?? 0, overviewSummary.poasChange),
     } satisfies OverviewMetrics;
   }, [overviewData, isLoading]);
 

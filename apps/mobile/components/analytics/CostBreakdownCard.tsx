@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text } from 'react-native';
 import { Card } from 'heroui-native';
+import { Ionicons } from '@expo/vector-icons';
 import DonutChart, { DonutDatum } from './DonutChart';
 
 export type CostItem = {
@@ -41,25 +42,27 @@ function CostBreakdownCard({ items, currencySymbol = '$' }: CostBreakdownCardPro
 
   return (
     <Card surfaceVariant="2" className="rounded-2xl border border-border/50">
-      <Card.Body className="px-5 py-5">
-        <View className="gap-4">
+      <Card.Body className="px-4 py-4">
+        <View className="gap-3">
           <View className="flex-row items-center justify-between">
             <View>
               <Text className="text-lg font-bold text-foreground">Cost Breakdown</Text>
               <Text className="text-xs text-default-500 mt-0.5">{data.length} categories tracked</Text>
             </View>
             <View className="h-10 w-10 rounded-xl bg-orange-500/10 items-center justify-center">
-              <Text className="text-xl">📊</Text>
+              <Ionicons name="wallet-outline" size={20} color="#f97316" />
             </View>
           </View>
 
-          <DonutChart
-            data={data}
-            size={220}
-            innerRadius={75}
-            totalLabel="Total Costs"
-            totalValue={formatCurrency(total, currencySymbol)}
-          />
+          <View className="items-center justify-center p-4 rounded-2xl border border-border/40 bg-surface-1">
+            <DonutChart
+              data={data}
+              size={220}
+              innerRadius={75}
+              totalLabel="Total Costs"
+              totalValue={formatCurrency(total, currencySymbol)}
+            />
+          </View>
 
           <View className="mt-0 -mx-1.5 flex-row flex-wrap">
             {items.slice(0, 6).map((i) => {

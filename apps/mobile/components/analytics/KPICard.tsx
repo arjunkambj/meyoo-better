@@ -81,10 +81,7 @@ export function KPICard({
   };
 
   const getGradientColors = (): readonly [ColorValue, ColorValue] => {
-    if (isPrimary) {
-      return ['#6366f1', '#8b5cf6'] as const;
-    }
-    // Use icon color to create a subtle gradient
+    // Use icon color to create a subtle gradient for all cards
     const baseColor = iconColor || '#6366f1';
     return [`${baseColor}15`, `${baseColor}08`] as const;
   };
@@ -110,7 +107,7 @@ export function KPICard({
               <Skeleton className="h-4 w-24 rounded-md" />
               <Skeleton className="h-4 w-4 rounded-full" />
             </View>
-            <Skeleton className={`${isPrimary ? 'h-10' : 'h-9'} w-32 rounded-md`} />
+            <Skeleton className={`${isPrimary ? 'h-8' : 'h-7'} w-32 rounded-md`} />
           </View>
         </Card.Body>
       </Card>
@@ -125,22 +122,22 @@ export function KPICard({
         end={{ x: 1, y: 1 }}
         style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
       />
-      <Card.Body className={isPrimary ? 'px-5 py-5' : ''}>
-        <View className={isPrimary ? 'gap-4' : 'gap-3.5'}>
+      <Card.Body className={isPrimary ? 'px-4 py-4' : ''}>
+        <View className={isPrimary ? 'gap-3' : 'gap-3.5'}>
           {/* Header with title and icon */}
           <View className="flex-row items-center justify-between">
-            <Text className={`text-xs font-bold uppercase tracking-wider ${isPrimary ? 'text-white/90' : 'text-default-600'} flex-1`} numberOfLines={1}>
+            <Text className="text-xs font-bold uppercase tracking-wider text-default-600 flex-1" numberOfLines={1}>
               {title}
             </Text>
             {icon && (
               <View className="items-center justify-center">
-                <Ionicons name={icon} size={18} color={isPrimary ? '#ffffff' : iconColor} />
+                <Ionicons name={icon} size={16} color={iconColor} />
               </View>
             )}
           </View>
 
           {/* Value */}
-          <Text className={`${isPrimary ? 'text-4xl text-white' : 'text-3xl text-foreground'} font-black tracking-tight`}>
+          <Text className={`${isPrimary ? 'text-2xl' : 'text-xl'} text-foreground font-black tracking-tight`}>
             {formatValue(value)}
           </Text>
           {changeDisplay && (
@@ -148,13 +145,13 @@ export function KPICard({
               {changeDisplay.icon && (
                 <Ionicons
                   name={changeDisplay.icon}
-                  size={14}
-                  color={isPrimary ? '#ffffff' : changeDisplay.color}
+                  size={12}
+                  color={changeDisplay.color}
                 />
               )}
               <Text
-                className={`${isPrimary ? 'text-sm text-white/80' : 'text-sm'}`}
-                style={{ color: isPrimary ? undefined : changeDisplay.color }}
+                className="text-xs"
+                style={{ color: changeDisplay.color, fontSize: 11 }}
               >
                 {changeDisplay.label}
               </Text>

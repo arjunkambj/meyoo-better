@@ -19,6 +19,10 @@ import HistorySkeleton from "@/components/agent/components/HistorySkeleton";
 import ChatHistoryItem from "@/components/agent/components/ChatHistoryItem";
 import RenameThreadDialog from "@/components/agent/components/RenameThreadDialog";
 import ThinkingSpinnerAlt from "@/components/agent/components/ThinkingSpinnerAlt";
+import {
+  inferAgentThinkingLabel,
+  useOptimisticAgentMessages,
+} from "@repo/ui/agent/useOptimisticAgentMessages";
 
 export default function ChatUI() {
   const [activeId, setActiveId] = useState<string | undefined>(undefined);
@@ -41,21 +45,26 @@ export default function ChatUI() {
     deleteThread,
   } = useAgent({ threadId: activeId });
 
-  // Local optimistic messages shown immediately while waiting for server.
-  const [localMessages, setLocalMessages] = useState<
-    { id: string; role: "user" | "assistant"; text: string }[]
-  >([]);
+  const {
+    displayedMessages: optimisticMessages,
+    appendSequence,
+    markSequenceSaved,
+    removeSequence,
+    reset,
+  } = useOptimisticAgentMessages(messages as AgentUIMessage[] | undefined);
 
   const startNewChat = useCallback(() => {
     // Clear active thread; first send will create a new one
+    reset();
     setActiveId(undefined);
     setViewMode("chat");
-  }, []);
+  }, [reset]);
 
   const onSelectConversation = useCallback((id: string) => {
+    reset();
     setActiveId(id);
     setViewMode("chat");
-  }, []);
+  }, [reset]);
 
   const handleSend = useCallback(
     async (message: string) => {
@@ -64,10 +73,9 @@ export default function ChatUI() {
       // Add optimistic user message and a temporary assistant thinking bubble
       const userId = `local-u-${nanoid(6)}`;
       const thinkingId = `local-a-${nanoid(6)}`;
-      setLocalMessages((prev) => [
-        ...prev,
-        { id: userId, role: "user", text: message },
-        { id: thinkingId, role: "assistant", text: "__thinking__" },
+      const pendingKey = appendSequence([
+        { id: userId, role: "user", text: message, status: "local" },
+        { id: thinkingId, role: "assistant", text: "__thinking__", status: "local" },
       ]);
 
       try {
@@ -79,11 +87,15 @@ export default function ChatUI() {
         if (!activeId && res?.threadId) {
           setActiveId(res.threadId);
         }
-      } finally {
-        // Clear handled via effect when server messages hydrate
+        markSequenceSaved(pendingKey, res?.savedMessageIds ?? []);
+        return true;
+      } catch (error) {
+        console.error("Failed to send agent message", error);
+        removeSequence(pendingKey);
+        return false;
       }
     },
-    [activeId, sendMessage]
+    [activeId, appendSequence, markSequenceSaved, removeSequence, sendMessage]
   );
 
   // Auto-scroll on new messages
@@ -91,19 +103,7 @@ export default function ChatUI() {
     const el = scrollRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
-  }, [messages?.length, localMessages.length]);
-
-  const displayedMessages: AgentUIMessage[] = useMemo(() => {
-    if (messages && messages.length > 0) return messages as AgentUIMessage[];
-    return localMessages as unknown as AgentUIMessage[];
-  }, [messages, localMessages]);
-
-  // Clear optimistic messages once server messages are present to avoid first-render blink
-  useEffect(() => {
-    if (localMessages.length > 0 && (messages?.length ?? 0) > 0) {
-      setLocalMessages([]);
-    }
-  }, [messages?.length, localMessages.length]);
+  }, [optimisticMessages.length]);
 
   const conversationOptions = useMemo(() => {
     return (threads ?? []).map((t) => ({
@@ -187,13 +187,16 @@ export default function ChatUI() {
                   onDelete={async (id) => {
                     // handled below via useAgent deleteThread
                     await deleteThread(id);
-                    if (activeId === id) setActiveId(undefined);
+                    if (activeId === id) {
+                      reset();
+                      setActiveId(undefined);
+                    }
                   }}
                 />
               ))}
             </div>
           )
-        ) : !displayedMessages || displayedMessages.length === 0 ? (
+        ) : !optimisticMessages || optimisticMessages.length === 0 ? (
           showLoadingSkeleton ? (
             <MessageSkeleton rows={4} />
           ) : (
@@ -221,51 +224,31 @@ export default function ChatUI() {
           )
         ) : (
           <div className="space-y-2 pt-2">
-            {displayedMessages.map((m) => {
-              if (m.role === "assistant") {
-                const streaming = m.status === "streaming";
-                const text = m.text ?? "";
-                const parts = (m.parts ?? []) as UIMessagePart[];
+            {optimisticMessages.map((message) => {
+              if (message.role === "assistant") {
+                const streaming = message.status === "streaming";
+                const text = message.text ?? "";
+                const trimmed = text.trim();
+                const label = inferAgentThinkingLabel(message.parts as UIMessagePart[] | undefined);
 
-                if (text.trim().length === 0 && streaming) {
-                  // Try to infer tool activity label from parts
-                  const toolName = (() => {
-                    const toolPart = parts.find(
-                      (p) =>
-                        p &&
-                        p.type &&
-                        (p.type === "tool" || p.type === "step-start")
-                    ) as UIMessagePart | undefined;
-                    const rawName = toolPart
-                      ? (toolPart.toolName ?? toolPart.name ?? toolPart.tool)
-                      : undefined;
-                    const name = typeof rawName === "string" ? rawName : "";
-                    const n = name.toLowerCase();
-                    if (n.includes("inventory"))
-                      return "Reading inventory details…";
-                    if (n.includes("meta") || n.includes("ads"))
-                      return "Reading meta analytics…";
-                    if (n.includes("order")) return "Summarizing orders…";
-                    if (n.includes("brand")) return "Fetching brand summary…";
-                    return "Thinking…";
-                  })();
-                  return <ThinkingSpinnerAlt key={m.id} label={toolName} />;
+                if (streaming && trimmed.length === 0) {
+                  return <ThinkingSpinnerAlt key={message.id} label={label} />;
                 }
 
                 if (text === "__thinking__") {
-                  return <TypingMessage key={m.id} />;
+                  return <TypingMessage key={message.id} label={label} />;
                 }
 
                 return (
                   <AssistantMessage
-                    key={m.id}
+                    key={message.id}
                     content={text}
                     streaming={streaming}
                     onVote={(v) => console.log("vote", v)}
                   />
                 );
               }
-              return <UserMessage key={m.id} content={m.text} />;
+              return <UserMessage key={message.id} content={message.text ?? ""} />;
             })}
           </div>
         )}

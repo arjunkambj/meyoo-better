@@ -1,26 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
+import { Alert, ScrollView, Text, View } from 'react-native';
 import { Button, useTheme } from 'heroui-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import {
   type AgentThread,
-  type AgentUIMessage,
   DEFAULT_MESSAGE_PAGE_SIZE,
   DEFAULT_THREAD_PAGE_SIZE,
   useAgent,
 } from '@/hooks/useAgent';
-import { AgentChatComposer } from './AgentChatComposer';
+import { useOptimisticAgentMessages } from '@repo/ui/agent/useOptimisticAgentMessages';
 import { AgentMessageFeed } from './AgentMessageFeed';
 import { AgentThreadList } from './AgentThreadList';
-
-const keyboardOffset = Platform.select({ ios: 96, android: 0, default: 0 });
 
 export function AgentPanel() {
   const [viewMode, setViewMode] = useState<'chat' | 'history'>('chat');
   const [activeThreadId, setActiveThreadId] = useState<string | undefined>(undefined);
-  const [inputValue, setInputValue] = useState('');
-  const [localMessages, setLocalMessages] = useState<AgentUIMessage[]>([]);
   const { colors } = useTheme();
 
   const {
@@ -34,9 +29,12 @@ export function AgentPanel() {
     loadMoreMessages,
     renameThread,
     deleteThread,
-    sendMessage,
-    isSending,
   } = useAgent({ threadId: activeThreadId });
+
+  const {
+    displayedMessages: optimisticMessages,
+    reset: resetOptimisticMessages,
+  } = useOptimisticAgentMessages(messages);
 
   const messageScrollRef = useRef<ScrollView | null>(null);
 
@@ -44,80 +42,31 @@ export function AgentPanel() {
     messageScrollRef.current = node;
   }, []);
 
-  const displayedMessages = useMemo(() => {
-    if (messages && messages.length > 0) {
-      return messages;
-    }
-    return localMessages;
-  }, [messages, localMessages]);
-
   const activeThread = useMemo(() => {
     if (!activeThreadId || !threads) return null;
     return threads.find(t => t.threadId === activeThreadId);
   }, [activeThreadId, threads]);
 
   useEffect(() => {
-    if (localMessages.length > 0 && (messages?.length ?? 0) > 0) {
-      setLocalMessages([]);
-    }
-  }, [localMessages.length, messages?.length]);
-
-  useEffect(() => {
     const scrollView = messageScrollRef.current;
     if (!scrollView) return;
-    if (displayedMessages.length === 0) return;
+    if (optimisticMessages.length === 0) return;
     requestAnimationFrame(() => {
       scrollView.scrollToEnd({ animated: true });
     });
-  }, [displayedMessages.length]);
+  }, [optimisticMessages.length]);
 
   const startNewThread = useCallback(() => {
+    resetOptimisticMessages();
     setActiveThreadId(undefined);
-    setLocalMessages([]);
     setViewMode('chat');
-  }, []);
+  }, [resetOptimisticMessages]);
 
   const handleSelectThread = useCallback((threadId: string) => {
+    resetOptimisticMessages();
     setActiveThreadId(threadId);
-    setLocalMessages([]);
     setViewMode('chat');
-  }, []);
-
-  const handleSend = useCallback(async () => {
-    const trimmed = inputValue.trim();
-    if (!trimmed) return;
-
-    setInputValue('');
-
-    const now = Date.now();
-    const userMessage: AgentUIMessage = {
-      id: `local-user-${now}`,
-      role: 'user',
-      text: trimmed,
-    };
-    const thinkingMessage: AgentUIMessage = {
-      id: `local-assistant-${now}`,
-      role: 'assistant',
-      text: '__thinking__',
-    };
-
-    setLocalMessages((prev) => [...prev, userMessage, thinkingMessage]);
-
-    try {
-      const result = await sendMessage({
-        message: trimmed,
-        threadId: activeThreadId,
-        title: trimmed.slice(0, 40),
-      });
-      if (!activeThreadId && result?.threadId) {
-        setActiveThreadId(result.threadId);
-      }
-    } catch (error) {
-      setLocalMessages((prev) => prev.filter((msg) => !msg.id.startsWith('local-')));
-      setInputValue(trimmed);
-      console.error('Failed to send agent message', error);
-    }
-  }, [activeThreadId, inputValue, sendMessage]);
+  }, [resetOptimisticMessages]);
 
   const handleRenameThread = useCallback(
     async (threadId: string, nextTitle: string) => {
@@ -142,6 +91,7 @@ export function AgentPanel() {
               try {
                 await deleteThread(thread.threadId);
                 if (activeThreadId === thread.threadId) {
+                  resetOptimisticMessages();
                   startNewThread();
                 }
               } catch (error) {
@@ -152,14 +102,14 @@ export function AgentPanel() {
         ],
       );
     },
-    [activeThreadId, deleteThread, startNewThread],
+    [activeThreadId, deleteThread, resetOptimisticMessages, startNewThread],
   );
 
   const canLoadMoreThreads = threadsStatus === 'CanLoadMore';
   const loadingMoreThreads = threadsStatus === 'LoadingMore';
   const canLoadMoreMessages = messagesStatus === 'CanLoadMore';
   const loadingMoreMessages = messagesStatus === 'LoadingMore';
-  const showEmptyMessages = displayedMessages.length === 0 && !isLoadingMessages;
+  const showEmptyMessages = optimisticMessages.length === 0 && !isLoadingMessages;
   const isInitialMessagesLoading = isLoadingMessages && (messages?.length ?? 0) === 0;
 
   const handleLoadMoreThreads = useCallback(() => {
@@ -222,9 +172,9 @@ export function AgentPanel() {
               <Text className="text-base font-semibold text-foreground" numberOfLines={1}>
                 {activeThread?.title || 'New Chat'}
               </Text>
-              {displayedMessages.length > 0 && (
+              {optimisticMessages.length > 0 && (
                 <Text className="text-xs text-default-500">
-                  {displayedMessages.length} {displayedMessages.length === 1 ? 'message' : 'messages'}
+                  {optimisticMessages.length} {optimisticMessages.length === 1 ? 'message' : 'messages'}
                 </Text>
               )}
             </View>
@@ -255,28 +205,13 @@ export function AgentPanel() {
           {/* Messages */}
           <AgentMessageFeed
             onScrollViewReady={handleScrollViewReady}
-            messages={displayedMessages}
+            messages={optimisticMessages}
             showEmpty={showEmptyMessages}
             isInitialLoading={isInitialMessagesLoading}
             canLoadMore={canLoadMoreMessages}
             loadingMore={loadingMoreMessages}
             onLoadMore={canLoadMoreMessages ? handleLoadMoreMessages : undefined}
           />
-
-          {/* Input */}
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            keyboardVerticalOffset={keyboardOffset}
-          >
-            <View className="px-4 pb-4 pt-3 border-t border-border/40 bg-surface-2">
-              <AgentChatComposer
-                value={inputValue}
-                onChange={setInputValue}
-                onSend={handleSend}
-                loading={isSending}
-              />
-            </View>
-          </KeyboardAvoidingView>
         </View>
       )}
     </View>

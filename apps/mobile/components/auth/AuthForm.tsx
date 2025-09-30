@@ -1,7 +1,7 @@
 import { useAuthActions } from '@convex-dev/auth/react';
 import { Button, ErrorView, TextField, useTheme } from 'heroui-native';
 import { useState } from 'react';
-import { View, Text, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { GoogleAuthButton } from './GoogleAuthButton';
 import { AppleAuthButton } from './AppleAuthButton';
@@ -54,16 +54,23 @@ export function AuthForm({ onSuccess }: AuthFormProps) {
 
       await signIn('password', formData);
       onSuccess?.();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessageText =
+        error instanceof Error ? error.message ?? '' : '';
+      const invalidCredentials = errorMessageText
+        .toLowerCase()
+        .includes('invalid email or password');
+
       // Check if it's a user not found error to suggest signup
-      if (error.message?.includes('Invalid email or password') && !isNewUser) {
+      if (invalidCredentials && !isNewUser) {
         setErrorMessage('No account found. Create a new account to continue.');
         setIsNewUser(true);
       } else {
         const fallback = isNewUser
           ? 'Could not create account. Please try again.'
           : 'Could not sign you in. Please check your credentials.';
-        setErrorMessage(error.message || fallback);
+        setErrorMessage(fallback);
+        Alert.alert('Something went wrong', 'Please try again in a moment.');
       }
     } finally {
       setIsSubmitting(false);

@@ -8,6 +8,12 @@
       ],
       "@repo/convex/*": [
         "../backend/convex/_generated/*"
+      ],
+      "@repo/ui/*": [
+        "../../packages/ui/src/*"
+      ],
+      "@repo/types/*": [
+        "../../packages/types/*"
       ]
     }
   },

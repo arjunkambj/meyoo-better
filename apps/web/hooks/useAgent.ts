@@ -3,6 +3,9 @@ import { useUIMessages } from "@convex-dev/agent/react";
 import { useAuthToken } from "@convex-dev/auth/react";
 import { useCallback, useMemo, useState } from "react";
 import { api } from "@/libs/convexApi";
+import type { AgentUIMessage, UIMessagePart } from "@repo/types/ui/agent";
+
+export type { AgentUIMessage, UIMessagePart } from "@repo/types/ui/agent";
 
 export type AgentThread = {
   threadId: string;
@@ -21,22 +24,6 @@ export type SendAgentMessageArgs = {
 
 const DEFAULT_THREAD_PAGE_SIZE = 25;
 const DEFAULT_MESSAGE_PAGE_SIZE = 40;
-
-export type UIMessagePart = {
-  type: string;
-  toolName?: string;
-  name?: string;
-  tool?: string;
-  [key: string]: unknown;
-};
-
-export type AgentUIMessage = {
-  id: string;
-  role: "user" | "assistant" | "system";
-  text: string;
-  status?: string; // e.g. "streaming" or success
-  parts?: UIMessagePart[]; // optional UI parts for tool/status awareness
-};
 
 export function useAgent({
   threadId,

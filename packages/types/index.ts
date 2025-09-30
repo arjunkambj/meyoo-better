@@ -25,5 +25,6 @@ export * from "./shared/utilities";
 export * from "./ui/charts";
 // UI types
 export * from "./ui/components";
+export * from "./ui/agent";
 export * from "./ui/forms";
 export * from "./ui/notifications";

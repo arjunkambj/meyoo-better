@@ -10,7 +10,7 @@ export type AgentChatInputProps = {
   disabled?: boolean;
   busy?: boolean;
   className?: string;
-  onSend: (message: string) => void | Promise<void>;
+  onSend: (message: string) => void | boolean | Promise<void | boolean>;
 };
 
 export default function AgentChatInput({
@@ -28,7 +28,15 @@ export default function AgentChatInput({
     if (!canSend) return;
     const content = message.trim();
     setMessage("");
-    await onSend(content);
+    try {
+      const result = await onSend(content);
+      if (result === false) {
+        setMessage(content);
+      }
+    } catch (error) {
+      console.error("Failed to send chat message", error);
+      setMessage(content);
+    }
   }, [canSend, message, onSend]);
 
   return (
@@ -37,9 +45,9 @@ export default function AgentChatInput({
         <Textarea
           aria-label="Chat message"
           className="w-full"
-          size="md"
-          minRows={3}
-          maxRows={8}
+          
+          minRows={4}
+          maxRows={4}
           isDisabled={disabled}
           isReadOnly={busy}
           placeholder={placeholder}
@@ -47,20 +55,21 @@ export default function AgentChatInput({
           onValueChange={setMessage}
           classNames={{
             inputWrapper: cn(
-              "bg-default-50 rounded-xl",
-              "hover:bg-default-100",
+              "bg-default-50",
+              "rounded-2xl",
+              "hover:bg-default-50",
               "focus-within:bg-background",
-              "data-[hover=true]:bg-default-100",
+              "data-[hover=true]:bg-default-50",
               "border-2 border-default-200",
               "hover:border-default-300",
               "focus-within:border-primary",
               "transition-all duration-200",
-              "pr-14 pb-12"
+              "px-3 pt-2"
             ),
             input: cn(
-              "bg-transparent text-sm",
+              "bg-transparent text-base leading-relaxed",
               "placeholder:text-default-400",
-              "min-h-[60px]"
+              "min-h-[52px]"
             ),
           }}
           onKeyDown={(e) => {
@@ -71,8 +80,8 @@ export default function AgentChatInput({
           }}
         />
 
-        <div className="absolute right-2.5 bottom-2.5 z-10 flex items-center gap-1.5">
-          <div className="text-xs text-default-400 mr-1">
+        <div className="absolute right-3.5 bottom-3 z-10 flex items-center gap-2">
+          <div className="text-xs text-default-400 mr-1.5">
             {!busy && message.length > 0 && "↵ to send"}
           </div>
           <Tooltip
@@ -88,9 +97,9 @@ export default function AgentChatInput({
               isDisabled={!canSend}
               isLoading={busy}
               onPress={handleSend}
-              className="hover:scale-105 transition-transform"
+              className="h-10 w-10 text-base shadow-sm hover:scale-105 transition-transform"
             >
-              <Icon icon="solar:plain-2-bold-duotone" width={20} />
+              <Icon icon="solar:plain-2-bold-duotone" width={22} />
             </Button>
           </Tooltip>
         </div>

@@ -121,22 +121,22 @@ const Pricing = () => {
             return (
               <Card
                 key={tier.key}
-                className={`h-full w-full ${designSystem.card.base} rounded-3xl p-1.5 transition-all duration-300 hover:scale-[1.02] sm:w-96`}
+                className={`h-full w-full ${designSystem.card.base} rounded-3xl p-1.5 transition-all duration-300 hover:scale-[1.02] sm:w-96 overflow-hidden`}
               >
-                <CardHeader className="flex flex-col gap-5 py-8 px-6">
-                  <div className="text-center space-y-2">
-                    <h3 className="text-xl font-semibold tracking-tight text-foreground">
+                <CardHeader className="flex flex-col gap-3 py-5 px-6 bg-background rounded-[20px]">
+                  <div className="text-center space-y-1.5">
+                    <h3 className="text-lg font-semibold tracking-tight text-foreground">
                       {tier.title}
                     </h3>
-                    <p className="text-sm leading-relaxed text-muted-foreground">
+                    <p className="text-xs leading-relaxed text-muted-foreground">
                       {tier.description}
                     </p>
                   </div>
-                  <div className="flex flex-col items-center gap-2 py-4">
-                    <div className="flex items-end gap-1.5 text-5xl font-bold tracking-tight text-foreground">
+                  <div className="flex flex-col items-center gap-1 py-2">
+                    <div className="flex items-end gap-1.5 text-4xl font-bold tracking-tight text-foreground">
                       {shouldAnimate ? (
                         <>
-                          <span className="text-3xl font-semibold text-muted-foreground">
+                          <span className="text-2xl font-semibold text-muted-foreground">
                             $
                           </span>
                           <NumberTicker
@@ -147,29 +147,29 @@ const Pricing = () => {
                           />
                         </>
                       ) : (
-                        <span className="text-3xl font-semibold text-muted-foreground">
+                        <span className="text-2xl font-semibold text-muted-foreground">
                           {price}
                         </span>
                       )}
                     </div>
-                    <div className="text-sm text-muted-foreground font-medium">
+                    <div className="text-xs text-muted-foreground font-medium">
                       {periodCopy}
                     </div>
                   </div>
 
                   <Button
                     as={Link}
-                    className="mt-2 w-full h-11 font-semibold transition-all duration-200 hover:scale-105 active:scale-100"
+                    className="w-full h-10 font-semibold transition-all duration-200 hover:scale-105 active:scale-100"
                     color={tier.buttonColor}
                     href={tier.href}
                     variant={tier.buttonVariant}
-                    size="lg"
+                    size="md"
                   >
                     {tier.buttonText}
                   </Button>
                 </CardHeader>
 
-                <Divider className="my-3 bg-default-100" />
+                <Divider className="my-0 bg-default-100" />
 
                 <CardBody className="flex flex-col px-6 pb-8 pt-4">
                   <div className="flex-1">

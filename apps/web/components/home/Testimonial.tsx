@@ -63,24 +63,24 @@ const Testimonial = () => {
         </p>
       </div>
       <div
-        className={`relative mx-auto mt-12 grid min-h-[28rem] w-full max-w-7xl items-stretch ${designSystem.spacing.gap.md} px-4 sm:px-6 lg:px-8 md:grid-cols-2 lg:grid-cols-3`}
+        className={`relative mx-auto mt-16 grid w-full max-w-7xl items-stretch gap-8 px-4 sm:px-6 lg:px-8 md:grid-cols-2 lg:grid-cols-3`}
       >
         {testimonials.map((testimonial) => (
-          <div
+          <article
             key={testimonial.id}
-            className="relative flex h-full w-full rounded-2xl border border-primary/15 bg-primary/5 p-6 sm:p-8 dark:border-default-200/20 dark:bg-gradient-to-br dark:from-default-100/15 dark:via-default-100/10 dark:to-default-200/5 dark:backdrop-blur before:absolute before:left-6 before:right-6 before:top-0 before:h-0.5 before:bg-primary/40"
+            className={`${designSystem.card.base} group relative flex h-full flex-col rounded-3xl p-1.5 transition-all duration-300 hover:scale-[1.02]`}
           >
-            <div className="relative flex h-full flex-col">
+            <div className="relative flex h-full flex-col p-6 sm:p-8">
               <div className="mb-5 inline-flex size-10 items-center justify-center rounded-full text-primary/70">
                 <Icon icon="ri:double-quotes-l" width={26} />
               </div>
 
-              <h3 className="mb-3 text-lg sm:text-xl md:text-2xl font-semibold tracking-tight text-foreground">
+              <h3 className="mb-3 text-xl font-semibold tracking-tight leading-tight">
                 {testimonial.title}
               </h3>
 
               <div className="mb-8 flex-1">
-                <p className="text-[15px] leading-7 text-default-700">
+                <p className="text-sm text-muted-foreground leading-relaxed">
                   {testimonial.description}
                 </p>
               </div>
@@ -92,17 +92,16 @@ const Testimonial = () => {
                   name={testimonial.user.name}
                 />
                 <div className="space-y-1">
-                  <p className="text-base font-semibold text-default-800 ">
+                  <p className="text-sm font-semibold">
                     {testimonial.user.name}
                   </p>
-                  <p className="text-sm text-default-700">
+                  <p className="text-xs text-muted-foreground">
                     {testimonial.user.location}
                   </p>
                 </div>
               </div>
             </div>
-            
-          </div>
+          </article>
         ))}
       </div>
     </section>

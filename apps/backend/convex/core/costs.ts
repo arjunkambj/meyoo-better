@@ -384,9 +384,6 @@ export const upsertVariantCosts = mutation({
     shippingPerUnit: v.optional(v.number()),
     handlingPerUnit: v.optional(v.number()),
     taxPercent: v.optional(v.number()),
-    paymentFeePercent: v.optional(v.number()),
-    paymentFixedPerItem: v.optional(v.number()),
-    paymentProvider: v.optional(v.string()),
   },
   returns: v.object({ success: v.boolean() }),
   handler: async (ctx, args) => {
@@ -405,9 +402,6 @@ export const upsertVariantCosts = mutation({
     if (args.shippingPerUnit !== undefined) updates.shippingPerUnit = args.shippingPerUnit;
     if (args.handlingPerUnit !== undefined) updates.handlingPerUnit = args.handlingPerUnit;
     if (args.taxPercent !== undefined) updates.taxPercent = args.taxPercent;
-    if (args.paymentFeePercent !== undefined) updates.paymentFeePercent = args.paymentFeePercent;
-    if (args.paymentFixedPerItem !== undefined) updates.paymentFixedPerItem = args.paymentFixedPerItem;
-    if (args.paymentProvider !== undefined) updates.paymentProvider = args.paymentProvider;
 
     if (existing) {
       await ctx.db.patch(existing._id, updates);
@@ -824,9 +818,6 @@ export const saveVariantCosts = mutation({
         taxPercent: v.optional(v.number()),
         shippingPerUnit: v.optional(v.number()),
         handlingPerUnit: v.optional(v.number()),
-        paymentFeePercent: v.optional(v.number()),
-        paymentFixedPerItem: v.optional(v.number()),
-        paymentProvider: v.optional(v.string()),
       })
     ),
   },
@@ -841,10 +832,7 @@ export const saveVariantCosts = mutation({
         cost.cogsPerUnit !== undefined ||
         cost.shippingPerUnit !== undefined ||
         cost.handlingPerUnit !== undefined ||
-        cost.taxPercent !== undefined ||
-        cost.paymentFeePercent !== undefined ||
-        cost.paymentFixedPerItem !== undefined ||
-        cost.paymentProvider !== undefined;
+        cost.taxPercent !== undefined;
 
       if (!hasAnyValue) continue;
 
@@ -862,9 +850,6 @@ export const saveVariantCosts = mutation({
       if (cost.shippingPerUnit !== undefined) updates.shippingPerUnit = cost.shippingPerUnit;
       if (cost.handlingPerUnit !== undefined) updates.handlingPerUnit = cost.handlingPerUnit;
       if (cost.taxPercent !== undefined) updates.taxPercent = cost.taxPercent;
-      if (cost.paymentFeePercent !== undefined) updates.paymentFeePercent = cost.paymentFeePercent;
-      if (cost.paymentFixedPerItem !== undefined) updates.paymentFixedPerItem = cost.paymentFixedPerItem;
-      if (cost.paymentProvider !== undefined) updates.paymentProvider = cost.paymentProvider;
 
       if (existing) {
         await ctx.db.patch(existing._id, updates);

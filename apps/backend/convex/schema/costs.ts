@@ -79,21 +79,13 @@ export const variantCosts = defineTable({
 
   // Per-unit components
   cogsPerUnit: v.optional(v.number()),
-  shippingPerUnit: v.optional(v.number()),
   handlingPerUnit: v.optional(v.number()),
   // Per-variant tax percent
   taxPercent: v.optional(v.number()),
 
-  // Payment fee overrides at product level
-  paymentFeePercent: v.optional(v.number()),
-  paymentFixedPerItem: v.optional(v.number()),
-  paymentProvider: v.optional(v.string()),
-
   // Lifecycle
-  isActive: v.boolean(),
-  effectiveFrom: v.number(),
-  effectiveTo: v.optional(v.number()),
 
+  effectiveFrom: v.number(),
   // Metadata
   createdAt: v.optional(v.number()),
   updatedAt: v.optional(v.number()),
@@ -101,6 +93,4 @@ export const variantCosts = defineTable({
   .index("by_organization", ["organizationId"])
   .index("by_variant", ["variantId"])
   .index("by_org_variant", ["organizationId", "variantId"]) 
-  .index("by_org_and_active", ["organizationId", "isActive"]) 
-  .index("by_variant_and_active", ["variantId", "isActive"]) 
-  .index("by_effective_from", ["effectiveFrom"]);
+   .index("by_effective_from", ["effectiveFrom"]);

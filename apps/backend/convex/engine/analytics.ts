@@ -760,13 +760,6 @@ function buildDailyMetricsFromResponse(
     (count, occurrences) => (occurrences > 1 ? count + 1 : count),
     0,
   );
-  const customerBreakdown = newCustomers + returningCustomers + repeatCustomers > 0
-    ? sanitizeDocument({
-        newCustomers: newCustomers || undefined,
-        returningCustomers: returningCustomers || undefined,
-        repeatCustomers: repeatCustomers || undefined,
-      })
-    : null;
 
   const returnedOrders = (() => {
     if (!refunds.length) return 0;
@@ -782,9 +775,25 @@ function buildDailyMetricsFromResponse(
     return withReturns.size;
   })();
 
-  const uniqueCustomers = ordersPerCustomer.size > 0
-    ? ordersPerCustomer.size
-    : toSafeNumber(summary?.customers);
+  // uniqueCustomers = customers who PURCHASED (paid customers)
+  const uniqueCustomers = ordersPerCustomer.size;
+
+  // totalCustomers = ALL customers (from summary aggregation, which includes all customers in system)
+  // If not available, fall back to uniqueCustomers (paid customers only)
+  const totalCustomers = toSafeNumber(summary?.customers) || uniqueCustomers;
+
+  // Calculate abandoned customers (customers who didn't purchase)
+  // totalCustomers from summary includes ALL customers, uniqueCustomers is only paid
+  const abandonedCustomers = Math.max(0, totalCustomers - uniqueCustomers);
+
+  const customerBreakdown = newCustomers + returningCustomers + repeatCustomers + abandonedCustomers > 0
+    ? sanitizeDocument({
+        newCustomers: newCustomers || undefined,
+        returningCustomers: returningCustomers || undefined,
+        repeatCustomers: repeatCustomers || undefined,
+        abandonedCustomers: abandonedCustomers || undefined,
+      })
+    : null;
 
   // Calculate units sold from order items
   let unitsSold = 0;
@@ -807,15 +816,13 @@ function buildDailyMetricsFromResponse(
   const metrics = sanitizeDocument({
     totalOrders: toSafeNumber(summary?.orders),
     totalRevenue: toSafeNumber(summary?.revenue),
-    uniqueCustomers,
-    totalCustomers: ordersPerCustomer.size, // Total customers who made purchases
+    paidCustomers: uniqueCustomers, // Customers who purchased
+    totalCustomers, // All customers in system
     unitsSold, // Total units sold that day
     totalCogs: toSafeNumber(summary?.cogs),
     totalHandlingFee: toSafeNumber(summary?.handlingFees),
     totalShippingCost: toSafeNumber(summary?.shippingCosts),
     totalTransactionFees: toSafeNumber(summary?.transactionFees),
-    totalMarketingCost: toSafeNumber(summary?.blendedMarketingCost),
-    dailyOperatingCost: toSafeNumber(summary?.customCosts),
     totalTaxes: toSafeNumber(summary?.taxesCollected),
     blendedRoas: toSafeNumber(summary?.roas),
     blendedCtr: toSafeNumber(platformMetrics.blendedCTR),
@@ -834,15 +841,13 @@ function buildDailyMetricsFromResponse(
 const dailyMetricsPayload = v.object({
   totalOrders: v.optional(v.number()),
   totalRevenue: v.optional(v.number()),
-  uniqueCustomers: v.optional(v.number()),
+  paidCustomers: v.optional(v.number()),
   totalCustomers: v.optional(v.number()),
   unitsSold: v.optional(v.number()),
   totalCogs: v.optional(v.number()),
   totalHandlingFee: v.optional(v.number()),
   totalShippingCost: v.optional(v.number()),
   totalTransactionFees: v.optional(v.number()),
-  totalMarketingCost: v.optional(v.number()),
-  dailyOperatingCost: v.optional(v.number()),
   totalTaxes: v.optional(v.number()),
   blendedRoas: v.optional(v.number()),
   blendedCtr: v.optional(v.number()),

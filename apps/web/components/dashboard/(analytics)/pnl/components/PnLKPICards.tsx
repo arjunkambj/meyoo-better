@@ -47,9 +47,8 @@ export const PnLKPICards = memo(function PnLKPICards({
         (metrics?.changes?.netRevenue ?? 0) >= 0
           ? "positive"
           : ("negative" as const),
-      icon: "solar:card-receive-bold-duotone",
-      // Revenue tends to read as success
-      iconColor: "text-success",
+      icon: "solar:wallet-money-bold-duotone",
+      iconColor: "text-default-500",
     },
     {
       title: "Gross Profit",
@@ -59,8 +58,8 @@ export const PnLKPICards = memo(function PnLKPICards({
         (metrics?.changes?.grossProfit ?? 0) >= 0
           ? "positive"
           : ("negative" as const),
-      icon: "solar:chart-2-bold-duotone",
-      iconColor: "text-primary",
+      icon: "solar:graph-new-up-bold-duotone",
+      iconColor: "text-default-500",
     },
     {
       title: "Net Profit",
@@ -72,8 +71,7 @@ export const PnLKPICards = memo(function PnLKPICards({
           ? "positive"
           : ("negative" as const),
       icon: "solar:dollar-minimalistic-bold-duotone",
-      // Profit distinct from revenue: secondary accent
-      iconColor: "text-secondary",
+      iconColor: "text-default-500",
     },
     {
       title: "Marketing",
@@ -85,8 +83,7 @@ export const PnLKPICards = memo(function PnLKPICards({
           ? "positive"
           : ("negative" as const),
       icon: "solar:megaphone-bold-duotone",
-      // Cost category: use warning accent
-      iconColor: "text-warning",
+      iconColor: "text-default-500",
     },
     {
       title: "Op. Expenses",
@@ -97,8 +94,7 @@ export const PnLKPICards = memo(function PnLKPICards({
           ? "positive"
           : ("negative" as const),
       icon: "solar:calculator-bold-duotone",
-      // Expense category: danger accent for contrast with others
-      iconColor: "text-danger",
+      iconColor: "text-default-500",
     },
   ];
 

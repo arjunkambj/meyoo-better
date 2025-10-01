@@ -1,7 +1,7 @@
 "use client";
 
 import { Skeleton, Spacer } from "@heroui/react";
-import { useCallback, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useMemo, useState } from "react";
 import { AnalyticsHeader } from "@/components/shared/AnalyticsHeader";
 import { ExportButton } from "@/components/shared/actions/ExportButton";
 import { FilterBar } from "@/components/shared/filters/FilterBar";
@@ -9,8 +9,13 @@ import GlobalDateRangePicker from "@/components/shared/GlobalDateRangePicker";
 import { useInventoryAnalytics } from "@/hooks";
 import { useAnalyticsDateRange } from "@/hooks";
 
-import { InventoryOverviewCards } from "./components/InventoryOverviewCards";
 import { ProductsTable } from "./components/ProductsTable";
+
+const InventoryOverviewCards = lazy(() =>
+  import("./components/InventoryOverviewCards").then((mod) => ({
+    default: mod.InventoryOverviewCards,
+  }))
+);
 
 export function InventoryView() {
   const [stockFilter, setStockFilter] = useState<string>("all");
@@ -173,7 +178,17 @@ export function InventoryView() {
       />
 
       {/* Overview Cards */}
-      <InventoryOverviewCards metrics={overview} />
+      <Suspense
+        fallback={
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={`card-skeleton-${i}`} className="h-32 rounded-lg" />
+            ))}
+          </div>
+        }
+      >
+        <InventoryOverviewCards metrics={overview} />
+      </Suspense>
 
       {/* Products Table */}
       <ProductsTable

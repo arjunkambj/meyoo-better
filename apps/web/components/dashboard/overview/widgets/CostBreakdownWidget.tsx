@@ -266,7 +266,7 @@ export function CostBreakdownWidget({
           <Icon
             icon="solar:wallet-bold-duotone"
             width={24}
-            className="text-primary"
+            className="text-default-500"
           />
           <h3 className="text-lg font-semibold text-default-900">
             Cost Breakdown

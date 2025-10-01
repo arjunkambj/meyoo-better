@@ -14,10 +14,10 @@ import { Icon } from "@iconify/react";
 import { useTheme } from "next-themes";
 import Link from "next/link";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useCurrentUser } from "@/hooks";
+import { useUserContext } from "@/contexts/UserContext";
 
 const UserProfile = React.memo(() => {
-  const { user } = useCurrentUser();
+  const { user } = useUserContext();
   const { signOut } = useAuthActions();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -36,14 +36,31 @@ const UserProfile = React.memo(() => {
   }, [setTheme]);
 
   // Memoize user data extraction
-  const userData = useMemo(
-    () => ({
-      name: user?.name || "User",
-      email: user?.email || "",
-      image: user?.image,
-    }),
-    [user]
-  );
+  type UserProfileData = {
+    name: string;
+    email: string;
+    image?: string;
+  };
+
+  const userData = useMemo<UserProfileData>(() => {
+    const name =
+      typeof user?.name === "string" && user.name.trim().length > 0
+        ? user.name
+        : "User";
+
+    const email =
+      typeof user?.email === "string" && user.email.trim().length > 0
+        ? user.email
+        : "";
+
+    const image = typeof user?.image === "string" ? user.image : undefined;
+
+    return {
+      name,
+      email,
+      image,
+    };
+  }, [user]);
 
   // Memoize navigation items for better performance
   const navigationItems = useMemo(

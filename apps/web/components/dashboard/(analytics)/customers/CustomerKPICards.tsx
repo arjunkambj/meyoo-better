@@ -31,7 +31,8 @@ export const CustomerKPICards = memo(function CustomerKPICards({
       {
         title: "Total Customers",
         value: formatInteger(metrics.periodCustomerCount),
-        icon: "solar:users-group-two-rounded-bold-duotone",
+        icon: "solar:users-group-rounded-bold-duotone",
+        iconColor: "text-default-500",
         tooltip:
           "Unique customers who placed an order within the selected date range.",
       },
@@ -39,12 +40,14 @@ export const CustomerKPICards = memo(function CustomerKPICards({
         title: "Prepaid Rate",
         value: formatPercent(metrics.prepaidRate),
         icon: "solar:bill-list-bold-duotone",
+        iconColor: "text-default-500",
         tooltip: "Percentage of orders marked as paid during the selected period.",
       },
       {
         title: "Repeat Rate",
         value: formatPercent(metrics.periodRepeatRate),
         icon: "solar:refresh-circle-bold-duotone",
+        iconColor: "text-default-500",
         tooltip:
           "Share of period customers who placed two or more orders in the selected window.",
       },
@@ -52,6 +55,7 @@ export const CustomerKPICards = memo(function CustomerKPICards({
         title: "Abandoned Carts",
         value: formatInteger(metrics.abandonedCartCustomers),
         icon: "solar:cart-cross-bold-duotone",
+        iconColor: "text-default-500",
         tooltip:
           "Customers created in the selected date range who have not completed an order.",
       },
@@ -78,6 +82,7 @@ export const CustomerKPICards = memo(function CustomerKPICards({
         <KPI
           key={item.title}
           icon={item.icon}
+          iconColor={item.iconColor}
           size="small"
           title={item.title}
           tooltip={item.tooltip}

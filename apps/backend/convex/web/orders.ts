@@ -2,6 +2,7 @@ import { v } from "convex/values";
 
 import type { Id } from "../_generated/dataModel";
 import { action, query, type QueryCtx } from "../_generated/server";
+import { api } from "../_generated/api";
 import {
   defaultDateRange,
   loadAnalytics,
@@ -623,6 +624,46 @@ export const getAnalytics = action({
       dateRange: { startDate: string; endDate: string };
       organizationId: string;
       result: OrdersAnalyticsResult;
+    };
+  },
+});
+
+export const getOrdersMetrics = action({
+  args: {
+    dateRange: v.object({ startDate: v.string(), endDate: v.string() }),
+  },
+  returns: v.union(
+    v.null(),
+    v.object({
+      overview: v.union(
+        v.null(),
+        v.object({
+          metrics: ordersOverviewValidator,
+          meta: v.optional(v.any()),
+        }),
+      ),
+      fulfillment: v.union(v.null(), fulfillmentMetricsValidator),
+    }),
+  ),
+  handler: async (ctx, args): Promise<{
+    overview: {
+      metrics: any;
+      meta?: any;
+    } | null;
+    fulfillment: any;
+  } | null> => {
+    const [overview, fulfillment] = await Promise.all([
+      ctx.runQuery(api.web.orders.getOrdersOverviewMetrics, {
+        dateRange: args.dateRange,
+      }),
+      ctx.runQuery(api.web.orders.getFulfillmentMetrics, {
+        dateRange: args.dateRange,
+      }),
+    ]);
+
+    return {
+      overview,
+      fulfillment,
     };
   },
 });

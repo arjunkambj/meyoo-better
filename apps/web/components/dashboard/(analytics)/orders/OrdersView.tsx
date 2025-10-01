@@ -1,14 +1,19 @@
 "use client";
 
 import { Skeleton, Spacer } from "@heroui/react";
-import { memo, useCallback, useState } from "react";
+import { lazy, memo, Suspense, useCallback, useState } from "react";
 import { AnalyticsHeader } from "@/components/shared/AnalyticsHeader";
 import { ExportButton } from "@/components/shared/actions/ExportButton";
 import { FilterBar } from "@/components/shared/filters/FilterBar";
 import GlobalDateRangePicker from "@/components/shared/GlobalDateRangePicker";
 import { useAnalyticsDateRange, useOrdersAnalytics } from "@/hooks";
-import { OrdersOverviewCards } from "./components/OrdersOverviewCards";
 import { OrdersTable } from "./components/OrdersTable";
+
+const OrdersOverviewCards = lazy(() =>
+  import("./components/OrdersOverviewCards").then((mod) => ({
+    default: mod.OrdersOverviewCards,
+  }))
+);
 
 export const OrdersView = memo(function OrdersView() {
   const {
@@ -99,15 +104,25 @@ export const OrdersView = memo(function OrdersView() {
       />
 
       {/* Overview Cards */}
-      {loadingStates.overview ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} className="h-32 rounded-lg" />
-          ))}
-        </div>
-      ) : (
-        <OrdersOverviewCards metrics={overview} />
-      )}
+      <Suspense
+        fallback={
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-32 rounded-lg" />
+            ))}
+          </div>
+        }
+      >
+        {loadingStates.overview ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-32 rounded-lg" />
+            ))}
+          </div>
+        ) : (
+          <OrdersOverviewCards metrics={overview} />
+        )}
+      </Suspense>
 
       {/* Orders Table with Pagination */}
       <OrdersTable

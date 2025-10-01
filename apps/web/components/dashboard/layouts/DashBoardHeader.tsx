@@ -9,7 +9,7 @@ import { Icon } from "@iconify/react";
 import { useAtom } from "jotai";
 import { PlanUsageAlert } from "../../shared/billing/PlanUsageAlert";
 import UserProfile from "../../shared/UserProfile";
-import { useOnboarding, useCurrentUser } from "@/hooks";
+import { useUserContext } from "@/contexts/UserContext";
 import { agentSidebarOpenAtom } from "@/store/atoms";
 
 import SidebarToggle from "./SidebarToggle";
@@ -17,8 +17,7 @@ import SidebarToggle from "./SidebarToggle";
 export default function DashBoardHeader({ className }: { className?: string }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user } = useCurrentUser();
-  const { status: _status } = useOnboarding();
+  const { user } = useUserContext();
   const [isAgentOpen, setIsAgentOpen] = useAtom(agentSidebarOpenAtom);
 
   // Fast redirect for non-onboarded users

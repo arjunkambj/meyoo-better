@@ -1,5 +1,6 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "convex-helpers/react/cache/hooks";
+import { useAction } from "convex/react";
 import type { Product } from "@/components/dashboard/(analytics)/inventory/components/ProductsTable";
 
 import { api } from "@/libs/convexApi";
@@ -131,20 +132,42 @@ export function useInventoryAnalytics(
     return toUtcRangeStrings(dateRange, timezone);
   }, [dateRange?.endDate, dateRange?.startDate, timezone]);
 
-  const overviewArgs = useMemo(
-    () => ({
+  // Use consolidated action for overview, alerts, topPerformers, and stockMovement
+  const [metricsData, setMetricsData] = useState<any>(null);
+  const [isLoadingMetrics, setIsLoadingMetrics] = useState(true);
+  const fetchMetrics = useAction(api.web.inventory.getInventoryMetrics);
+
+  useEffect(() => {
+    let cancelled = false;
+    setIsLoadingMetrics(true);
+
+    fetchMetrics({
       dateRange: normalizedDateRange,
-    }),
-    [normalizedDateRange],
-  );
+    })
+      .then((result) => {
+        if (!cancelled) {
+          setMetricsData(result);
+          setIsLoadingMetrics(false);
+        }
+      })
+      .catch((error) => {
+        console.error("Failed to load inventory metrics:", error);
+        if (!cancelled) {
+          setIsLoadingMetrics(false);
+        }
+      });
 
-  // Fetch inventory overview
-  const overview = useQuery(
-    api.web.inventory.getInventoryOverview,
-    overviewArgs,
-  );
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchMetrics, normalizedDateRange?.startDate, normalizedDateRange?.endDate]);
 
-  // Fetch products list
+  const overview = metricsData?.overview;
+  const stockAlerts = metricsData?.stockAlerts;
+  const topPerformers = metricsData?.topPerformers;
+  const stockMovement = metricsData?.stockMovement;
+
+  // Fetch products list separately (paginated)
   const productsArgs = useMemo(
     () => ({
       page,
@@ -166,43 +189,8 @@ export function useInventoryAnalytics(
 
   const products = useQuery(api.web.inventory.getProductsList, productsArgs);
 
-  // Fetch stock alerts
-  const stockAlertsArgs = useMemo(() => ({ limit: 10 }), []);
-  const stockAlerts = useQuery(
-    api.web.inventory.getStockAlerts,
-    stockAlertsArgs,
-  );
-
-  // Fetch top performers
-  const topPerformersArgs = useMemo(
-    () => ({
-      dateRange: normalizedDateRange,
-      limit: 3,
-    }),
-    [normalizedDateRange],
-  );
-
-  const topPerformers = useQuery(
-    api.web.inventory.getTopPerformers,
-    topPerformersArgs,
-  );
-
-  // Fetch real stock movement data
-  const stockMovementArgs = useMemo(
-    () => ({
-      dateRange: normalizedDateRange,
-      periods: 7,
-    }),
-    [normalizedDateRange],
-  );
-
-  const stockMovement = useQuery(
-    api.web.inventory.getStockMovement,
-    stockMovementArgs,
-  );
-
   // Only treat `undefined` as loading; `null` means "no data" (not loading).
-  const isLoading = overview === undefined || products === undefined;
+  const isLoading = isLoadingMetrics || products === undefined;
 
   const exportData = async () => {
     if (!products) return [];

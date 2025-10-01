@@ -39,21 +39,24 @@ export const OrdersOverviewCards = memo(function OrdersOverviewCards({
       title: "Total Orders",
       value: formatNumber(metrics.totalOrders),
       change: metrics.changes.totalOrders,
-      icon: "solar:bag-4-bold-duotone",
+      icon: "solar:bag-check-bold-duotone",
+      iconColor: "text-default-500",
       subtitle: `AOV: ${formatCurrency(metrics.avgOrderValue)}`,
     },
     {
       title: "Total Revenue",
       value: formatCurrency(metrics.totalRevenue),
       change: metrics.changes.revenue,
-      icon: "solar:money-bag-bold-duotone",
+      icon: "solar:wallet-money-bold-duotone",
+      iconColor: "text-default-500",
       subtitle: `Costs: ${formatCurrency(metrics.totalCosts)}`,
     },
     {
       title: "Net Profit",
       value: formatCurrency(metrics.netProfit),
       change: metrics.changes.netProfit,
-      icon: "solar:graph-up-bold-duotone",
+      icon: "solar:graph-new-up-bold-duotone",
+      iconColor: "text-default-500",
       subtitle: `Margin: ${metrics.grossMargin.toFixed(1)}%`,
     },
     {
@@ -61,6 +64,7 @@ export const OrdersOverviewCards = memo(function OrdersOverviewCards({
       value: formatCurrency(metrics.totalTax),
       change: 0,
       icon: "solar:bill-list-bold-duotone",
+      iconColor: "text-default-500",
       subtitle: `CAC: ${formatCurrency(metrics.customerAcquisitionCost)}`,
     },
     {
@@ -68,6 +72,7 @@ export const OrdersOverviewCards = memo(function OrdersOverviewCards({
       value: `${(metrics.fulfillmentRate || 0).toFixed(1)}%`,
       change: metrics.changes.fulfillmentRate,
       icon: "solar:delivery-bold-duotone",
+      iconColor: "text-default-500",
       subtitle: "Orders fulfilled",
     },
   ];
@@ -79,6 +84,7 @@ export const OrdersOverviewCards = memo(function OrdersOverviewCards({
           key={card.title}
           change={card.change}
           icon={card.icon}
+          iconColor={card.iconColor}
           subtitle={card.subtitle}
           title={card.title}
           value={card.value}

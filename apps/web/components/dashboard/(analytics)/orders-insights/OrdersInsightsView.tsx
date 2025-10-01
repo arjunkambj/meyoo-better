@@ -1,15 +1,23 @@
 "use client";
 
 import { Skeleton, Spacer } from "@heroui/react";
-import { memo, useCallback, useMemo } from "react";
+import { lazy, memo, Suspense, useCallback, useMemo } from "react";
 import { AnalyticsHeader } from "@/components/shared/AnalyticsHeader";
 import { ExportButton } from "@/components/shared/actions/ExportButton";
 import GlobalDateRangePicker from "@/components/shared/GlobalDateRangePicker";
 import { useAnalyticsDateRange, useCustomerAnalytics, useOrdersAnalytics } from "@/hooks";
 import { OrdersOverviewCards } from "../orders/components/OrdersOverviewCards";
-import { CohortAnalysis } from "./components/CohortAnalysis";
-import { FulfillmentAnalysis } from "./components/FulfillmentAnalysis";
-import { GeographicDistribution } from "./components/GeographicDistribution";
+
+// Lazy load heavy chart components
+const CohortAnalysis = lazy(() =>
+  import("./components/CohortAnalysis").then(mod => ({ default: mod.CohortAnalysis }))
+);
+const FulfillmentAnalysis = lazy(() =>
+  import("./components/FulfillmentAnalysis").then(mod => ({ default: mod.FulfillmentAnalysis }))
+);
+const GeographicDistribution = lazy(() =>
+  import("./components/GeographicDistribution").then(mod => ({ default: mod.GeographicDistribution }))
+);
 
 export const OrdersInsightsView = memo(function OrdersInsightsView() {
   const {
@@ -78,23 +86,29 @@ export const OrdersInsightsView = memo(function OrdersInsightsView() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {customerLoading.geographic ? (
-          <Skeleton className="h-96 rounded-lg" />
-        ) : (
-          <GeographicDistribution data={geographic} />
-        )}
-        {customerLoading.cohorts ? (
-          <Skeleton className="h-96 rounded-lg" />
-        ) : (
-          <CohortAnalysis cohorts={cohorts} />
-        )}
+        <Suspense fallback={<Skeleton className="h-96 rounded-lg" />}>
+          {customerLoading.geographic ? (
+            <Skeleton className="h-96 rounded-lg" />
+          ) : (
+            <GeographicDistribution data={geographic} />
+          )}
+        </Suspense>
+        <Suspense fallback={<Skeleton className="h-96 rounded-lg" />}>
+          {customerLoading.cohorts ? (
+            <Skeleton className="h-96 rounded-lg" />
+          ) : (
+            <CohortAnalysis cohorts={cohorts} />
+          )}
+        </Suspense>
       </div>
 
-      {ordersLoading.fulfillment ? (
-        <Skeleton className="h-[350px] rounded-lg" />
-      ) : (
-        <FulfillmentAnalysis metrics={fulfillmentMetrics} />
-      )}
+      <Suspense fallback={<Skeleton className="h-[350px] rounded-lg" />}>
+        {ordersLoading.fulfillment ? (
+          <Skeleton className="h-[350px] rounded-lg" />
+        ) : (
+          <FulfillmentAnalysis metrics={fulfillmentMetrics} />
+        )}
+      </Suspense>
     </div>
   );
 });

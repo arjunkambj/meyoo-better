@@ -1,7 +1,7 @@
 "use client";
 
-import { Spacer } from "@heroui/react";
-import { memo, useCallback, useMemo, useState } from "react";
+import { Skeleton, Spacer } from "@heroui/react";
+import { lazy, memo, Suspense, useCallback, useMemo, useState } from "react";
 
 import { AnalyticsHeader } from "@/components/shared/AnalyticsHeader";
 import GlobalDateRangePicker from "@/components/shared/GlobalDateRangePicker";
@@ -10,7 +10,12 @@ import { ExportButton } from "@/components/shared/actions/ExportButton";
 import { useAnalyticsDateRange, useCustomerAnalytics } from "@/hooks";
 
 import { CustomerTable } from "../customer-insights/components/CustomerTable";
-import { CustomerKPICards } from "./CustomerKPICards";
+
+const CustomerKPICards = lazy(() =>
+  import("./CustomerKPICards").then((mod) => ({
+    default: mod.CustomerKPICards,
+  }))
+);
 
 const STATUS_FILTERS = [
   { value: "all", label: "All Customers" },
@@ -93,19 +98,29 @@ export const CustomersView = memo(function CustomersView() {
         }
       />
 
-      <CustomerKPICards
-        loading={loadingStates.overview}
-        metrics={
-          overview
-            ? {
-                periodCustomerCount: overview.periodCustomerCount,
-                prepaidRate: overview.prepaidRate,
-                periodRepeatRate: overview.periodRepeatRate,
-                abandonedCartCustomers: overview.abandonedCartCustomers,
-              }
-            : undefined
+      <Suspense
+        fallback={
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-32 rounded-lg" />
+            ))}
+          </div>
         }
-      />
+      >
+        <CustomerKPICards
+          loading={loadingStates.overview}
+          metrics={
+            overview
+              ? {
+                  periodCustomerCount: overview.periodCustomerCount,
+                  prepaidRate: overview.prepaidRate,
+                  periodRepeatRate: overview.periodRepeatRate,
+                  abandonedCartCustomers: overview.abandonedCartCustomers,
+                }
+              : undefined
+          }
+        />
+      </Suspense>
 
       <CustomerTable
         customers={customers?.data || []}

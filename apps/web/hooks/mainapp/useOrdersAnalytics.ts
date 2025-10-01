@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "convex-helpers/react/cache/hooks";
+import { useAction } from "convex/react";
 
 import { api } from "@/libs/convexApi";
 import { toUtcRangeStrings } from "@/libs/dateRange";
@@ -84,15 +85,42 @@ export function useOrdersAnalytics(params: UseOrdersAnalyticsParams = {}) {
     return toUtcRangeStrings(effectiveRange, timezone);
   }, [effectiveRange, timezone]);
 
-  const overviewQueryArgs = useMemo(() => {
-    if (!rangeStrings) return "skip" as const;
-    return {
-      dateRange: rangeStrings,
-    };
-  }, [rangeStrings?.startDate, rangeStrings?.endDate]);
+  // Use consolidated action for overview and fulfillment metrics
+  const [metricsData, setMetricsData] = useState<any>(null);
+  const [isLoadingMetrics, setIsLoadingMetrics] = useState(true);
+  const fetchMetrics = useAction(api.web.orders.getOrdersMetrics);
 
-  const overviewSnapshot = useQuery(api.web.orders.getOrdersOverviewMetrics, overviewQueryArgs);
-  const overview: OrdersOverviewMetrics | null = overviewSnapshot?.metrics ?? null;
+  useEffect(() => {
+    if (!rangeStrings) {
+      setIsLoadingMetrics(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoadingMetrics(true);
+
+    fetchMetrics({
+      dateRange: rangeStrings,
+    })
+      .then((result) => {
+        if (!cancelled) {
+          setMetricsData(result);
+          setIsLoadingMetrics(false);
+        }
+      })
+      .catch((error) => {
+        console.error("Failed to load orders metrics:", error);
+        if (!cancelled) {
+          setIsLoadingMetrics(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchMetrics, rangeStrings?.startDate, rangeStrings?.endDate]);
+
+  const overview: OrdersOverviewMetrics | null = metricsData?.overview?.metrics ?? null;
 
   const cursorKey = useMemo(() => {
     if (!rangeStrings) return null;
@@ -224,17 +252,7 @@ export function useOrdersAnalytics(params: UseOrdersAnalyticsParams = {}) {
     prefetchQueryArgs,
   ) as OrdersPageSnapshot | undefined;
 
-  const fulfillmentQueryArgs = useMemo(() => {
-    if (!rangeStrings) return "skip" as const;
-    return {
-      dateRange: {
-        startDate: rangeStrings.startDate,
-        endDate: rangeStrings.endDate,
-      },
-    };
-  }, [rangeStrings]);
-
-  const fulfillmentSnapshot = useQuery(api.web.orders.getFulfillmentMetrics, fulfillmentQueryArgs);
+  // Fulfillment metrics now come from consolidated action
 
   useEffect(() => {
     if (!ordersPageSnapshot) return;
@@ -350,9 +368,9 @@ export function useOrdersAnalytics(params: UseOrdersAnalyticsParams = {}) {
   }, [ordersPageSnapshot, estimatedTotal, effectivePage, pageSize]);
 
   const fulfillmentMetrics: OrdersFulfillmentMetrics | undefined = useMemo(() => {
-    if (fulfillmentSnapshot === undefined) return undefined;
-    return fulfillmentSnapshot ?? undefined;
-  }, [fulfillmentSnapshot]);
+    if (isLoadingMetrics) return undefined;
+    return metricsData?.fulfillment ?? undefined;
+  }, [isLoadingMetrics, metricsData]);
 
   const exportData: OrdersAnalyticsExportRow[] = useMemo(() => {
     if (!ordersPageSnapshot) return [];
@@ -377,9 +395,9 @@ export function useOrdersAnalytics(params: UseOrdersAnalyticsParams = {}) {
     }));
   }, [ordersPageSnapshot]);
 
-  const overviewLoading = overviewSnapshot === undefined;
+  const overviewLoading = isLoadingMetrics;
   const ordersLoading = ordersQueryArgs !== "skip" && ordersPageSnapshot === undefined;
-  const fulfillmentLoading = fulfillmentSnapshot === undefined;
+  const fulfillmentLoading = isLoadingMetrics;
 
   const loadingStates = {
     overview: overviewLoading,
@@ -387,7 +405,7 @@ export function useOrdersAnalytics(params: UseOrdersAnalyticsParams = {}) {
     fulfillment: fulfillmentLoading,
   };
 
-  const isLoading = overviewLoading || ordersLoading || fulfillmentLoading;
+  const isLoading = isLoadingMetrics || ordersLoading;
   const isInitialLoading = ordersLoading && effectivePage === 1;
 
   return {

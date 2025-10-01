@@ -1,8 +1,9 @@
 import { v } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
-import { query } from "../_generated/server";
+import { action, query } from "../_generated/server";
 import type { QueryCtx } from "../_generated/server";
 import { getUserAndOrg } from "../utils/auth";
+import { api } from "../_generated/api";
 
 /**
  * Inventory Management API
@@ -1973,5 +1974,50 @@ export const getInventoryTurnover = query({
     });
 
     return results;
+  },
+});
+
+export const getInventoryMetrics = action({
+  args: {
+    dateRange: v.optional(v.object({ startDate: v.string(), endDate: v.string() })),
+  },
+  returns: v.union(
+    v.null(),
+    v.object({
+      overview: v.any(),
+      stockAlerts: v.any(),
+      topPerformers: v.any(),
+      stockMovement: v.any(),
+    }),
+  ),
+  handler: async (ctx, args): Promise<{
+    overview: any;
+    stockAlerts: any;
+    topPerformers: any;
+    stockMovement: any;
+  } | null> => {
+    const [overview, stockAlerts, topPerformers, stockMovement] = await Promise.all([
+      ctx.runQuery(api.web.inventory.getInventoryOverview, {
+        dateRange: args.dateRange,
+      }),
+      ctx.runQuery(api.web.inventory.getStockAlerts, {
+        limit: 10,
+      }),
+      ctx.runQuery(api.web.inventory.getTopPerformers, {
+        dateRange: args.dateRange,
+        limit: 3,
+      }),
+      ctx.runQuery(api.web.inventory.getStockMovement, {
+        dateRange: args.dateRange,
+        periods: 7,
+      }),
+    ]);
+
+    return {
+      overview,
+      stockAlerts,
+      topPerformers,
+      stockMovement,
+    };
   },
 });

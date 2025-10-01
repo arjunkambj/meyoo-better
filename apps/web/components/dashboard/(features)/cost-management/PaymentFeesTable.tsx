@@ -22,7 +22,6 @@ import { Icon } from "@iconify/react";
 import { useState } from "react";
 import {
   useCreateTransactionFee,
-  useCurrentUser,
   useTransactionFees,
 } from "@/hooks";
 import { TableSkeleton } from "@/components/shared/skeletons";
@@ -58,8 +57,6 @@ export default function PaymentFeesTable() {
   const [formData, setFormData] = useState<PaymentFormData>({});
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
   // Delete disabled: single processing fee only
-
-  const _user = useCurrentUser();
 
   const { fees: allTransactionCosts, loading } = useTransactionFees();
   const transactionCosts = (allTransactionCosts as TransactionCost[] | undefined)?.slice(0, 1);

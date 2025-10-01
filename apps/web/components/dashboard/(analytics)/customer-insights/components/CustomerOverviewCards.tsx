@@ -69,24 +69,28 @@ export const CustomerOverviewCards = memo(function CustomerOverviewCards({
               value: formatNumber(metrics.totalCustomers),
               change: formatChange(metrics.changes.totalCustomers),
               icon: "solar:users-group-rounded-bold-duotone",
+              iconColor: "text-default-500",
             },
             {
               title: "New Customers",
               value: formatNumber(metrics.newCustomers),
               change: formatChange(metrics.changes.newCustomers),
-              icon: "solar:user-plus-rounded-bold-duotone",
+              icon: "solar:user-hand-up-bold-duotone",
+              iconColor: "text-default-500",
             },
             {
               title: "Avg LTV",
               value: formatCurrency(metrics.avgLTV),
               change: formatChange(metrics.changes.avgLTV),
               icon: "solar:dollar-minimalistic-bold-duotone",
+              iconColor: "text-default-500",
             },
             {
               title: "LTV:CAC",
               value: `${!Number.isNaN(metrics.ltvCacRatio) ? metrics.ltvCacRatio.toFixed(1) : "0.0"}x`,
               change: formatChange((metrics.ltvCacRatio - 3) * 33.33), // Target is 3x
-              icon: "solar:graph-up-bold-duotone",
+              icon: "solar:graph-new-up-bold-duotone",
+              iconColor: "text-default-500",
               subtitle: `CAC: ${formatCurrency(metrics.avgCAC)}`,
             },
           ]
@@ -112,6 +116,7 @@ export const CustomerOverviewCards = memo(function CustomerOverviewCards({
           change={card.change.text.replace("%", "")}
           changeType={card.change.type}
           icon={card.icon}
+          iconColor={card.iconColor}
           subtitle={card.subtitle}
           title={card.title}
           value={card.value}

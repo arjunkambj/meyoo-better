@@ -1153,33 +1153,36 @@ export const getProductVariantsPaginated = query({
 
     const orgId = user.organizationId;
     const page = args.page || 1;
-    const pageSize = args.pageSize || 20;
+    const pageSize = Math.min(args.pageSize || 20, 100); // Cap at 100 for safety
 
-    // Get all variants for search/filter (we'll improve this with better indexes later)
-    let allVariants = await ctx.db
+    // Build query with organization filter
+    const variantsQuery = ctx.db
       .query("shopifyProductVariants")
-      .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
-      .collect();
+      .withIndex("by_organization", (q) => q.eq("organizationId", orgId));
 
-    // Get products for joining
-    const products = await ctx.db
-      .query("shopifyProducts")
-      .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
-      .collect();
+    // For search, we still need to collect all (can be optimized with full-text search later)
+    let paginatedVariants: any[];
+    let totalItems: number;
 
-    const productMap = new Map();
-
-    for (const product of products) {
-      productMap.set(product._id, product);
-    }
-
-    // Apply search filter if provided
     if (args.searchTerm) {
       const searchLower = args.searchTerm.toLowerCase();
 
-      allVariants = allVariants.filter((variant) => {
-        const product = productMap.get(variant.productId);
+      // Collect for search filtering
+      const allVariants = await variantsQuery.collect();
 
+      // Get products for search join
+      const products = await ctx.db
+        .query("shopifyProducts")
+        .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
+        .collect();
+
+      const productMap = new Map();
+      for (const product of products) {
+        productMap.set(product._id, product);
+      }
+
+      const filtered = allVariants.filter((variant) => {
+        const product = productMap.get(variant.productId);
         return (
           variant.title?.toLowerCase().includes(searchLower) ||
           variant.sku?.toLowerCase().includes(searchLower) ||
@@ -1188,16 +1191,47 @@ export const getProductVariantsPaginated = query({
           product?.vendor?.toLowerCase().includes(searchLower)
         );
       });
+
+      totalItems = filtered.length;
+      const startIndex = (page - 1) * pageSize;
+      paginatedVariants = filtered.slice(startIndex, startIndex + pageSize);
+    } else {
+      // Use efficient pagination when no search
+      let currentPage = 1;
+      let result = await variantsQuery
+        .order("desc")
+        .paginate({ numItems: pageSize, cursor: null });
+
+      while (currentPage < page && result.continueCursor) {
+        result = await variantsQuery
+          .order("desc")
+          .paginate({ numItems: pageSize, cursor: result.continueCursor });
+        currentPage++;
+      }
+
+      paginatedVariants = result.page;
+
+      // Get total count (cache this in production)
+      const allCount = await ctx.db
+        .query("shopifyProductVariants")
+        .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
+        .collect()
+        .then(arr => arr.length);
+      totalItems = allCount;
     }
 
-    // Calculate pagination
-    const totalItems = allVariants.length;
-    const totalPages = Math.ceil(totalItems / pageSize);
-    const startIndex = (page - 1) * pageSize;
-    const endIndex = startIndex + pageSize;
+    // Get products for join (only for paginated variants)
+    const productIds = [...new Set(paginatedVariants.map(v => v.productId))];
+    const products = await Promise.all(
+      productIds.map(id => ctx.db.get(id))
+    );
 
-    // Get paginated data
-    const paginatedVariants = allVariants.slice(startIndex, endIndex);
+    const productMap = new Map();
+    for (const product of products) {
+      if (product) productMap.set(product._id, product);
+    }
+
+    const totalPages = Math.ceil(totalItems / pageSize);
 
     // Join with product data and apply default costs
     // Load product-level cost components for tax percent

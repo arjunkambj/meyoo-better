@@ -167,9 +167,9 @@ export function CustomerSummaryWidget({
       <div className="mb-4 pb-4 border-b border-divider">
         <div className="flex items-center gap-2.5">
           <Icon
-            icon="solar:users-group-two-rounded-bold-duotone"
+            icon="solar:users-group-rounded-bold-duotone"
             width={24}
-            className="text-primary"
+            className="text-default-500"
           />
           <h3 className="text-lg font-semibold text-default-900">
             Customer Summary

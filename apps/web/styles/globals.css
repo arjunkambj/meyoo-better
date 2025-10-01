@@ -181,43 +181,40 @@ html, body {
   --tracking-normal: 0em;
 }
 
-html {
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
-}
-
-html.scrollbar-visible {
-  scrollbar-color: var(--scrollbar-thumb-color) transparent;
-}
-
-* {
-  scrollbar-width: thin;
+html,
+body {
+  scrollbar-width: none;
   scrollbar-color: transparent transparent;
 }
 
 html.scrollbar-visible,
-html.scrollbar-visible * {
+html.scrollbar-visible body {
+  scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb-color) transparent;
 }
 
-*::-webkit-scrollbar {
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+html.scrollbar-visible::-webkit-scrollbar,
+html.scrollbar-visible body::-webkit-scrollbar {
   width: var(--scrollbar-width);
   height: var(--scrollbar-width);
 }
 
-*::-webkit-scrollbar-track {
+html.scrollbar-visible::-webkit-scrollbar-track,
+html.scrollbar-visible body::-webkit-scrollbar-track {
   background-color: transparent;
-}
-
-*::-webkit-scrollbar-thumb {
-  background-color: transparent;
-  border-radius: 9999px;
-  transition: background-color 200ms ease;
 }
 
 html.scrollbar-visible::-webkit-scrollbar-thumb,
-html.scrollbar-visible *::-webkit-scrollbar-thumb {
+html.scrollbar-visible body::-webkit-scrollbar-thumb {
   background-color: var(--scrollbar-thumb-color);
+  border-radius: 9999px;
+  transition: background-color 200ms ease;
 }
 
 /* Hide scrollbar buttons/arrows completely */
@@ -258,9 +255,15 @@ html.scrollbar-visible *::-webkit-scrollbar-thumb {
   background-color: var(--background);
 }
 
-/* For Firefox - hide buttons by making the scrollbar thin */
+/* For Firefox - ensure the root scrollbar toggles between none/thin */
 @supports (scrollbar-width: thin) {
-  * {
+  html,
+  body {
+    scrollbar-width: none;
+  }
+
+  html.scrollbar-visible,
+  html.scrollbar-visible body {
     scrollbar-width: thin;
   }
 }

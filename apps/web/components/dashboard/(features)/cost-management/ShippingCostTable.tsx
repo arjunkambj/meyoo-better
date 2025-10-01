@@ -23,10 +23,10 @@ import { useState } from "react";
 // Delete flow removed; only edit/set single shipping cost
 import type { GenericId as Id } from "convex/values";
 import {
-  useCurrentUser,
   useShippingCosts,
   useCreateShippingCost as useUpsertShippingCost,
 } from "@/hooks";
+import { useUserContext } from "@/contexts/UserContext";
 import { getCurrencySymbol } from "@/libs/utils/format";
 import { TableSkeleton } from "@/components/shared/skeletons";
 import {
@@ -62,8 +62,8 @@ export default function ShippingCostTable() {
   const [formData, setFormData] = useState<ShippingFormData>({});
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
 
-  const user = useCurrentUser();
-  const currency = user?.primaryCurrency || "USD";
+  const { primaryCurrency } = useUserContext();
+  const currency = primaryCurrency;
   const { shippingCosts: allShippingCosts, loading } = useShippingCosts();
   const baseCosts = (allShippingCosts || []) as ShippingCostItem[];
   const shippingCosts: ShippingCostItem[] = baseCosts.slice(0, 1);

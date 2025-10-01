@@ -18,10 +18,10 @@ import { useMemo, useState, type ComponentProps, type ReactElement } from "react
 import { sanitizeDecimal } from "@/components/shared/table/sanitize";
 
 import {
-  useCurrentUser,
   useSaveVariantCosts,
   useShopifyProductVariantsPaginated,
 } from "@/hooks";
+import { useUserContext } from "@/contexts/UserContext";
 import { getCurrencySymbol } from "@/libs/utils/format";
 import {
   DATA_TABLE_GROUP_ROW_BORDER_CLASS,
@@ -57,8 +57,8 @@ type VariantRow = {
 };
 
 export default function ProductCostTable() {
-  const user = useCurrentUser();
-  const currency = user?.primaryCurrency || "USD";
+  const { primaryCurrency } = useUserContext();
+  const currency = primaryCurrency;
   const currencySymbol = useMemo(() => getCurrencySymbol(currency), [currency]);
 
   const [page, setPage] = useState(1);

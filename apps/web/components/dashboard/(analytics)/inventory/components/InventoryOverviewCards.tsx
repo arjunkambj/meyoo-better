@@ -55,6 +55,7 @@ export function InventoryOverviewCards({
       value: `${currencySymbol}${formatNumber(metrics.totalValue)}`,
       change: metrics.changes.totalValue,
       icon: "solar:box-bold-duotone",
+      iconColor: "text-default-500",
       subtitle: `Total value across ${metrics.totalSKUs} SKUs`,
     },
     {
@@ -62,6 +63,7 @@ export function InventoryOverviewCards({
       value: `${currencySymbol}${metrics.averageSalePrice.toFixed(2)}`,
       change: 0,
       icon: "solar:tag-price-bold-duotone",
+      iconColor: "text-default-500",
       subtitle: "Per order in range",
     },
     {
@@ -69,21 +71,23 @@ export function InventoryOverviewCards({
       value: `${metrics.stockCoverageDays} days`,
       change: metrics.changes.stockCoverage,
       icon: "solar:clock-circle-bold-duotone",
+      iconColor: "text-default-500",
       subtitle: "Days of inventory remaining",
     },
     {
       title: "Dead Stock",
       value: formatNumber(metrics.deadStock),
       change: 0,
-      icon: "solar:trash-bin-minimalistic-bold-duotone",
-      iconColor: metrics.deadStock > 0 ? "text-danger" : "text-primary",
+      icon: "solar:trash-bin-trash-bold-duotone",
+      iconColor: "text-default-500",
       subtitle: "Items not sold in 90+ days",
     },
     {
       title: "Stock Turnover",
       value: `${(metrics.stockTurnoverRate || 0).toFixed(1)}x`,
       change: metrics.changes.stockTurnoverRate,
-      icon: "solar:refresh-bold-duotone",
+      icon: "solar:refresh-circle-bold-duotone",
+      iconColor: "text-default-500",
       subtitle: "Inventory turns per year",
     },
   ];

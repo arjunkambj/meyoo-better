@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 
 const AUTO_HIDE_DELAY_MS = 1500;
+const ACTIVATION_ZONE_PX = 16;
 
 export function ScrollbarController() {
   useEffect(() => {
@@ -23,12 +24,35 @@ export function ScrollbarController() {
       scheduleHide();
     };
 
-    const handlePointerMove = () => {
-      revealScrollbar();
+    const handlePointerMove = (event: PointerEvent) => {
+      if (event.pointerType === "touch") {
+        return;
+      }
+
+      const nearVerticalScrollbar = window.innerWidth - event.clientX <= ACTIVATION_ZONE_PX;
+      const nearHorizontalScrollbar = window.innerHeight - event.clientY <= ACTIVATION_ZONE_PX;
+
+      if (nearVerticalScrollbar || nearHorizontalScrollbar) {
+        revealScrollbar();
+      }
     };
 
-    const handleScroll = () => {
-      revealScrollbar();
+    const handleScroll = (event: Event) => {
+      const target = event.target;
+
+      if (
+        target === document ||
+        target === document.documentElement ||
+        target === document.body ||
+        target === window
+      ) {
+        revealScrollbar();
+        return;
+      }
+
+      if (target instanceof Element) {
+        revealScrollbar();
+      }
     };
 
     window.addEventListener("pointermove", handlePointerMove);

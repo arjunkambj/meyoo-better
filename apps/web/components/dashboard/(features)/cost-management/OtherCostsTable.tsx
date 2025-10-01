@@ -31,11 +31,11 @@ import { ConfirmationModal } from "@/components/shared/ConfirmationModal";
 import type { GenericId as Id } from "convex/values";
 import {
   useCreateExpense,
-  useCurrentUser,
   useDeleteExpense as useDeleteOtherCost,
   useExpenses as useOtherCosts,
   useUpdateExpense,
 } from "@/hooks";
+import { useUserContext } from "@/contexts/UserContext";
 import { createLogger } from "@/libs/logging";
 import { getCurrencySymbol } from "@/libs/utils/format";
 import { TableSkeleton } from "@/components/shared/skeletons";
@@ -190,8 +190,8 @@ export default function OtherCostsTable() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isEffectiveFromOpen, setIsEffectiveFromOpen] = useState(false);
 
-  const user = useCurrentUser();
-  const currency = user?.primaryCurrency || "USD";
+  const { primaryCurrency } = useUserContext();
+  const currency = primaryCurrency;
   const { expenses: allOtherCosts, loading: expensesLoading } = useOtherCosts();
   const otherCosts = allOtherCosts as Cost[] | undefined;
   const addCompleteExpense = useCreateExpense();

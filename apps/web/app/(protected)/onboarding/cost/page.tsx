@@ -1,4 +1,6 @@
+import { Suspense } from "react";
 import SimpleCostsClient from "@/components/onboarding/client/SimpleCostsClient";
+import StepLoadingState from "@/components/onboarding/StepLoadingState";
 
 export default function CostPage() {
   return (
@@ -14,7 +16,9 @@ export default function CostPage() {
         - Tax percentage
         - Handling per unit
       */}
-      <SimpleCostsClient />
+      <Suspense fallback={<StepLoadingState message="Loading cost settings..." />}>
+        <SimpleCostsClient />
+      </Suspense>
     </section>
   );
 }

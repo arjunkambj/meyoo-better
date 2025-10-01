@@ -128,39 +128,55 @@ export function AgentConversationsScreen() {
           </View>
 
           {!threads || threads.length === 0 ? (
-            <Card surfaceVariant="1" className="mt-4">
-              <Card.Body className="items-center py-6">
+            <Card
+              surfaceVariant="2"
+              className="rounded-2xl border border-border/50 mt-4"
+            >
+              <Card.Body className="items-center py-8 gap-4">
                 <View className="items-center gap-4">
-                  <View className="h-16 w-16 rounded-full bg-primary-100 items-center justify-center">
+                  <View className="h-16 w-16 rounded-full bg-accent/10 items-center justify-center">
                     <Ionicons
                       name="chatbubbles-outline"
                       size={32}
                       color="#6366f1"
                     />
                   </View>
-                  <Card.Title>No conversations yet</Card.Title>
-                  <Card.Description className="text-center px-4">
-                    Start a conversation to get help with your Shopify data,
-                    marketing campaigns, and more.
-                  </Card.Description>
-                  <Button variant="primary" onPress={handleNewChat}>
+                  <View className="items-center gap-2">
+                    <Text className="text-lg font-semibold text-foreground">
+                      No conversations yet
+                    </Text>
+                    <Text className="text-sm text-foreground/50 text-center px-4">
+                      Start a conversation to get help with your Shopify data,
+                      marketing campaigns, and more.
+                    </Text>
+                  </View>
+                  <Button
+                    variant="primary"
+                    onPress={handleNewChat}
+                    className="h-11 rounded-2xl"
+                  >
                     <Button.StartContent>
                       <Ionicons name="add" size={20} color="white" />
                     </Button.StartContent>
-                    <Button.LabelContent>Start First Chat</Button.LabelContent>
+                    <Button.LabelContent classNames={{ text: "font-semibold" }}>
+                      Start First Chat
+                    </Button.LabelContent>
                   </Button>
                 </View>
               </Card.Body>
             </Card>
           ) : (
-            <View className="gap-3">
+            <View className="gap-4">
               {threads.map((thread) => (
                 <TouchableOpacity
                   key={thread.threadId}
                   onPress={() => handleSelectThread(thread.threadId)}
                   activeOpacity={0.7}
                 >
-                  <Card className="bg-default-200/50">
+                  <Card
+                    surfaceVariant="2"
+                    className="rounded-2xl border border-border/50"
+                  >
                     <Card.Body>
                       <View className="flex-row items-start justify-between">
                         <View className="flex-1 gap-2">
@@ -171,10 +187,12 @@ export function AgentConversationsScreen() {
                                 color="default"
                                 className="rounded-full"
                               >
-                                <Text className="text-[10px]">Archived</Text>
+                                <Chip.LabelContent className="text-[10px]">
+                                  Archived
+                                </Chip.LabelContent>
                               </Chip>
                             )}
-                            <Text className="text-xs text-default-500">
+                            <Text className="text-xs text-foreground/50">
                               {formatDate(thread.createdAt)}
                             </Text>
                           </View>
@@ -183,7 +201,7 @@ export function AgentConversationsScreen() {
                           </Text>
                           {thread.summary && (
                             <Text
-                              className="text-sm text-default-600"
+                              className="text-sm text-foreground/70"
                               numberOfLines={2}
                             >
                               {thread.summary}
@@ -199,7 +217,7 @@ export function AgentConversationsScreen() {
                         >
                           <Ionicons
                             name="trash-outline"
-                            size={18}
+                            size={20}
                             color="#ef4444"
                           />
                         </TouchableOpacity>
@@ -212,11 +230,13 @@ export function AgentConversationsScreen() {
               {canLoadMore && (
                 <Button
                   variant="ghost"
-                  size="sm"
+                  size="md"
                   onPress={() => loadMoreThreads?.(DEFAULT_THREAD_PAGE_SIZE)}
-                  className="mt-2"
+                  className="mt-2 rounded-2xl"
                 >
-                  {isLoadingMore ? "Loading..." : "Load More"}
+                  <Button.LabelContent>
+                    {isLoadingMore ? "Loading..." : "Load More"}
+                  </Button.LabelContent>
                 </Button>
               )}
             </View>

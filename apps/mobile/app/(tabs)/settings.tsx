@@ -1,23 +1,10 @@
 import { Avatar, Button, Card, Chip, Skeleton, useTheme } from "heroui-native";
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
-import {
-  Alert,
-  Linking,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-} from "react-native";
-import { useCallback, useMemo, useState } from "react";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Alert, Pressable, Text, View } from "react-native";
+import { useCallback, useMemo } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useRouter } from "expo-router";
-import Animated, { FadeOut, ZoomIn } from "react-native-reanimated";
-import { BlurView } from "expo-blur";
 
 import { useUserDetails } from "@/hooks/useUserDetails";
 
@@ -33,9 +20,7 @@ export default function SettingsTab() {
   const { billing, billingUsage, isLoading, user } = useUserDetails();
   const { signOut } = useAuthActions();
   const router = useRouter();
-  const { colors, theme, toggleTheme } = useTheme();
-  const insets = useSafeAreaInsets();
-  const [headerHeight, setHeaderHeight] = useState(96);
+  const { colors, theme, setTheme } = useTheme();
 
   const plan = billingUsage?.plan ?? billing?.plan ?? "free";
 
@@ -154,157 +139,230 @@ export default function SettingsTab() {
     }
   }, [billing, billingUsage]);
 
-  const supportEmail = "support@meyoo.ai";
-
-  const handleEmailSupport = useCallback(async () => {
-    const mailTo = `mailto:${supportEmail}`;
-
-    try {
-      const canOpen = await Linking.canOpenURL(mailTo);
-      if (canOpen) {
-        await Linking.openURL(mailTo);
-        return;
-      }
-    } catch (error) {
-      console.error("Failed to open mail client", error);
-    }
-
-    Alert.alert("Contact support", `Email ${supportEmail} and we\'ll jump in.`);
-  }, [supportEmail]);
-
   return (
-    <SafeAreaView>
-      <View className="gap-4 px-5">
-        {isLoading ? (
-          <View className="gap-4">
-            <Skeleton className="h-28 rounded-2xl" />
-            <Skeleton className="h-36 rounded-2xl" />
-            <Skeleton className="h-40 rounded-2xl" />
+    <SafeAreaView className="flex-1 bg-background">
+      <View className="flex-1 gap-6 px-6 py-6">
+        <View className="gap-3">
+          <View className="flex-row items-center justify-between">
+            <View className="flex-1">
+              <Text className="text-3xl font-bold text-foreground">
+                Settings
+              </Text>
+              <Text className="text-sm text-foreground/70 mt-1">
+                Manage your account and preferences
+              </Text>
+            </View>
           </View>
-        ) : (
-          <View className="gap-4 pb-8">
-            <Card
-              surfaceVariant="2"
-              className="rounded-2xl border border-border/50"
-            >
-              <Card.Body className="gap-4">
-                <View className="flex-row items-center gap-4">
-                  <Avatar
-                    size="lg"
-                    color="accent"
-                    alt={displayName ?? "User avatar"}
-                  >
-                    {avatarSource ? (
-                      <Avatar.Image source={avatarSource} />
-                    ) : null}
-                    <Avatar.Fallback entering={undefined}>
-                      {avatarInitials}
-                    </Avatar.Fallback>
-                  </Avatar>
+        </View>
 
-                  <View className="flex-1 gap-1">
-                    <Text className="text-lg font-bold text-foreground">
-                      {displayName}
-                    </Text>
-                    {typedUser?.email ? (
-                      <Text className="text-sm text-default-400">
-                        {typedUser.email}
+        <View className="gap-4">
+          {isLoading ? (
+            <View className="gap-4">
+              <Skeleton className="h-28 rounded-2xl" />
+              <Skeleton className="h-36 rounded-2xl" />
+              <Skeleton className="h-40 rounded-2xl" />
+            </View>
+          ) : (
+            <View className="gap-4 pb-8">
+              <Card
+                surfaceVariant="2"
+                className="rounded-2xl border border-border/50"
+              >
+                <Card.Body className="gap-4">
+                  <View className="flex-row items-center gap-4">
+                    <Avatar
+                      size="lg"
+                      color="accent"
+                      alt={displayName ?? "User avatar"}
+                    >
+                      {avatarSource ? (
+                        <Avatar.Image source={avatarSource} />
+                      ) : null}
+                      <Avatar.Fallback entering={undefined}>
+                        {avatarInitials}
+                      </Avatar.Fallback>
+                    </Avatar>
+
+                    <View className="flex-1 gap-1">
+                      <Text className="text-lg font-bold text-foreground">
+                        {displayName}
                       </Text>
-                    ) : null}
-                    {organizationLabel ? (
-                      <Text className="text-xs text-default-400">
-                        {organizationLabel}
+                      {typedUser?.email ? (
+                        <Text className="text-sm text-foreground/50">
+                          {typedUser.email}
+                        </Text>
+                      ) : null}
+                      {organizationLabel ? (
+                        <Text className="text-xs text-foreground/50">
+                          {organizationLabel}
+                        </Text>
+                      ) : null}
+                    </View>
+
+                    <Chip
+                      size="sm"
+                      color={billing?.isPremium ? "accent" : "default"}
+                    >
+                      <Chip.LabelContent className="text-[10px] font-semibold uppercase tracking-wide text-foreground">
+                        {planLabel}
+                      </Chip.LabelContent>
+                    </Chip>
+                  </View>
+                </Card.Body>
+              </Card>
+
+              <Card
+                surfaceVariant="2"
+                className="rounded-2xl border border-border/50"
+              >
+                <Card.Body className="gap-4">
+                  <View className="flex-row items-center justify-between">
+                    <View className="gap-1">
+                      <Text className="text-base font-semibold text-foreground">
+                        Plan & usage
                       </Text>
-                    ) : null}
-                  </View>
-
-                  <Chip
-                    size="sm"
-                    color={billing?.isPremium ? "accent" : "default"}
-                  >
-                    <Chip.LabelContent className="text-[10px] font-semibold uppercase tracking-wide text-foreground">
-                      {planLabel}
-                    </Chip.LabelContent>
-                  </Chip>
-                </View>
-              </Card.Body>
-            </Card>
-
-            <Card
-              surfaceVariant="2"
-              className="rounded-2xl border border-border/50"
-            >
-              <Card.Body className="gap-4">
-                <View className="flex-row items-center justify-between">
-                  <View className="gap-1">
-                    <Text className="text-base font-semibold text-foreground">
-                      Plan & usage
-                    </Text>
-                    <Text className="text-xs text-default-400">
-                      {billingStatusLabel}
-                    </Text>
-                  </View>
-                  <Ionicons
-                    name="card-outline"
-                    size={22}
-                    color={colors.foreground}
-                  />
-                </View>
-
-                <View className="gap-2">
-                  <View className="h-2 w-full overflow-hidden rounded-full bg-surface-2">
-                    <View
-                      className="h-2 rounded-full bg-accent"
-                      style={{ width: `${usageProgress}%` }}
+                      <Text className="text-xs text-foreground/50">
+                        {billingStatusLabel}
+                      </Text>
+                    </View>
+                    <Ionicons
+                      name="card-outline"
+                      size={22}
+                      color={colors.foreground}
                     />
                   </View>
-                  <Text className="text-sm text-foreground">
-                    {usageSummary}
-                  </Text>
-                  <Text
-                    className={`text-xs ${billingUsage?.requiresUpgrade ? "text-danger" : "text-default-400"}`}
-                  >
-                    {usageHelperText}
-                  </Text>
-                </View>
-              </Card.Body>
-            </Card>
 
-            <Card
-              surfaceVariant="2"
-              className="rounded-2xl border border-border/50"
-            >
-              <Card.Body className="gap-3">
-                <View className="gap-1">
-                  <Text className="text-base font-semibold text-foreground">
-                    Need a hand?
-                  </Text>
-                  <Text className="text-xs text-default-400">
-                    {"Drop a line and we'll follow up quickly."}
-                  </Text>
-                </View>
+                  <View className="gap-2">
+                    <View className="h-2 w-full overflow-hidden rounded-full bg-surface-2">
+                      <View
+                        className="h-2 rounded-full bg-accent"
+                        style={{ width: `${usageProgress}%` }}
+                      />
+                    </View>
+                    <Text className="text-sm text-foreground">
+                      {usageSummary}
+                    </Text>
+                    <Text
+                      className={`text-xs ${billingUsage?.requiresUpgrade ? "text-danger" : "text-foreground/50"}`}
+                    >
+                      {usageHelperText}
+                    </Text>
+                  </View>
+                </Card.Body>
+              </Card>
 
-                <Text className="text-xl mt-2">Email: Hello@meyoo.io</Text>
-              </Card.Body>
-            </Card>
-
-            <Button
-              variant="danger"
-              size="lg"
-              onPress={handleSignOut}
-              className="h-12 rounded-2xl"
-            >
-              <Button.StartContent>
-                <Ionicons name="log-out" size={22} color="#ffffff" />
-              </Button.StartContent>
-              <Button.LabelContent
-                classNames={{ text: "font-semibold text-white" }}
+              <Card
+                surfaceVariant="2"
+                className="rounded-2xl border border-border/50"
               >
-                Sign Out
-              </Button.LabelContent>
-            </Button>
-          </View>
-        )}
+                <Card.Body className="gap-3">
+                  <View className="gap-1">
+                    <Text className="text-base font-semibold text-foreground">
+                      Theme
+                    </Text>
+                    <Text className="text-xs text-foreground/50">
+                      Choose your preferred appearance
+                    </Text>
+                  </View>
+
+                  <View className="gap-2">
+                    <Pressable
+                      onPress={() => setTheme("light")}
+                      className="flex-row items-center justify-between py-3 px-2 rounded-xl"
+                    >
+                      <View className="flex-row items-center gap-3">
+                        <Ionicons
+                          name="sunny-outline"
+                          size={20}
+                          color={colors.foreground}
+                        />
+                        <Text className="text-base text-foreground">Light</Text>
+                      </View>
+                      <View
+                        className="w-5 h-5 rounded-full border-2 items-center justify-center"
+                        style={{
+                          borderColor:
+                            theme === "light" ? colors.accent : colors.foreground + "40",
+                        }}
+                      >
+                        {theme === "light" && (
+                          <View
+                            className="w-3 h-3 rounded-full"
+                            style={{ backgroundColor: colors.accent }}
+                          />
+                        )}
+                      </View>
+                    </Pressable>
+
+                    <Pressable
+                      onPress={() => setTheme("dark")}
+                      className="flex-row items-center justify-between py-3 px-2 rounded-xl"
+                    >
+                      <View className="flex-row items-center gap-3">
+                        <Ionicons
+                          name="moon-outline"
+                          size={20}
+                          color={colors.foreground}
+                        />
+                        <Text className="text-base text-foreground">Dark</Text>
+                      </View>
+                      <View
+                        className="w-5 h-5 rounded-full border-2 items-center justify-center"
+                        style={{
+                          borderColor:
+                            theme === "dark" ? colors.accent : colors.foreground + "40",
+                        }}
+                      >
+                        {theme === "dark" && (
+                          <View
+                            className="w-3 h-3 rounded-full"
+                            style={{ backgroundColor: colors.accent }}
+                          />
+                        )}
+                      </View>
+                    </Pressable>
+                  </View>
+                </Card.Body>
+              </Card>
+
+              <Card
+                surfaceVariant="2"
+                className="rounded-2xl border border-border/50"
+              >
+                <Card.Body className="gap-3">
+                  <View className="gap-1">
+                    <Text className="text-base font-semibold text-foreground">
+                      Need a hand?
+                    </Text>
+                    <Text className="text-xs text-foreground/50">
+                      {"Drop a line and we'll follow up quickly."}
+                    </Text>
+                  </View>
+
+                  <Text className="text-lg text-foreground mt-2">
+                    Email: Hello@meyoo.io
+                  </Text>
+                </Card.Body>
+              </Card>
+
+              <Button
+                variant="danger"
+                size="lg"
+                onPress={handleSignOut}
+                className="h-12 rounded-2xl"
+              >
+                <Button.StartContent>
+                  <Ionicons name="log-out" size={22} color="#ffffff" />
+                </Button.StartContent>
+                <Button.LabelContent
+                  classNames={{ text: "font-semibold text-white" }}
+                >
+                  Sign Out
+                </Button.LabelContent>
+              </Button>
+            </View>
+          )}
+        </View>
       </View>
     </SafeAreaView>
   );

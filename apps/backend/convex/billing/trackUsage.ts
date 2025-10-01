@@ -125,7 +125,7 @@ export const trackOrderUsage = mutation({
 });
 
 /**
- * Get current month's usage for an organization
+ * Get current usage for an organization based on last 30 days of orders from dailyMetrics
  */
 export const getCurrentUsage = query({
   args: {},
@@ -147,19 +147,28 @@ export const getCurrentUsage = query({
 
     if (!organization) return null;
 
-    // Get current month
+    // Calculate last 30 days date range
     const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth() + 1;
-    const monthKey = `${year}-${month.toString().padStart(2, "0")}`;
+    const endDate = now.toISOString().slice(0, 10); // Today: YYYY-MM-DD
+    const startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10); // 30 days ago: YYYY-MM-DD
 
-    // Get usage record
-    const usage = await ctx.db
-      .query("usage")
-      .withIndex("by_org_month", (q) =>
-        q.eq("organizationId", organization._id).eq("month", monthKey),
+    // Get daily metrics for last 30 days
+    const dailyMetrics = await ctx.db
+      .query("dailyMetrics")
+      .withIndex("by_organization_date", (q) =>
+        q
+          .eq("organizationId", organization._id)
+          .gte("date", startDate)
+          .lte("date", endDate),
       )
-      .first();
+      .collect();
+
+    // Sum up total orders from dailyMetrics
+    const currentUsage = dailyMetrics.reduce((sum, metric) => {
+      return sum + (metric.totalOrders ?? 0);
+    }, 0);
 
     // Get billing info
     if (!user.organizationId) {
@@ -183,8 +192,7 @@ export const getCurrentUsage = query({
     const currentPlan = billing?.shopifyBilling?.plan ?? null;
     const planKeyForLimit = billing?.shopifyBilling?.plan || "free";
     const limit = planLimits[planKeyForLimit] || 300;
-    const currentUsage = usage?.count || 0;
-    const percentage = (currentUsage / limit) * 100;
+    const percentage = limit > 0 ? (currentUsage / limit) * 100 : 0;
 
     // Check if on trial
     const isOnTrial = billing?.status === "trial";
@@ -195,6 +203,9 @@ export const getCurrentUsage = query({
           Math.ceil((trialEndsAt - Date.now()) / (1000 * 60 * 60 * 24)),
         )
       : 0;
+
+    // Format month display as "Last 30 days"
+    const monthKey = `Last 30 days (${startDate} to ${endDate})`;
 
     return {
       plan: currentPlan,

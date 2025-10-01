@@ -11,7 +11,6 @@ const customerBreakdown = v.object({
   newCustomers: v.optional(v.number()),
   returningCustomers: v.optional(v.number()),
   repeatCustomers: v.optional(v.number()),
-  abandonedCustomers: v.optional(v.number()),
 });
 
 export const dailyMetrics = defineTable({

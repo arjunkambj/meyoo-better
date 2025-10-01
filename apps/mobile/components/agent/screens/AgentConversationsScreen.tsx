@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState } from "react";
 import {
   RefreshControl,
   ScrollView,
@@ -6,16 +6,16 @@ import {
   View,
   Alert,
   TouchableOpacity,
-} from 'react-native';
-import { Button, Card, Skeleton, Chip } from 'heroui-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+} from "react-native";
+import { Button, Card, Skeleton, Chip } from "heroui-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 
 import {
   type AgentThread,
   DEFAULT_THREAD_PAGE_SIZE,
   useAgent,
-} from '@/hooks/useAgent';
+} from "@/hooks/useAgent";
 
 export function AgentConversationsScreen() {
   const router = useRouter();
@@ -37,38 +37,38 @@ export function AgentConversationsScreen() {
   }, []);
 
   const handleNewChat = useCallback(() => {
-    router.push('/agent');
+    router.push("/agent");
   }, [router]);
 
   const handleSelectThread = useCallback(
     (threadId: string) => {
       router.push(`/agent?threadId=${threadId}`);
     },
-    [router],
+    [router]
   );
 
   const handleDeleteThread = useCallback(
     (thread: AgentThread) => {
       Alert.alert(
-        'Delete Conversation',
-        `Are you sure you want to delete "${thread.title || 'this conversation'}"?`,
+        "Delete Conversation",
+        `Are you sure you want to delete "${thread.title || "this conversation"}"?`,
         [
-          { text: 'Cancel', style: 'cancel' },
+          { text: "Cancel", style: "cancel" },
           {
-            text: 'Delete',
-            style: 'destructive',
+            text: "Delete",
+            style: "destructive",
             onPress: async () => {
               try {
                 await deleteThread(thread.threadId);
               } catch (error) {
-                console.error('Failed to delete thread:', error);
+                console.error("Failed to delete thread:", error);
               }
             },
           },
-        ],
+        ]
       );
     },
-    [deleteThread],
+    [deleteThread]
   );
 
   const formatDate = (timestamp: number) => {
@@ -76,22 +76,26 @@ export function AgentConversationsScreen() {
     const now = new Date();
     const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
 
-    if (diffInHours < 1) return 'Just now';
+    if (diffInHours < 1) return "Just now";
     if (diffInHours < 24) return `${Math.floor(diffInHours)}h ago`;
-    if (diffInHours < 48) return 'Yesterday';
+    if (diffInHours < 48) return "Yesterday";
     return date.toLocaleDateString();
   };
 
-  const canLoadMore = threadsStatus === 'CanLoadMore';
-  const isLoadingMore = threadsStatus === 'LoadingMore';
+  const canLoadMore = threadsStatus === "CanLoadMore";
+  const isLoadingMore = threadsStatus === "LoadingMore";
 
   if (isLoadingThreads && (!threads || threads.length === 0)) {
     return (
       <View className="flex-1 bg-background px-4 py-6">
         <View className="gap-4">
           <View className="gap-2">
-            <Text className="text-2xl font-bold text-foreground">Conversations</Text>
-            <Text className="text-sm text-default-500">Your chat history with Meyoo Agent</Text>
+            <Text className="text-2xl font-bold text-foreground">
+              Conversations
+            </Text>
+            <Text className="text-sm text-default-500">
+              Your chat history with Meyoo Agent
+            </Text>
           </View>
           <View className="gap-3 mt-4">
             {Array.from({ length: 4 }).map((_, i) => (
@@ -111,26 +115,33 @@ export function AgentConversationsScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
         }
       >
-        <View className="px-4 py-6 gap-4">
+        <View className="px-4 py-3 gap-4">
           <View className="gap-2">
-            <Text className="text-2xl font-bold text-foreground">Conversations</Text>
+            <Text className="text-2xl font-bold text-foreground">
+              Conversations
+            </Text>
             <Text className="text-sm text-default-500">
               {threads?.length
-                ? `${threads.length} conversation${threads.length === 1 ? '' : 's'}`
-                : 'Start a new chat with Meyoo Agent'}
+                ? `${threads.length} conversation${threads.length === 1 ? "" : "s"}`
+                : "Start a new chat with Meyoo Agent"}
             </Text>
           </View>
 
           {!threads || threads.length === 0 ? (
-            <Card surfaceVariant="1" className="mt-8">
-              <Card.Body className="items-center py-8">
+            <Card surfaceVariant="1" className="mt-4">
+              <Card.Body className="items-center py-6">
                 <View className="items-center gap-4">
                   <View className="h-16 w-16 rounded-full bg-primary-100 items-center justify-center">
-                    <Ionicons name="chatbubbles-outline" size={32} color="#6366f1" />
+                    <Ionicons
+                      name="chatbubbles-outline"
+                      size={32}
+                      color="#6366f1"
+                    />
                   </View>
                   <Card.Title>No conversations yet</Card.Title>
                   <Card.Description className="text-center px-4">
-                    Start a conversation to get help with your Shopify data, marketing campaigns, and more.
+                    Start a conversation to get help with your Shopify data,
+                    marketing campaigns, and more.
                   </Card.Description>
                   <Button variant="primary" onPress={handleNewChat}>
                     <Button.StartContent>
@@ -149,13 +160,17 @@ export function AgentConversationsScreen() {
                   onPress={() => handleSelectThread(thread.threadId)}
                   activeOpacity={0.7}
                 >
-                  <Card surfaceVariant="1">
+                  <Card className="bg-default-200/50">
                     <Card.Body>
                       <View className="flex-row items-start justify-between">
                         <View className="flex-1 gap-2">
                           <View className="flex-row items-center gap-2">
-                            {thread.status === 'archived' && (
-                              <Chip size="sm" color="default" className="rounded-full">
+                            {thread.status === "archived" && (
+                              <Chip
+                                size="sm"
+                                color="default"
+                                className="rounded-full"
+                              >
                                 <Text className="text-[10px]">Archived</Text>
                               </Chip>
                             )}
@@ -164,10 +179,13 @@ export function AgentConversationsScreen() {
                             </Text>
                           </View>
                           <Text className="text-base font-semibold text-foreground">
-                            {thread.title || 'Untitled Conversation'}
+                            {thread.title || "Untitled Conversation"}
                           </Text>
                           {thread.summary && (
-                            <Text className="text-sm text-default-600" numberOfLines={2}>
+                            <Text
+                              className="text-sm text-default-600"
+                              numberOfLines={2}
+                            >
                               {thread.summary}
                             </Text>
                           )}
@@ -179,7 +197,11 @@ export function AgentConversationsScreen() {
                           }}
                           className="p-2"
                         >
-                          <Ionicons name="trash-outline" size={18} color="#ef4444" />
+                          <Ionicons
+                            name="trash-outline"
+                            size={18}
+                            color="#ef4444"
+                          />
                         </TouchableOpacity>
                       </View>
                     </Card.Body>
@@ -194,14 +216,13 @@ export function AgentConversationsScreen() {
                   onPress={() => loadMoreThreads?.(DEFAULT_THREAD_PAGE_SIZE)}
                   className="mt-2"
                 >
-                  {isLoadingMore ? 'Loading...' : 'Load More'}
+                  {isLoadingMore ? "Loading..." : "Load More"}
                 </Button>
               )}
             </View>
           )}
         </View>
       </ScrollView>
-
     </View>
   );
 }

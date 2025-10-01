@@ -105,58 +105,27 @@ export const GeographicDistribution = memo(function GeographicDistribution({
       </div>
 
       {/* Top 5 Zip Codes */}
-      <div className="space-y-3 bg-background p-3 rounded-xl mb-6">
-        <p className="text-sm font-medium bg-background text-default-900">
+      <div className="space-y-3 mb-6">
+        <p className="text-sm font-medium text-default-900">
           Top Postal Codes
         </p>
         {topZipCodes.length > 0 ? (
-          topZipCodes.map((zip, index) => {
-            const percentage =
-              totals.revenue > 0 ? (zip.revenue / totals.revenue) * 100 : 0;
-
-            return (
-              <div
+          <div className="grid grid-cols-2 gap-2">
+            {topZipCodes.map((zip) => (
+              <Tooltip
                 key={`${zip.zipCode}-${zip.country}`}
-                className="p-3 rounded-xl bg-background border border-default-50"
+                closeDelay={0}
+                content={`${zip.city ? `${zip.city}, ` : ""}${zip.country} • ${formatNumber(zip.customers)} customers`}
               >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center justify-center w-6 h-6 rounded-md bg-default-100 text-default-600 font-medium text-xs">
-                      {index + 1}
-                    </div>
-                    <div>
-                      <Tooltip
-                        closeDelay={0}
-                        content={`${formatNumber(zip.customers)} customers from postal code ${zip.zipCode}`}
-                      >
-                        <p className="font-medium text-sm cursor-help">
-                          {zip.zipCode}
-                        </p>
-                      </Tooltip>
-                      <p className="text-xs text-default-500">
-                        {zip.city && `${zip.city}, `}
-                        {zip.country} • {formatNumber(zip.customers)} customers
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-sm">
-                      {formatRevenue(zip.revenue)}
-                    </p>
-                    <p className="text-xs text-default-500">
-                      {percentage.toFixed(1)}% of total
-                    </p>
-                  </div>
+                <div className="flex items-center justify-between p-3 rounded-xl bg-background border border-default-50 text-xs cursor-help">
+                  <span className="text-default-600">{zip.zipCode}</span>
+                  <span className="font-medium text-default-900">
+                    {formatRevenue(zip.revenue)}
+                  </span>
                 </div>
-                <div className="h-1 bg-default-100 rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-primary-400"
-                    style={{ width: `${percentage}%` }}
-                  />
-                </div>
-              </div>
-            );
-          })
+              </Tooltip>
+            ))}
+          </div>
         ) : (
           <div className="text-center py-8 text-default-400">
             <Icon

@@ -782,16 +782,11 @@ function buildDailyMetricsFromResponse(
   // If not available, fall back to uniqueCustomers (paid customers only)
   const totalCustomers = toSafeNumber(summary?.customers) || uniqueCustomers;
 
-  // Calculate abandoned customers (customers who didn't purchase)
-  // totalCustomers from summary includes ALL customers, uniqueCustomers is only paid
-  const abandonedCustomers = Math.max(0, totalCustomers - uniqueCustomers);
-
-  const customerBreakdown = newCustomers + returningCustomers + repeatCustomers + abandonedCustomers > 0
+  const customerBreakdown = newCustomers + returningCustomers + repeatCustomers > 0
     ? sanitizeDocument({
         newCustomers: newCustomers || undefined,
         returningCustomers: returningCustomers || undefined,
         repeatCustomers: repeatCustomers || undefined,
-        abandonedCustomers: abandonedCustomers || undefined,
       })
     : null;
 

@@ -7,9 +7,16 @@ export type OptimisticAgentMessage = AgentUIMessage & {
   pendingKey: string;
 };
 
+type SequenceSignatureEntry = {
+  role: AgentUIMessage['role'];
+  text: string;
+  isThinkingPlaceholder: boolean;
+};
+
 type PendingSequence = {
   key: string;
   savedIds: string[] | null;
+  signature: SequenceSignatureEntry[];
 };
 
 const createPendingKey = () =>
@@ -35,6 +42,41 @@ const hasContent = (text?: string | null) => typeof text === 'string' && text.tr
 const normalizeSavedIds = (savedIds: string[] | undefined | null) =>
   (Array.isArray(savedIds) ? savedIds.filter((id) => typeof id === 'string' && id.length > 0) : []);
 
+const signatureMatchesMessages = (
+  signature: SequenceSignatureEntry[],
+  messages?: AgentUIMessage[],
+) => {
+  if (!messages || signature.length === 0 || messages.length < signature.length) {
+    return false;
+  }
+
+  const tailOffset = messages.length - signature.length;
+
+  for (let index = 0; index < signature.length; index += 1) {
+    const expected = signature[index];
+    if (!expected) {
+      return false;
+    }
+
+    const candidate = messages[tailOffset + index];
+
+    if (!candidate || candidate.role !== expected.role) {
+      return false;
+    }
+
+    if (expected.isThinkingPlaceholder) {
+      continue;
+    }
+
+    const candidateText = (candidate.text ?? '').trim();
+    if (candidateText !== expected.text) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
 /**
  * Provides shared optimistic UI handling for Convex agent chats.
  * Keeps local placeholders until the server confirms the messages exist.
@@ -54,13 +96,20 @@ export function useOptimisticAgentMessages(
     const remaining: PendingSequence[] = [];
 
     for (const sequence of pendingSequencesRef.current) {
+      let shouldRemove = false;
+
       if (!sequence.savedIds || sequence.savedIds.length === 0) {
-        remaining.push(sequence);
-        continue;
+        shouldRemove = signatureMatchesMessages(sequence.signature, currentMessages);
+      } else {
+        const allSavedIdsPresent = sequence.savedIds.every((savedId) => existingIds.has(savedId));
+        if (allSavedIdsPresent) {
+          shouldRemove = true;
+        } else {
+          shouldRemove = signatureMatchesMessages(sequence.signature, currentMessages);
+        }
       }
 
-      const allSavedIdsPresent = sequence.savedIds.every((savedId) => existingIds.has(savedId));
-      if (allSavedIdsPresent) {
+      if (shouldRemove) {
         toRemoveKeys.push(sequence.key);
       } else {
         remaining.push(sequence);
@@ -93,7 +142,19 @@ export function useOptimisticAgentMessages(
       }
 
       const key = options?.key ?? createPendingKey();
-      const nextSequence: PendingSequence = { key, savedIds: null };
+      const signature: SequenceSignatureEntry[] = sequence.map((message) => {
+        const text = typeof message.text === 'string' ? message.text.trim() : '';
+        const isThinkingPlaceholder =
+          message.role === 'assistant' && (message.text === '__thinking__' || text === '__thinking__');
+
+        return {
+          role: message.role,
+          text,
+          isThinkingPlaceholder,
+        };
+      });
+
+      const nextSequence: PendingSequence = { key, savedIds: null, signature };
       pendingSequencesRef.current = [...pendingSequencesRef.current, nextSequence];
 
       const normalizedSequence = sequence.map<OptimisticAgentMessage>((message) => {
@@ -155,7 +216,11 @@ export function useOptimisticAgentMessages(
     if (localMessages.length === 0) {
       return messages;
     }
-    return [...messages, ...localMessages];
+
+    const serverIds = new Set(messages.map((message) => message.id));
+    const dedupedLocals = localMessages.filter((message) => !serverIds.has(message.id));
+
+    return [...messages, ...dedupedLocals];
   }, [messages, localMessages]);
 
   return {

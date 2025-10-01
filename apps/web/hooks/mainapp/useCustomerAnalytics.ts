@@ -1,5 +1,5 @@
-import { useAction } from "convex/react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "convex-helpers/react/cache/hooks";
+import { useEffect, useMemo, useState } from "react";
 
 import { api } from "@/libs/convexApi";
 import { toUtcRangeStrings } from "@/libs/dateRange";
@@ -30,106 +30,6 @@ interface CustomerOverviewMetrics {
     newCustomers: number;
     avgLTV: number;
   };
-}
-
-interface CustomerListEntry {
-  id: string;
-  name: string;
-  email: string;
-  avatar?: string;
-  status: string;
-  lifetimeValue: number;
-  orders: number;
-  avgOrderValue: number;
-  lastOrderDate: string;
-  firstOrderDate: string;
-  segment: string;
-  city?: string;
-  country?: string;
-}
-
-interface CustomerListPagination {
-  page: number;
-  pageSize: number;
-  total: number;
-  totalPages: number;
-}
-
-interface CustomersAnalyticsActionResult {
-  overview: {
-    totalCustomers: number;
-    newCustomers: number;
-    returningCustomers: number;
-    activeCustomers: number;
-    churnedCustomers: number;
-    avgLifetimeValue: number;
-    avgOrderValue: number;
-    avgOrdersPerCustomer: number;
-    customerAcquisitionCost: number;
-    churnRate: number;
-    repeatPurchaseRate: number;
-    periodCustomerCount: number;
-    prepaidRate: number;
-    periodRepeatRate: number;
-    abandonedCartCustomers: number;
-    changes: {
-      totalCustomers: number;
-      newCustomers: number;
-      lifetimeValue: number;
-    };
-  } | null;
-  cohorts: Array<{
-    cohort: string;
-    cohortSize: number;
-    periods: Array<{
-      period: number;
-      retained: number;
-      percentage: number;
-      revenue: number;
-    }>;
-  }>;
-  customerList: {
-    data: CustomerListEntry[];
-    pagination: CustomerListPagination;
-    continueCursor: string;
-  } | null;
-  geographic: {
-    countries: Array<{
-      country: string;
-      customers: number;
-      revenue: number;
-      orders: number;
-      avgOrderValue: number;
-      zipCodes: Array<{
-        zipCode: string;
-        city?: string;
-        customers: number;
-        revenue: number;
-      }>;
-    }>;
-    cities: Array<{
-      city: string;
-      country: string;
-      customers: number;
-      revenue: number;
-    }>;
-    heatmapData: Array<{ lat: number; lng: number; value: number }>;
-  } | null;
-  journey: Array<{
-    stage: string;
-    customers: number;
-    percentage: number;
-    avgDays: number;
-    conversionRate: number;
-    icon: string;
-    color: string;
-  }>;
-}
-
-interface CustomersAnalyticsActionResponse {
-  dateRange: { startDate: string; endDate: string };
-  organizationId: string;
-  result: CustomersAnalyticsActionResult;
 }
 
 interface Customer {
@@ -183,24 +83,6 @@ export function useCustomerAnalytics(dateRange?: {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSegment, setSelectedSegment] = useState<string | undefined>();
 
-  const [analytics, setAnalytics] = useState<
-    CustomersAnalyticsActionResponse | null | undefined
-  >(undefined);
-  const [isOverviewLoading, setIsOverviewLoading] = useState(false);
-  const [isCustomersLoading, setIsCustomersLoading] = useState(false);
-  const [isCohortsLoading, setIsCohortsLoading] = useState(false);
-  const [isGeographicLoading, setIsGeographicLoading] = useState(false);
-  const [isJourneyLoading, setIsJourneyLoading] = useState(false);
-
-  const requestIdRef = useRef(0);
-  const previousArgsRef = useRef<{
-    dateRange: { startDate: string; endDate: string };
-    page: number;
-    pageSize: number;
-    searchTerm?: string;
-    segment?: string;
-  } | null>(null);
-
   const effectiveDateRange = useMemo(() => {
     if (dateRange) return dateRange;
     return defaultRange();
@@ -228,96 +110,122 @@ export function useCustomerAnalytics(dateRange?: {
     };
   }, [effectiveDateRange, timezone, page, searchTerm, selectedSegment]);
 
-  const getAnalytics = useAction(api.web.customers.getAnalytics);
+  const geographicQueryArgs = useMemo(
+    () => ({
+      dateRange: {
+        startDate: actionArgs.dateRange.startDate,
+        endDate: actionArgs.dateRange.endDate,
+      },
+    }),
+    [actionArgs.dateRange.endDate, actionArgs.dateRange.startDate],
+  );
 
-  useEffect(() => {
-    const previousArgs = previousArgsRef.current;
-    const onlyPageChanged =
-      previousArgs !== null &&
-      previousArgs.dateRange.startDate === actionArgs.dateRange.startDate &&
-      previousArgs.dateRange.endDate === actionArgs.dateRange.endDate &&
-      previousArgs.searchTerm === actionArgs.searchTerm &&
-      previousArgs.segment === actionArgs.segment &&
-      previousArgs.pageSize === actionArgs.pageSize &&
-      previousArgs.page !== actionArgs.page;
+  const geographicQuery = useQuery(
+    api.web.customers.getGeographicDistribution,
+    geographicQueryArgs,
+  );
 
-    previousArgsRef.current = actionArgs;
+  const sharedDateRange = useMemo(
+    () => ({
+      startDate: actionArgs.dateRange.startDate,
+      endDate: actionArgs.dateRange.endDate,
+    }),
+    [actionArgs.dateRange.endDate, actionArgs.dateRange.startDate],
+  );
 
-    setIsOverviewLoading(!onlyPageChanged);
-    setIsCohortsLoading(!onlyPageChanged);
-    setIsGeographicLoading(!onlyPageChanged);
-    setIsJourneyLoading(!onlyPageChanged);
-    setIsCustomersLoading(true);
+  const overviewQueryArgs = useMemo(
+    () => ({
+      dateRange: sharedDateRange,
+    }),
+    [sharedDateRange],
+  );
 
-    if (!onlyPageChanged) {
-      setAnalytics(undefined);
-    }
+  const cohortsQueryArgs = useMemo(
+    () => ({
+      dateRange: sharedDateRange,
+      cohortType: "monthly" as const,
+    }),
+    [sharedDateRange],
+  );
 
-    let cancelled = false;
-    requestIdRef.current += 1;
-    const currentRequestId = requestIdRef.current;
+  const customerListQueryArgs = useMemo(
+    () => ({
+      dateRange: sharedDateRange,
+      page: actionArgs.page,
+      pageSize: actionArgs.pageSize,
+      searchTerm: actionArgs.searchTerm,
+      segment: actionArgs.segment,
+    }),
+    [
+      sharedDateRange,
+      actionArgs.page,
+      actionArgs.pageSize,
+      actionArgs.searchTerm,
+      actionArgs.segment,
+    ],
+  );
 
-    getAnalytics(actionArgs)
-      .then((response) => {
-        if (cancelled || requestIdRef.current !== currentRequestId) return;
-        setAnalytics(response ?? null);
-      })
-      .catch((error) => {
-        if (cancelled || requestIdRef.current !== currentRequestId) return;
-        console.error("Failed to load customer analytics", error);
-        setAnalytics(null);
-      })
-      .finally(() => {
-        if (cancelled || requestIdRef.current !== currentRequestId) return;
-        setIsOverviewLoading(false);
-        setIsCohortsLoading(false);
-        setIsGeographicLoading(false);
-        setIsJourneyLoading(false);
-        setIsCustomersLoading(false);
-      });
+  const journeyQueryArgs = useMemo(
+    () => ({
+      dateRange: sharedDateRange,
+    }),
+    [sharedDateRange],
+  );
 
-    return () => {
-      cancelled = true;
-    };
-  }, [actionArgs, getAnalytics]);
+  const overviewQuery = useQuery(
+    api.web.customers.getCustomerOverview,
+    overviewQueryArgs,
+  );
 
-  const result = analytics?.result as CustomersAnalyticsActionResult | undefined;
+  const cohortsQuery = useQuery(
+    api.web.customers.getCohortAnalysis,
+    cohortsQueryArgs,
+  );
+
+  const customerListQuery = useQuery(
+    api.web.customers.getCustomerList,
+    customerListQueryArgs,
+  );
+
+  const journeyQuery = useQuery(
+    api.web.customers.getCustomerJourney,
+    journeyQueryArgs,
+  );
 
   const overview: CustomerOverviewMetrics | undefined = useMemo(() => {
-    const overviewData = result?.overview;
-    if (!overviewData) return undefined;
+    if (!overviewQuery) return undefined;
 
-    const ltv = overviewData.avgLifetimeValue;
-    const cac = overviewData.customerAcquisitionCost;
+    const ltv = overviewQuery.avgLifetimeValue;
+    const cac = overviewQuery.customerAcquisitionCost;
 
     return {
-      totalCustomers: overviewData.totalCustomers,
-      newCustomers: overviewData.newCustomers,
-      returningCustomers: overviewData.returningCustomers,
-      activeCustomers: overviewData.activeCustomers,
-      churnedCustomers: overviewData.churnedCustomers,
+      totalCustomers: overviewQuery.totalCustomers,
+      newCustomers: overviewQuery.newCustomers,
+      returningCustomers: overviewQuery.returningCustomers,
+      activeCustomers: overviewQuery.activeCustomers,
+      churnedCustomers: overviewQuery.churnedCustomers,
       avgLTV: ltv,
       avgCAC: cac,
       ltvCacRatio: cac > 0 ? ltv / cac : 0,
-      avgOrderValue: overviewData.avgOrderValue,
-      avgOrdersPerCustomer: overviewData.avgOrdersPerCustomer,
-      repeatPurchaseRate: overviewData.repeatPurchaseRate,
-      periodCustomerCount: overviewData.periodCustomerCount,
-      prepaidRate: overviewData.prepaidRate,
-      periodRepeatRate: overviewData.periodRepeatRate,
-      abandonedCartCustomers: overviewData.abandonedCartCustomers,
+      avgOrderValue: overviewQuery.avgOrderValue,
+      avgOrdersPerCustomer: overviewQuery.avgOrdersPerCustomer,
+      repeatPurchaseRate: overviewQuery.repeatPurchaseRate,
+      periodCustomerCount: overviewQuery.periodCustomerCount,
+      prepaidRate: overviewQuery.prepaidRate,
+      periodRepeatRate: overviewQuery.periodRepeatRate,
+      abandonedCartCustomers: overviewQuery.abandonedCartCustomers,
       changes: {
-        totalCustomers: overviewData.changes.totalCustomers,
-        newCustomers: overviewData.changes.newCustomers,
-        avgLTV: overviewData.changes.lifetimeValue,
+        totalCustomers: overviewQuery.changes.totalCustomers,
+        newCustomers: overviewQuery.changes.newCustomers,
+        avgLTV: overviewQuery.changes.lifetimeValue,
       },
     };
-  }, [result?.overview]);
+  }, [overviewQuery]);
 
   const cohorts: CohortData[] | undefined = useMemo(() => {
-    if (!result?.cohorts) return undefined;
+    if (!cohortsQuery) return undefined;
 
-    return result.cohorts.map((cohort) => ({
+    return cohortsQuery.map((cohort) => ({
       cohort: cohort.cohort,
       size: cohort.cohortSize,
       months: cohort.periods.map((period) => ({
@@ -326,50 +234,55 @@ export function useCustomerAnalytics(dateRange?: {
         revenue: period.revenue,
       })),
     }));
-  }, [result?.cohorts]);
+  }, [cohortsQuery]);
 
   const customers: CustomersResult | undefined = useMemo(() => {
-    if (!result?.customerList) return undefined;
+    if (!customerListQuery) return undefined;
 
-    const pagination = result.customerList.pagination ?? {
+    const entries =
+      customerListQuery.data ?? customerListQuery.page ?? ([] as Customer[]);
+
+    const paginationSource = customerListQuery.pagination ?? {
       page,
       pageSize: DEFAULT_PAGE_SIZE,
-      total: result.customerList.data?.length ?? 0,
+      total: entries.length,
       totalPages: Math.max(
         1,
-        Math.ceil((result.customerList.data?.length ?? 0) / DEFAULT_PAGE_SIZE),
+        Math.ceil(Math.max(entries.length, 1) / DEFAULT_PAGE_SIZE),
       ),
     };
 
     return {
-      data: result.customerList.data ?? [],
+      data: entries,
       pagination: {
-        page: pagination.page,
+        page: paginationSource.page,
         setPage,
-        total: pagination.total,
-        pageSize: pagination.pageSize,
+        total: paginationSource.total,
+        pageSize: paginationSource.pageSize,
         hasMore:
-          !!result.customerList.continueCursor &&
-          result.customerList.continueCursor !== END_CURSOR,
+          !!customerListQuery.continueCursor &&
+          customerListQuery.continueCursor !== END_CURSOR,
       },
     };
-  }, [result?.customerList, page]);
+  }, [customerListQuery, page, setPage]);
+
+  const geographicSource = geographicQuery ?? null;
 
   const geographicTotals = useMemo(() => {
-    if (!result?.geographic) return 0;
+    if (!geographicSource) return 0;
 
-    return result.geographic.countries.reduce(
+    return geographicSource.countries.reduce(
       (sum, country) => sum + country.customers,
       0,
     );
-  }, [result?.geographic]);
+  }, [geographicSource]);
 
   const geographic: GeoData[] | undefined = useMemo(() => {
-    if (!result?.geographic) return undefined;
+    if (!geographicSource) return undefined;
 
     const total = geographicTotals || 1;
 
-    return result.geographic.countries.map((country) => ({
+    return geographicSource.countries.map((country) => ({
       country: country.country,
       customers: country.customers,
       revenue: country.revenue,
@@ -382,10 +295,10 @@ export function useCustomerAnalytics(dateRange?: {
         revenue: zip.revenue,
       })),
     }));
-  }, [result?.geographic, geographicTotals]);
+  }, [geographicSource, geographicTotals]);
 
   const journey: JourneyStage[] | undefined = useMemo(() => {
-    if (!result?.journey) return undefined;
+    if (!journeyQuery) return undefined;
 
     const colorMap: Record<string, { bg: string; text: string }> = {
       primary: { bg: "bg-primary/10", text: "text-primary" },
@@ -396,7 +309,7 @@ export function useCustomerAnalytics(dateRange?: {
       default: { bg: "bg-default-100", text: "text-default-500" },
     };
 
-    return result.journey.map((stage) => ({
+    return journeyQuery.map((stage) => ({
       stage: stage.stage,
       customers: stage.customers,
       percentage: stage.percentage,
@@ -407,7 +320,7 @@ export function useCustomerAnalytics(dateRange?: {
       bgColor: (colorMap[stage.color] ?? colorMap.default)!.bg,
       textColor: (colorMap[stage.color] ?? colorMap.default)!.text,
     }));
-  }, [result?.journey]);
+  }, [journeyQuery]);
 
   const exportData = async () => {
     const exportableData = [] as Array<Record<string, unknown>>;
@@ -510,16 +423,18 @@ export function useCustomerAnalytics(dateRange?: {
     return exportableData;
   };
 
+  const geographicLoading = geographicQuery === undefined;
+
   const loadingStates = {
-    overview: isOverviewLoading,
-    cohorts: isCohortsLoading,
-    customers: isCustomersLoading,
-    geographic: isGeographicLoading,
-    journey: isJourneyLoading,
+    overview: overviewQuery === undefined,
+    cohorts: cohortsQuery === undefined,
+    customers: customerListQuery === undefined,
+    geographic: geographicLoading,
+    journey: journeyQuery === undefined,
   };
 
   const isLoading = Object.values(loadingStates).some(Boolean);
-  const isInitialLoading = analytics === undefined;
+  const isInitialLoading = isLoading;
 
   return {
     overview,

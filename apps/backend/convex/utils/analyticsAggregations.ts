@@ -635,8 +635,9 @@ export function computeOverviewMetrics(
   const taxesPercentageOfRevenue = revenue > 0 ? (taxesCollected / revenue) * 100 : 0;
 
   const returnRate = activeOrderCount > 0 ? (refunds.length / activeOrderCount) * 100 : 0;
-  const customersCount = uniqueCustomerIds.size;
-  const repeatCustomerRate = customersCount > 0 ? (returningCustomers / customersCount) * 100 : 0;
+  const paidCustomersCount = uniqueCustomerIds.size;
+  const totalCustomersCount = customers.length > 0 ? customers.length : paidCustomersCount;
+  const repeatCustomerRate = paidCustomersCount > 0 ? (returningCustomers / paidCustomersCount) * 100 : 0;
   const customerAcquisitionCost = newCustomers > 0 ? totalAdSpend / newCustomers : 0;
   const cacPercentageOfAOV = averageOrderValue > 0 ? (customerAcquisitionCost / averageOrderValue) * 100 : 0;
   const operatingCostPercentage = revenue > 0 ? (customCostTotal / revenue) * 100 : 0;
@@ -724,7 +725,7 @@ export function computeOverviewMetrics(
     customCostsChange: 0,
     customCostsPercentage: operatingCostPercentage,
     customCostsPercentageChange: 0,
-    customers: customersCount,
+    customers: totalCustomersCount,
     customersChange: 0,
     newCustomers,
     newCustomersChange: 0,

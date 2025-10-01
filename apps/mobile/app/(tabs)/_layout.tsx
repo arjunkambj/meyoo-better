@@ -1,62 +1,78 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
-import { useTheme } from 'heroui-native';
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { Tabs } from "expo-router";
+import { useTheme } from "heroui-native";
 
-import {
-  NativeTabs,
-  Icon,
-  Label,
-  VectorIcon,
-} from 'expo-router/unstable-native-tabs';
+import { useTabBar } from "@/contexts/TabBarContext";
 
 export default function TabsLayout() {
   const { colors } = useTheme();
+  const palette = colors as Record<string, string>;
+  const { isTabBarVisible } = useTabBar();
 
-  const backgroundColor = colors.background ?? '#ffffff';
-  const inactiveColor = colors.default ?? colors.foreground ?? '#6b7280';
-  const resolvedAccent = 'accent' in colors ? colors.accent : undefined;
-  const activeColor = resolvedAccent ?? colors.foreground ?? '#2563EB';
+  const backgroundColor = palette.background ?? "#ffffff";
+  const accentColor = palette.primary ?? palette.accent;
+  const activeColor = accentColor ?? "#2563EB";
+  const inactiveColor = "#6b7280";
 
   return (
-    <NativeTabs
-      backgroundColor={backgroundColor}
-      iconColor={inactiveColor}
-      tintColor={activeColor}
-      labelStyle={{
-        fontSize: 12,
-        fontFamily: 'Inter_500Medium',
-        color: inactiveColor,
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: activeColor,
+        tabBarInactiveTintColor: inactiveColor,
+        tabBarHideOnKeyboard: true,
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontFamily: "Inter_500Medium",
+        },
+        tabBarStyle: {
+          backgroundColor,
+          borderTopWidth: 0,
+          elevation: 0,
+          paddingVertical: 6,
+          display: isTabBarVisible ? "flex" : "none",
+        },
       }}
     >
-      <NativeTabs.Trigger name="overview">
-        <Icon
-          selectedColor={activeColor}
-          src={{
-            default: <VectorIcon family={Ionicons} name="home-outline" />,
-            selected: <VectorIcon family={Ionicons} name="home" />,
-          }}
-        />
-        <Label selectedStyle={{ color: activeColor }}>Overview</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="agent">
-        <Icon
-          selectedColor={activeColor}
-          src={{
-            default: <VectorIcon family={Ionicons} name="sparkles-outline" />,
-            selected: <VectorIcon family={Ionicons} name="sparkles" />,
-          }}
-        />
-        <Label selectedStyle={{ color: activeColor }}>Agent</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="settings">
-        <Icon
-          selectedColor={activeColor}
-          src={{
-            default: <VectorIcon family={Ionicons} name="settings-outline" />,
-            selected: <VectorIcon family={Ionicons} name="settings" />,
-          }}
-        />
-        <Label selectedStyle={{ color: activeColor }}>Settings</Label>
-      </NativeTabs.Trigger>
-    </NativeTabs>
+      <Tabs.Screen
+        name="overview"
+        options={{
+          title: "Overview",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? "home" : "home-outline"}
+              size={24}
+              color={color}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="agent"
+        options={{
+          title: "Agent",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? "sparkles" : "sparkles-outline"}
+              size={24}
+              color={color}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: "Settings",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? "settings" : "settings-outline"}
+              size={24}
+              color={color}
+            />
+          ),
+        }}
+      />
+    </Tabs>
   );
 }

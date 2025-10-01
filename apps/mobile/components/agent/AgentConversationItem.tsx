@@ -60,7 +60,7 @@ export function AgentConversationItem({
   return (
     <View
       className={`rounded-2xl border px-3 py-3 ${
-        isActive ? 'border-primary-200 bg-primary-50/60' : 'border-default-100 bg-background'
+        isActive ? 'border-primary-200 bg-primary-50/60' : 'border-border bg-background'
       }`}
     >
       <Button

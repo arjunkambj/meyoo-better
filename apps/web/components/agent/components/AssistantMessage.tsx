@@ -31,7 +31,7 @@ export default function AssistantMessage({
   return (
     <div className="flex items-start py-1.5">
       <div className="max-w-[85%] group relative">
-        <div className="inline-block rounded-2xl rounded-tl-sm bg-default-100 text-foreground text-sm px-4 py-3 leading-relaxed">
+        <div className="inline-block rounded-2xl rounded-tl-sm bg-default-200/40 text-foreground text-sm px-4 py-3 leading-relaxed">
           <AgentResponseFormatter
             content={content}
             onCopy={() => void handleCopyAll()}

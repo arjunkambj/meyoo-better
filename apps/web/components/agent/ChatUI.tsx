@@ -18,7 +18,6 @@ import MessageSkeleton from "@/components/agent/components/MessageSkeleton";
 import HistorySkeleton from "@/components/agent/components/HistorySkeleton";
 import ChatHistoryItem from "@/components/agent/components/ChatHistoryItem";
 import RenameThreadDialog from "@/components/agent/components/RenameThreadDialog";
-import ThinkingSpinnerAlt from "@/components/agent/components/ThinkingSpinnerAlt";
 import {
   inferAgentThinkingLabel,
   useOptimisticAgentMessages,
@@ -60,11 +59,14 @@ export default function ChatUI() {
     setViewMode("chat");
   }, [reset]);
 
-  const onSelectConversation = useCallback((id: string) => {
-    reset();
-    setActiveId(id);
-    setViewMode("chat");
-  }, [reset]);
+  const onSelectConversation = useCallback(
+    (id: string) => {
+      reset();
+      setActiveId(id);
+      setViewMode("chat");
+    },
+    [reset]
+  );
 
   const handleSend = useCallback(
     async (message: string) => {
@@ -75,7 +77,12 @@ export default function ChatUI() {
       const thinkingId = `local-a-${nanoid(6)}`;
       const pendingKey = appendSequence([
         { id: userId, role: "user", text: message, status: "local" },
-        { id: thinkingId, role: "assistant", text: "__thinking__", status: "local" },
+        {
+          id: thinkingId,
+          role: "assistant",
+          text: "__thinking__",
+          status: "local",
+        },
       ]);
 
       try {
@@ -147,7 +154,7 @@ export default function ChatUI() {
 
         <NewChatButton onNew={startNewChat} />
       </div>
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 pb-3">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-1 pb-3">
         {viewMode === "history" ? (
           isLoadingThreads ? (
             <HistorySkeleton />
@@ -212,7 +219,9 @@ export default function ChatUI() {
                   </div>
                 </div>
                 <div className="text-base font-semibold text-default-900 mb-2">
-                  {isNewChat ? "How can I help you today?" : "Start the conversation"}
+                  {isNewChat
+                    ? "How can I help you today?"
+                    : "Start the conversation"}
                 </div>
                 <div className="text-sm text-default-500 leading-relaxed">
                   {isNewChat
@@ -229,14 +238,20 @@ export default function ChatUI() {
                 const streaming = message.status === "streaming";
                 const text = message.text ?? "";
                 const trimmed = text.trim();
-                const label = inferAgentThinkingLabel(message.parts as UIMessagePart[] | undefined);
+                const label = inferAgentThinkingLabel(
+                  message.parts as UIMessagePart[] | undefined
+                );
 
-                if (streaming && trimmed.length === 0) {
-                  return <ThinkingSpinnerAlt key={message.id} label={label} />;
+                const isThinkingPlaceholder =
+                  text === "__thinking__" ||
+                  (streaming && trimmed.length === 0);
+
+                if (isThinkingPlaceholder) {
+                  return <TypingMessage key={message.id} label={label} />;
                 }
 
-                if (text === "__thinking__") {
-                  return <TypingMessage key={message.id} label={label} />;
+                if (trimmed.length === 0) {
+                  return null;
                 }
 
                 return (
@@ -248,12 +263,15 @@ export default function ChatUI() {
                   />
                 );
               }
-              return <UserMessage key={message.id} content={message.text ?? ""} />;
+
+              return (
+                <UserMessage key={message.id} content={message.text ?? ""} />
+              );
             })}
           </div>
         )}
       </div>
-      <div className="px-3 pt-3 pb-2">
+      <div className="px-1 pt-3">
         <AgentChatInput onSend={handleSend} busy={isSending} />
       </div>
       <RenameThreadDialog

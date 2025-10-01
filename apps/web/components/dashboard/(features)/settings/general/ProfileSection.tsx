@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  Avatar,
-  Button,
-  Input,
-  addToast,
-  useDisclosure,
-} from "@heroui/react";
+import { Avatar, Button, Input, addToast, useDisclosure } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { useAction } from "convex/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -152,7 +146,7 @@ export default function ProfileSection() {
   return (
     <>
       {/* Avatar Section */}
-      <div className="flex items-center gap-6">
+      <div className="flex px-1 items-center gap-6">
         <div className="relative">
           <Avatar
             isBordered

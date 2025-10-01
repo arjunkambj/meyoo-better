@@ -43,9 +43,7 @@ export function AgentMessageFeed({
 
       {isInitialLoading && messages.length === 0 ? (
         <View className="gap-3 py-16">
-          {Array.from({ length: 4 }).map((_, index) => (
-            <Skeleton key={index} className="h-20 rounded-3xl" />
-          ))}
+          <Skeleton className="h-20 rounded-3xl" />
         </View>
       ) : showEmpty ? (
         <View className="items-center justify-center py-16 gap-2 px-6">

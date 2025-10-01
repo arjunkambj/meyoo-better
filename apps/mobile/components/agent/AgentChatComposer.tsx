@@ -1,7 +1,7 @@
-import { useCallback, useMemo } from 'react';
-import { Text, View } from 'react-native';
-import { Button, TextField, useTheme } from 'heroui-native';
-import { Ionicons } from '@expo/vector-icons';
+import { useCallback, useMemo } from "react";
+import { Text, View } from "react-native";
+import { Button, TextField, useTheme } from "heroui-native";
+import { Ionicons } from "@expo/vector-icons";
 
 type AgentChatComposerProps = {
   value: string;
@@ -18,18 +18,21 @@ export function AgentChatComposer({
   onSend,
   disabled = false,
   loading = false,
-  placeholder = 'Ask anything…',
+  placeholder = "Ask anything…",
 }: AgentChatComposerProps) {
   const { colors } = useTheme();
   const trimmed = useMemo(() => value.trim(), [value]);
   const isSendDisabled = trimmed.length === 0 || disabled || loading;
 
-  const handleKeyPress = useCallback((e: any) => {
-    // On native, we handle this via onSubmitEditing
-    if (!isSendDisabled) {
-      onSend();
-    }
-  }, [isSendDisabled, onSend]);
+  const handleKeyPress = useCallback(
+    (e: any) => {
+      // On native, we handle this via onSubmitEditing
+      if (!isSendDisabled) {
+        onSend();
+      }
+    },
+    [isSendDisabled, onSend]
+  );
 
   return (
     <View className="w-full">
@@ -37,14 +40,13 @@ export function AgentChatComposer({
         <TextField>
           <TextField.Input
             multiline
-            numberOfLines={3}
-            maxLength={2000}
+            numberOfLines={4}
+            maxLength={8}
             value={value}
             onChangeText={onChange}
             placeholder={placeholder}
             editable={!disabled}
             returnKeyType="send"
-            blurOnSubmit={false}
             onSubmitEditing={handleKeyPress}
             className="min-h-[60px] rounded-xl bg-default-50 border-2 border-default-200 px-4 py-3 pr-16 pb-14"
             style={{ maxHeight: 200 }}
@@ -64,9 +66,17 @@ export function AgentChatComposer({
             className="h-10 w-10 rounded-lg"
           >
             {loading ? (
-              <Ionicons name="hourglass-outline" size={20} color={colors.accentForeground} />
+              <Ionicons
+                name="hourglass-outline"
+                size={20}
+                color={colors.accentForeground}
+              />
             ) : (
-              <Ionicons name="send" size={20} color={isSendDisabled ? colors.muted : colors.accentForeground} />
+              <Ionicons
+                name="send"
+                size={20}
+                color={isSendDisabled ? colors.muted : colors.accentForeground}
+              />
             )}
           </Button>
         </View>

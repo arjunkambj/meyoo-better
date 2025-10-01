@@ -1,5 +1,8 @@
 import { useCallback, useMemo, useState } from "react";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { ScrollView, Text, View, RefreshControl } from "react-native";
 
 import { KPICard, type KPICardProps } from "@/components/analytics/KPICard";
@@ -29,7 +32,7 @@ export default function OverviewTab() {
   const primaryCurrency = (user as any)?.currency || "USD";
   const currencySymbol = useMemo(
     () => getCurrencySymbol(primaryCurrency),
-    [primaryCurrency],
+    [primaryCurrency]
   );
 
   const onRefresh = useCallback(async () => {
@@ -159,7 +162,7 @@ export default function OverviewTab() {
         iconColor: "#f97316",
       },
     }),
-    [currencySymbol, metrics, ratioLabel],
+    [currencySymbol, metrics, ratioLabel]
   );
 
   const layout: (keyof typeof cards)[][] = [
@@ -174,7 +177,10 @@ export default function OverviewTab() {
   ];
 
   return (
-    <SafeAreaView className="flex-1 bg-background" edges={['top', 'left', 'right']}>
+    <SafeAreaView
+      className="flex-1 bg-background"
+      edges={["top", "left", "right"]}
+    >
       <ScrollView
         contentContainerStyle={{
           flexGrow: 1,
@@ -184,9 +190,9 @@ export default function OverviewTab() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        <View className="flex-1 gap-6 px-6 py-6">
+        <View className="flex-1 gap-5 px-4 py-6">
           {/* Header with Date Picker */}
-          <View className="gap-3">
+          <View className="gap-4">
             <View className="flex-row items-center justify-between">
               <View className="flex-1">
                 <Text className="text-3xl font-bold text-foreground">
@@ -201,7 +207,7 @@ export default function OverviewTab() {
           </View>
 
           {/* Key Performance Section */}
-          <View className="gap-5">
+          <View className="gap-4">
             {layout.map((row, index) => (
               <View key={`metric-row-${index}`} className="flex-row gap-4">
                 {row.map((key) => {

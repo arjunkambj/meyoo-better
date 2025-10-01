@@ -32,7 +32,7 @@ export default function ChatHistoryItem({
       className={`group relative flex items-center rounded-xl gap-1 transition-all duration-200 ${
         active
           ? "bg-primary/10 ring-2 ring-primary/30"
-          : "bg-default-50 hover:bg-default-100 hover:ring-1 hover:ring-default-200"
+          : "bg-default-200/50 hover:bg-default-200/70 hover:ring-1 hover:ring-default-200"
       }`}
     >
       <Link

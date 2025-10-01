@@ -7,6 +7,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Spinner } from "heroui-native";
 import "@/styles/global.css";
 import { AppThemeProvider } from "@/contexts/theme-context";
+import { TabBarProvider } from "@/contexts/TabBarContext";
 
 const convex = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL!, {
   unsavedChangesWarning: false,
@@ -33,11 +34,13 @@ function RootContent() {
   return (
     <SafeAreaProvider>
       <AppThemeProvider>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="index" />
-          <Stack.Screen name="onboarding" />
-          <Stack.Screen name="(tabs)" />
-        </Stack>
+        <TabBarProvider>
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="index" />
+            <Stack.Screen name="onboarding" />
+            <Stack.Screen name="(tabs)" />
+          </Stack>
+        </TabBarProvider>
       </AppThemeProvider>
     </SafeAreaProvider>
   );

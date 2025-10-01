@@ -27,13 +27,23 @@ export const OrdersView = memo(function OrdersView() {
       page: currentPage,
     });
 
-  const handleFilterChange = useCallback((key: string, value: unknown) => {
-    if (key === "status") {
-      setSelectedStatus(value === "all" ? undefined : (value as string));
-    }
-  }, []);
+  const handleFilterChange = useCallback(
+    (key: string, value: unknown) => {
+      if (key === "status") {
+        setSelectedStatus(value === "all" ? undefined : (value as string));
+        setCurrentPage(1);
+      }
+    },
+    [setSelectedStatus, setCurrentPage],
+  );
 
-  const handleAnalyticsRangeChange = useCallback(updateOrdersRange, [updateOrdersRange]);
+  const handleAnalyticsRangeChange = useCallback(
+    (...args: Parameters<typeof updateOrdersRange>) => {
+      setCurrentPage(1);
+      return updateOrdersRange(...args);
+    },
+    [setCurrentPage, updateOrdersRange],
+  );
 
   const filters = [
     {

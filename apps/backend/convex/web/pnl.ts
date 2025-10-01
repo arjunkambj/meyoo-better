@@ -8,9 +8,9 @@ import {
   responseValidator,
   type AnalyticsResponse,
 } from "./analyticsShared";
-import { validateDateRange, type AnalyticsSourceKey } from "../utils/analyticsSource";
+import { validateDateRange } from "../utils/analyticsSource";
 import { getUserAndOrg } from "../utils/auth";
-import { computePnLAnalytics } from "../utils/analyticsAggregations";
+import { loadPnLAnalyticsFromDailyMetrics } from "../utils/dailyMetrics";
 import type { PnLAnalyticsResult, PnLGranularity } from "@repo/types";
 
 const responseOrNull = v.union(v.null(), responseValidator);
@@ -22,12 +22,6 @@ type QueryHandler = (
   orgId: Id<"organizations">,
   range: DateRangeArg,
 ) => Promise<AnalyticsResponse>;
-
-const PNL_DATASETS: readonly AnalyticsSourceKey[] = [
-  "orders",
-  "globalCosts",
-  "metaInsights",
-];
 
 async function handleQuery(
   ctx: QueryCtx,
@@ -180,6 +174,7 @@ export const getAnalytics = query({
       dateRange: v.object({ startDate: v.string(), endDate: v.string() }),
       organizationId: v.string(),
       result: v.optional(v.any()),
+      meta: v.optional(v.any()),
     }),
   ),
   handler: async (ctx, args) => {
@@ -187,18 +182,29 @@ export const getAnalytics = query({
     if (!auth) return null;
 
     const range = validateDateRange(args.dateRange);
-    const response = await loadAnalytics(
+    const organizationId = auth.orgId as Id<"organizations">;
+    const granularity = (args.granularity ?? "daily") as PnLGranularity;
+
+    const { result, meta } = await loadPnLAnalyticsFromDailyMetrics(
       ctx,
-      auth.orgId as Id<"organizations">,
+      organizationId,
       range,
-      { datasets: PNL_DATASETS },
+      granularity,
     );
-    const result = computePnLAnalytics(response, (args.granularity ?? "monthly") as PnLGranularity);
 
     return {
-      dateRange: response.dateRange,
-      organizationId: response.organizationId,
+      dateRange: range,
+      organizationId: auth.orgId as string,
       result,
-    } satisfies { dateRange: { startDate: string; endDate: string }; organizationId: string; result: PnLAnalyticsResult };
+      meta: {
+        strategy: "dailyMetrics",
+        ...meta,
+      },
+    } satisfies {
+      dateRange: { startDate: string; endDate: string };
+      organizationId: string;
+      result: PnLAnalyticsResult;
+      meta: Record<string, unknown>;
+    };
   },
 });

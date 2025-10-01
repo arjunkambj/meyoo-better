@@ -1,27 +1,14 @@
 import { useRouter } from "expo-router";
 import { Spinner } from "heroui-native";
 import { View } from "react-native";
-import { useQuery } from "convex/react";
-import { useEffect } from "react";
-import {
-  SafeAreaView,
-} from 'react-native-safe-area-context';
+import { SafeAreaView } from "react-native-safe-area-context";
 import { AuthLayout } from "@/components/auth/AuthLayout";
 import { AuthForm } from "@/components/auth/AuthForm";
-import { api } from "@/libs/convexApi";
+import { useOnboardingRedirect } from "@/hooks/useOnboardingRedirect";
 
 export default function Index() {
   const router = useRouter();
-  const user = useQuery(api.core.users.getCurrentUser);
-  const isLoading = user === undefined;
-  const isAuthenticated = Boolean(user);
-
-  // If user is already authenticated, redirect to overview
-  useEffect(() => {
-    if (!isLoading && isAuthenticated) {
-      router.replace("/(tabs)/overview");
-    }
-  }, [isLoading, isAuthenticated, router]);
+  const { isLoading, isAuthenticated } = useOnboardingRedirect();
 
   // Show loading while checking auth
   if (isLoading) {
@@ -43,17 +30,19 @@ export default function Index() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
-    <AuthLayout
-      title="Welcome to Meyoo"
-      subtitle="Manage your store, marketing, and insights from one clean workspace."
-    >
-      <AuthForm onSuccess={() => {
-        // Small delay to allow auth state to propagate
-        setTimeout(() => {
-          router.replace("/(tabs)/overview");
-        }, 100);
-      }} />
-    </AuthLayout>
+      <AuthLayout
+        title="Welcome to Meyoo"
+        subtitle="Manage your store, marketing, and insights from one clean workspace."
+      >
+        <AuthForm
+          onSuccess={() => {
+            // Small delay to allow auth state to propagate
+            setTimeout(() => {
+              router.replace("/(tabs)/overview");
+            }, 100);
+          }}
+        />
+      </AuthLayout>
     </SafeAreaView>
   );
 }

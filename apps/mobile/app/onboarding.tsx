@@ -1,10 +1,11 @@
-import { Button, Card, useTheme } from "heroui-native";
+import { Button, Card, Spinner, useTheme } from "heroui-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { View, Text, Alert } from "react-native";
 import Animated, { FadeInDown, FadeIn, ZoomIn } from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuthActions } from "@convex-dev/auth/react";
+import { useOnboardingRedirect } from "@/hooks/useOnboardingRedirect";
 
 const FEATURES = [
   { icon: "flash-outline", label: "Fast insights" },
@@ -16,6 +17,7 @@ export default function OnboardingScreen() {
   const router = useRouter();
   const { colors } = useTheme();
   const { signOut } = useAuthActions();
+  const { isLoading, isAuthenticated } = useOnboardingRedirect();
 
   const handleLogout = async () => {
     Alert.alert(
@@ -34,6 +36,16 @@ export default function OnboardingScreen() {
       ]
     );
   };
+
+  if (isLoading || !isAuthenticated) {
+    return (
+      <SafeAreaView className="flex-1 bg-background">
+        <View className="flex-1 items-center justify-center">
+          <Spinner size="lg" />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView className="flex-1 bg-background">

@@ -248,6 +248,7 @@ export const ordersSummaryTool = createTool<
     };
     summary: string;
   }> => {
+    console.log("[TOOL CALL] ordersSummary", { startDate: args.startDate, endDate: args.endDate });
     await requireUserAndOrg(ctx);
     const dateRange = args.startDate && args.endDate
       ? { startDate: args.startDate, endDate: args.endDate }
@@ -416,6 +417,7 @@ export const inventoryLowStockTool = createTool<
       message: string;
     }>;
   }> => {
+    console.log("[TOOL CALL] inventoryLowStock", { limit: args.limit });
     await requireUserAndOrg(ctx);
     const limit = args.limit && args.limit > 0 ? Math.min(args.limit, 50) : 10;
 
@@ -475,6 +477,7 @@ export const analyticsSummaryTool = createTool<
     ctx,
     { startDate, endDate, granularity, metrics },
   ): Promise<AnalyticsSummaryResult> => {
+    console.log("[TOOL CALL] analyticsSummary", { startDate, endDate, granularity, metricsCount: metrics?.length });
     const analytics = (await ctx.runQuery(api.web.pnl.getAnalytics, {
       dateRange: { startDate, endDate },
       granularity,
@@ -542,6 +545,7 @@ export const metaAdsOverviewTool = createTool<
     ctx,
     args,
   ): Promise<{ summary: string; dateRange: { startDate: string; endDate: string }; meta: MetaPlatformSummary }> => {
+    console.log("[TOOL CALL] metaAdsOverview", { startDate: args.startDate, endDate: args.endDate });
     const dateRange = args.startDate && args.endDate
       ? { startDate: args.startDate, endDate: args.endDate }
       : defaultDateRange();
@@ -623,6 +627,7 @@ export const currentDateTool = createTool<
     'Returns the current date in ISO 8601 format (UTC). Use this when you need to reference "today" explicitly.',
   args: z.object({}),
   handler: async () => {
+    console.log("[TOOL CALL] currentDate");
     const now = new Date();
     return {
       isoDate: now.toISOString().slice(0, 10),
@@ -684,6 +689,7 @@ export const pnlSnapshotTool = createTool<
       marketingROI: number;
     };
   }> => {
+    console.log("[TOOL CALL] pnlSnapshot", { startDate: args.startDate, endDate: args.endDate });
     await requireUserAndOrg(ctx);
     const dateRange = args.startDate && args.endDate
       ? { startDate: args.startDate, endDate: args.endDate }
@@ -770,15 +776,25 @@ export const brandSummaryTool = createTool<
     'Retrieve the latest stored overview of the merchant brand. Use this to understand positioning, key products, and sales cadence.',
   args: z.object({}),
   handler: async (ctx) => {
+    console.log("[TOOL CALL] brandSummary");
     const { orgId } = await requireUserAndOrg(ctx);
     const namespace = String(orgId);
 
-    const search = await rag.search(ctx, {
-      namespace,
-      query: "brand summary",
-      filters: [{ name: "type", value: "brand-summary" }],
-      limit: 1,
-    });
+    let search;
+    try {
+      search = await rag.search(ctx, {
+        namespace,
+        query: "brand summary",
+        filters: [{ name: "type", value: "brand-summary" }],
+        limit: 1,
+      });
+    } catch (error) {
+      console.error("[TOOL CALL] brandSummary - RAG search error:", error);
+      return {
+        summary:
+          "No brand summary is stored yet. Ask an administrator to run the brand summary update action to refresh the knowledge base.",
+      };
+    }
 
     const entry = search.entries?.[0];
 
@@ -904,6 +920,7 @@ export const productsInventoryTool = createTool<
       }>;
     }>;
   }> => {
+    console.log("[TOOL CALL] productsInventory", { page: args.page, pageSize: args.pageSize, stockLevel: args.stockLevel, search: args.search });
     await requireUserAndOrg(ctx);
 
     const page = args.page && args.page > 0 ? args.page : 1;
@@ -1018,6 +1035,7 @@ export const orgMembersTool = createTool<OrgMembersToolArgs, OrgMembersToolResul
       ),
   }),
   handler: async (ctx, args): Promise<OrgMembersToolResult> => {
+    console.log("[TOOL CALL] orgMembers", { role: args.role, status: args.status, includeRemoved: args.includeRemoved });
     await requireUserAndOrg(ctx);
 
     const { role, status, includeRemoved = false } = args;
@@ -1201,6 +1219,7 @@ export const sendEmailTool = createTool<SendEmailToolArgs, SendEmailToolResult>(
       }
     }),
   handler: async (ctx, args): Promise<SendEmailToolResult> => {
+    console.log("[TOOL CALL] sendEmail", { memberId: args.memberId, toEmail: args.toEmail, subject: args.subject, previewOnly: args.previewOnly });
     await requireUserAndOrg(ctx);
 
     const normalizedSubject = args.subject.replace(/[\r\n]+/g, " ").trim();

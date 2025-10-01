@@ -440,10 +440,12 @@ export function useDashboardOverview(dateRange: DateRangeArgs) {
   const [actionState, setActionState] = useState<{
     key: string | null;
     loading: boolean;
+    completed: boolean;
     data: OverviewResponse;
   }>({
     key: null,
     loading: false,
+    completed: false,
     data: null,
   });
 
@@ -455,18 +457,18 @@ export function useDashboardOverview(dateRange: DateRangeArgs) {
 
   useEffect(() => {
     if (!needsActionLoad) {
-      if (actionState.key !== null || actionState.loading || actionState.data !== null) {
-        setActionState({ key: null, loading: false, data: null });
+      if (actionState.key !== null || actionState.loading || actionState.data !== null || actionState.completed) {
+        setActionState({ key: null, loading: false, completed: false, data: null });
       }
       return;
     }
 
-    if (actionState.key === currentKey && (actionState.loading || actionState.data !== null)) {
+    if (actionState.key === currentKey && (actionState.loading || actionState.completed)) {
       return;
     }
 
     let cancelled = false;
-    setActionState({ key: currentKey, loading: true, data: null });
+    setActionState({ key: currentKey, loading: true, completed: false, data: null });
 
     fetchOverviewAction({
       startDate: queryArgs.startDate,
@@ -474,12 +476,12 @@ export function useDashboardOverview(dateRange: DateRangeArgs) {
     })
       .then((result) => {
         if (cancelled) return;
-        setActionState({ key: currentKey, loading: false, data: result ?? null });
+        setActionState({ key: currentKey, loading: false, completed: true, data: result ?? null });
       })
       .catch((error) => {
         console.error("Failed to load dashboard overview via action:", error);
         if (cancelled) return;
-        setActionState({ key: currentKey, loading: false, data: null });
+        setActionState({ key: currentKey, loading: false, completed: true, data: null });
       });
 
     return () => {
@@ -494,10 +496,11 @@ export function useDashboardOverview(dateRange: DateRangeArgs) {
     actionState.key,
     actionState.loading,
     actionState.data,
+    actionState.completed,
   ]);
 
-  const fallbackLoading = needsActionLoad && (actionState.loading || actionState.key !== currentKey);
-  const baseData = needsActionLoad && actionState.key === currentKey
+  const fallbackLoading = needsActionLoad && (!actionState.completed || actionState.loading || actionState.key !== currentKey);
+  const baseData = needsActionLoad && actionState.key === currentKey && actionState.completed
     ? actionState.data
     : (response ?? null);
 

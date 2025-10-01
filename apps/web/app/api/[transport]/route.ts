@@ -47,7 +47,7 @@ const handler = createMcpHandler(
     // Orders Summary Tool
     server.tool(
       "orders_summary",
-      "Summarize order volumes, revenue, and fulfillment performance over a date range",
+      "Summarize order volumes, revenue, and fulfillment performance over a date range. Returns total orders by status (pending, processing, completed, cancelled), financial metrics (revenue, costs, net profit, average order value, gross margin, CAC), fulfillment metrics (rate, avg time, returns), and period-over-period changes. Works for single-day or multi-day ranges",
       {
         apiKey: z
           .string()
@@ -166,7 +166,7 @@ const handler = createMcpHandler(
     // P&L Snapshot Tool
     server.tool(
       "pnl_snapshot",
-      "Summarize profit and loss metrics (revenue, margins, spend) for a date range",
+      "Summarize profit and loss metrics (revenue, margins, spend) for a date range. Works for single-day queries (e.g., today's profit: set startDate=endDate=today) or multi-day periods. Returns net profit, gross profit, revenue, margins, operating expenses, ad spend, EBITDA, and period-over-period changes",
       {
         apiKey: z
           .string()
@@ -338,7 +338,7 @@ Video Performance:
     // Current Date Tool
     server.tool(
       "current_date",
-      "Returns the current date in ISO 8601 format (UTC). Use this when you need to reference 'today' explicitly",
+      "Returns the current date in ISO 8601 format (UTC). Use this tool to get today's date for queries like 'today's profit', 'today's orders', or 'current performance'. Commonly used to generate date parameters for other tools (e.g., get today's date, then pass to pnl_snapshot or orders_summary)",
       {
         apiKey: z
           .string()
@@ -376,7 +376,7 @@ Video Performance:
     // Brand Summary Tool
     server.tool(
       "brand_summary",
-      "Retrieve the latest stored overview of the merchant brand. Use this to understand positioning, key products, and sales cadence",
+      "Retrieve the latest stored overview of the merchant brand, including store positioning, product categories, target audience, and recent performance highlights. Use this tool when you need context about the merchant's business before answering questions about strategy, product recommendations, or performance interpretation. Helpful for personalized insights and recommendations",
       {
         apiKey: z
           .string()

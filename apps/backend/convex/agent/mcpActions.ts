@@ -141,10 +141,18 @@ export const updateApiKeyUsage = internalMutation({
       .first();
 
     if (apiKeyDoc) {
+      const newUsageCount = apiKeyDoc.usageCount + 1;
       await ctx.db.patch(apiKeyDoc._id, {
         lastUsed: Date.now(),
-        usageCount: apiKeyDoc.usageCount + 1,
+        usageCount: newUsageCount,
       });
+      console.log("[API KEY USAGE]", {
+        keyId: apiKeyDoc._id,
+        usageCount: newUsageCount,
+        lastUsed: new Date().toISOString(),
+      });
+    } else {
+      console.warn("[API KEY USAGE] Key not found in database (might be invalid)");
     }
   },
 });
@@ -584,6 +592,7 @@ export const pnlSnapshot = action({
     }),
   }),
   handler: async (ctx, args): Promise<PnLSnapshotResult> => {
+    console.log("[MCP TOOL CALL] pnlSnapshot", { startDate: args.startDate, endDate: args.endDate });
     await validateAndGetOrgContext(ctx, args.apiKey);
 
     const dateRange = args.startDate && args.endDate
@@ -598,7 +607,16 @@ export const pnlSnapshot = action({
     const metrics = pnlResponse?.result?.metrics;
     const totals = pnlResponse?.result?.totals;
 
+    console.log("[MCP TOOL CALL] pnlSnapshot - raw data", {
+      hasMetrics: !!metrics,
+      hasTotals: !!totals,
+      revenue: totals?.revenue,
+      netProfit: totals?.netProfit,
+      grossProfit: totals?.grossProfit
+    });
+
     if (!metrics || !totals) {
+      console.log("[MCP TOOL CALL] pnlSnapshot - No metrics or totals found");
       return {
         summary: `No financial data available between ${dateRange.startDate} and ${dateRange.endDate}.`,
         dateRange,
@@ -680,6 +698,7 @@ export const getCurrentDate = action({
     utc: v.string(),
   }),
   handler: async (ctx, args): Promise<{ isoDate: string; isoDateTime: string; utc: string; }> => {
+    console.log("[MCP TOOL CALL] getCurrentDate");
     await validateAndGetOrgContext(ctx, args.apiKey);
 
     const now = new Date();
@@ -703,12 +722,21 @@ export const getBrandSummary = action({
   handler: async (ctx, args) => {
     const { organizationId } = await validateAndGetOrgContext(ctx, args.apiKey);
 
-    const search = await rag.search(ctx, {
-      namespace: String(organizationId),
-      query: "brand summary",
-      filters: [{ name: "type", value: "brand-summary" }],
-      limit: 1,
-    });
+    let search;
+    try {
+      search = await rag.search(ctx, {
+        namespace: String(organizationId),
+        query: "brand summary",
+        filters: [{ name: "type", value: "brand-summary" }],
+        limit: 1,
+      });
+    } catch (error) {
+      console.error("[MCP] getBrandSummary - RAG search error:", error);
+      return {
+        summary:
+          "No brand summary is stored yet. Ask an administrator to run the brand summary update action to refresh the knowledge base.",
+      };
+    }
 
     const entry = search.entries?.[0];
 

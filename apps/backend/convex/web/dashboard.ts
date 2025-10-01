@@ -22,6 +22,7 @@ import { getUserAndOrg } from "../utils/auth";
 import { resolveDashboardConfig } from "../utils/dashboardConfig";
 import { computeIntegrationStatus, integrationStatusValidator } from "../utils/integrationStatus";
 import { loadAnalyticsWithChunks } from "../utils/analyticsLoader";
+import { loadOverviewFromDailyMetrics } from "../utils/dailyMetrics";
 
 type IntegrationStatus = Awaited<ReturnType<typeof computeIntegrationStatus>>;
 
@@ -130,6 +131,101 @@ export const getOverviewData = query({
     const range = args.startDate && args.endDate
       ? validateDateRange({ startDate: args.startDate, endDate: args.endDate })
       : defaultDateRange(parseTimeRange(args.timeRange));
+    const dailyOverview = await loadOverviewFromDailyMetrics(
+      ctx,
+      auth.orgId as Id<"organizations">,
+      range,
+    );
+
+    const dashboardConfig = await resolveDashboardConfig(
+      ctx,
+      auth.user._id,
+      auth.orgId,
+    );
+    const integrationStatus = await computeIntegrationStatus(ctx, auth.orgId);
+    const primaryCurrency = auth.user.primaryCurrency ?? "USD";
+
+    if (dailyOverview) {
+      const basePayload: OverviewPayload = {
+        dateRange: range,
+        organizationId: auth.orgId,
+        overview: dailyOverview.overview,
+        platformMetrics: dailyOverview.platformMetrics,
+        channelRevenue: null,
+        primaryCurrency,
+        dashboardConfig,
+        integrationStatus,
+        meta: {
+          strategy: "dailyMetrics",
+          ...dailyOverview.meta,
+        },
+      } satisfies OverviewPayload;
+
+      const supplementalDatasets = dailyOverview.hasFullCoverage
+        ? (["orders"] as const) // orders are required to populate channel revenue
+        : (["orders", "metaInsights", "analytics"] as const);
+      try {
+        const analyticsResponse = await loadAnalytics(
+          ctx,
+          auth.orgId as Id<"organizations">,
+          range,
+          {
+            datasets: supplementalDatasets,
+          },
+        );
+
+        const channelRevenue = computeChannelRevenue(analyticsResponse);
+
+        const platformMetrics = dailyOverview.hasFullCoverage
+          ? basePayload.platformMetrics
+          : computePlatformMetrics(analyticsResponse);
+
+        const enhancedMeta: Record<string, unknown> = {
+          strategy: "dailyMetrics",
+          ...dailyOverview.meta,
+          supplemental: {
+            datasets: supplementalDatasets,
+          },
+        };
+
+        if (analyticsResponse.meta) {
+          enhancedMeta.analyticsMeta = analyticsResponse.meta;
+        }
+
+        return {
+          ...basePayload,
+          platformMetrics,
+          channelRevenue,
+          meta: enhancedMeta,
+        } satisfies OverviewPayload;
+      } catch (error) {
+        const errorMeta: Record<string, unknown> = {
+          datasets: supplementalDatasets,
+        };
+
+        if (error instanceof Error) {
+          errorMeta.error = error.message;
+          if (isTooManyReadsError(error)) {
+            errorMeta.fallback = "too_many_reads";
+          }
+        }
+
+        const fallbackMeta = isTooManyReadsError(error)
+          ? { needsActionLoad: true, reason: "too_many_reads" }
+          : undefined;
+
+        return {
+          ...basePayload,
+          meta: {
+            strategy: "dailyMetrics",
+            ...dailyOverview.meta,
+            supplemental: errorMeta,
+            ...(fallbackMeta ?? {}),
+          },
+        } satisfies OverviewPayload;
+      }
+    }
+
     let analyticsResponse: AnalyticsResponse | null = null;
     let fallbackMeta: Record<string, unknown> | undefined;
 
@@ -146,13 +242,6 @@ export const getOverviewData = query({
         throw error;
       }
     }
-
-    const dashboardConfig = await resolveDashboardConfig(
-      ctx,
-      auth.user._id,
-      auth.orgId,
-    );
-    const integrationStatus = await computeIntegrationStatus(ctx, auth.orgId);
 
     if (!analyticsResponse) {
       return {

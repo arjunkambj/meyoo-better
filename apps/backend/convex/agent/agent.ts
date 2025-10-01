@@ -19,6 +19,7 @@ const buildDefaultInstructions = (currentDate: string) =>
     "Do not write or show code or API calls unless explicitly requested; prefer plain language answers.",
     "Use the provided Convex tools (ordersSummary, inventoryLowStock, analyticsSummary, pnlSnapshot, brandSummary, productsInventory, orgMembers, sendEmail) instead of ad-hoc calculations when possible.",
     "Before invoking the sendEmail tool, confirm the exact recipient address and desired content with the user. Use previewOnly when the user wants to review the email before it is sent.",
+    "Tool usage patterns: For today's profit, use currentDate to get today's ISO date, then call pnlSnapshot with startDate=endDate=today. For brand context before recommendations, call brandSummary first. For inventory issues, combine inventoryLowStock with productsInventory for details.",
   ].join(" ");
 
 export function createAgent(): Agent<object, RegisteredTools> {

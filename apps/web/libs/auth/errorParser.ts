@@ -12,6 +12,7 @@ export function parseAuthError(error: unknown): string {
   // Parse Convex auth errors
   if (
     errorMessage.includes("InvalidAccountId") ||
+    errorMessage.includes("InvalidSecret") ||
     errorMessage.includes("retrieveAccount")
   ) {
     return "Invalid email or password";
@@ -62,6 +63,7 @@ export function getAuthErrorType(
 
   if (
     errorMessage.includes("InvalidAccountId") ||
+    errorMessage.includes("InvalidSecret") ||
     errorMessage.includes("password")
   ) {
     return "credentials";

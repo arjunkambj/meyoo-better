@@ -309,6 +309,106 @@ Example prompts:
 
 ---
 
+## Common Use Cases
+
+These examples show how to combine tools effectively for typical e-commerce analytics questions:
+
+### Get Today's Profit
+
+To check today's profit specifically:
+
+1. **Get today's date:**
+   ```json
+   {
+     "name": "current_date",
+     "arguments": {}
+   }
+   ```
+   Response: `{ "isoDate": "2025-10-01", ... }`
+
+2. **Get today's P&L:**
+   ```json
+   {
+     "name": "pnl_snapshot",
+     "arguments": {
+       "startDate": "2025-10-01",
+       "endDate": "2025-10-01"
+     }
+   }
+   ```
+   Response includes: `netProfit`, `revenue`, `grossProfit`, `netMargin`, etc.
+
+### Compare This Week vs Last Week
+
+1. Get current date
+2. Call `pnl_snapshot` with `startDate` = 7 days ago, `endDate` = today
+3. Use the `changes` field in the response for period-over-period comparison
+
+### Find Low Stock Items and Get Details
+
+1. **Check alerts:**
+   ```json
+   {
+     "name": "inventory_low_stock",
+     "arguments": { "limit": 20 }
+   }
+   ```
+
+2. **Get full product details for a specific SKU:**
+   ```json
+   {
+     "name": "products_inventory",
+     "arguments": {
+       "search": "SKU-12345",
+       "pageSize": 1
+     }
+   }
+   ```
+
+### Get Personalized Insights with Brand Context
+
+1. **First, get brand context:**
+   ```json
+   {
+     "name": "brand_summary",
+     "arguments": {}
+   }
+   ```
+
+2. **Then analyze performance:**
+   ```json
+   {
+     "name": "orders_summary",
+     "arguments": {
+       "startDate": "2025-09-01",
+       "endDate": "2025-09-30"
+     }
+   }
+   ```
+
+Use brand summary to provide context-aware recommendations based on the merchant's positioning and product categories.
+
+### Send Performance Report Email
+
+1. **Get data** (orders, P&L, inventory)
+2. **Preview email:**
+   ```json
+   {
+     "name": "send_email",
+     "arguments": {
+       "toEmail": "owner@store.com",
+       "subject": "Your September Performance Report",
+       "html": "<h1>Report...</h1>",
+       "previewOnly": true
+     }
+   }
+   ```
+
+3. **Send after confirmation:**
+   Same call with `"previewOnly": false`
+
+---
+
 ## Available MCP Tools
 
 ### 1. `orders_summary`

@@ -278,6 +278,47 @@ type ShopifyOrderInput = {
   syncedAt?: number;
 };
 
+const MAX_ERROR_SUMMARY_ITEMS = 3;
+
+const shortenText = (input: string, maxWords: number) => {
+  if (!input) return input;
+  const words = input.trim().split(/\s+/).filter(Boolean);
+  if (words.length <= maxWords) {
+    return words.join(" ");
+  }
+  return words.slice(0, maxWords).join(" ");
+};
+
+const summarizeGraphQLErrors = (
+  errors: Array<{ message?: string; extensions?: { code?: string } }>,
+) => {
+  if (!errors.length) {
+    return { count: 0, codes: [], samples: [] };
+  }
+
+  const byCode = new Map<string, number>();
+  for (const error of errors) {
+    const code = error.extensions?.code || "UNKNOWN";
+    byCode.set(code, (byCode.get(code) ?? 0) + 1);
+  }
+
+  const samples: string[] = [];
+  for (const error of errors) {
+    if (!error.message) continue;
+    samples.push(shortenText(error.message.split("\n")[0], 10));
+    if (samples.length >= MAX_ERROR_SUMMARY_ITEMS) break;
+  }
+
+  return {
+    count: errors.length,
+    codes: Array.from(byCode.entries()).map(([code, occurrences]) => ({
+      code,
+      occurrences,
+    })),
+    samples,
+  };
+};
+
 function mapOrderNodeToPersistence(
   order: ShopifyOrderNode,
   organizationId: Id<"organizations">,
@@ -1093,6 +1134,17 @@ export const initial = internalAction({
           let batchesScheduled = 0;
           let ordersQueued = 0;
           const jobIds: string[] = [];
+          const MIN_ORDERS_PAGE_SIZE =
+            SHOPIFY_CONFIG.SYNC?.ORDERS_MIN_BATCH_SIZE ?? 25;
+          const COST_BACKOFF_MS =
+            SHOPIFY_CONFIG.SYNC?.ORDERS_COST_BACKOFF_MS ?? 250;
+          let currentPageSize =
+            SHOPIFY_CONFIG.QUERIES?.ORDERS_BATCH_SIZE ?? MIN_ORDERS_PAGE_SIZE;
+          if (currentPageSize < MIN_ORDERS_PAGE_SIZE) {
+            currentPageSize = MIN_ORDERS_PAGE_SIZE;
+          }
+          const sleep = (ms: number) =>
+            new Promise((resolve) => setTimeout(resolve, ms));
 
           const flushOrderBatch = async () => {
             if (!ordersBatch.length) return;
@@ -1149,39 +1201,77 @@ export const initial = internalAction({
           };
 
           while (hasNextPage) {
-            pageCount += 1;
-            logger.debug(`Fetching orders page ${pageCount}`, {
-              cursor,
-              dateQuery,
-            });
+            logger.debug(
+              `Fetching orders page ${pageCount + 1} with page size ${currentPageSize}`,
+              {
+                cursor,
+                dateQuery,
+              },
+            );
 
             const response: any = await client.getOrders(
-              SHOPIFY_CONFIG.QUERIES.ORDERS_BATCH_SIZE,
+              currentPageSize,
               cursor,
               dateQuery,
             );
 
-            logger.debug("Orders API Response", {
+            const errorSummary =
+              response.errors && response.errors.length > 0
+                ? summarizeGraphQLErrors(response.errors)
+                : undefined;
+
+            logger.debug("Orders API response snapshot logged", {
               hasData: !!response.data,
               hasOrders: !!response.data?.orders,
               hasEdges: !!response.data?.orders?.edges,
               edgeCount: response.data?.orders?.edges?.length || 0,
-              errors: response.errors,
-              extensions: response.extensions,
+              errorSummary,
             });
 
-            if (response.errors && response.errors.length > 0) {
-              logger.error("GraphQL errors in orders fetch", {
-                errors: response.errors,
-                extensions: response.extensions,
+            if (errorSummary) {
+              logger.warn("Orders fetch GraphQL errors noted", {
+                errorSummary,
                 dateQuery,
               });
+
+              const costError = response.errors.find(
+                (error: { extensions?: { code?: string } }) =>
+                  error.extensions?.code === "MAX_COST_EXCEEDED",
+              );
+
+              if (costError) {
+                const previousPageSize = currentPageSize;
+                const nextPageSize = Math.max(
+                  MIN_ORDERS_PAGE_SIZE,
+                  Math.floor(previousPageSize / 2),
+                );
+
+                if (nextPageSize === previousPageSize) {
+                  throw new Error(
+                    `Shopify orders query exceeded cost limit even at minimum page size ${MIN_ORDERS_PAGE_SIZE}`,
+                  );
+                }
+
+                currentPageSize = nextPageSize;
+                logger.warn(
+                  "Reducing orders page size due to Shopify query cost limit",
+                  {
+                    previousPageSize,
+                    nextPageSize,
+                    dateQuery,
+                  },
+                );
+                // Retry the same cursor with the smaller page size
+                await sleep(COST_BACKOFF_MS);
+                continue;
+              }
             }
 
             if (
               response.data?.orders?.edges &&
               response.data.orders.edges.length > 0
             ) {
+              pageCount += 1;
               const pageOrders =
                 response.data.orders.edges as Array<{ node: ShopifyOrderNode }>;
 
@@ -1281,126 +1371,184 @@ export const initial = internalAction({
 
       // 3. Fetch Customers with complete data
       const fetchCustomers = async () => {
-          try {
-            await patchSyncMetadata({
-              stageStatus: {
-                customers: "processing",
-              },
-            });
-            logger.debug("Fetching customers with complete data", {
-              timestamp: new Date().toISOString(),
-            });
-            const customers = [];
-            let hasNextPage = true;
-            let cursor = null;
+        try {
+          await patchSyncMetadata({
+            stageStatus: {
+              customers: "processing",
+            },
+          });
+          logger.debug("Fetching customers with complete data", {
+            timestamp: new Date().toISOString(),
+          });
 
-            while (hasNextPage) {
-              const response: any = await client.getCustomers(
-                SHOPIFY_CONFIG.QUERIES.CUSTOMERS_BATCH_SIZE,
-                cursor
+          const configuredMax = SHOPIFY_CONFIG.SYNC?.CUSTOMERS_MAX_RECORDS;
+          const maxCustomers =
+            typeof configuredMax === "number" && configuredMax > 0
+              ? configuredMax
+              : Number.POSITIVE_INFINITY;
+          const persistBatchSize = Math.max(
+            1,
+            SHOPIFY_CONFIG.SYNC?.CUSTOMERS_PERSIST_BATCH_SIZE ?? 200,
+          );
+          const pageSizeBase = Math.max(
+            1,
+            SHOPIFY_CONFIG.QUERIES?.CUSTOMERS_BATCH_SIZE ?? 200,
+          );
+
+          let hasNextPage = true;
+          let cursor: string | null = null;
+          let totalPersisted = 0;
+          let truncated = false;
+
+          const pending: Array<Record<string, unknown>> = [];
+
+          const persistCustomers = async (count: number) => {
+            const batchToPersist = pending.splice(0, count);
+            if (!batchToPersist.length) return;
+            await ctx.runMutation(
+              internal.integrations.shopify.storeCustomersInternal,
+              {
+                organizationId: args.organizationId,
+                customers: batchToPersist,
+              },
+            );
+
+            totalPersisted += batchToPersist.length;
+          };
+
+          const flushReadyChunks = async () => {
+            while (pending.length >= persistBatchSize && totalPersisted < maxCustomers) {
+              const remainingCapacity = maxCustomers - totalPersisted;
+              if (remainingCapacity <= 0) {
+                break;
+              }
+
+              const chunkSize = Math.min(persistBatchSize, remainingCapacity);
+              await persistCustomers(chunkSize);
+            }
+          };
+
+          while (hasNextPage && totalPersisted < maxCustomers) {
+            const remaining = maxCustomers - totalPersisted;
+            if (remaining <= 0) {
+              hasNextPage = false;
+              break;
+            }
+
+            const pageSize = Math.min(pageSizeBase, remaining);
+
+            const response: any = await client.getCustomers(pageSize, cursor);
+
+            if (response.data?.customers?.edges) {
+              const batch = response.data.customers.edges.map(
+                (edge: { node: { [key: string]: unknown } }) => {
+                  const customer = edge.node;
+                  const customerId = String(customer.id).replace(
+                    "gid://shopify/Customer/",
+                    "",
+                  );
+
+                  return {
+                    organizationId: args.organizationId,
+                    storeId,
+                    shopifyId: customerId,
+                    email: customer.email || undefined,
+                    phone: customer.phone || undefined,
+                    firstName: customer.firstName || undefined,
+                    lastName: customer.lastName || undefined,
+                    ordersCount: parseInt(
+                      String((customer as any).numberOfOrders?.count || 0),
+                      10,
+                    ),
+                    totalSpent: parseMoney(
+                      String((customer as any).amountSpent?.amount),
+                    ),
+                    state: customer.state || undefined,
+                    verifiedEmail: customer.verifiedEmail || false,
+                    taxExempt: customer.taxExempt || false,
+                    defaultAddress: (customer as any).addresses?.[0]
+                      ? {
+                          country:
+                            (customer as any).addresses[0].country || undefined,
+                          province:
+                            (customer as any).addresses[0].provinceCode ||
+                            undefined,
+                          city:
+                            (customer as any).addresses[0].city || undefined,
+                          zip:
+                            (customer as any).addresses[0].zip ||
+                            (customer as any).addresses[0].zipCode || undefined,
+                        }
+                      : undefined,
+                    tags: customer.tags || [],
+                    note: customer.note || undefined,
+                    shopifyCreatedAt: Date.parse(String(customer.createdAt)),
+                    shopifyUpdatedAt: Date.parse(String(customer.updatedAt)),
+                    syncedAt: Date.now(),
+                  };
+                },
               );
 
-              if (response.data?.customers?.edges) {
-                // Fix customer processing with proper type handling
-                const batch = response.data.customers.edges.map(
-                  (edge: { node: { [key: string]: unknown } }) => {
-                    const customer = edge.node;
+              if (batch.length) {
+                pending.push(...batch);
+                await flushReadyChunks();
+              }
 
-                    // Extract customer ID without gid prefix
-                    const customerId = String(customer.id).replace(
-                      "gid://shopify/Customer/",
-                      ""
-                    );
+              const pageInfo = response.data.customers.pageInfo;
+              hasNextPage = pageInfo.hasNextPage;
+              cursor = pageInfo.endCursor;
 
-                    return {
-                      organizationId: args.organizationId,
-                      storeId,
-                      shopifyId: customerId,
-                      email: customer.email || undefined,
-                      phone: customer.phone || undefined,
-                      firstName: customer.firstName || undefined,
-                      lastName: customer.lastName || undefined,
-                      ordersCount: parseInt(
-                        String((customer as any).numberOfOrders?.count || 0),
-                        10
-                      ),
-                      totalSpent: parseMoney(
-                        String((customer as any).amountSpent?.amount)
-                      ),
-                      state: customer.state || undefined,
-                      verifiedEmail: customer.verifiedEmail || false,
-                      taxExempt: customer.taxExempt || false,
-                      defaultAddress: (customer as any).addresses?.[0]
-                        ? {
-                            country:
-                              (customer as any).addresses[0].country ||
-                              undefined,
-                            province:
-                              (customer as any).addresses[0].provinceCode ||
-                              undefined,
-                            city:
-                              (customer as any).addresses[0].city || undefined,
-                            zip:
-                              (customer as any).addresses[0].zip ||
-                              (customer as any).addresses[0].zipCode ||
-                              undefined,
-                          }
-                        : undefined,
-                      tags: customer.tags || [],
-                      note: customer.note || undefined,
-                      shopifyCreatedAt: Date.parse(String(customer.createdAt)),
-                      shopifyUpdatedAt: Date.parse(String(customer.updatedAt)),
-                      syncedAt: Date.now(),
-                    };
-                  }
-                );
-
-                customers.push(...batch);
-
-                hasNextPage = response.data.customers.pageInfo.hasNextPage;
-                cursor = response.data.customers.pageInfo.endCursor;
-              } else {
+              if (totalPersisted >= maxCustomers && hasNextPage) {
+                truncated = true;
                 hasNextPage = false;
               }
+            } else {
+              hasNextPage = false;
             }
-
-            // Store customers in database
-            if (customers.length > 0) {
-              await ctx.runMutation(
-                internal.integrations.shopify.storeCustomersInternal,
-                {
-                  organizationId: args.organizationId,
-                  customers,
-                }
-              );
-            }
-
-            logger.info("Customers fetched with complete data", {
-              count: customers.length,
-              completedAt: new Date().toISOString(),
-            });
-
-            await patchSyncMetadata({
-              stageStatus: {
-                customers: "completed",
-              },
-              syncedEntities: ["customers"],
-            });
-
-            return customers.length;
-          } catch (error) {
-            errors.push(`Customer sync failed: ${error}`);
-            logger.error("Customer sync failed", error);
-
-            await patchSyncMetadata({
-              stageStatus: {
-                customers: "failed",
-              },
-            });
-
-            return 0;
           }
-        };
+
+          if (pending.length && totalPersisted < maxCustomers) {
+            const remainingCapacity = maxCustomers - totalPersisted;
+            if (remainingCapacity > 0) {
+              await persistCustomers(Math.min(pending.length, remainingCapacity));
+            }
+          }
+
+          pending.length = 0;
+
+          if (truncated) {
+            logger.warn("Customer fetch truncated due to configured limit", {
+              maxCustomers,
+              totalPersisted,
+            });
+          }
+
+          logger.info("Customers fetched with complete data", {
+            count: totalPersisted,
+            completedAt: new Date().toISOString(),
+          });
+
+          await patchSyncMetadata({
+            stageStatus: {
+              customers: "completed",
+            },
+            syncedEntities: ["customers"],
+          });
+
+          return totalPersisted;
+        } catch (error) {
+          errors.push(`Customer sync failed: ${error}`);
+          logger.error("Customer sync failed", error);
+
+          await patchSyncMetadata({
+            stageStatus: {
+              customers: "failed",
+            },
+          });
+
+          return 0;
+        }
+      };
 
       // Execute stages sequentially: products/inventory -> customers -> orders
       logger.info("Executing staged Shopify sync", {

@@ -5,6 +5,59 @@ import { createSimpleLogger } from "../logging/simple";
 
 const logger = createSimpleLogger("ShopifyGraphQLClient");
 
+type ShopifyGraphQLError = {
+  message: string;
+  extensions?: { code?: string; [key: string]: unknown };
+  path?: ReadonlyArray<string | number>;
+};
+
+const MAX_ERROR_SUMMARY_ITEMS = 3;
+
+const shortenText = (input: string, maxWords: number) => {
+  if (!input) return input;
+  const words = input.trim().split(/\s+/).filter(Boolean);
+  if (words.length <= maxWords) {
+    return words.join(" ");
+  }
+  return words.slice(0, maxWords).join(" ");
+};
+
+const summarizeGraphQLErrors = (errors: ReadonlyArray<ShopifyGraphQLError>) => {
+  const byCode = new Map<string, number>();
+  for (const error of errors) {
+    const code = error.extensions?.code || "UNKNOWN";
+    byCode.set(code, (byCode.get(code) ?? 0) + 1);
+  }
+
+  const sampleMessages: string[] = [];
+  const samplePaths: string[] = [];
+
+  for (const error of errors) {
+    if (sampleMessages.length < MAX_ERROR_SUMMARY_ITEMS && error.message) {
+      sampleMessages.push(shortenText(error.message.split("\n")[0], 10));
+    }
+    if (samplePaths.length < MAX_ERROR_SUMMARY_ITEMS && error.path?.length) {
+      samplePaths.push(error.path.join("."));
+    }
+    if (
+      sampleMessages.length >= MAX_ERROR_SUMMARY_ITEMS &&
+      samplePaths.length >= MAX_ERROR_SUMMARY_ITEMS
+    ) {
+      break;
+    }
+  }
+
+  return {
+    count: errors.length,
+    codes: Array.from(byCode.entries()).map(([code, occurrences]) => ({
+      code,
+      occurrences,
+    })),
+    sampleMessages,
+    samplePaths,
+  };
+};
+
 export interface ShopifyGraphQLClientConfig {
   shopDomain: string;
   accessToken: string;
@@ -381,7 +434,7 @@ export class ShopifyGraphQLClient {
       after,
     };
 
-    logger.info("[ShopifyGraphQLClient] Fetching products", { first, after });
+    logger.info("Fetching Shopify products right now", { first, after });
 
     const result = await this.makeRequest<{
       products: {
@@ -392,19 +445,12 @@ export class ShopifyGraphQLClient {
 
     if (result.errors && result.errors.length > 0) {
       logger.warn(
-        "[ShopifyGraphQLClient] Products query returned with errors",
-        {
-          errorCount: result.errors.length,
-          errors: result.errors.map((e) => ({
-            message: e.message,
-            code: e.extensions?.code,
-            path: e.path,
-          })),
-        }
+        "Products query errors detected now",
+        summarizeGraphQLErrors(result.errors),
       );
     }
 
-    logger.info("[ShopifyGraphQLClient] Products response", {
+    logger.info("Products response summary ready now", {
       productsCount: result.data?.products?.edges?.length || 0,
       hasNextPage: result.data?.products?.pageInfo?.hasNextPage,
       hasErrors: !!(result.errors && result.errors.length > 0),
@@ -814,20 +860,12 @@ export class ShopifyGraphQLClient {
 
     if (result.errors && result.errors.length > 0) {
       logger.warn(
-        "[ShopifyGraphQLClient] Customers query returned with errors",
-        {
-          errorCount: result.errors.length,
-          errors: result.errors.map((e) => ({
-            message: e.message,
-            code: e.extensions?.code,
-            path: e.path,
-            locations: e.locations,
-          })),
-        }
+        "Customer query errors detected now",
+        summarizeGraphQLErrors(result.errors),
       );
     }
 
-    logger.info("[ShopifyGraphQLClient] Customers response", {
+    logger.info("Customers response summary ready now", {
       customersCount: result.data?.customers?.edges?.length || 0,
       hasNextPage: result.data?.customers?.pageInfo?.hasNextPage,
       hasErrors: !!(result.errors && result.errors.length > 0),
@@ -1103,7 +1141,6 @@ export class ShopifyGraphQLClient {
               fulfillments(first: 10) {
                 id
                 status
-                shipmentStatus
                 trackingInfo {
                   company
                   number
@@ -1112,9 +1149,6 @@ export class ShopifyGraphQLClient {
                 location {
                   id
                   name
-                }
-                service {
-                  serviceName
                 }
                 createdAt
                 updatedAt
@@ -1125,34 +1159,6 @@ export class ShopifyGraphQLClient {
                       quantity
                       lineItem {
                         id
-                      }
-                    }
-                  }
-                }
-              }
-              fulfillmentOrders(first: 20) {
-                edges {
-                  node {
-                    id
-                    status
-                    assignedLocation {
-                      location {
-                        id
-                        name
-                      }
-                    }
-                    deliveryMethod {
-                      methodType
-                      serviceName
-                    }
-                    lineItems(first: 50) {
-                      edges {
-                        node {
-                          id
-                          lineItem {
-                            id
-                          }
-                        }
                       }
                     }
                   }
@@ -1174,7 +1180,7 @@ export class ShopifyGraphQLClient {
       query,
     };
 
-    logger.info("[ShopifyGraphQLClient] Fetching orders", {
+    logger.info("Fetching Shopify orders right now", {
       first,
       after,
       queryFilter: query,
@@ -1188,17 +1194,13 @@ export class ShopifyGraphQLClient {
     }>(graphqlQuery, variables);
 
     if (result.errors && result.errors.length > 0) {
-      logger.warn("[ShopifyGraphQLClient] Orders query returned with errors", {
-        errorCount: result.errors.length,
-        errors: result.errors.map((e) => ({
-          message: e.message,
-          code: e.extensions?.code,
-          path: e.path,
-        })),
-      });
+      logger.warn(
+        "Orders query errors detected now",
+        summarizeGraphQLErrors(result.errors),
+      );
     }
 
-    logger.info("[ShopifyGraphQLClient] Orders response", {
+    logger.info("Orders response summary ready now", {
       ordersCount: result.data?.orders?.edges?.length || 0,
       hasNextPage: result.data?.orders?.pageInfo?.hasNextPage,
       hasErrors: !!(result.errors && result.errors.length > 0),
@@ -1242,7 +1244,7 @@ export class ShopifyGraphQLClient {
       await this.applyThrottleBuffer(throttleStatus);
 
       if (query.includes("products") && query.includes("first")) {
-        logger.debug("[ShopifyGraphQLClient] Products query response", {
+        logger.debug("Products query raw response logged", {
           hasData: !!rawResponse.data,
           dataKeys: rawResponse.data ? Object.keys(rawResponse.data) : [],
           querySnippet: query.substring(0, 100),
@@ -1289,13 +1291,11 @@ export class ShopifyGraphQLClient {
 
         if (shouldRetryThrottle) {
           const waitTime = this.calculateThrottleDelay(throttleStatus, attempt);
-          logger.warn(
-            `[ShopifyGraphQLClient] Throttled (attempt ${attempt + 1}/${this.MAX_GRAPHQL_RETRIES}). Waiting ${waitTime}ms before retry`,
-            {
-              code: throttleError?.extensions?.code,
-              message: throttleError?.message,
-            },
-          );
+          logger.warn(`GraphQL throttled attempt retry ${attempt + 1}`, {
+            waitMs: waitTime,
+            maxRetries: this.MAX_GRAPHQL_RETRIES,
+            code: throttleError?.extensions?.code,
+          });
           await this.delay(waitTime);
           return this.makeRequest<T>(query, variables, attempt + 1);
         }
@@ -1313,11 +1313,9 @@ export class ShopifyGraphQLClient {
         }
 
         if (errors && errors.length > 0) {
-          logger.error("[ShopifyGraphQLClient] GraphQL errors", {
-            errors,
-            extensions,
-            query: query.substring(0, 200),
-            variables,
+          logger.error("GraphQL errors during request detected", {
+            summary: summarizeGraphQLErrors(errors),
+            querySnippet: query.substring(0, 120),
           });
         }
 
@@ -1338,11 +1336,10 @@ export class ShopifyGraphQLClient {
         } as GraphQLResponse<T>;
       }
 
-      logger.error("[ShopifyGraphQLClient] Network/Request error", {
+      logger.error("Network request error detected now", {
         message: graphQLError.message,
         code: graphQLError.code,
-        query: query.substring(0, 200),
-        variables,
+        querySnippet: query.substring(0, 120),
       });
 
       throw new ShopifyAPIError(
@@ -1431,7 +1428,7 @@ export class ShopifyGraphQLClient {
     );
 
     if (waitTime > 0) {
-      logger.debug("[ShopifyGraphQLClient] Cooling down after response", {
+      logger.debug("Cooling down after response now", {
         waitTime,
         currentlyAvailable,
       });

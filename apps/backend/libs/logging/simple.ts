@@ -16,18 +16,40 @@ export interface SimpleLogger {
  * Create a simple logger for Convex functions
  */
 export function createSimpleLogger(context: string): SimpleLogger {
+  const MAX_MESSAGE_WORDS = 10;
+
+  const shortenMessage = (input: string) => {
+    if (!input) return input;
+    const words = input.trim().split(/\s+/).filter(Boolean);
+    if (words.length <= MAX_MESSAGE_WORDS) {
+      return words.join(" ");
+    }
+    return words.slice(0, MAX_MESSAGE_WORDS).join(" ");
+  };
+
   const log = (level: LogLevel, message: string, data?: unknown) => {
     const timestamp = new Date().toISOString();
     const logEntry: Record<string, unknown> = {
       timestamp,
       level,
       context,
-      message,
+      message: shortenMessage(message),
       ...(data && typeof data === "object" ? { data } : {}),
     };
 
-    // In Convex, console.log is the only reliable output
-    console.log(JSON.stringify(logEntry));
+    const serialized = JSON.stringify(logEntry);
+
+    switch (level) {
+      case "error":
+        console.error(serialized);
+        break;
+      case "warn":
+        console.warn(serialized);
+        break;
+      default:
+        console.log(serialized);
+        break;
+    }
   };
 
   return {

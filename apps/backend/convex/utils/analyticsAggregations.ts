@@ -454,7 +454,7 @@ export function computeOverviewMetrics(
   }
 
   let handlingFromComponents = 0;
-  let shippingFromComponents = 0;
+  const shippingFromComponents = 0;
   for (const [variantId, quantity] of variantQuantities.entries()) {
     const component = componentMap.get(variantId);
     if (!component) continue;

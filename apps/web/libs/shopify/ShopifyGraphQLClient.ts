@@ -1071,9 +1071,6 @@ export class ShopifyGraphQLClient {
                 location {
                   id
                 }
-                service {
-                  serviceName
-                }
                 createdAt
                 updatedAt
                 fulfillmentLineItems(first: 25) {

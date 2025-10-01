@@ -39,8 +39,7 @@ export function AuthForm({ onSuccess }: AuthFormProps) {
       await signIn('password', formData);
       onSuccess?.();
     } catch (error: unknown) {
-      const errorMessageText =
-        error instanceof Error ? error.message ?? '' : '';
+      console.error(error);
       setErrorMessage('Could not sign you in. Please check your credentials.');
       Alert.alert('Something went wrong', 'Please try again in a moment.');
     } finally {

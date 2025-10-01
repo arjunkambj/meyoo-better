@@ -19,7 +19,7 @@ export default function Index() {
   // If user is already authenticated, redirect to overview
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
-      router.replace("/overview");
+      router.replace("/(tabs)/overview");
     }
   }, [isLoading, isAuthenticated, router]);
 
@@ -50,7 +50,7 @@ export default function Index() {
       <AuthForm onSuccess={() => {
         // Small delay to allow auth state to propagate
         setTimeout(() => {
-          router.replace("/overview");
+          router.replace("/(tabs)/overview");
         }, 100);
       }} />
     </AuthLayout>

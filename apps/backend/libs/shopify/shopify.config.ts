@@ -35,6 +35,10 @@ export const SHOPIFY_CONFIG = {
   // Sync batching controls
   SYNC: {
     ORDERS_PERSIST_BATCH_SIZE: 100, // Orders persisted per workpool batch job
+    ORDERS_MIN_BATCH_SIZE: 25, // Lowest page size when adapting for query costs
+    ORDERS_COST_BACKOFF_MS: 250, // Delay before retrying after cost limit hit
+    CUSTOMERS_PERSIST_BATCH_SIZE: 200, // Customers persisted per batch mutation
+    CUSTOMERS_MAX_RECORDS: 5000, // Hard limit on customers per sync pass
   },
 
   // Webhook Topics

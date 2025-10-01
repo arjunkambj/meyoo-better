@@ -2,6 +2,7 @@ import { useAuthActions } from '@convex-dev/auth/react';
 import { Button } from 'heroui-native';
 import { useState } from 'react';
 import { Alert, View } from 'react-native';
+import { createURL } from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import Svg, { Path } from 'react-native-svg';
 
@@ -48,8 +49,31 @@ export function GoogleAuthButton({
 
     setIsLoading(true);
     try {
-      await signIn('google');
-      onSuccess?.();
+      const result = await signIn('google');
+
+      if (result.redirect) {
+        const authUrl = result.redirect.toString();
+        const returnUrl = createURL('/');
+        const browserResult = await WebBrowser.openAuthSessionAsync(authUrl, returnUrl);
+
+        if (browserResult.type === 'success' && browserResult.url) {
+          const callbackUrl = new URL(browserResult.url);
+          const code = callbackUrl.searchParams.get('code');
+
+          if (!code) {
+            throw new Error('Google sign-in failed to return an authorization code.');
+          }
+
+          await signIn('google', { code });
+          onSuccess?.();
+        } else if (browserResult.type === 'cancel' || browserResult.type === 'dismiss') {
+          return;
+        } else {
+          throw new Error('Google sign-in was not completed.');
+        }
+      } else if (result.signingIn) {
+        onSuccess?.();
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Google sign-in failed';
       Alert.alert('Sign In Failed', message);

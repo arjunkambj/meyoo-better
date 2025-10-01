@@ -362,9 +362,12 @@ export function computeOverviewMetrics(
   for (const component of variantCosts) {
     const variantId = toStringId(component.variantId ?? component.variant_id);
     if (!variantId) continue;
-    if (component.isActive === false) continue;
+    // Don't filter by isActive - if variant was sold, calculate its costs
+    // For variants with multiple cost records, use the most recently updated one
     const current = componentMap.get(variantId);
-    if (!current || safeNumber(component.effectiveFrom) > safeNumber(current?.effectiveFrom)) {
+    const currentTime = safeNumber(current?.updatedAt ?? current?.createdAt ?? 0);
+    const componentTime = safeNumber(component.updatedAt ?? component.createdAt ?? 0);
+    if (!current || componentTime > currentTime) {
       componentMap.set(variantId, component);
     }
   }
@@ -506,28 +509,27 @@ export function computeOverviewMetrics(
   const rangeEnd = parseDateBoundary(response.dateRange.endDate, true);
 
   const toCostMode = (cost: AnyRecord): string => {
-    const raw = String(cost.mode ?? cost.calculation ?? cost.frequency ?? "fixed");
-    switch (raw) {
-      case "percentage":
-      case "percentageRevenue":
-        return "percentageRevenue";
-      case "per_unit":
-      case "per_item":
-      case "perUnit":
-        return "perUnit";
-      case "per_order":
-      case "perOrder":
-        return "perOrder";
-      case "timeBound":
-      case "time_bound":
-        return "timeBound";
-      default:
-        return "fixed";
-    }
+    // Schema has calculation and frequency as separate fields
+    // frequency determines if it's per_order, per_unit, etc.
+    // calculation determines if it's fixed, percentage, etc.
+    const freq = String(cost.frequency ?? "");
+    const calc = String(cost.calculation ?? "fixed");
+
+    // Check frequency first for per_order/per_unit patterns
+    if (freq === "per_order") return "perOrder";
+    if (freq === "per_unit" || freq === "per_item") return "perUnit";
+
+    // Then check calculation for percentage and other modes
+    if (calc === "percentage") return "percentageRevenue";
+    if (calc === "per_unit") return "perUnit";
+
+    // Default to fixed for monthly, yearly, one_time frequencies
+    return "fixed";
   };
 
   const computeCostAmount = (cost: AnyRecord): number => {
-    const amount = safeNumber(cost.amount ?? cost.value ?? cost.total ?? 0);
+    // Schema uses 'value' field, not 'amount'
+    const amount = safeNumber(cost.value ?? cost.amount ?? cost.total ?? 0);
     if (amount === 0) {
       return 0;
     }
@@ -572,39 +574,12 @@ export function computeOverviewMetrics(
     cogs += productCostTotal;
   }
 
-  const shippingCostPerOrderRate = shippingCostEntries
-    .filter((cost) => toCostMode(cost) === "perOrder")
-    .reduce((sum, cost) => sum + safeNumber(cost.amount ?? cost.value ?? cost.total ?? 0), 0);
-  const shippingCostPerUnitRate = shippingCostEntries
-    .filter((cost) => toCostMode(cost) === "perUnit")
-    .reduce((sum, cost) => sum + safeNumber(cost.amount ?? cost.value ?? cost.total ?? 0), 0);
+  // Use computeCostAmount for all cost types - it handles per_order, per_unit, percentage, etc.
+  const shippingCostTotal = sumBy(shippingCostEntries, computeCostAmount);
+  const handlingCostTotal = sumBy(handlingCostEntries, computeCostAmount) + handlingFromComponents;
 
-  const handlingCostPerOrderRate = handlingCostEntries
-    .filter((cost) => toCostMode(cost) === "perOrder")
-    .reduce((sum, cost) => sum + safeNumber(cost.amount ?? cost.value ?? cost.total ?? 0), 0);
-  const handlingCostPerUnitRate = handlingCostEntries
-    .filter((cost) => toCostMode(cost) === "perUnit")
-    .reduce((sum, cost) => sum + safeNumber(cost.amount ?? cost.value ?? cost.total ?? 0), 0);
-  // Add fixed handling costs that apply to the period
-  const handlingFixedCosts = sumBy(handlingCostEntries.filter((cost) => toCostMode(cost) === "fixed" || toCostMode(cost) === "timeBound"), computeCostAmount);
-
-  // Only add component shipping if we have it, otherwise rely on order-level shipping
-  if (shippingFromComponents > 0) {
-    shippingCosts = shippingFromComponents; // Replace order-level with component-level if available
-  }
-  shippingCosts += shippingCostPerOrderRate * activeOrderCount;
-  shippingCosts += shippingCostPerUnitRate * unitsSold;
-
-  let handlingCostTotal = handlingFromComponents;
-  handlingCostTotal += handlingCostPerOrderRate * activeOrderCount;
-  handlingCostTotal += handlingCostPerUnitRate * unitsSold;
-  handlingCostTotal += handlingFixedCosts;
-
-  // If no handling costs found from any source, check if there's a default handling fee
-  if (handlingCostTotal === 0 && handlingCostEntries.length === 0 && handlingFromComponents === 0) {
-    // Could add a default handling calculation here if needed
-    // For example: handlingCostTotal = activeOrderCount * DEFAULT_HANDLING_PER_ORDER;
-  }
+  // Start with order-level shipping (usually 0), then add globalCosts shipping
+  shippingCosts = shippingCostsFromOrders + shippingCostTotal;
 
   // Debug logging for cost calculations
   if (process.env.DEBUG_COSTS === "true") {
@@ -613,13 +588,9 @@ export function computeOverviewMetrics(
       unitsSold,
       shippingCostsFromOrders,
       shippingFromComponents,
-      shippingCostPerOrderRate,
-      shippingCostPerUnitRate,
+      shippingCostTotal,
       totalShipping: shippingCosts,
       handlingFromComponents,
-      handlingCostPerOrderRate,
-      handlingCostPerUnitRate,
-      handlingFixedCosts,
       totalHandling: handlingCostTotal,
       taxFromComponents,
       taxesCollected,
@@ -1129,8 +1100,11 @@ export function computeOrdersAnalytics(
   for (const component of variantCosts) {
     const variantId = toStringId(component.variantId ?? component.variant_id);
     if (!variantId) continue;
+    // For variants with multiple cost records, use the most recently updated one
     const current = componentMap.get(variantId);
-    if (!current || safeNumber(component.effectiveFrom) > safeNumber(current?.effectiveFrom)) {
+    const currentTime = safeNumber(current?.updatedAt ?? current?.createdAt ?? 0);
+    const componentTime = safeNumber(component.updatedAt ?? component.createdAt ?? 0);
+    if (!current || componentTime > currentTime) {
       componentMap.set(variantId, component);
     }
   }
@@ -1468,28 +1442,25 @@ type CostComputationContext = {
 };
 
 function toCostMode(cost: AnyRecord): "fixed" | "perOrder" | "perUnit" | "percentageRevenue" | "timeBound" {
-  const raw = String(cost.mode ?? cost.calculation ?? cost.frequency ?? "fixed");
-  switch (raw) {
-    case "per_order":
-    case "perOrder":
-      return "perOrder";
-    case "per_unit":
-    case "per_item":
-    case "perUnit":
-      return "perUnit";
-    case "percentage":
-    case "percentageRevenue":
-      return "percentageRevenue";
-    case "timeBound":
-    case "time_bound":
-      return "timeBound";
-    default:
-      return "fixed";
-  }
+  // Schema has calculation and frequency as separate fields
+  const freq = String(cost.frequency ?? "");
+  const calc = String(cost.calculation ?? "fixed");
+
+  // Check frequency first for per_order/per_unit patterns
+  if (freq === "per_order") return "perOrder";
+  if (freq === "per_unit" || freq === "per_item") return "perUnit";
+
+  // Then check calculation for percentage and other modes
+  if (calc === "percentage") return "percentageRevenue";
+  if (calc === "per_unit") return "perUnit";
+
+  // Default to fixed for monthly, yearly, one_time frequencies
+  return "fixed";
 }
 
 function computeCostAmountForRange(cost: AnyRecord, ctx: CostComputationContext): number {
-  const amount = safeNumber(cost.amount ?? cost.value ?? cost.total ?? 0);
+  // Schema uses 'value' field, not 'amount'
+  const amount = safeNumber(cost.value ?? cost.amount ?? cost.total ?? 0);
   if (amount === 0) return 0;
 
   const mode = toCostMode(cost);

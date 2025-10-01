@@ -83,7 +83,6 @@ export const populateMissingCostComponents = mutation({
           variantId: variant._id,
           handlingPerUnit: defaults.handlingPerUnit,
           taxPercent: defaults.taxPercent,
-          effectiveFrom: Date.now(),
           createdAt: Date.now(),
         });
         created++;

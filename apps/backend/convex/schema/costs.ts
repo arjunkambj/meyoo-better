@@ -83,14 +83,10 @@ export const variantCosts = defineTable({
   // Per-variant tax percent
   taxPercent: v.optional(v.number()),
 
-  // Lifecycle
-
-  effectiveFrom: v.number(),
   // Metadata
   createdAt: v.optional(v.number()),
   updatedAt: v.optional(v.number()),
 })
   .index("by_organization", ["organizationId"])
   .index("by_variant", ["variantId"])
-  .index("by_org_variant", ["organizationId", "variantId"]) 
-   .index("by_effective_from", ["effectiveFrom"]);
+  .index("by_org_variant", ["organizationId", "variantId"]);

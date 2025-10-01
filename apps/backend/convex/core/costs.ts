@@ -408,7 +408,6 @@ export const upsertVariantCosts = mutation({
         organizationId: orgId,
         userId: user._id,
         variantId: args.variantId,
-        effectiveFrom: Date.now(),
         ...updates,
         createdAt: Date.now(),
       });
@@ -685,7 +684,6 @@ export const bulkUpdateProductCosts = mutation({
           userId: user._id,
           variantId,
           ...updates,
-          effectiveFrom: Date.now(),
           createdAt: Date.now(),
           updatedAt: Date.now(),
         });
@@ -746,7 +744,6 @@ export const applyGlobalHandling = mutation({
             userId: user._id,
             variantId: variant._id,
             handlingPerUnit: handling,
-            effectiveFrom: Date.now(),
             createdAt: Date.now(),
             updatedAt: Date.now(),
           });
@@ -842,7 +839,6 @@ export const saveVariantCosts = mutation({
           userId: user._id,
           variantId: cost.variantId,
           ...updates,
-          effectiveFrom: Date.now(),
           createdAt: Date.now(),
         });
       }
@@ -980,7 +976,6 @@ export const createVariantCosts = internalMutation({
           organizationId: args.organizationId,
           variantId,
           cogsPerUnit: component.cogsPerUnit,
-          effectiveFrom: Date.now(),
           createdAt: Date.now(),
           updatedAt: Date.now(),
         });

@@ -454,7 +454,7 @@ async function fetchVariantCosts(
   ctx: QueryCtx,
   organizationId: OrganizationId,
   variantIds: ReadonlySet<Id<"shopifyProductVariants">>,
-  timestamps: TimestampRange,
+  _timestamps: TimestampRange,
 ): Promise<Doc<"variantCosts">[]> {
   if (variantIds.size === 0) {
     return [];
@@ -471,12 +471,10 @@ async function fetchVariantCosts(
     ),
   );
 
-  return batches
-    .flat()
-    .filter((component) => {
-      const from = component.effectiveFrom;
-      return from <= timestamps.end;
-    });
+  // For historical sync: return ALL variant costs for sold items
+  // Don't filter by effectiveFrom - if a variant was sold, calculate its costs
+  // The aggregation layer will pick the most recent cost by effectiveFrom
+  return batches.flat();
 }
 
 async function fetchGlobalCosts(
@@ -490,9 +488,24 @@ async function fetchGlobalCosts(
     .collect();
 
   return costs.filter((cost) => {
+    // Only filter by isActive - effectiveFrom/To handled in calculation
+    // For historical sync, we include all active costs regardless of date
+    if (!cost.isActive) return false;
+
+    // If effectiveFrom is set, check if cost was effective during the period
     const from = cost.effectiveFrom;
-    const to = cost.effectiveTo ?? Number.POSITIVE_INFINITY;
-    return cost.isActive && from <= timestamps.end && to >= timestamps.start;
+    const to = cost.effectiveTo;
+
+    // If no effectiveFrom, include it (backward compatibility)
+    if (!from) return true;
+
+    // If effectiveTo is not set, cost is still active - check if it started before period ends
+    if (!to) {
+      return from <= timestamps.end;
+    }
+
+    // Both dates set - check for any overlap with query period
+    return from <= timestamps.end && to >= timestamps.start;
   });
 }
 

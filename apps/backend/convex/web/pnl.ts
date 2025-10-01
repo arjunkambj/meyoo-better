@@ -10,7 +10,7 @@ import {
 } from "./analyticsShared";
 import { validateDateRange } from "../utils/analyticsSource";
 import { getUserAndOrg } from "../utils/auth";
-import { loadPnLAnalyticsFromDailyMetrics } from "../utils/dailyMetrics";
+import { computePnLAnalytics } from "../utils/analyticsAggregations";
 import type { PnLAnalyticsResult, PnLGranularity } from "@repo/types";
 
 const responseOrNull = v.union(v.null(), responseValidator);
@@ -185,20 +185,16 @@ export const getAnalytics = query({
     const organizationId = auth.orgId as Id<"organizations">;
     const granularity = (args.granularity ?? "daily") as PnLGranularity;
 
-    const { result, meta } = await loadPnLAnalyticsFromDailyMetrics(
-      ctx,
-      organizationId,
-      range,
-      granularity,
-    );
+    const analytics = await loadAnalytics(ctx, organizationId, range);
+    const result = computePnLAnalytics(analytics, granularity);
 
     return {
       dateRange: range,
       organizationId: auth.orgId as string,
       result,
       meta: {
-        strategy: "dailyMetrics",
-        ...meta,
+        strategy: "analytics",
+        ...(analytics.meta ?? {}),
       },
     } satisfies {
       dateRange: { startDate: string; endDate: string };

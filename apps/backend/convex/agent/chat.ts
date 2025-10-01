@@ -26,7 +26,11 @@ export const listThreads = query({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) {
-      throw new ConvexError("Not authenticated");
+      return {
+        page: [],
+        continueCursor: null,
+        isDone: true,
+      };
     }
 
     const result = await ctx.runQuery(components.agent.threads.listThreadsByUserId, {
@@ -36,7 +40,7 @@ export const listThreads = query({
         cursor: args.paginationOpts.cursor ?? null,
         numItems: args.paginationOpts.numItems ?? 50,
       },
-  });
+    });
 
     return {
       page: result.page.map((thread) => ({
@@ -96,7 +100,18 @@ export const listMessages = query({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) {
-      throw new ConvexError("Not authenticated");
+      const emptyStreams = args.streamArgs
+        ? args.streamArgs.kind === "deltas"
+          ? { kind: "deltas", deltas: [] }
+          : { kind: "list", messages: [] }
+        : undefined;
+
+      return {
+        page: [],
+        continueCursor: null,
+        isDone: true,
+        streams: emptyStreams,
+      };
     }
 
     const thread = await ctx.runQuery(components.agent.threads.getThread, {

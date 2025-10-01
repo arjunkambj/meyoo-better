@@ -251,9 +251,7 @@ type ShopifyOrderInput = {
   cancelledAt?: number;
   totalPrice: number;
   subtotalPrice: number;
-  totalTax: number;
   totalDiscounts: number;
-  totalShippingPrice: number;
   totalTip?: number;
   currency?: string;
   financialStatus?: string;
@@ -299,9 +297,7 @@ function mapOrderNodeToPersistence(
     cancelledAt: order.cancelledAt ? Date.parse(String(order.cancelledAt)) : undefined,
     totalPrice: parseMoney(order.currentTotalPriceSet?.shopMoney?.amount),
     subtotalPrice: parseMoney(order.currentSubtotalPriceSet?.shopMoney?.amount),
-    totalTax: parseMoney(order.currentTotalTaxSet?.shopMoney?.amount),
     totalDiscounts: parseMoney(order.currentTotalDiscountsSet?.shopMoney?.amount),
-    totalShippingPrice: parseMoney(order.totalShippingPriceSet?.shopMoney?.amount),
     totalTip: order.totalTipReceivedSet
       ? parseMoney(order.totalTipReceivedSet.shopMoney?.amount)
       : undefined,

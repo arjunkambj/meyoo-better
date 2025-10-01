@@ -89,9 +89,7 @@ const ORDER_COMPARE_FIELDS: ReadonlyArray<keyof Doc<"shopifyOrders">> = [
   "fulfillmentStatus",
   "totalPrice",
   "subtotalPrice",
-  "totalTax",
   "totalDiscounts",
-  "totalShippingPrice",
   "totalTip",
   "currency",
   "totalItems",
@@ -1398,9 +1396,7 @@ export const getOrders = query({
       cancelledAt: v.optional(v.number()),
       totalPrice: v.number(),
       subtotalPrice: v.number(),
-      totalTax: v.number(),
       totalDiscounts: v.number(),
-      totalShippingPrice: v.number(),
       totalTip: v.optional(v.number()),
       financialStatus: v.optional(v.string()),
       fulfillmentStatus: v.optional(v.string()),
@@ -2029,9 +2025,7 @@ export const storeOrdersInternal = internalMutation({
         fulfillmentStatus: v.optional(v.string()),
         totalPrice: v.number(),
         subtotalPrice: v.number(),
-        totalTax: v.number(),
         totalDiscounts: v.number(),
-        totalShippingPrice: v.number(),
         totalTip: v.optional(v.number()),
         currency: v.optional(v.string()),
         totalItems: v.number(),
@@ -2236,9 +2230,7 @@ export const storeOrdersInternal = internalMutation({
         fulfillmentStatus: toOptionalString(orderData.fulfillmentStatus),
         totalPrice: orderData.totalPrice,
         subtotalPrice: orderData.subtotalPrice,
-        totalTax: orderData.totalTax,
         totalDiscounts: orderData.totalDiscounts,
-        totalShippingPrice: orderData.totalShippingPrice,
         totalTip: orderData.totalTip,
         currency: toOptionalString(orderData.currency), // Store the currency code
         totalItems: orderData.totalItems,
@@ -3843,7 +3835,6 @@ export const webhooks = {
             // Keep business-relevant data
             totalPrice: order.totalPrice,
             subtotalPrice: order.subtotalPrice,
-            totalTax: order.totalTax,
           });
           redactedRecords++;
         }

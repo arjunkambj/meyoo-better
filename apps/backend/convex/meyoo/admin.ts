@@ -83,7 +83,6 @@ export const populateMissingCostComponents = mutation({
           variantId: variant._id,
           handlingPerUnit: defaults.handlingPerUnit,
           taxPercent: defaults.taxPercent,
-          isActive: true,
           effectiveFrom: Date.now(),
           createdAt: Date.now(),
         });
@@ -179,8 +178,8 @@ export const debugCostComponents = query({
         calculation: c.calculation,
       })),
       sampleOrder: orders.length > 0 && orders[0] ? {
-        totalTax: orders[0].totalTax,
-        totalShippingPrice: orders[0].totalShippingPrice,
+        totalPrice: orders[0].totalPrice,
+        subtotalPrice: orders[0].subtotalPrice,
         orderItemsCount: orderItems.length,
       } : null,
     };

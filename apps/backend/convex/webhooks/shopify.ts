@@ -290,14 +290,9 @@ async function handleTopicInline(
           subtotalPrice:
             toMoney(order.current_subtotal_price_set?.shop_money?.amount) ||
             toMoney(order.subtotal_price),
-          totalTax:
-            toMoney(order.current_total_tax_set?.shop_money?.amount) ||
-            toMoney(order.total_tax),
           totalDiscounts:
             toMoney(order.current_total_discounts_set?.shop_money?.amount) ||
             toMoney(order.total_discounts),
-          totalShippingPrice:
-            toMoney(order.total_shipping_price_set?.shop_money?.amount) || 0,
           totalTip: toMoney(order.total_tip_received),
           currency: order.currency,
           totalItems: li.length,

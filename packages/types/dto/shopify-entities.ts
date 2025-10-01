@@ -63,8 +63,8 @@ export interface ShopifyOrderDTO {
   currency: string;
   totalPrice: string;
   subtotalPrice: string;
-  totalTax: string;
-  totalShipping: string;
+  totalTax?: string;
+  totalShipping?: string;
   totalDiscounts: string;
   customer?: ShopifyOrderCustomerDTO;
   shippingAddress?: ShopifyAddressDTO;

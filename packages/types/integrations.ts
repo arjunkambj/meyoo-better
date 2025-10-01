@@ -83,10 +83,10 @@ export interface ShopifyOrder {
   // Financial
   totalPrice: number;
   subtotalPrice: number;
-  totalTax: number;
   totalDiscounts: number;
-  totalShipping: number;
-  totalRefunds: number;
+  totalTax?: number;
+  totalShipping?: number;
+  totalRefunds?: number;
   currency: string;
 
   // Status

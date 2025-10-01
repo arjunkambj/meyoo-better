@@ -381,7 +381,6 @@ export const upsertVariantCosts = mutation({
   args: {
     variantId: v.id("shopifyProductVariants"),
     cogsPerUnit: v.optional(v.number()),
-    shippingPerUnit: v.optional(v.number()),
     handlingPerUnit: v.optional(v.number()),
     taxPercent: v.optional(v.number()),
   },
@@ -399,7 +398,6 @@ export const upsertVariantCosts = mutation({
     // Only include fields that are explicitly provided to avoid wiping others
     const updates: any = { updatedAt: Date.now() };
     if (args.cogsPerUnit !== undefined) updates.cogsPerUnit = args.cogsPerUnit;
-    if (args.shippingPerUnit !== undefined) updates.shippingPerUnit = args.shippingPerUnit;
     if (args.handlingPerUnit !== undefined) updates.handlingPerUnit = args.handlingPerUnit;
     if (args.taxPercent !== undefined) updates.taxPercent = args.taxPercent;
 
@@ -410,7 +408,6 @@ export const upsertVariantCosts = mutation({
         organizationId: orgId,
         userId: user._id,
         variantId: args.variantId,
-        isActive: true,
         effectiveFrom: Date.now(),
         ...updates,
         createdAt: Date.now(),
@@ -537,9 +534,7 @@ export const getProductsWithVariants = query({
     // Get all cost components for variants
     const allCostComponents = await ctx.db
       .query("variantCosts")
-      .withIndex("by_org_and_active", (q) =>
-        q.eq("organizationId", orgId).eq("isActive", true),
-      )
+      .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
       .collect();
 
     // Create a map of variant ID to cost components
@@ -568,11 +563,10 @@ export const getProductsWithVariants = query({
           const cogs = costComponent?.cogsPerUnit ?? 0;
           const overhead = 0;
           const taxRate = costComponent?.taxPercent || 0;
-          const shipping = costComponent?.shippingPerUnit || 0;
           const handling = costComponent?.handlingPerUnit || 0;
-          
+
           // Calculate gross margin
-          const totalCost = cogs + shipping + handling;
+          const totalCost = cogs + handling;
           const grossProfit = price - totalCost;
           const grossMargin = price > 0 ? (grossProfit / price) * 100 : 0;
 
@@ -592,7 +586,6 @@ export const getProductsWithVariants = query({
             cogsPerUnit: cogs,
             overheadPercent: overhead,
             taxPercent: taxRate,
-            shippingPerUnit: shipping,
             handlingPerUnit: handling,
             // Calculated fields
             grossProfit: roundMoney(grossProfit),
@@ -630,7 +623,6 @@ export const bulkUpdateProductCosts = mutation({
       cogsPerUnit: v.optional(v.number()),
       overheadPercent: v.optional(v.number()),
       taxPercent: v.optional(v.number()),
-      shippingPerUnit: v.optional(v.number()),
       handlingPerUnit: v.optional(v.number()),
       applyType: v.union(
         v.literal("fixed"), // Fixed amount
@@ -677,10 +669,6 @@ export const bulkUpdateProductCosts = mutation({
         }
       }
 
-      if (args.updates.shippingPerUnit !== undefined) {
-        updates.shippingPerUnit = roundMoney(args.updates.shippingPerUnit);
-      }
-
       if (args.updates.handlingPerUnit !== undefined) {
         updates.handlingPerUnit = roundMoney(args.updates.handlingPerUnit);
       }
@@ -697,7 +685,6 @@ export const bulkUpdateProductCosts = mutation({
           userId: user._id,
           variantId,
           ...updates,
-          isActive: true,
           effectiveFrom: Date.now(),
           createdAt: Date.now(),
           updatedAt: Date.now(),
@@ -759,7 +746,6 @@ export const applyGlobalHandling = mutation({
             userId: user._id,
             variantId: variant._id,
             handlingPerUnit: handling,
-            isActive: true,
             effectiveFrom: Date.now(),
             createdAt: Date.now(),
             updatedAt: Date.now(),
@@ -816,7 +802,6 @@ export const saveVariantCosts = mutation({
         variantId: v.id("shopifyProductVariants"),
         cogsPerUnit: v.optional(v.number()),
         taxPercent: v.optional(v.number()),
-        shippingPerUnit: v.optional(v.number()),
         handlingPerUnit: v.optional(v.number()),
       })
     ),
@@ -830,7 +815,6 @@ export const saveVariantCosts = mutation({
       // Include taxPercent so tax-only edits are persisted
       const hasAnyValue =
         cost.cogsPerUnit !== undefined ||
-        cost.shippingPerUnit !== undefined ||
         cost.handlingPerUnit !== undefined ||
         cost.taxPercent !== undefined;
 
@@ -847,7 +831,6 @@ export const saveVariantCosts = mutation({
       // Build updates with only provided fields to prevent wiping existing values
       const updates: any = { updatedAt: Date.now() };
       if (cost.cogsPerUnit !== undefined) updates.cogsPerUnit = cost.cogsPerUnit;
-      if (cost.shippingPerUnit !== undefined) updates.shippingPerUnit = cost.shippingPerUnit;
       if (cost.handlingPerUnit !== undefined) updates.handlingPerUnit = cost.handlingPerUnit;
       if (cost.taxPercent !== undefined) updates.taxPercent = cost.taxPercent;
 
@@ -859,7 +842,6 @@ export const saveVariantCosts = mutation({
           userId: user._id,
           variantId: cost.variantId,
           ...updates,
-          isActive: true,
           effectiveFrom: Date.now(),
           createdAt: Date.now(),
         });
@@ -983,9 +965,7 @@ export const createVariantCosts = internalMutation({
       // Check if component already exists
       const existing = await ctx.db
         .query("variantCosts")
-        .withIndex("by_variant_and_active", (q) =>
-          q.eq("variantId", variantId).eq("isActive", true)
-        )
+        .withIndex("by_variant", (q) => q.eq("variantId", variantId))
         .first();
       
       if (existing) {
@@ -1000,7 +980,6 @@ export const createVariantCosts = internalMutation({
           organizationId: args.organizationId,
           variantId,
           cogsPerUnit: component.cogsPerUnit,
-          isActive: true,
           effectiveFrom: Date.now(),
           createdAt: Date.now(),
           updatedAt: Date.now(),
@@ -1039,12 +1018,12 @@ export const validateCostDataCompleteness = internalQuery({
     const totalVariants = variants.length;
 
     // Check cost components
-    const costComponents = await ctx.db
-      .query("variantCosts")
-      .withIndex("by_org_and_active", (q) =>
-        q.eq("organizationId", args.organizationId).eq("isActive", true)
-      )
-      .collect();
+  const costComponents = await ctx.db
+    .query("variantCosts")
+    .withIndex("by_organization", (q) =>
+      q.eq("organizationId", args.organizationId)
+    )
+    .collect();
 
     const variantsWithCostComponentsIds = new Set<string>();
     const variantsWithCogsIds = new Set<string>();

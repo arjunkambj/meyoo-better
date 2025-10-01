@@ -324,9 +324,15 @@ export function computeOverviewMetrics(
   const grossSales = sumBy(activeOrders, (order) => safeNumber(order.subtotalPrice ?? order.totalPrice));
   const discounts = sumBy(activeOrders, (order) => safeNumber(order.totalDiscounts));
   // Start with order-level shipping costs as the base
-  const shippingCostsFromOrders = sumBy(activeOrders, (order) => safeNumber(order.totalShippingPrice));
+  const shippingCostsFromOrders = sumBy(
+    activeOrders,
+    (order) => safeNumber(order.shippingCosts ?? 0),
+  );
   let shippingCosts = shippingCostsFromOrders;
-  let taxesCollected = sumBy(activeOrders, (order) => safeNumber(order.totalTax));
+  let taxesCollected = sumBy(
+    activeOrders,
+    (order) => safeNumber(order.taxesCollected ?? 0),
+  );
   const refundsAmountFromDocs = refunds.length
     ? sumBy(refunds, (refund) => safeNumber(refund.totalRefunded ?? refund.amount))
     : 0;
@@ -453,7 +459,6 @@ export function computeOverviewMetrics(
     const component = componentMap.get(variantId);
     if (!component) continue;
     handlingFromComponents += safeNumber(component?.handlingPerUnit) * quantity;
-    shippingFromComponents += safeNumber(component?.shippingPerUnit) * quantity;
   }
 
   if (taxFromComponents > 0) {
@@ -1167,8 +1172,8 @@ export function computeOrdersAnalytics(
     });
 
     const revenue = safeNumber(orderRaw.totalPrice);
-    const shippingCost = safeNumber(orderRaw.totalShippingPrice);
-    const taxAmount = safeNumber(orderRaw.totalTax);
+    const shippingCost = safeNumber(orderRaw.shippingCosts ?? 0);
+    const taxAmount = safeNumber(orderRaw.taxesCollected ?? 0);
     const cogsAmount = lineItems.reduce((total, item) => total + item.cost, 0);
     const transactionFee = txs.reduce((total, tx) => total + safeNumber(tx.fee), 0);
 
@@ -1548,10 +1553,10 @@ function calculatePnLMetricsForRange({
   const discounts = sumBy(filteredOrders, (order) => safeNumber(order.totalDiscounts ?? order.discounts ?? 0));
   const refunds = sumBy(filteredOrders, (order) => safeNumber(order.totalRefunded ?? order.totalRefunds ?? 0));
   let cogs = sumBy(filteredOrders, (order) => safeNumber(order.totalCostOfGoods ?? order.cogs ?? 0));
-  let shippingCosts = sumBy(filteredOrders, (order) => safeNumber(order.totalShippingPrice ?? order.shippingCosts ?? 0));
+  let shippingCosts = sumBy(filteredOrders, (order) => safeNumber(order.shippingCosts ?? 0));
   let transactionFees = sumBy(filteredOrders, (order) => safeNumber(order.totalFees ?? order.transactionFees ?? 0));
   let handlingFees = sumBy(filteredOrders, (order) => safeNumber(order.handlingFees ?? 0));
-  let taxesCollected = sumBy(filteredOrders, (order) => safeNumber(order.totalTax ?? order.taxesCollected ?? 0));
+  let taxesCollected = sumBy(filteredOrders, (order) => safeNumber(order.taxesCollected ?? 0));
 
   const unitsSold = sumBy(filteredOrders, (order) =>
     safeNumber(

@@ -305,7 +305,10 @@ const summarizeGraphQLErrors = (
   const samples: string[] = [];
   for (const error of errors) {
     if (!error.message) continue;
-    samples.push(shortenText(error.message.split("\n")[0], 10));
+    const [firstLine] = error.message.split("\n");
+    const sample = firstLine ?? error.message;
+    if (!sample) continue;
+    samples.push(shortenText(sample, 10));
     if (samples.length >= MAX_ERROR_SUMMARY_ITEMS) break;
   }
 
@@ -1138,7 +1141,7 @@ export const initial = internalAction({
             SHOPIFY_CONFIG.SYNC?.ORDERS_MIN_BATCH_SIZE ?? 25;
           const COST_BACKOFF_MS =
             SHOPIFY_CONFIG.SYNC?.ORDERS_COST_BACKOFF_MS ?? 250;
-          let currentPageSize =
+          let currentPageSize: number =
             SHOPIFY_CONFIG.QUERIES?.ORDERS_BATCH_SIZE ?? MIN_ORDERS_PAGE_SIZE;
           if (currentPageSize < MIN_ORDERS_PAGE_SIZE) {
             currentPageSize = MIN_ORDERS_PAGE_SIZE;

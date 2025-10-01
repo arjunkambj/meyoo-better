@@ -11,7 +11,7 @@ export const DEFAULT_DASHBOARD_CONFIG: DashboardConfig = {
     "orders",
     "avgOrderValue",
     "blendedRoas",
-    "totalAdSpend",
+    "blendedMarketingCost",
     "repeatCustomerRate",
     "moMRevenueGrowth",
   ],

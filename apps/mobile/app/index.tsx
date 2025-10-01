@@ -1,4 +1,3 @@
-import { useRouter } from "expo-router";
 import { Spinner } from "heroui-native";
 import { View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -7,7 +6,7 @@ import { AuthForm } from "@/components/auth/AuthForm";
 import { useOnboardingRedirect } from "@/hooks/useOnboardingRedirect";
 
 export default function Index() {
-  const router = useRouter();
+
   const { isLoading, isAuthenticated } = useOnboardingRedirect();
 
   // Show loading while checking auth
@@ -34,14 +33,7 @@ export default function Index() {
         title="Welcome to Meyoo"
         subtitle="Manage your store, marketing, and insights from one clean workspace."
       >
-        <AuthForm
-          onSuccess={() => {
-            // Small delay to allow auth state to propagate
-            setTimeout(() => {
-              router.replace("/(tabs)/overview");
-            }, 100);
-          }}
-        />
+        <AuthForm />
       </AuthLayout>
     </SafeAreaView>
   );

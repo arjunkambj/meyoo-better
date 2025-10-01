@@ -15,7 +15,7 @@ export const METRIC_CATEGORIES: Record<string, MetricCategory> = {
       "orders",                // Orders
       "avgOrderValue",         // AOV
       "blendedRoas",           // ROAS (Revenue ÷ Total Ad Spend)
-      "totalAdSpend",          // Total Ad Spend
+      "blendedMarketingCost",  // Total Ad Spend
       "repeatCustomerRate",    // Returning Customers % (proxy for New vs Returning)
       "moMRevenueGrowth",      // MoM Revenue Growth
     ],
@@ -355,8 +355,8 @@ export const METRICS: Record<string, MetricDefinition> = {
   },
 
   // Marketing Analytics
-  totalAdSpend: {
-    id: "totalAdSpend",
+  blendedMarketingCost: {
+    id: "blendedMarketingCost",
     label: "Total Ad Spend",
     icon: "solar:ad-bold-duotone",
     iconColor: "text-danger-600",

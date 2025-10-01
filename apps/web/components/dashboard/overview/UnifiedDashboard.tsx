@@ -142,7 +142,7 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
       operatingMargin: overviewMetrics?.operatingMargin?.value || 0,
 
       // Marketing
-      totalAdSpend: overviewMetrics?.totalAdSpend?.value || 0,
+      blendedMarketingCost: overviewMetrics?.blendedMarketingCost?.value || 0,
       metaAdSpend: overviewMetrics?.metaAdSpend?.value || 0,
       metaSpendPercentage: overviewMetrics?.metaSpendPercentage?.value || 0,
       marketingPercentageOfGross:
@@ -196,9 +196,9 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
       poas:
         overviewMetrics?.poas?.value ??
         (overviewMetrics?.netProfit?.value &&
-        overviewMetrics?.totalAdSpend?.value
+        overviewMetrics?.blendedMarketingCost?.value
           ? overviewMetrics.netProfit.value /
-            overviewMetrics.totalAdSpend.value
+            overviewMetrics.blendedMarketingCost.value
           : 0),
       roasUTM: utmRoas.value,
       roasUTMChange: utmRoas.change,
@@ -208,8 +208,9 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
       adSpendPerOrder:
         overviewMetrics?.adSpendPerOrder?.value ??
         (overviewMetrics?.orders?.value &&
-        overviewMetrics?.totalAdSpend?.value
-          ? overviewMetrics.totalAdSpend.value / overviewMetrics.orders.value
+        overviewMetrics?.blendedMarketingCost?.value
+          ? overviewMetrics.blendedMarketingCost.value /
+            overviewMetrics.orders.value
           : 0),
       avgOrderCost:
         overviewMetrics?.avgOrderCost?.value ??

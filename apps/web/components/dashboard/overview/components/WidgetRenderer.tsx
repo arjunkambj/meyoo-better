@@ -29,7 +29,7 @@ export function WidgetRenderer({
     case "adSpendSummary":
       return (
         <AdSpendSummaryWidget
-          adSpendChange={overviewMetrics?.totalAdSpend?.change ?? 0}
+          adSpendChange={overviewMetrics?.blendedMarketingCost?.change ?? 0}
           currency={primaryCurrency}
           loading={isLoading}
           ncROAS={metricsData.ncROAS ?? 0}
@@ -40,7 +40,7 @@ export function WidgetRenderer({
           roasChange={overviewMetrics?.blendedRoas?.change ?? 0}
           roasUTM={metricsData.roasUTM ?? 0}
           roasUTMChange={metricsData.roasUTMChange ?? 0}
-          totalAdSpend={metricsData.totalAdSpend ?? 0}
+          totalAdSpend={metricsData.blendedMarketingCost ?? 0}
         />
       );
     case "costBreakdown":
@@ -54,7 +54,7 @@ export function WidgetRenderer({
           shippingCosts={metricsData.shippingCosts ?? 0}
           showCostSetupWarning={showCostSetupWarning}
           taxes={metricsData.taxesCollected ?? 0}
-          totalAdSpend={metricsData.totalAdSpend ?? 0}
+          totalAdSpend={metricsData.blendedMarketingCost ?? 0}
           totalRevenue={metricsData.revenue ?? 0}
           transactionFees={metricsData.transactionFees ?? 0}
         />

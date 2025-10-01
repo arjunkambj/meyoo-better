@@ -196,10 +196,10 @@ function buildOverviewMetrics(
       suffix: "%",
       decimal: 1,
     },
-    totalAdSpend: {
+    blendedMarketingCost: {
       label: "Total Ad Spend",
-      value: summary.adSpend || 0,
-      change: summary.adSpendChange || 0,
+      value: summary.blendedMarketingCost || 0,
+      change: summary.blendedMarketingCostChange || 0,
       prefix: currencySymbol,
     },
     metaAdSpend: {
@@ -346,7 +346,7 @@ function buildOverviewMetrics(
       value:
         summary.customerAcquisitionCost ||
         (summary.newCustomers > 0
-          ? summary.adSpend / summary.newCustomers
+          ? summary.blendedMarketingCost / summary.newCustomers
           : 0),
       change: summary.customerAcquisitionCostChange || 0,
       prefix: currencySymbol,
@@ -356,7 +356,7 @@ function buildOverviewMetrics(
       label: "CAC % of AOV",
       value:
         summary.avgOrderValue > 0 && summary.newCustomers > 0
-          ? (summary.adSpend /
+          ? (summary.blendedMarketingCost /
               summary.newCustomers /
               summary.avgOrderValue) *
             100
@@ -404,7 +404,9 @@ function buildOverviewMetrics(
     adSpendPerOrder: {
       label: "Ad Spend / Order",
       value: summary.adSpendPerOrder ||
-        (summary.orders > 0 ? summary.adSpend / summary.orders : 0),
+        (summary.orders > 0
+          ? summary.blendedMarketingCost / summary.orders
+          : 0),
       change: summary.adSpendPerOrderChange || 0,
       prefix: currencySymbol,
       decimal: 2,

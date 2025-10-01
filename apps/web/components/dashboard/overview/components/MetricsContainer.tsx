@@ -28,7 +28,7 @@ const DEFAULT_METRICS = [
   "orders",
   "avgOrderValue",
   "blendedRoas", // ROAS
-  "totalAdSpend",
+  "blendedMarketingCost",
   "repeatCustomerRate",
   "moMRevenueGrowth",
 ];

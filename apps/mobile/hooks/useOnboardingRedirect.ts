@@ -49,14 +49,14 @@ export function useOnboardingRedirect(
 
     if (!isAuthenticated) {
       if (pathname !== unauthenticatedRoute) {
-        router.replace(unauthenticatedRoute);
+        router.replace(unauthenticatedRoute as any);
       }
       return;
     }
 
     if (!isOnboardingComplete) {
       if (pathname !== onboardingRoute) {
-        router.replace(onboardingRoute);
+        router.replace(onboardingRoute as any);
       }
       return;
     }
@@ -65,7 +65,7 @@ export function useOnboardingRedirect(
       (pathname === onboardingRoute || pathname === unauthenticatedRoute) &&
       pathname !== overviewRoute
     ) {
-      router.replace(overviewRoute);
+      router.replace(overviewRoute as any);
     }
   }, [
     isLoading,

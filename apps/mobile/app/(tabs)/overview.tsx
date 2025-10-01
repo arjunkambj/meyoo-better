@@ -1,13 +1,11 @@
 import { useCallback, useMemo, useState } from "react";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { ScrollView, Text, View, RefreshControl } from "react-native";
-import { Spinner } from "heroui-native";
 
 import { KPICard, type KPICardProps } from "@/components/analytics/KPICard";
 import { DateRangePickerButton } from "@/components/shared/DateRangePicker";
 import { useOverviewAnalytics } from "@/hooks/useAnalytics";
 import { useUserDetails } from "@/hooks/useUserDetails";
-import { useAuthGuard } from "@/hooks/useAuthGuard";
 import { getCurrencySymbol } from "@/libs/format";
 
 interface CardConfig {
@@ -24,9 +22,6 @@ interface CardConfig {
 export default function OverviewTab() {
   const [refreshing, setRefreshing] = useState(false);
   const insets = useSafeAreaInsets();
-
-  // Auth guard - ensure user is authenticated before loading data
-  const { isLoading: isAuthLoading } = useAuthGuard();
 
   const { metrics, isLoading } = useOverviewAnalytics();
   const { user } = useUserDetails();
@@ -177,15 +172,6 @@ export default function OverviewTab() {
     ["grossProfit", "profitMargin"],
     ["ncRoas", "poas"],
   ];
-
-  // Show loading spinner while authentication is being checked
-  if (isAuthLoading) {
-    return (
-      <SafeAreaView className="flex-1 bg-background items-center justify-center" edges={['top']}>
-        <Spinner size="lg" />
-      </SafeAreaView>
-    );
-  }
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={['top', 'left', 'right']}>

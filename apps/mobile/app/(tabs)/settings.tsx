@@ -1,4 +1,4 @@
-import { Avatar, Button, Card, Chip, Skeleton, Spinner, useTheme } from 'heroui-native';
+import { Avatar, Button, Card, Chip, Skeleton, useTheme } from 'heroui-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Alert, Linking, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { useCallback, useMemo, useState } from 'react';
@@ -9,7 +9,6 @@ import Animated, { FadeOut, ZoomIn } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
 
 import { useUserDetails } from '@/hooks/useUserDetails';
-import { useAuthGuard } from '@/hooks/useAuthGuard';
 
 type CurrentUser = {
   name?: string | null;
@@ -20,9 +19,6 @@ type CurrentUser = {
 } | null;
 
 export default function SettingsTab() {
-  // Auth guard - ensure user is authenticated before loading data
-  const { isLoading: isAuthLoading } = useAuthGuard();
-
   const { billing, billingUsage, isLoading, user } = useUserDetails();
   const { signOut } = useAuthActions();
   const router = useRouter();
@@ -168,14 +164,6 @@ export default function SettingsTab() {
 
     Alert.alert('Contact support', `Email ${supportEmail} and we\'ll jump in.`);
   }, [supportEmail]);
-
-  if (isAuthLoading) {
-    return (
-      <SafeAreaView className="flex-1 bg-background items-center justify-center" edges={['top']}>
-        <Spinner size="lg" />
-      </SafeAreaView>
-    );
-  }
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={['left', 'right']}>

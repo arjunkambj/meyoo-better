@@ -401,7 +401,7 @@ export const deleteDashboardsBatch = internalMutation({
               "orders",
               "avgOrderValue",
               "blendedRoas",
-              "totalAdSpend",
+              "blendedMarketingCost",
               "shopifyConversionRate",
               "repeatCustomerRate",
               "moMRevenueGrowth",

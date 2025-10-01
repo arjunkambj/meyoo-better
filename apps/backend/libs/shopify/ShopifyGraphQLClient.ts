@@ -34,7 +34,11 @@ const summarizeGraphQLErrors = (errors: ReadonlyArray<ShopifyGraphQLError>) => {
 
   for (const error of errors) {
     if (sampleMessages.length < MAX_ERROR_SUMMARY_ITEMS && error.message) {
-      sampleMessages.push(shortenText(error.message.split("\n")[0], 10));
+      const [firstLine] = error.message.split("\n");
+      const sample = firstLine ?? error.message;
+      if (sample) {
+        sampleMessages.push(shortenText(sample, 10));
+      }
     }
     if (samplePaths.length < MAX_ERROR_SUMMARY_ITEMS && error.path?.length) {
       samplePaths.push(error.path.join("."));

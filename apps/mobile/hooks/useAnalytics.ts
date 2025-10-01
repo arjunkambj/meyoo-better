@@ -210,8 +210,8 @@ export function useOverviewAnalytics() {
         overviewSummary.avgOrderValueChange,
       ),
       totalAdSpend: createMetric(
-        overviewSummary.totalAdSpend,
-        overviewSummary.totalAdSpendChange,
+        overviewSummary.blendedMarketingCost,
+        overviewSummary.blendedMarketingCostChange,
       ),
       roas: createMetric(overviewSummary.roas, overviewSummary.roasChange),
       customers: createMetric(overviewSummary.customers, overviewSummary.customersChange),
@@ -256,7 +256,7 @@ export function useCostBreakdown() {
 
     return {
       totals: {
-        adSpend: overviewSummary.totalAdSpend,
+        adSpend: overviewSummary.blendedMarketingCost,
         cogs: overviewSummary.cogs,
         shipping: overviewSummary.shippingCosts,
         transaction: overviewSummary.transactionFees,

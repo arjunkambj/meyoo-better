@@ -24,10 +24,9 @@ export const GoogleAuthButton = React.memo(function GoogleAuthButton({
     if (isLoading) return;
 
     setIsLoading(true);
-    try {
-      await signIn("google", { redirectTo: returnUrl });
-      // Keep the loading state active; successful sign-in will redirect.
-    } catch (error) {
+
+    // Open popup immediately to avoid popup blockers
+    signIn("google", { redirectTo: returnUrl }).catch((error) => {
       setIsLoading(false);
 
       const message = parseAuthError(error);
@@ -38,7 +37,7 @@ export const GoogleAuthButton = React.memo(function GoogleAuthButton({
         color: "danger",
         timeout: 5000,
       });
-    }
+    });
   };
 
   return (

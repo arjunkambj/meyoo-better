@@ -1,6 +1,6 @@
 import { useMutation } from "convex/react";
+import { useQuery } from "convex-helpers/react/cache/hooks";
 import { api } from "@/libs/convexApi";
-import { useQuery } from "convex/react";
 import { createContext, useContext, useMemo } from "react";
 import type { ReactNode } from "react";
 

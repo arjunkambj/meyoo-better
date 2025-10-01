@@ -72,10 +72,8 @@ export interface OverviewSummary {
   contributionMarginPercentageChange: number;
   operatingMargin: number;
   operatingMarginChange: number;
-  adSpend: number;
-  adSpendChange: number;
-  totalAdSpend: number;
-  totalAdSpendChange: number;
+  blendedMarketingCost: number;
+  blendedMarketingCostChange: number;
   metaAdSpend: number;
   metaAdSpendChange: number;
   googleAdSpend: number;

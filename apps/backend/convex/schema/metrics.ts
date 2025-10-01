@@ -20,8 +20,8 @@ export const dailyMetrics = defineTable({
 
   totalOrders: v.optional(v.number()),
   totalRevenue: v.optional(v.number()),
-  uniqueCustomers: v.optional(v.number()),
-  totalCustomers: v.optional(v.number()), // Total customers who purchased that day
+  uniqueCustomers: v.optional(v.number()), // Customers who PURCHASED (paid customers)
+  totalCustomers: v.optional(v.number()), // ALL customers in system (purchased + didn't purchase)
   unitsSold: v.optional(v.number()), // Total units sold that day
   totalCogs: v.optional(v.number()),
   totalHandlingFee: v.optional(v.number()),

@@ -8,13 +8,9 @@ export const globalCosts = defineTable({
 
   // Type determines which UI tab this belongs to
   type: v.union(
-    v.literal("product"), // Products tab - COGS
     v.literal("shipping"), // Shipping tab - shipping costs
     v.literal("payment"), // Payment Fees tab - transaction fees
     v.literal("operational"), // Other Expenses tab - operational costs
-    v.literal("tax"), // Tax rates
-    v.literal("handling"), // Handling fees
-    v.literal("marketing"), // Marketing/advertising costs
   ),
 
   // Core fields

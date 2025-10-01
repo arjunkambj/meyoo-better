@@ -11,6 +11,10 @@ import {
 import { validateDateRange } from "../utils/analyticsSource";
 import { getUserAndOrg } from "../utils/auth";
 import { computePnLAnalytics } from "../utils/analyticsAggregations";
+import {
+  loadPnLAnalyticsFromDailyMetrics,
+  type DailyPnLMeta,
+} from "../utils/dailyMetrics";
 import type { PnLAnalyticsResult, PnLGranularity } from "@repo/types";
 
 const responseOrNull = v.union(v.null(), responseValidator);
@@ -185,7 +189,34 @@ export const getAnalytics = query({
     const organizationId = auth.orgId as Id<"organizations">;
     const granularity = (args.granularity ?? "daily") as PnLGranularity;
 
-    const analytics = await loadAnalytics(ctx, organizationId, range);
+    const dailyMetrics = await loadPnLAnalyticsFromDailyMetrics(
+      ctx,
+      organizationId,
+      range,
+      granularity,
+    );
+
+    if (dailyMetrics.meta.hasData) {
+      const dailyMeta: DailyPnLMeta = dailyMetrics.meta;
+      return {
+        dateRange: range,
+        organizationId: auth.orgId as string,
+        result: dailyMetrics.result,
+        meta: {
+          strategy: "dailyMetrics",
+          ...dailyMeta,
+        },
+      } satisfies {
+        dateRange: { startDate: string; endDate: string };
+        organizationId: string;
+        result: PnLAnalyticsResult;
+        meta: Record<string, unknown>;
+      };
+    }
+
+    const analytics = await loadAnalytics(ctx, organizationId, range, {
+      datasets: ["orders", "metaInsights", "globalCosts"],
+    });
     const result = computePnLAnalytics(analytics, granularity);
 
     return {

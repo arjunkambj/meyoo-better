@@ -20,7 +20,7 @@ export const listThreads = query({
         createdAt: v.number(),
       }),
     ),
-    continueCursor: v.union(v.string(), v.null()),
+    continueCursor: v.string(),
     isDone: v.boolean(),
   }),
   handler: async (ctx, args) => {
@@ -28,7 +28,7 @@ export const listThreads = query({
     if (!userId) {
       return {
         page: [],
-        continueCursor: null,
+        continueCursor: "",
         isDone: true,
       };
     }
@@ -50,7 +50,7 @@ export const listThreads = query({
         status: thread.status,
         createdAt: thread._creationTime,
       })),
-      continueCursor: result.continueCursor ?? null,
+      continueCursor: result.continueCursor,
       isDone: result.isDone,
     };
   },

@@ -191,6 +191,7 @@ const ORG_SCOPED_TABLES = [
   "shopifyRefunds",
   "shopifyFulfillments",
   "shopifyInventory",
+  "shopifyInventoryTotals",
   "shopifyProductVariants",
   "shopifyProducts",
   "shopifyOrders",
@@ -1712,6 +1713,7 @@ export const resetShopifyData = action({
     await deleteTableWithCount("shopifyTransactions", "transactions");
     await deleteTableWithCount("shopifyFulfillments", "fulfillments");
     await deleteTableWithCount("shopifyInventory", "inventory");
+    await deleteTableWithCount("shopifyInventoryTotals", "inventory");
     await deleteTableWithCount("shopifyProductVariants", "variants");
     await deleteTableWithCount("shopifyProducts", "products");
     await deleteTableWithCount("shopifyOrders", "orders");
@@ -1851,6 +1853,7 @@ export const resetEverything = action({
       "shopifyRefunds",
       "shopifyFulfillments",
       "shopifyInventory",
+      "shopifyInventoryTotals",
       "shopifyProductVariants",
       "shopifyProducts",
       "shopifyOrders",

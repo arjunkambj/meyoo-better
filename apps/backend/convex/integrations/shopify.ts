@@ -143,6 +143,7 @@ const ORGANIZATION_TABLES = [
   "shopifyRefunds",
   "shopifyFulfillments",
   "shopifyInventory",
+  "shopifyInventoryTotals",
   "metaAdAccounts",
   "metaInsights",
   "shopifyAnalytics",
@@ -172,6 +173,7 @@ const organizationTableValidator = v.union(
   v.literal("shopifyRefunds"),
   v.literal("shopifyFulfillments"),
   v.literal("shopifyInventory"),
+  v.literal("shopifyInventoryTotals"),
   v.literal("metaAdAccounts"),
   v.literal("metaInsights"),
   v.literal("shopifyAnalytics"),
@@ -1819,8 +1821,31 @@ export const storeProductsInternal = internalMutation({
 
     // Step 4: Process variants and collect inventory data
     const inventoryToStore = [];
+    const variantTotalsToStore = new Map<
+      Id<"shopifyProductVariants">,
+      { available: number; incoming: number; committed: number }
+    >();
     const touchedVariantIds = new Set<Id<"shopifyProductVariants">>();
     const variantIdMap = new Map();
+
+    const accumulateVariantTotals = (
+      variantId: Id<"shopifyProductVariants">,
+      available: number,
+      incoming: number,
+      committed: number,
+    ) => {
+      const current = variantTotalsToStore.get(variantId) ?? {
+        available: 0,
+        incoming: 0,
+        committed: 0,
+      };
+
+      current.available += available;
+      current.incoming += incoming;
+      current.committed += committed;
+
+      variantTotalsToStore.set(variantId, current);
+    };
 
     for (const variant of allVariants) {
       const variantToStore = {
@@ -1874,38 +1899,41 @@ export const storeProductsInternal = internalMutation({
 
       if (inventoryLevels.length > 0) {
         for (const invLevel of inventoryLevels) {
+          const available =
+            typeof invLevel.available === "number" ? invLevel.available : 0;
+          const incoming =
+            typeof invLevel.incoming === "number" ? invLevel.incoming : 0;
+          const committed =
+            typeof invLevel.committed === "number" ? invLevel.committed : 0;
+
           inventoryToStore.push({
             organizationId: variant.organizationId,
             variantId,
             locationId: invLevel.locationId,
             locationName: invLevel.locationName,
-            available:
-              typeof invLevel.available === "number"
-                ? invLevel.available
-                : 0,
-            incoming:
-              typeof invLevel.incoming === "number"
-                ? invLevel.incoming
-                : 0,
-            committed:
-              typeof invLevel.committed === "number"
-                ? invLevel.committed
-                : 0,
+            available,
+            incoming,
+            committed,
           });
+
+          accumulateVariantTotals(variantId, available, incoming, committed);
         }
       } else {
+        const available =
+          typeof variant.inventoryQuantity === "number"
+            ? variant.inventoryQuantity
+            : 0;
         inventoryToStore.push({
           organizationId: variant.organizationId,
           variantId,
           locationId: "default",
           locationName: "Default Location",
-          available:
-            typeof variant.inventoryQuantity === "number"
-              ? variant.inventoryQuantity
-              : 0,
+          available,
           incoming: 0,
           committed: 0,
         });
+
+        accumulateVariantTotals(variantId, available, 0, 0);
       }
     }
 
@@ -1962,6 +1990,39 @@ export const storeProductsInternal = internalMutation({
           await ctx.db.delete(existing._id);
         }
       }
+    }
+
+    if (variantTotalsToStore.size > 0) {
+      const now = Date.now();
+      await Promise.all(
+        Array.from(variantTotalsToStore.entries()).map(
+          async ([variantId, totals]) => {
+            const existingTotals = await ctx.db
+              .query("shopifyInventoryTotals")
+              .withIndex("by_variant", (q) => q.eq("variantId", variantId))
+              .first();
+
+            const totalPayload = {
+              organizationId: args.organizationId as Id<"organizations">,
+              variantId,
+              available: totals.available,
+              incoming: totals.incoming,
+              committed: totals.committed,
+              updatedAt: now,
+              syncedAt: now,
+            };
+
+            if (existingTotals) {
+              await ctx.db.patch(existingTotals._id, totalPayload);
+            } else {
+              await (ctx.db.insert as any)(
+                "shopifyInventoryTotals",
+                totalPayload,
+              );
+            }
+          },
+        ),
+      );
     }
 
     logger.info(
@@ -3023,6 +3084,15 @@ export const deleteProductByShopifyIdInternal = internalMutation({
         .withIndex("by_variant", (q) => q.eq("variantId", vdoc._id))
         .collect();
       for (const inv of invRows) await ctx.db.delete(inv._id);
+
+      const totalsDoc = await ctx.db
+        .query("shopifyInventoryTotals")
+        .withIndex("by_variant", (q) => q.eq("variantId", vdoc._id))
+        .first();
+      if (totalsDoc) {
+        await ctx.db.delete(totalsDoc._id);
+      }
+
       await ctx.db.delete(vdoc._id);
     }
 

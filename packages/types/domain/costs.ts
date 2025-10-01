@@ -1,13 +1,6 @@
 import type { Id } from '@repo/convex/dataModel';
 
-export type CostType =
-  | 'product'
-  | 'shipping'
-  | 'payment'
-  | 'operational'
-  | 'tax'
-  | 'handling'
-  | 'marketing';
+export type CostType = 'shipping' | 'payment' | 'operational';
 
 export type CostCalculation =
   | 'fixed'
@@ -56,18 +49,4 @@ export type PaymentFee = Cost & {
 
 export type OperationalExpense = Cost & {
   type: 'operational';
-};
-
-export type MarketingCost = Cost & {
-  type: 'marketing';
-};
-
-export type TaxCost = Cost & {
-  type: 'tax';
-  calculation: 'percentage';
-  frequency?: Extract<CostFrequency, 'percentage'>;
-};
-
-export type ProductCost = Cost & {
-  type: 'product';
 };

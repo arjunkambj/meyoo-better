@@ -5,7 +5,9 @@ import { useCallback, useMemo, useState } from "react";
 import { AnalyticsHeader } from "@/components/shared/AnalyticsHeader";
 import { ExportButton } from "@/components/shared/actions/ExportButton";
 import { FilterBar } from "@/components/shared/filters/FilterBar";
+import GlobalDateRangePicker from "@/components/shared/GlobalDateRangePicker";
 import { useInventoryAnalytics } from "@/hooks";
+import { useAnalyticsDateRange } from "@/hooks";
 
 import { InventoryOverviewCards } from "./components/InventoryOverviewCards";
 import { ProductsTable } from "./components/ProductsTable";
@@ -14,18 +16,40 @@ export function InventoryView() {
   const [stockFilter, setStockFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const {
+    analyticsRange: inventoryRange,
+    calendarRange: inventoryCalendarRange,
+    preset: inventoryPreset,
+    updateRange: updateInventoryRange,
+  } = useAnalyticsDateRange("dashboard-inventory", {
+    defaultPreset: "today",
+  });
 
   const { overview, products, isLoading, exportData } = useInventoryAnalytics({
+    dateRange: inventoryRange,
     stockLevel: stockFilter,
     category: categoryFilter,
     page: currentPage,
   });
 
+  const handleAnalyticsRangeChange = useCallback(
+    (...args: Parameters<typeof updateInventoryRange>) => {
+      setCurrentPage(1);
+      return updateInventoryRange(...args);
+    },
+    [setCurrentPage, updateInventoryRange],
+  );
+
   const handleFilterChange = useCallback((key: string, value: unknown) => {
     if (key === "stock") {
       setStockFilter((value as string) || "all");
-    } else if (key === "category") {
+      setCurrentPage(1);
+      return;
+    }
+
+    if (key === "category") {
       setCategoryFilter((value as string) || "all");
+      setCurrentPage(1);
     }
   }, []);
 
@@ -71,6 +95,12 @@ export function InventoryView() {
     <div className="flex flex-col gap-4">
       <h1 className="text-2xl font-semibold leading-tight">Inventory Products</h1>
       <div className="flex flex-wrap items-center gap-2">
+        <GlobalDateRangePicker
+          value={inventoryCalendarRange}
+          preset={inventoryPreset}
+          defaultPreset="today"
+          onAnalyticsChange={handleAnalyticsRangeChange}
+        />
         <FilterBar
           filters={filters}
           values={filterValues}

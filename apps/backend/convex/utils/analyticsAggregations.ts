@@ -22,6 +22,15 @@ type AnyRecord = Record<string, unknown>;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+function filterAccountLevelMetaInsights(metaInsights: AnyRecord[]): AnyRecord[] {
+  return metaInsights.filter((insight) => {
+    const entityType = typeof insight?.entityType === "string"
+      ? insight.entityType.toLowerCase()
+      : null;
+    return entityType === null || entityType === "account";
+  });
+}
+
 function parseDateBoundary(value: string | undefined, end = false): number {
   if (!value) {
     const now = new Date();
@@ -278,6 +287,7 @@ export function computeOverviewMetrics(
   const transactions = (data.transactions || []) as AnyRecord[];
   const refunds = (data.refunds || []) as AnyRecord[];
   const metaInsights = (data.metaInsights || []) as AnyRecord[];
+  const accountMetaInsights = filterAccountLevelMetaInsights(metaInsights);
   const costs = (data.globalCosts || []) as AnyRecord[];
   const variantCosts = (data.variantCosts || []) as AnyRecord[];
   const variants = (data.variants || []) as AnyRecord[];
@@ -496,12 +506,12 @@ export function computeOverviewMetrics(
     }
   }
 
-  const marketingCosts = costs.filter((cost) => cost.type === "marketing");
   const shippingCostEntries = costs.filter((cost) => cost.type === "shipping");
-  const handlingCostEntries = costs.filter((cost) => cost.type === "handling");
-  const operationalCosts = costs.filter((cost) => cost.type === "operational" || cost.type === "custom");
+  const operationalCosts = costs.filter((cost) => {
+    const type = String(cost.type ?? "");
+    return type === "operational" || type === "custom";
+  });
   const paymentCostEntries = costs.filter((cost) => cost.type === "payment");
-  const productCostEntries = costs.filter((cost) => cost.type === "product");
 
   const rangeStart = parseDateBoundary(response.dateRange.startDate);
   const rangeEnd = parseDateBoundary(response.dateRange.endDate, true);
@@ -564,17 +574,11 @@ export function computeOverviewMetrics(
     }
   };
 
-  const marketingCostTotal = sumBy(marketingCosts, computeCostAmount);
   const customCostTotal = sumBy(operationalCosts, computeCostAmount);
   const paymentCostTotal = sumBy(paymentCostEntries, computeCostAmount);
-  const productCostTotal = sumBy(productCostEntries, computeCostAmount);
-  if (productCostTotal > 0) {
-    cogs += productCostTotal;
-  }
-
   // Use computeCostAmount for all cost types - it handles per_order, per_unit, percentage, etc.
   const shippingCostTotal = sumBy(shippingCostEntries, computeCostAmount);
-  const handlingCostTotal = sumBy(handlingCostEntries, computeCostAmount) + handlingFromComponents;
+  const handlingCostTotal = handlingFromComponents;
 
   // Start with order-level shipping (usually 0), then add globalCosts shipping
   shippingCosts = shippingCostsFromOrders + shippingCostTotal;
@@ -603,10 +607,13 @@ export function computeOverviewMetrics(
   );
   const transactionFees = transactionFeesFromTransactions + paymentCostTotal;
 
-  const metaAdSpend = sumBy(metaInsights, (insight) => safeNumber(insight.spend));
-  const metaConversionValue = sumBy(metaInsights, (insight) => safeNumber(insight.conversionValue));
+  const metaAdSpend = sumBy(accountMetaInsights, (insight) => safeNumber(insight.spend));
+  const metaConversionValue = sumBy(
+    accountMetaInsights,
+    (insight) => safeNumber(insight.conversionValue),
+  );
 
-  const totalAdSpend = metaAdSpend + marketingCostTotal;
+  const totalAdSpend = metaAdSpend;
 
   const totalCostsWithoutAds =
     cogs + shippingCosts + transactionFees + handlingCostTotal + customCostTotal + taxesCollected;
@@ -1520,11 +1527,11 @@ function calculatePnLMetricsForRange({
   const revenue = sumBy(filteredOrders, (order) => safeNumber(order.totalPrice ?? order.revenue ?? 0));
   const discounts = sumBy(filteredOrders, (order) => safeNumber(order.totalDiscounts ?? order.discounts ?? 0));
   const refunds = sumBy(filteredOrders, (order) => safeNumber(order.totalRefunded ?? order.totalRefunds ?? 0));
-  let cogs = sumBy(filteredOrders, (order) => safeNumber(order.totalCostOfGoods ?? order.cogs ?? 0));
+  const cogs = sumBy(filteredOrders, (order) => safeNumber(order.totalCostOfGoods ?? order.cogs ?? 0));
   let shippingCosts = sumBy(filteredOrders, (order) => safeNumber(order.shippingCosts ?? 0));
   let transactionFees = sumBy(filteredOrders, (order) => safeNumber(order.totalFees ?? order.transactionFees ?? 0));
-  let handlingFees = sumBy(filteredOrders, (order) => safeNumber(order.handlingFees ?? 0));
-  let taxesCollected = sumBy(filteredOrders, (order) => safeNumber(order.taxesCollected ?? 0));
+  const handlingFees = sumBy(filteredOrders, (order) => safeNumber(order.handlingFees ?? 0));
+  const taxesCollected = sumBy(filteredOrders, (order) => safeNumber(order.taxesCollected ?? 0));
 
   const unitsSold = sumBy(filteredOrders, (order) =>
     safeNumber(
@@ -1544,28 +1551,19 @@ function calculatePnLMetricsForRange({
     rangeEndMs,
   };
 
-  const marketingCostEntries = costs.filter((cost) => cost.type === "marketing");
   const shippingCostEntries = costs.filter((cost) => cost.type === "shipping");
   const paymentCostEntries = costs.filter((cost) => cost.type === "payment");
-  const handlingCostEntries = costs.filter((cost) => cost.type === "handling");
-  const operationalCostEntries = costs.filter((cost) => cost.type === "operational" || cost.type === "custom");
-  const productCostEntries = costs.filter((cost) => cost.type === "product");
-  const taxCostEntries = costs.filter((cost) => cost.type === "tax");
-
-  const marketingCostFromCosts = sumBy(marketingCostEntries, (cost) => computeCostAmountForRange(cost, context));
+  const operationalCostEntries = costs.filter((cost) => {
+    const type = String(cost.type ?? "");
+    return type === "operational" || type === "custom";
+  });
+ 
   shippingCosts += sumBy(shippingCostEntries, (cost) => computeCostAmountForRange(cost, context));
   transactionFees += sumBy(paymentCostEntries, (cost) => computeCostAmountForRange(cost, context));
-  handlingFees += sumBy(handlingCostEntries, (cost) => computeCostAmountForRange(cost, context));
   const operationalCostsAmount = sumBy(operationalCostEntries, (cost) => computeCostAmountForRange(cost, context));
-  const productCostAmount = sumBy(productCostEntries, (cost) => computeCostAmountForRange(cost, context));
-  const taxCostsAmount = sumBy(taxCostEntries, (cost) => computeCostAmountForRange(cost, context));
 
-  if (productCostAmount > 0) {
-    cogs += productCostAmount;
-  }
-  taxesCollected += taxCostsAmount;
-
-  const metaSpend = sumBy(metaInsights, (insight) => {
+  const accountMetaInsights = filterAccountLevelMetaInsights(metaInsights);
+  const metaSpend = sumBy(accountMetaInsights, (insight) => {
     if (!insight || typeof insight.date !== "string") return 0;
     const timestamp = Date.parse(`${insight.date}T00:00:00.000Z`);
     if (!Number.isFinite(timestamp)) return 0;
@@ -1574,8 +1572,7 @@ function calculatePnLMetricsForRange({
     return safeNumber(insight.spend ?? 0);
   });
 
-  const marketingCost = marketingCostFromCosts + metaSpend;
-  const totalAdSpend = marketingCost;
+  const totalAdSpend = metaSpend;
   const customCosts = operationalCostsAmount;
 
   const netRevenue = revenue - refunds;
@@ -1601,14 +1598,14 @@ function calculatePnLMetricsForRange({
 
   return {
     metrics,
-    marketingCost,
+    marketingCost: totalAdSpend,
   };
 }
 
 function buildPnLKPIs(total: PnLMetrics, marketingCost: number): PnLKPIMetrics {
   const netRevenue = total.revenue;
-  const operatingExpenses = total.customCosts + total.totalAdSpend;
-  const ebitda = total.netProfit + total.totalAdSpend;
+  const operatingExpenses = total.customCosts;
+  const ebitda = total.netProfit + total.totalAdSpend + total.customCosts;
   const marketingROAS = marketingCost > 0 ? total.revenue / marketingCost : 0;
   const marketingROI = marketingCost > 0 ? (total.netProfit / marketingCost) * 100 : 0;
 

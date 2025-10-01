@@ -4,7 +4,9 @@ import type { Doc, Id } from "../_generated/dataModel";
 import { action, query } from "../_generated/server";
 import type { QueryCtx } from "../_generated/server";
 import { api } from "../_generated/api";
+import { validateDateRange } from "../utils/analyticsSource";
 import { getUserAndOrg } from "../utils/auth";
+import { loadCustomerOverviewFromDailyMetrics } from "../utils/dailyMetrics";
 
 const MAX_CUSTOMER_PAGE_SIZE = 100;
 const MAX_CURSOR_CARRY = 100;
@@ -270,7 +272,16 @@ export const getCustomerOverview = query({
   handler: async (ctx, args) => {
     const auth = await getUserAndOrg(ctx);
     if (!auth) return null;
-    const orgId = auth.orgId;
+    const orgId = auth.orgId as Id<"organizations">;
+    const range = args.dateRange ? validateDateRange(args.dateRange) : null;
+
+    if (range) {
+      const dailyOverview = await loadCustomerOverviewFromDailyMetrics(ctx, orgId, range);
+      if (dailyOverview) {
+        return dailyOverview.metrics;
+      }
+    }
+
     const periodRange = normalizeDateRange(args.dateRange ?? undefined);
     const hasPeriod = periodRange !== undefined;
 
@@ -553,7 +564,7 @@ export const getCustomerOverview = query({
         .query("shopifyOrders")
         .withIndex("by_organization_and_created", (q) =>
           q
-            .eq("organizationId", auth.orgId as Id<"organizations">)
+            .eq("organizationId", orgId)
             .gte("shopifyCreatedAt", previousStart)
             .lte("shopifyCreatedAt", previousEnd),
         )

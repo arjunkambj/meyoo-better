@@ -53,14 +53,7 @@ interface Cost {
   _id: Id<"globalCosts">;
   organizationId: string;
   userId: Id<"users">;
-  type:
-    | "product"
-    | "shipping"
-    | "payment"
-    | "operational"
-    | "tax"
-    | "handling"
-    | "marketing";
+  type: "shipping" | "payment" | "operational";
   name: string;
   description?: string;
   calculation:

@@ -31,6 +31,7 @@ import {
   shopifyRefunds,
   shopifyFulfillments,
   shopifyInventory,
+  shopifyInventoryTotals,
   shopifySessions,
   shopifyAnalytics,
 } from "./schema/shopify";
@@ -77,6 +78,7 @@ export default defineSchema({
   shopifyRefunds,
   shopifyFulfillments,
   shopifyInventory,
+  shopifyInventoryTotals,
   shopifySessions,
   shopifyAnalytics,
 

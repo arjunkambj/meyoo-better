@@ -1,14 +1,10 @@
 "use client";
 
-import { Card, CardBody, CardHeader, Switch } from "@heroui/react";
+import { Card, CardBody, CardHeader } from "@heroui/react";
 import { Icon } from "@iconify/react";
-import { useAtom } from "jotai";
-import { devToolsVisibleAtom } from "@/store/atoms";
 import ApiKeyManagement from "./ApiKeyManagement";
 
 export default function SecuritySettingsView() {
-  const [devToolsVisible, setDevToolsVisible] = useAtom(devToolsVisibleAtom);
-
   return (
     <div className="space-y-6">
       <Card className="rounded-2xl border border-default-100 shadow-none bg-content2 dark:bg-content1">
@@ -29,11 +25,11 @@ export default function SecuritySettingsView() {
                 overview page
               </span>
             </div>
-            <Switch
+            {/* <Switch
               isSelected={devToolsVisible}
               onValueChange={setDevToolsVisible}
               size="sm"
-            />
+            /> */}
           </div>
         </CardBody>
       </Card>

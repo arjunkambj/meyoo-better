@@ -11,7 +11,7 @@ import { getUserAndOrg, requireUserAndOrg } from "../utils/auth";
 
 /**
  * Cost management
- * Handles all cost tracking including COGS, shipping, taxes, and custom expenses
+ * Handles organization-level shipping, payment processing, and operational expenses
  */
 
 // Cost categories
@@ -21,8 +21,6 @@ export const COST_CATEGORIES = {
   HANDLING: "handling", // Handling fees
   TRANSACTION: "transaction", // Payment processing fees
   TAX: "tax", // Taxes paid
-  MARKETING: "marketing", // Ad spend (auto-tracked)
-  CUSTOM: "custom", // Custom expenses
   OPERATIONAL: "operational", // Operational expenses
   RETURNS: "returns", // Return processing costs
 } as const;
@@ -40,17 +38,7 @@ export const getCosts = query({
         endDate: v.string(),
       }),
     ),
-    type: v.optional(
-      v.union(
-        v.literal("product"),
-        v.literal("shipping"),
-        v.literal("payment"),
-        v.literal("operational"),
-        v.literal("tax"),
-        v.literal("handling"),
-        v.literal("marketing"),
-      ),
-    ),
+    type: v.optional(v.union(v.literal("shipping"), v.literal("payment"), v.literal("operational"))),
   },
   handler: async (ctx, args) => {
     const auth = await getUserAndOrg(ctx);
@@ -66,17 +54,7 @@ export const getCosts = query({
         .withIndex("by_org_and_type", (q) =>
           q
             .eq("organizationId", orgId)
-            .eq(
-              "type",
-              args.type as
-                | "product"
-                | "shipping"
-                | "payment"
-                | "operational"
-                | "tax"
-                | "handling"
-                | "marketing",
-            ),
+            .eq("type", args.type as "shipping" | "payment" | "operational"),
         )
         .collect();
     } else {
@@ -124,37 +102,6 @@ export const getShippingCosts = query({
       )
       .order("desc")
       .take(args.limit || 100);
-  },
-});
-
-/**
- * Get tax rates
- */
-export const getTaxRates = query({
-  args: {},
-  handler: async (ctx) => {
-    const auth = await getUserAndOrg(ctx);
-    if (!auth) return [];
-
-    // Get tax rates from costs
-    const taxCosts = await ctx.db
-      .query("globalCosts")
-      .withIndex("by_org_and_type", (q) =>
-        q
-          .eq("organizationId", auth.orgId as Id<"organizations">)
-          .eq("type", "tax"),
-      )
-      .collect();
-
-    return taxCosts.map((tax) => ({
-      id: tax._id,
-      name: tax.name,
-      rate: tax.calculation === "percentage" ? tax.value : undefined,
-      amount: tax.calculation !== "percentage" ? tax.value : undefined,
-      calculation: tax.calculation,
-      frequency: tax.frequency,
-      isActive: tax.isActive,
-    }));
   },
 });
 
@@ -218,15 +165,7 @@ export const getCostSummary = query({
  */
 export const addCost = mutation({
   args: {
-    type: v.union(
-      v.literal("product"),
-      v.literal("shipping"),
-      v.literal("payment"),
-      v.literal("operational"),
-      v.literal("tax"),
-      v.literal("handling"),
-      v.literal("marketing"),
-    ),
+    type: v.union(v.literal("shipping"), v.literal("payment"), v.literal("operational")),
     name: v.string(),
     value: v.number(),
     calculation: v.union(
@@ -425,13 +364,9 @@ export const bulkImportCosts = mutation({
     costs: v.array(
       v.object({
         type: v.union(
-          v.literal("product"),
           v.literal("shipping"),
           v.literal("payment"),
           v.literal("operational"),
-          v.literal("tax"),
-          v.literal("handling"),
-          v.literal("marketing"),
         ),
         value: v.number(),
         effectiveFrom: v.number(),
@@ -873,55 +808,6 @@ export const saveVariantCosts = mutation({
 // ============ INTERNAL FUNCTIONS ============
 
 /**
- * Update historical tax rate based on calculated average from orders
- */
-export const updateHistoricalTaxRate = internalMutation({
-  args: {
-    organizationId: v.id("organizations"),
-    taxPercent: v.number(),
-  },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    // Single source of truth: update or create a tax cost entry only
-    const existingTaxCost = await ctx.db
-      .query("globalCosts")
-      .withIndex("by_org_type_default", (q) =>
-        q
-          .eq("organizationId", args.organizationId)
-          .eq("type", "tax")
-          .eq("isDefault", true),
-      )
-      .first();
-    
-    if (existingTaxCost) {
-      await ctx.db.patch(existingTaxCost._id, {
-        value: args.taxPercent,
-        calculation: "percentage",
-        frequency: "percentage",
-        isActive: true,
-        isDefault: true,
-        updatedAt: Date.now(),
-      } as Partial<Doc<"globalCosts">>);
-    } else {
-      await ctx.db.insert("globalCosts", {
-        organizationId: args.organizationId,
-        type: "tax",
-        name: "Calculated Sales Tax",
-        description: "Auto-generated tax rate synced from Shopify variants",
-        value: args.taxPercent,
-        calculation: "percentage",
-        frequency: "percentage",
-        isActive: true,
-        isDefault: true,
-        effectiveFrom: Date.now(),
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      });
-    }
-  },
-});
-
-/**
  * Create product cost components for synced variants
  */
 export const createVariantCosts = internalMutation({
@@ -1039,7 +925,10 @@ export const validateCostDataCompleteness = internalQuery({
       )
       .collect();
     
-    const hasTaxRate = costs.some(c => c.type === "tax");
+    const hasTaxRate = costComponents.some((component) => {
+      const value = component.taxPercent;
+      return typeof value === "number" && value > 0;
+    });
     const hasShippingCosts = costs.some(c => c.type === "shipping");
     const hasPaymentFees = costs.some(c => c.type === "payment");
     
@@ -1057,7 +946,7 @@ export const validateCostDataCompleteness = internalQuery({
     }
     
     if (!hasTaxRate) {
-      recommendations.push("No tax rate configured. The system calculated one from your orders.");
+      recommendations.push("No tax rates configured at the product level. Add tax percentages to your variants for better reporting.");
     }
     
     if (!hasShippingCosts) {
@@ -1155,13 +1044,9 @@ export const syncPlatformCosts = internalMutation({
     costs: v.array(
       v.object({
         type: v.union(
-          v.literal("product"),
           v.literal("shipping"),
           v.literal("payment"),
           v.literal("operational"),
-          v.literal("tax"),
-          v.literal("handling"),
-          v.literal("marketing"),
         ),
         value: v.number(),
         effectiveFrom: v.number(),

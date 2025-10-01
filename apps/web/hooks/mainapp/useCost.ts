@@ -9,18 +9,14 @@ import { useOrganizationTimeZone } from "./useUser";
 
 /**
  * Cost Management Hooks
- * Handles all cost tracking including COGS, shipping, taxes, and custom expenses
+ * Handles organization-level costs including shipping, payment processing, and operational expenses
  */
 
 // Cost type constants
 const COST_TYPES = {
-  PRODUCT: "product",
   SHIPPING: "shipping",
   PAYMENT: "payment",
   OPERATIONAL: "operational",
-  TAX: "tax",
-  HANDLING: "handling",
-  MARKETING: "marketing",
 } as const;
 
 const PAYMENT_COST_ARGS = { type: "payment" } as const;

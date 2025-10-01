@@ -420,6 +420,18 @@ export const shopifyInventory = defineTable({
   .index("by_location", ["locationId"])
   .index("by_variant_location", ["variantId", "locationId"]);
 
+export const shopifyInventoryTotals = defineTable({
+  organizationId: v.id("organizations"),
+  variantId: v.id("shopifyProductVariants"),
+  available: v.number(),
+  incoming: v.optional(v.number()),
+  committed: v.optional(v.number()),
+  updatedAt: v.number(),
+  syncedAt: v.number(),
+})
+  .index("by_organization", ["organizationId"])
+  .index("by_variant", ["variantId"]);
+
 // Shopify sessions for tracking visitor behavior
 export const shopifySessions = defineTable({
   organizationId: v.id("organizations"),

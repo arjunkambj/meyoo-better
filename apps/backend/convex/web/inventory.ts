@@ -45,7 +45,7 @@ const getCachedComponent = (
 };
 
 const aggregateInventoryLevels = (
-  levels: Array<Doc<"shopifyInventory">>,
+  levels: Array<Doc<"shopifyInventoryTotals">>,
   variants?: Array<Doc<"shopifyProductVariants">>,
 ): Map<
   Id<"shopifyProductVariants">,
@@ -57,22 +57,15 @@ const aggregateInventoryLevels = (
   >();
 
   for (const level of levels) {
-    const current = totals.get(level.variantId);
     const available = typeof level.available === "number" ? level.available : 0;
     const incoming = typeof level.incoming === "number" ? level.incoming : 0;
     const committed = typeof level.committed === "number" ? level.committed : 0;
 
-    if (current) {
-      current.available += available;
-      current.incoming += incoming;
-      current.committed += committed;
-    } else {
-      totals.set(level.variantId, {
-        available,
-        incoming,
-        committed,
-      });
-    }
+    totals.set(level.variantId, {
+      available,
+      incoming,
+      committed,
+    });
   }
 
   if (variants) {
@@ -506,7 +499,7 @@ export const getInventoryOverview = query({
 
     // Get inventory levels
     const inventory = await ctx.db
-      .query("shopifyInventory")
+      .query("shopifyInventoryTotals")
       .withIndex("by_organization", (q) => q.eq("organizationId", _orgId))
       .collect();
 
@@ -793,7 +786,7 @@ export const getProductsList = query({
         .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
         .collect(),
       ctx.db
-        .query("shopifyInventory")
+        .query("shopifyInventoryTotals")
         .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
         .collect(),
     ]);
@@ -1031,7 +1024,7 @@ export const getStockHealth = query({
       .collect();
 
     const inventory = await ctx.db
-      .query("shopifyInventory")
+      .query("shopifyInventoryTotals")
       .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
       .collect();
 
@@ -1303,7 +1296,7 @@ export const getStockAlerts = query({
         .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
         .collect(),
       ctx.db
-        .query("shopifyInventory")
+        .query("shopifyInventoryTotals")
         .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
         .collect(),
     ]);
@@ -1716,7 +1709,7 @@ export const getStockMovement = query({
       .collect();
 
     const inventory = await ctx.db
-      .query("shopifyInventory")
+      .query("shopifyInventoryTotals")
       .withIndex("by_organization", (q) =>
         q.eq("organizationId", orgId),
       )
@@ -1843,7 +1836,7 @@ export const getInventoryTurnover = query({
         .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
         .collect(),
       ctx.db
-        .query("shopifyInventory")
+        .query("shopifyInventoryTotals")
         .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
         .collect(),
     ]);

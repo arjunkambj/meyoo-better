@@ -93,7 +93,7 @@ export default function VariantCostsClient({
   const user = useCurrentUser();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const pageSize = 50;
+  const pageSize = 10;
   const [bulkPct, setBulkPct] = useState<string>("10");
   const { data, totalPages, loading } = useShopifyProductVariantsPaginated(
     page,

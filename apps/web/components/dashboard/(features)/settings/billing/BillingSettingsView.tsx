@@ -1,6 +1,5 @@
 "use client";
 import { Card, CardBody } from "@heroui/react";
-import { PlanUsageAlert } from "@/components/shared/billing/PlanUsageAlert";
 import AvailablePlans from "./AvailablePlans";
 import InvoicesList from "./InvoicesList";
 import PlanOverview from "./PlanOverview";
@@ -8,9 +7,6 @@ import PlanOverview from "./PlanOverview";
 export default function BillingSettingsView() {
   return (
     <div className="space-y-6 pb-8">
-      {/* Plan Usage Alert */}
-      <PlanUsageAlert variant="full" />
-
       {/* Current Plan - Moved to top */}
       <Card className="rounded-2xl border border-default-100 shadow-none bg-content2 dark:bg-content1">
         <CardBody className="px-5 py-5">

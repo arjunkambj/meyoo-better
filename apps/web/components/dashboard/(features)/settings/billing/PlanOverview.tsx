@@ -1,136 +1,66 @@
 "use client";
-import { Chip, Progress } from "@heroui/react";
-import { Icon } from "@iconify/react";
-import { useQuery } from "convex-helpers/react/cache/hooks";
+
 import { useMemo } from "react";
 
+import { Chip } from "@heroui/react";
+import { Icon } from "@iconify/react";
+import { useQuery } from "convex-helpers/react/cache/hooks";
+
 import { tiers } from "@/components/home/pricing/constants";
+import { TiersEnum } from "@/components/home/pricing/types";
 import { PlanOverviewSkeleton } from "@/components/shared/skeletons";
 import { api } from "@/libs/convexApi";
-import { useBilling } from "@/hooks";
-import { toUtcRangeStrings } from "@/libs/dateRange";
-import { useOrganizationTimeZone } from "@/hooks/mainapp/useUser";
-import { formatNumber } from "@/libs/utils/format";
+
+type PlanKey = "free" | "starter" | "growth" | "business";
+
+const PLAN_KEY_TO_LABEL: Record<PlanKey, string> = {
+  free: "Free Plan",
+  starter: "Starter Plan",
+  growth: "Growth Plan",
+  business: "Business Plan",
+};
+
+const PLAN_KEY_TO_TIER: Record<PlanKey, TiersEnum> = {
+  free: TiersEnum.Free,
+  starter: TiersEnum.Pro,
+  growth: TiersEnum.Team,
+  business: TiersEnum.Custom,
+};
+
+const PLAN_PRICES: Record<PlanKey, string> = {
+  free: "$0/month",
+  starter: "$40/month",
+  growth: "$90/month",
+  business: "$160/month",
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  active: "Active",
+  trial: "Trial",
+  cancelled: "Cancelled",
+  suspended: "Suspended",
+};
+
 export default function PlanOverview() {
-  const { timezone } = useOrganizationTimeZone();
-  const { currentUsage: billingUsage, upgradeRecommendation } = useBilling();
-  // Read authoritative billing info directly
   const userBilling = useQuery(api.core.users.getUserBilling);
 
-  // Get current month's metrics for order count
-  const { startOfMonth, endOfMonth } = useMemo(() => {
-    const currentDate = new Date();
+  const currentPlanKey = (userBilling?.plan ?? "free") as PlanKey;
+  const planLabel = PLAN_KEY_TO_LABEL[currentPlanKey];
+  const planPrice = PLAN_PRICES[currentPlanKey];
 
-    return {
-      startOfMonth: new Date(
-        currentDate.getFullYear(),
-        currentDate.getMonth(),
-        1
-      ),
-      endOfMonth: new Date(
-        currentDate.getFullYear(),
-        currentDate.getMonth() + 1,
-        0
-      ),
-    };
-  }, []);
-
-  const dashboardSummary = useQuery(api.web.dashboard.getDashboardSummary, {
-    ...toUtcRangeStrings(
-      {
-        startDate: startOfMonth.toISOString().slice(0, 10),
-        endDate: endOfMonth.toISOString().slice(0, 10),
-      },
-      timezone
-    ),
-  });
-
-  // Get current plan from billing usage (more accurate)
-  const currentPlanName = userBilling?.plan || billingUsage?.plan || "free";
-  const currentPlan = useMemo(
+  const currentTier = useMemo(
     () =>
-      tiers.find(
-        (tier) => tier.title.toLowerCase() === currentPlanName.toLowerCase()
-      ),
-    [currentPlanName]
+      tiers.find((tier) => tier.key === PLAN_KEY_TO_TIER[currentPlanKey]) ?? null,
+    [currentPlanKey],
   );
 
-  // Get plan limits based on current plan (matching database/constants)
-  const getPlanOrderLimit = useMemo(
-    () => (plan: string) => {
-      const limits: Record<string, number> = {
-        free: 300,
-        starter: 1200,
-        growth: 3500,
-        business: 7500,
-      };
-
-      return limits[plan] || 300;
-    },
-    []
-  );
-
-  const currentUsage = useMemo(() => {
-    const ordersCount = dashboardSummary?.data?.orders?.length ?? 0;
-    return {
-      orders: billingUsage?.currentUsage || ordersCount,
-      ordersLimit: billingUsage?.limit || getPlanOrderLimit(currentPlanName),
-    };
-  }, [
-    billingUsage?.currentUsage,
-    billingUsage?.limit,
-    dashboardSummary?.data?.orders?.length,
-    getPlanOrderLimit,
-    currentPlanName,
-  ]);
-
-  const usagePercentage = useMemo(() => {
-    if (!currentUsage.ordersLimit || currentUsage.ordersLimit <= 0) {
-      return 0;
-    }
-
-    return Math.min(
-      (currentUsage.orders / currentUsage.ordersLimit) * 100,
-      100
-    );
-  }, [currentUsage.orders, currentUsage.ordersLimit]);
-
-  // Calculate next billing date (first day of next month)
-  const getNextBillingDate = useMemo(
-    () => () => {
-      const nextMonth = new Date();
-
-      nextMonth.setMonth(nextMonth.getMonth() + 1);
-      nextMonth.setDate(1);
-
-      return nextMonth.toLocaleDateString("en-US", {
-        month: "long",
-        day: "numeric",
-        year: "numeric",
-      });
-    },
-    []
-  );
-
-  // Get plan price (matching constants)
-  const getPlanPrice = useMemo(
-    () => (plan: string) => {
-      const prices: Record<string, string> = {
-        free: "$0/month",
-        starter: "$40/month",
-        growth: "$90/month",
-        business: "$160/month",
-      };
-
-      return prices[plan] || "$0/month";
-    },
-    []
-  );
-
-  // Show skeleton while loading
-  if (dashboardSummary === undefined || userBilling === undefined) {
+  if (userBilling === undefined) {
     return <PlanOverviewSkeleton />;
   }
+
+  const statusLabel = userBilling?.status
+    ? STATUS_LABELS[userBilling.status] ?? userBilling.status
+    : STATUS_LABELS.active;
 
   return (
     <div className="space-y-4">
@@ -140,95 +70,33 @@ export default function PlanOverview() {
             Current Plan
           </h3>
           <Chip
-            color={currentPlanName === "free" ? "default" : "primary"}
+            color={currentPlanKey === "free" ? "default" : "primary"}
             size="sm"
             startContent={
-              currentPlanName !== "free" && (
+              currentPlanKey === "free" ? null : (
                 <Icon icon="solar:crown-star-bold" width={14} />
               )
             }
             variant="flat"
           >
-            {currentPlan?.title || "Free"}
+            {currentTier?.title ?? planLabel.replace(" Plan", "")}
           </Chip>
-          {billingUsage?.isOnTrial && (
-            <Chip
-              color="warning"
-              size="sm"
-              startContent={
-                <Icon icon="solar:hourglass-line-linear" width={12} />
-              }
-              variant="flat"
-            >
-              Trial: {billingUsage.daysLeftInTrial} days left
-            </Chip>
-          )}
         </div>
         <div className="text-right">
-          <p className="text-sm font-semibold text-default-800">
-            {getPlanPrice(currentPlanName)}
-          </p>
-          <p className="text-xs text-default-500">
-            {billingUsage?.isOnTrial ? "Trial ends" : "Next billing"}:{" "}
-            {billingUsage?.isOnTrial && billingUsage.trialEndsAt
-              ? new Date(billingUsage.trialEndsAt).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                })
-              : new Date(getNextBillingDate()).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                })}
-          </p>
+          <p className="text-sm font-semibold text-default-800">{planPrice}</p>
+          <p className="text-xs text-default-500">Status: {statusLabel}</p>
         </div>
       </div>
 
-      {/* Compact Usage Display */}
-      <div className="rounded-lg px-3 py-2.5">
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-xs text-default-600">Monthly Usage</span>
-          <span className="text-xs  font-semibold text-default-800">
-            {formatNumber(currentUsage.orders)} /{" "}
-            {formatNumber(currentUsage.ordersLimit)} orders
-            <span className="text-xs text-default-500 ml-2">
-              ({Math.round(usagePercentage)}
-              %)
-            </span>
-          </span>
-        </div>
-        <Progress
-          classNames={{
-            base: "max-w-full",
-          }}
-          color={usagePercentage > 80 ? "warning" : "primary"}
-          maxValue={100}
-          size="sm"
-          value={usagePercentage}
-        />
+      <div className="rounded-lg border border-default-100 bg-content1/40 px-3 py-3">
+        <p className="text-xs text-default-600">
+          Plan changes are managed through your Shopify subscription. Visit
+          <span className="font-medium text-default-800">
+            {" "}Settings → Billing
+          </span>{" "}
+          to switch plans or manage invoices.
+        </p>
       </div>
-
-      {/* Upgrade Recommendation */}
-      {upgradeRecommendation && (
-        <div className="bg-warning/10 border border-warning/20 rounded-lg p-3">
-          <div className="flex gap-2.5 items-start">
-            <Icon
-              className="text-warning shrink-0 mt-0.5"
-              icon="solar:danger-triangle-bold"
-              width={16}
-            />
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-default-800">
-                Consider upgrading to{" "}
-                {upgradeRecommendation.planName.replace(" Plan", "")}{" "}
-                <span className="text-xs text-default-500">
-                  ({formatNumber(upgradeRecommendation.orderLimit)} orders/mo at
-                  ${upgradeRecommendation.amount}/mo)
-                </span>
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

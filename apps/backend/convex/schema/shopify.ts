@@ -369,7 +369,7 @@ export const shopifyFulfillments = defineTable({
   trackingNumbers: v.optional(v.array(v.string())),
   trackingUrls: v.optional(v.array(v.string())),
 
-  // Location
+  // Location (ID only, name requires read_locations scope)
   locationId: v.optional(v.string()),
 
   // Service
@@ -402,9 +402,8 @@ export const shopifyInventory = defineTable({
   organizationId: v.id("organizations"),
   variantId: v.id("shopifyProductVariants"),
 
-  // Location
+  // Location (ID only, name requires read_locations scope)
   locationId: v.string(),
-  locationName: v.optional(v.string()),
 
   // Quantities
   available: v.number(),

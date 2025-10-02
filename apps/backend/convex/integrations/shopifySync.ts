@@ -93,7 +93,7 @@ type ShopifyFulfillment = {
   status: string;
   shipmentStatus?: string;
   trackingInfo?: Array<{ company?: string; number?: string; url?: string }>;
-  location?: { id?: string | null; name?: string | null } | null;
+  location?: { id?: string | null } | null;
   service?: { serviceName?: string | null } | string | null;
   fulfillmentLineItems?: {
     edges?: Array<{
@@ -111,7 +111,7 @@ type ShopifyFulfillmentOrder = {
   id: string;
   status?: string;
   assignedLocation?: {
-    location?: { id?: string | null; name?: string | null } | null;
+    location?: { id?: string | null } | null;
   } | null;
   deliveryMethod?: { methodType?: string | null; serviceName?: string | null } | null;
   lineItems?: {
@@ -487,7 +487,6 @@ function mapOrderNodeToPersistence(
     string,
     {
       locationId?: string;
-      locationName?: string;
       serviceName?: string;
       methodType?: string;
       status?: string;
@@ -504,9 +503,6 @@ function mapOrderNodeToPersistence(
             "gid://shopify/Location/",
             "",
           )
-        : undefined;
-      const locationName = fulfillmentOrder.assignedLocation?.location?.name
-        ? String(fulfillmentOrder.assignedLocation.location.name)
         : undefined;
       const serviceName = fulfillmentOrder.deliveryMethod?.serviceName
         ? String(fulfillmentOrder.deliveryMethod.serviceName)
@@ -528,7 +524,6 @@ function mapOrderNodeToPersistence(
 
           fulfillmentOrderLineInfo.set(orderLineId, {
             locationId,
-            locationName,
             serviceName,
             methodType,
             status: fulfillmentOrder.status ? String(fulfillmentOrder.status) : undefined,
@@ -1001,8 +996,6 @@ export const initial = internalAction({
                                     "gid://shopify/Location/",
                                     ""
                                   ) || "",
-                                locationName:
-                                  location?.name?.trim() || undefined,
                                 available:
                                   typeof edge.node.available === "number"
                                     ? edge.node.available

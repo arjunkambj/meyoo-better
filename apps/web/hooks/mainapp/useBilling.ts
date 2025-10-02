@@ -90,8 +90,8 @@ export function useBilling() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Get current billing status from Convex
-  const currentUsage = useQuery(api.billing.trackUsage.getCurrentUsage);
+  // Fetch billing metadata for the current organization
+  const billingInfo = useQuery(api.core.users.getUserBilling);
   const organization = useQuery(
     api.billing.organizationHelpers.getOrganizationByUser,
   );
@@ -122,7 +122,7 @@ export function useBilling() {
 
       return {
         hasActivePayment: data.hasActivePayment,
-        currentPlan: currentUsage?.plan || "free",
+        currentPlan: billingInfo?.plan || "free",
         subscriptions: data.subscriptions || [],
       };
     } catch (err) {
@@ -307,74 +307,41 @@ export function useBilling() {
     }
   };
 
-  const getCurrentPlanDetails = (): PlanSelection | null => {
-    if (!currentUsage?.plan) {
+  const planNameMapping: Record<string, PlanSelection["planName"]> = {
+    free: "Free Plan",
+    starter: "Starter Plan",
+    growth: "Growth Plan",
+    business: "Business Plan",
+  };
+
+  const currentPlan = (billingInfo?.plan ?? "free") as
+    | "free"
+    | "starter"
+    | "growth"
+    | "business";
+
+  const currentPlanDetails = (() => {
+    const mappedName = planNameMapping[currentPlan];
+
+    if (!mappedName) {
       return null;
     }
 
-    const planNameMapping: Record<string, string> = {
-      free: "Free Plan",
-      starter: "Starter Plan",
-      growth: "Growth Plan",
-      business: "Business Plan",
-    };
-
-    const shopifyPlanName = planNameMapping[currentUsage.plan];
-
     return (
-      AVAILABLE_PLANS.find((plan) => plan.planName === shopifyPlanName) || null
+      AVAILABLE_PLANS.find((plan) => plan.planName === mappedName) || null
     );
-  };
-
-  const getUpgradeRecommendation = (): PlanSelection | null => {
-    if (!currentUsage) return AVAILABLE_PLANS[1] ?? null; // Default to Starter (Free is at index 0)
-
-    const { currentUsage: usage, plan } = currentUsage!;
-    if (!plan) return AVAILABLE_PLANS[1] ?? null;
-
-    // If user is on free plan and approaching limit, recommend Starter
-    if (plan === "free" && usage > 240) {
-      // 80% of 300
-      return AVAILABLE_PLANS[1] ?? null; // Starter Plan (Free is at index 0)
-    }
-
-    // Find current plan and recommend next tier if approaching limit
-    const currentPlanIndex = AVAILABLE_PLANS.findIndex((p) => {
-      const planMap: Record<string, string> = {
-        free: "Free Plan",
-        starter: "Starter Plan",
-        growth: "Growth Plan",
-        business: "Business Plan",
-      };
-
-      return p.planName === (planMap[plan] ?? "");
-    });
-
-    if (
-      currentPlanIndex >= 0 &&
-      currentPlanIndex < AVAILABLE_PLANS.length - 1
-    ) {
-      const currentPlanLimit = AVAILABLE_PLANS[currentPlanIndex]?.orderLimit ?? 0;
-
-      if (usage > currentPlanLimit * 0.8) {
-        // 80% of limit
-        return AVAILABLE_PLANS[currentPlanIndex + 1] ?? null;
-      }
-    }
-
-    return null;
-  };
+  })();
 
   return {
     // State
     isLoading,
     error,
-    currentUsage,
+    billingInfo,
+    currentPlan,
     organization,
 
     // Computed
-    currentPlanDetails: getCurrentPlanDetails(),
-    upgradeRecommendation: getUpgradeRecommendation(),
+    currentPlanDetails,
     availablePlans: AVAILABLE_PLANS,
 
     // Actions

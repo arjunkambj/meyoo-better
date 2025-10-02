@@ -1,5 +1,4 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { api } from "../_generated/api";
 import { httpAction } from "../_generated/server";
 
 /**
@@ -32,28 +31,12 @@ interface SyncResponse {
 /**
  * Helper to check billing limits
  */
-async function checkBillingLimits(
-  ctx: any,
-): Promise<{ allowed: boolean; creditsRemaining: number; message?: string }> {
-  // Get usage record directly from database
-  const usage = await ctx.runQuery(api.billing.trackUsage.getCurrentUsage);
-
-  if (!usage) {
-    // No usage data means no organization, allow for free tier
-    return { allowed: true, creditsRemaining: 300 };
-  }
-
-  const remaining = usage.limit - usage.currentUsage;
-
-  if (remaining <= 0) {
-    return {
-      allowed: false,
-      creditsRemaining: 0,
-      message: "Sync credit limit reached for this month",
-    };
-  }
-
-  return { allowed: true, creditsRemaining: remaining };
+async function checkBillingLimits(): Promise<{
+  allowed: boolean;
+  creditsRemaining: number;
+  message?: string;
+}> {
+  return { allowed: true, creditsRemaining: Number.POSITIVE_INFINITY };
 }
 
 /**
@@ -172,7 +155,7 @@ function createSyncHandler(config: {
         }
 
         // Check billing limits (getCurrentUsage will handle organization lookup)
-        const billingCheck = await checkBillingLimits(ctx);
+        const billingCheck = await checkBillingLimits();
         if (!billingCheck.allowed) {
           return new Response(
             JSON.stringify({

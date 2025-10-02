@@ -3,7 +3,6 @@
 import { Spacer } from "@heroui/react";
 import { useAtomValue } from "jotai";
 import React, { useCallback, useMemo, useState } from "react";
-import { PlanUsageAlert } from "@/components/shared/billing/PlanUsageAlert";
 import { useAnalyticsDateRange, useDashboardOverview } from "@/hooks";
 import { devToolsVisibleAtom } from "@/store/atoms";
 import type { ChannelRevenueBreakdown } from "@repo/types";
@@ -282,9 +281,6 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
       />
 
       {/* Data Status Chips removed */}
-
-      {/* Plan Usage Alert */}
-      <PlanUsageAlert variant="compact" />
 
       {/* KPI Metrics */}
       <div className="mb-8">

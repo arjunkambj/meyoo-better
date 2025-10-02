@@ -7,6 +7,7 @@ import { useAuthActions } from "@convex-dev/auth/react";
 import { useRouter } from "expo-router";
 
 import { useUserDetails } from "@/hooks/useUserDetails";
+import type { BillingUsage } from "@/hooks/useUserDetails";
 
 type CurrentUser = {
   name?: string | null;
@@ -17,7 +18,13 @@ type CurrentUser = {
 } | null;
 
 export default function SettingsTab() {
-  const { billing, billingUsage, isLoading, user } = useUserDetails();
+  const {
+    billing,
+    billingUsage: rawBillingUsage,
+    isLoading,
+    user,
+  } = useUserDetails();
+  const billingUsage = rawBillingUsage as BillingUsage | null;
   const { signOut } = useAuthActions();
   const router = useRouter();
   const { colors, theme, setTheme } = useTheme();

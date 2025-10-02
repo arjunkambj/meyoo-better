@@ -26,7 +26,7 @@ import {
 export default function OnboardingBillingView() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { currentUsage, upgradePlan, clearError } = useBilling();
+  const { currentPlan, upgradePlan, clearError } = useBilling();
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const setNavigationPending = useSetAtom(setNavigationPendingAtom);
   // CompleteBillingStep mutation is not used; billing completion is reflected via webhooks.
@@ -45,7 +45,7 @@ export default function OnboardingBillingView() {
   const onboardingStatus = useQuery(api.core.onboarding.getOnboardingStatus);
 
   // No default plan; if none selected, treat as no active plan
-  const _currentPlan = currentUsage?.plan ?? null;
+  const _currentPlan = currentPlan ?? null;
   const [selectedFrequency, setSelectedFrequency] = useState<Frequency>(
     (frequencies[0] as Frequency) ?? (frequencies[0] as Frequency)
   );
@@ -147,9 +147,9 @@ export default function OnboardingBillingView() {
   const availablePlans = tiers;
   // Determine active plan tier key for highlighting
   const activeTierKey = useMemo(() => {
-    const tier = getTierKeyFromPlanName(currentUsage?.plan ?? null);
+    const tier = getTierKeyFromPlanName(currentPlan ?? null);
     return tier ?? "";
-  }, [currentUsage?.plan]);
+  }, [currentPlan]);
   // Avoid duplicate client-side redirects; trust server redirect.
 
   return (
@@ -243,8 +243,8 @@ export default function OnboardingBillingView() {
               growth: "Growth Plan",
               business: "Business Plan",
             };
-            const label = currentUsage?.plan
-              ? map[String(currentUsage.plan)] || String(currentUsage.plan)
+            const label = currentPlan
+              ? map[String(currentPlan)] || String(currentPlan)
               : null;
             return `Current Plan: ${label ?? "Not selected"}`;
           })()}

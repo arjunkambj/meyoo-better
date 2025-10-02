@@ -991,6 +991,13 @@ export const monitorInitialSyncs = internalMutation({
         return { finalized: true };
       }
 
+      const isActivelySyncing =
+        (session.status === "processing" || session.status === "syncing") &&
+        Date.now() - session.startedAt < 2 * 60 * 1000;
+      if (isActivelySyncing) {
+        return { finalized: false };
+      }
+
       const metadata = (session.metadata || {}) as Record<string, any>;
       const totalBatches =
         typeof metadata.totalBatches === "number"
@@ -1126,23 +1133,36 @@ export const monitorInitialSyncs = internalMutation({
         }
 
         const now = Date.now();
-        const attempts =
-          (onboarding.onboardingData?.syncCheckAttempts ?? 0) + 1;
-
+        const previousAttempts =
+          onboarding.onboardingData?.syncCheckAttempts ?? 0;
+        const previousPending = new Set(
+          Array.isArray(onboarding.onboardingData?.syncPendingPlatforms)
+            ? onboarding.onboardingData?.syncPendingPlatforms
+            : [],
+        );
         const onboardingData: Record<string, any> = {
           ...onboarding.onboardingData,
-          syncCheckAttempts: attempts,
-          lastSyncCheckAt: now,
         };
+        const wasComplete = onboarding.isInitialSyncComplete;
+        let appliedUpdate = false;
+        let justCompleted = false;
 
         if (platforms.length === 0) {
-          delete onboardingData.syncPendingPlatforms;
+          const hadPending = previousPending.size > 0;
+          if (!wasComplete || hadPending) {
+            delete onboardingData.syncPendingPlatforms;
+            onboardingData.syncCheckAttempts = previousAttempts + 1;
+            onboardingData.lastSyncCheckAt = now;
 
-          await ctx.db.patch(onboarding._id, {
-            isInitialSyncComplete: true,
-            onboardingData,
-            updatedAt: now,
-          });
+            await ctx.db.patch(onboarding._id, {
+              isInitialSyncComplete: true,
+              onboardingData,
+              updatedAt: now,
+            });
+
+            appliedUpdate = true;
+            justCompleted = !wasComplete;
+          }
 
           completedCount += 1;
           continue;
@@ -1220,40 +1240,54 @@ export const monitorInitialSyncs = internalMutation({
           pendingPlatforms.add(platform);
         }
 
+        const pendingPlatformsList = Array.from(pendingPlatforms);
+        const pendingChanged = !(
+          pendingPlatformsList.length === previousPending.size &&
+          pendingPlatformsList.every((platform) => previousPending.has(platform))
+        );
+
         const allCompleted =
           completedPlatforms.size === platforms.length &&
           pendingPlatforms.size === 0;
 
         if (pendingPlatforms.size > 0) {
-          onboardingData.syncPendingPlatforms = Array.from(pendingPlatforms);
-        } else {
-          delete onboardingData.syncPendingPlatforms;
-        }
-
-        if (allCompleted) {
-          completedCount += 1;
-        } else {
           pendingCount += 1;
+        } else if (allCompleted) {
+          completedCount += 1;
         }
 
-        const wasComplete = onboarding.isInitialSyncComplete;
+        if (pendingChanged || allCompleted !== wasComplete) {
+          if (pendingPlatformsList.length > 0) {
+            onboardingData.syncPendingPlatforms = pendingPlatformsList;
+          } else {
+            delete onboardingData.syncPendingPlatforms;
+          }
 
-        await ctx.db.patch(onboarding._id, {
-          isInitialSyncComplete: allCompleted,
-          onboardingData,
-          updatedAt: now,
-        });
+          onboardingData.syncCheckAttempts = previousAttempts + 1;
+          onboardingData.lastSyncCheckAt = now;
+
+          await ctx.db.patch(onboarding._id, {
+            isInitialSyncComplete: allCompleted,
+            onboardingData,
+            updatedAt: now,
+          });
+
+          appliedUpdate = true;
+          justCompleted = !wasComplete && allCompleted;
+        }
 
         // Best-effort snapshot refresh
-        try {
-          await ctx.runMutation(internal.core.status.refreshIntegrationStatus, {
-            organizationId: orgId,
-          });
-        } catch (_error) {
-          // Best-effort refresh; ignore failures
+        if (appliedUpdate) {
+          try {
+            await ctx.runMutation(internal.core.status.refreshIntegrationStatus, {
+              organizationId: orgId,
+            });
+          } catch (_error) {
+            // Best-effort refresh; ignore failures
+          }
         }
 
-        if (!wasComplete && allCompleted) {
+        if (justCompleted) {
           const dates = buildDateSpan(
             ONBOARDING_COST_LOOKBACK_DAYS,
             new Date().toISOString(),

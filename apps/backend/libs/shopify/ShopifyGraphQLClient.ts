@@ -282,7 +282,6 @@ export interface ShopifyFulfillment {
   deliveredAt?: string;
   location?: {
     id?: string | null;
-    name?: string | null;
   } | null;
   service?: {
     serviceName?: string | null;
@@ -311,7 +310,6 @@ export interface ShopifyFulfillmentOrder {
   assignedLocation?: {
     location?: {
       id?: string | null;
-      name?: string | null;
     } | null;
   } | null;
   deliveryMethod?: {
@@ -552,7 +550,6 @@ export class ShopifyGraphQLClient {
                 committed
                 location {
                   id
-                  name
                 }
               }
             }
@@ -1152,7 +1149,6 @@ export class ShopifyGraphQLClient {
                 }
                 location {
                   id
-                  name
                 }
                 createdAt
                 updatedAt
@@ -1467,7 +1463,6 @@ export class ShopifyGraphQLClient {
                   committed
                   location {
                     id
-                    name
                   }
                 }
               }

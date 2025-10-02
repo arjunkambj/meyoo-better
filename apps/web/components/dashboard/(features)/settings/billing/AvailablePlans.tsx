@@ -28,15 +28,8 @@ const PLAN_ORDER: TiersEnum[] = [
   TiersEnum.Enterprise,
 ];
 
-const TIER_LIMITS: Partial<Record<TiersEnum, number>> = {
-  [TiersEnum.Free]: 300,
-  [TiersEnum.Pro]: 1200,
-  [TiersEnum.Team]: 3500,
-  [TiersEnum.Custom]: 7500,
-};
-
 export default function AvailablePlans() {
-  const { currentUsage, isLoading, error, upgradePlan, clearError } =
+  const { currentPlan, isLoading, error, upgradePlan, clearError } =
     useBilling();
 
   // Get current shop domain
@@ -45,9 +38,9 @@ export default function AvailablePlans() {
   );
 
   const currentTierKey = useMemo(() => {
-    const tier = getTierKeyFromPlanName(currentUsage?.plan ?? null);
+    const tier = getTierKeyFromPlanName(currentPlan ?? null);
     return tier ?? TiersEnum.Free;
-  }, [currentUsage?.plan]);
+  }, [currentPlan]);
   const [selectedFrequency, setSelectedFrequency] = useState<Frequency>(
     (frequencies[0] as Frequency) ?? (frequencies[0] as Frequency)
   );
@@ -160,19 +153,11 @@ export default function AvailablePlans() {
             currentPlanIndex !== -1 &&
             tierIndex < currentPlanIndex;
 
-          const tierLimit = TIER_LIMITS[tier.key];
-          const currentOrderUsage = currentUsage?.currentUsage || 0;
-          const exceedsDowngradeLimit = Boolean(
-            isDowngrade && tierLimit && currentOrderUsage > tierLimit
-          );
-
           const isProcessing = loadingTier === planName;
-          const disabled =
-            isCurrentPlan || isLoading || exceedsDowngradeLimit || isProcessing;
+          const disabled = isCurrentPlan || isLoading || isProcessing;
 
           const buttonLabel = (() => {
             if (isCurrentPlan) return "Current Plan";
-            if (exceedsDowngradeLimit) return "Over limit for downgrade";
             if (isProcessing) return "Processing...";
             if (isLoading) return "Processing...";
             return isDowngrade

@@ -5,7 +5,7 @@ import { Card, CardBody } from "@heroui/card";
 import { Icon } from "@iconify/react";
 import type { ReactNode } from "react";
 
-import { type Feature, useBilling, useFeatureAccess } from "@/hooks";
+import { type Feature, useFeatureAccess } from "@/hooks";
 
 interface FeatureGateProps {
   feature: Feature;
@@ -24,7 +24,7 @@ export function FeatureGate({
 }: FeatureGateProps) {
   const { hasAccess, reason, upgradeRequired, currentPlan, requiredPlan } =
     useFeatureAccess(feature);
-  const { isLoading } = useBilling();
+  const upgradeLoading = false;
 
   // If disabled, show the disabled state
   if (disabled) {
@@ -81,9 +81,9 @@ export function FeatureGate({
               <div className="flex gap-3">
                 <Button
                   color="warning"
-                  isLoading={isLoading}
+                  isLoading={upgradeLoading}
                   startContent={
-                    !isLoading && (
+                    upgradeLoading ? null : (
                       <Icon icon="solar:crown-star-bold" width={16} />
                     )
                   }

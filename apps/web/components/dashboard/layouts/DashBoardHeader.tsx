@@ -7,7 +7,6 @@ import { Button } from "@heroui/button";
 import { Tooltip } from "@heroui/tooltip";
 import { Icon } from "@iconify/react";
 import { useAtom } from "jotai";
-import { PlanUsageAlert } from "../../shared/billing/PlanUsageAlert";
 import UserProfile from "../../shared/UserProfile";
 import { useUserContext } from "@/contexts/UserContext";
 import { agentSidebarOpenAtom } from "@/store/atoms";
@@ -78,11 +77,6 @@ export default function DashBoardHeader({ className }: { className?: string }) {
 
       {/* Right side - Actions */}
       <div className="flex items-center gap-2 min-w-0">
-        {/* Plan Usage Indicator (minimal) */}
-        <div className="mr-1">
-          <PlanUsageAlert variant="minimal" />
-        </div>
-
         {/* AI Agent Toggle */}
         <Tooltip
           content={isAgentOpen ? "Close AI Assistant" : "Open AI Assistant"}

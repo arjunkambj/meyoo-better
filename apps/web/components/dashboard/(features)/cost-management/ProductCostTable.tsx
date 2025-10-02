@@ -62,7 +62,7 @@ export default function ProductCostTable() {
   const currencySymbol = useMemo(() => getCurrencySymbol(currency), [currency]);
 
   const [page, setPage] = useState(1);
-  const pageSize = 200; // smaller page keeps DOM manageable while grouping
+  const pageSize = 10; // smaller page keeps DOM manageable while grouping
   const {
     data: variantData,
     totalPages,

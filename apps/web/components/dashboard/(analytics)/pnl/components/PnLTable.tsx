@@ -376,7 +376,7 @@ export const PnLTable = React.memo(function PnLTable({
           })}
           {totalPeriod && (
             <td
-              className={`sticky right-0 text-right py-2 px-3 border-l-4 border-primary-200 dark:border-primary-800 z-10 shadow-[-2px_0_4px_rgba(0,0,0,0.02)] ${isBoldRow ? "bg-primary-50 dark:bg-primary-950" : "bg-content1"}`}
+              className={`sticky right-0 text-right py-2 px-3 border-l-4 border-primary-200 dark:border-primary-600 z-10 shadow-[-2px_0_4px_rgba(0,0,0,0.02)] ${isBoldRow ? "bg-primary-50 dark:bg-primary-100/10" : "bg-content1"}`}
             >
               <span
                 className={`
@@ -426,7 +426,7 @@ export const PnLTable = React.memo(function PnLTable({
                 </th>
               ))}
               {totalPeriod && (
-                <th className="sticky right-0 text-right py-3 px-3 font-bold text-xs text-primary-700 dark:text-primary-200 bg-primary-50 dark:bg-primary-950 min-w-[100px] border-l-4 border-primary-500 border-b-2 border-divider z-30 shadow-[-2px_0_4px_rgba(0,0,0,0.05)]">
+                <th className="sticky right-0 text-right py-3 px-3 font-bold text-xs text-primary-700 dark:text-primary-300 bg-primary-50 dark:bg-primary-100/10 min-w-[100px] border-l-4 border-primary-500 border-b-2 border-divider z-30 shadow-[-2px_0_4px_rgba(0,0,0,0.05)]">
                   TOTAL
                 </th>
               )}
@@ -434,14 +434,14 @@ export const PnLTable = React.memo(function PnLTable({
           </thead>
           <tbody>
             {/* Revenue Section */}
-            <tr className="bg-success-50 dark:bg-success-900">
+            <tr className="bg-success-50 dark:bg-success-100/10">
               <td
                 colSpan={displayPeriods.length + 1 + (totalPeriod ? 1 : 0)}
                 className="px-4 py-2.5 border-b border-divider"
               >
                 <div className="flex items-center gap-2">
                   <div className="w-1 h-4 bg-success rounded-full" />
-                  <span className="text-xs font-bold tracking-wider uppercase text-success-700 dark:text-success-200">
+                  <span className="text-xs font-bold tracking-wider uppercase text-success-700 dark:text-success-400">
                     Revenue
                   </span>
                 </div>
@@ -460,14 +460,14 @@ export const PnLTable = React.memo(function PnLTable({
             </tr>
 
             {/* COGS Section */}
-            <tr className="bg-danger-50 dark:bg-danger-900">
+            <tr className="bg-danger-50 dark:bg-danger-100/10">
               <td
                 colSpan={displayPeriods.length + 1 + (totalPeriod ? 1 : 0)}
                 className="px-4 py-2.5 border-b border-divider"
               >
                 <div className="flex items-center gap-2">
                   <div className="w-1 h-4 bg-danger rounded-full" />
-                  <span className="text-xs font-bold tracking-wider uppercase text-danger-700 dark:text-danger-200">
+                  <span className="text-xs font-bold tracking-wider uppercase text-danger-700 dark:text-danger-400">
                     Cost of Goods Sold
                   </span>
                 </div>
@@ -497,14 +497,14 @@ export const PnLTable = React.memo(function PnLTable({
             </tr>
 
             {/* Operating Expenses Section */}
-            <tr className="bg-warning-50 dark:bg-warning-900">
+            <tr className="bg-warning-50 dark:bg-warning-100/10">
               <td
                 colSpan={displayPeriods.length + 1 + (totalPeriod ? 1 : 0)}
                 className="px-4 py-2.5 border-b border-divider"
               >
                 <div className="flex items-center gap-2">
                   <div className="w-1 h-4 bg-warning rounded-full" />
-                  <span className="text-xs font-bold tracking-wider uppercase text-warning-700 dark:text-warning-200">
+                  <span className="text-xs font-bold tracking-wider uppercase text-warning-700 dark:text-warning-400">
                     Operating Expenses
                   </span>
                 </div>

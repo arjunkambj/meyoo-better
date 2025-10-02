@@ -41,6 +41,32 @@ const MAX_ORDERS_PAGE_SIZE = 200;
 const MIN_ORDERS_PAGE_SIZE = 1;
 const MAX_CURSOR_CARRY = 100;
 const END_CURSOR = "__end__";
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function shiftDateString(date: string, deltaDays: number): string {
+  const parsed = Date.parse(`${date}T00:00:00.000Z`);
+  if (!Number.isFinite(parsed)) {
+    return date;
+  }
+  const shifted = new Date(parsed);
+  shifted.setUTCDate(shifted.getUTCDate() + deltaDays);
+  return shifted.toISOString().slice(0, 10);
+}
+
+function derivePreviousRange(range: DateRange): DateRange | null {
+  const startMs = Date.parse(`${range.startDate}T00:00:00.000Z`);
+  const endMs = Date.parse(`${range.endDate}T23:59:59.999Z`) + 1;
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) {
+    return null;
+  }
+
+  const spanDays = Math.max(1, Math.round((endMs - startMs) / DAY_MS));
+
+  return {
+    startDate: shiftDateString(range.startDate, -spanDays),
+    endDate: shiftDateString(range.startDate, -1),
+  } satisfies DateRange;
+}
 
 type OrdersCursorState = {
   chunkCursor: string | null;
@@ -609,6 +635,31 @@ export const getAnalytics = action({
       ...(meta ? { meta } : {}),
     };
 
+    const previousRange = derivePreviousRange(range);
+    let previousResponse: AnalyticsResponse | null = null;
+
+    if (previousRange) {
+      try {
+        const { data: previousData, meta: previousMeta } = await loadAnalyticsWithChunks(
+          ctx,
+          auth.orgId as Id<"organizations">,
+          previousRange,
+          {
+            datasets: ORDER_ANALYTICS_DATASETS,
+          },
+        );
+
+        previousResponse = {
+          dateRange: previousRange,
+          organizationId: auth.orgId,
+          data: previousData,
+          ...(previousMeta ? { meta: previousMeta } : {}),
+        };
+      } catch (error) {
+        console.error("Failed to load previous orders analytics:", error);
+      }
+    }
+
     const result = computeOrdersAnalytics(response, {
       status: args.status ?? undefined,
       searchTerm: args.searchTerm ?? undefined,
@@ -616,7 +667,7 @@ export const getAnalytics = action({
       sortOrder: args.sortOrder ?? undefined,
       page: args.page ?? undefined,
       pageSize: args.pageSize ?? undefined,
-    });
+    }, previousResponse ?? undefined);
 
     return {
       dateRange: response.dateRange,

@@ -62,8 +62,35 @@ const DASHBOARD_SUMMARY_DATASETS = [
   "analytics",
 ] as const satisfies readonly AnalyticsSourceKey[];
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 function isTooManyReadsError(error: unknown): boolean {
   return error instanceof Error && error.message.includes("Too many reads");
+}
+
+function shiftDateString(date: string, deltaDays: number): string {
+  const parsed = Date.parse(`${date}T00:00:00.000Z`);
+  if (!Number.isFinite(parsed)) {
+    return date;
+  }
+  const shifted = new Date(parsed);
+  shifted.setUTCDate(shifted.getUTCDate() + deltaDays);
+  return shifted.toISOString().slice(0, 10);
+}
+
+function derivePreviousRange(range: DateRange): DateRange | null {
+  const startMs = Date.parse(`${range.startDate}T00:00:00.000Z`);
+  const endMs = Date.parse(`${range.endDate}T23:59:59.999Z`) + 1;
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) {
+    return null;
+  }
+
+  const spanDays = Math.max(1, Math.round((endMs - startMs) / DAY_MS));
+
+  return {
+    startDate: shiftDateString(range.startDate, -spanDays),
+    endDate: shiftDateString(range.startDate, -1),
+  } satisfies DateRange;
 }
 
 async function loadDashboardAnalytics(
@@ -324,10 +351,37 @@ const getOverviewDataActionDefinition = {
       ...(meta ? { meta } : {}),
     };
 
+    const previousRange = derivePreviousRange(range);
+    let previousAnalyticsResponse: AnalyticsResponse | null = null;
+
+    if (previousRange) {
+      try {
+        const { data: previousData, meta: previousMeta } = await loadAnalyticsWithChunks(
+          ctx,
+          auth.orgId as Id<"organizations">,
+          previousRange,
+          {
+            datasets: DASHBOARD_SUMMARY_DATASETS,
+          },
+        );
+
+        previousAnalyticsResponse = {
+          dateRange: previousRange,
+          organizationId: auth.orgId,
+          data: previousData,
+          ...(previousMeta ? { meta: previousMeta } : {}),
+        };
+      } catch (error) {
+        if (!isTooManyReadsError(error)) {
+          console.error("Failed to load previous analytics via action:", error);
+        }
+      }
+    }
+
     const dashboardLayout = await ctx.runQuery(api.core.dashboard.getDashboardLayout, {});
     const integrationStatus = await ctx.runQuery(api.core.status.getIntegrationStatus, {});
 
-    const overview = computeOverviewMetrics(analyticsResponse);
+    const overview = computeOverviewMetrics(analyticsResponse, previousAnalyticsResponse);
     const platformMetrics = computePlatformMetrics(analyticsResponse);
     const channelRevenue = computeChannelRevenue(analyticsResponse);
 
@@ -340,7 +394,10 @@ const getOverviewDataActionDefinition = {
       primaryCurrency: auth.user.primaryCurrency ?? "USD",
       dashboardConfig: dashboardLayout ?? DEFAULT_DASHBOARD_CONFIG,
       integrationStatus,
-      meta: analyticsResponse.meta,
+      meta: {
+        ...(analyticsResponse.meta ?? {}),
+        ...(previousRange ? { previousRange } : {}),
+      },
     } satisfies OverviewPayload;
   },
 };

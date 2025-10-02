@@ -258,6 +258,41 @@ function computeOperationalCostAmount(
   }
 }
 
+function applyOperationalCostsToAggregates(
+  aggregates: AggregatedDailyMetrics,
+  costs: OperationalCostDoc[],
+  range: DateRange,
+): AggregatedDailyMetrics {
+  if (costs.length === 0) {
+    return aggregates;
+  }
+
+  const rangeStartMs = getRangeStartMs(range);
+  const rangeEndExclusiveMs = getRangeEndExclusiveMs(range);
+  const normalizedStart = Number.isFinite(rangeStartMs) ? rangeStartMs : 0;
+  const normalizedEnd = Number.isFinite(rangeEndExclusiveMs)
+    ? rangeEndExclusiveMs - 1
+    : normalizedStart;
+
+  const context: CostComputationContext = {
+    ordersCount: aggregates.orders,
+    unitsSold: aggregates.unitsSold,
+    revenue: aggregates.revenue,
+    rangeStartMs: normalizedStart,
+    rangeEndMs: normalizedEnd,
+  };
+
+  const customCostsTotal = costs.reduce(
+    (total, cost) => total + computeOperationalCostAmount(cost, context),
+    0,
+  );
+
+  return {
+    ...aggregates,
+    customCosts: customCostsTotal,
+  } satisfies AggregatedDailyMetrics;
+}
+
 export type CustomerOverviewMetrics = {
   totalCustomers: number;
   newCustomers: number;
@@ -305,6 +340,18 @@ function inclusiveDaySpan(range: DateRange): number {
   }
   const spanMs = endExclusive - start;
   return Math.max(1, Math.round(spanMs / DAY_MS));
+}
+
+function derivePreviousRange(range: DateRange): DateRange | null {
+  const span = inclusiveDaySpan(range);
+  if (span <= 0) {
+    return null;
+  }
+
+  return {
+    startDate: shiftDateString(range.startDate, -span),
+    endDate: shiftDateString(range.startDate, -1),
+  } satisfies DateRange;
 }
 
 function shiftDateString(date: string, deltaDays: number): string {
@@ -505,88 +552,207 @@ function makeMetric(value: number, change = 0): MetricValue {
   return { value, change };
 }
 
-function buildOverviewFromAggregates(aggregates: AggregatedDailyMetrics): OverviewComputation {
+function buildOverviewFromAggregates(
+  aggregates: AggregatedDailyMetrics,
+  previous?: AggregatedDailyMetrics | null,
+): OverviewComputation {
+  const prev = previous ?? null;
+
   const revenue = aggregates.revenue;
+  const prevRevenue = prev?.revenue ?? 0;
+
   const grossSales = Math.max(aggregates.grossSales, revenue);
+  const prevGrossSales = prev ? Math.max(prev.grossSales, prev.revenue) : prevRevenue;
+
   const discounts = aggregates.discounts;
+  const prevDiscounts = prev?.discounts ?? 0;
+
   const refundsAmount = aggregates.refundsAmount;
+  const prevRefundsAmount = prev?.refundsAmount ?? 0;
+
   const orders = aggregates.orders;
+  const prevOrders = prev?.orders ?? 0;
+
   const unitsSold = aggregates.unitsSold;
+  const prevUnitsSold = prev?.unitsSold ?? 0;
+
   const cogs = aggregates.cogs;
+  const prevCogs = prev?.cogs ?? 0;
+
   const shippingCosts = aggregates.shippingCosts;
+  const prevShippingCosts = prev?.shippingCosts ?? 0;
+
   const transactionFees = aggregates.transactionFees;
+  const prevTransactionFees = prev?.transactionFees ?? 0;
+
   const handlingFees = aggregates.handlingFees;
+  const prevHandlingFees = prev?.handlingFees ?? 0;
+
   const taxesCollected = aggregates.taxesCollected;
+  const prevTaxesCollected = prev?.taxesCollected ?? 0;
+
   const customCosts = aggregates.customCosts;
+  const prevCustomCosts = prev?.customCosts ?? 0;
+
   const marketingCost = aggregates.marketingCost;
+  const prevMarketingCost = prev?.marketingCost ?? 0;
+
   const paidCustomers = aggregates.paidCustomers;
+  const prevPaidCustomers = prev?.paidCustomers ?? 0;
+
   const totalCustomers = aggregates.totalCustomers;
+  const prevTotalCustomers = prev?.totalCustomers ?? 0;
+
   const newCustomers = aggregates.newCustomers;
+  const prevNewCustomers = prev?.newCustomers ?? 0;
+
   const returningCustomers = aggregates.returningCustomers;
+  const prevReturningCustomers = prev?.returningCustomers ?? 0;
+
   const repeatCustomers = aggregates.repeatCustomers;
+  const prevRepeatCustomers = prev?.repeatCustomers ?? 0;
+
   const returnedOrders = aggregates.returnedOrders;
+  const prevReturnedOrders = prev?.returnedOrders ?? 0;
 
   const totalCostsWithoutAds =
     cogs + shippingCosts + transactionFees + handlingFees + taxesCollected + customCosts;
+  const prevTotalCostsWithoutAds =
+    prevCogs + prevShippingCosts + prevTransactionFees + prevHandlingFees + prevTaxesCollected + prevCustomCosts;
+
   const netProfit = revenue - totalCostsWithoutAds - marketingCost - refundsAmount;
+  const prevNetProfit =
+    prevRevenue - prevTotalCostsWithoutAds - prevMarketingCost - prevRefundsAmount;
+
   const grossProfit = revenue - cogs;
+  const prevGrossProfit = prevRevenue - prevCogs;
+
   const contributionProfit =
     revenue - (cogs + shippingCosts + transactionFees + handlingFees + customCosts);
+  const prevContributionProfit =
+    prevRevenue - (prevCogs + prevShippingCosts + prevTransactionFees + prevHandlingFees + prevCustomCosts);
+
   const contributionMarginPercentage = revenue > 0 ? (contributionProfit / revenue) * 100 : 0;
+  const prevContributionMarginPercentage =
+    prevRevenue > 0 ? (prevContributionProfit / prevRevenue) * 100 : 0;
+
   const profitMargin = revenue > 0 ? (netProfit / revenue) * 100 : 0;
+  const prevProfitMargin = prevRevenue > 0 ? (prevNetProfit / prevRevenue) * 100 : 0;
+
   const grossProfitMargin = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
+  const prevGrossProfitMargin = prevRevenue > 0 ? (prevGrossProfit / prevRevenue) * 100 : 0;
 
   const averageOrderValue = orders > 0 ? revenue / orders : 0;
-  const averageOrderCost = orders > 0 ? (totalCostsWithoutAds + marketingCost) / orders : 0;
+  const prevAverageOrderValue = prevOrders > 0 ? prevRevenue / prevOrders : 0;
+
+  const averageOrderCost =
+    orders > 0 ? (totalCostsWithoutAds + marketingCost) / orders : 0;
+  const prevAverageOrderCost =
+    prevOrders > 0 ? (prevTotalCostsWithoutAds + prevMarketingCost) / prevOrders : 0;
+
   const averageOrderProfit = orders > 0 ? netProfit / orders : 0;
+  const prevAverageOrderProfit = prevOrders > 0 ? prevNetProfit / prevOrders : 0;
+
   const adSpendPerOrder = orders > 0 ? marketingCost / orders : 0;
+  const prevAdSpendPerOrder = prevOrders > 0 ? prevMarketingCost / prevOrders : 0;
+
   const profitPerUnit = unitsSold > 0 ? netProfit / unitsSold : 0;
+  const prevProfitPerUnit = prevUnitsSold > 0 ? prevNetProfit / prevUnitsSold : 0;
+
   const blendedRoas = marketingCost > 0 ? revenue / marketingCost : 0;
+  const prevBlendedRoas = prevMarketingCost > 0 ? prevRevenue / prevMarketingCost : 0;
+
   const poas = marketingCost > 0 ? netProfit / marketingCost : 0;
+  const prevPoas = prevMarketingCost > 0 ? prevNetProfit / prevMarketingCost : 0;
+
   const fulfillmentCostPerOrder = orders > 0 ? handlingFees / orders : 0;
+  const prevFulfillmentCostPerOrder = prevOrders > 0 ? prevHandlingFees / prevOrders : 0;
 
   const cogsPercentageOfGross = grossSales > 0 ? (cogs / grossSales) * 100 : 0;
+  const prevCogsPercentageOfGross = prevGrossSales > 0 ? (prevCogs / prevGrossSales) * 100 : 0;
+
   const cogsPercentageOfNet = revenue > 0 ? (cogs / revenue) * 100 : 0;
+  const prevCogsPercentageOfNet = prevRevenue > 0 ? (prevCogs / prevRevenue) * 100 : 0;
+
   const shippingPercentageOfNet = revenue > 0 ? (shippingCosts / revenue) * 100 : 0;
+  const prevShippingPercentageOfNet = prevRevenue > 0 ? (prevShippingCosts / prevRevenue) * 100 : 0;
+
   const taxesPercentageOfRevenue = revenue > 0 ? (taxesCollected / revenue) * 100 : 0;
+  const prevTaxesPercentageOfRevenue = prevRevenue > 0 ? (prevTaxesCollected / prevRevenue) * 100 : 0;
+
   const marketingPercentageOfGross = grossSales > 0 ? (marketingCost / grossSales) * 100 : 0;
+  const prevMarketingPercentageOfGross =
+    prevGrossSales > 0 ? (prevMarketingCost / prevGrossSales) * 100 : 0;
+
   const marketingPercentageOfNet = revenue > 0 ? (marketingCost / revenue) * 100 : 0;
+  const prevMarketingPercentageOfNet =
+    prevRevenue > 0 ? (prevMarketingCost / prevRevenue) * 100 : 0;
+
   const operatingCostPercentage = revenue > 0 ? (customCosts / revenue) * 100 : 0;
+  const prevOperatingCostPercentage =
+    prevRevenue > 0 ? (prevCustomCosts / prevRevenue) * 100 : 0;
 
   const customersCount = totalCustomers > 0 ? totalCustomers : paidCustomers;
+  const prevCustomersCount = prevTotalCustomers > 0 ? prevTotalCustomers : prevPaidCustomers;
+
   const repeatCustomerBase = customersCount > 0 ? customersCount : paidCustomers;
-  const repeatCustomerRate = repeatCustomerBase > 0 ? (repeatCustomers / repeatCustomerBase) * 100 : 0;
+  const prevRepeatCustomerBase = prevCustomersCount > 0 ? prevCustomersCount : prevPaidCustomers;
+
+  const repeatCustomerRate = repeatCustomerBase > 0
+    ? (repeatCustomers / repeatCustomerBase) * 100
+    : 0;
+  const prevRepeatCustomerRate = prevRepeatCustomerBase > 0
+    ? (prevRepeatCustomers / prevRepeatCustomerBase) * 100
+    : 0;
+
   const customerAcquisitionCost = newCustomers > 0 ? marketingCost / newCustomers : 0;
-  const cacPercentageOfAOV = averageOrderValue > 0 ? (customerAcquisitionCost / averageOrderValue) * 100 : 0;
+  const prevCustomerAcquisitionCost = prevNewCustomers > 0
+    ? prevMarketingCost / prevNewCustomers
+    : 0;
+
+  const cacPercentageOfAOV = averageOrderValue > 0
+    ? (customerAcquisitionCost / averageOrderValue) * 100
+    : 0;
+  const prevCacPercentageOfAOV = prevAverageOrderValue > 0
+    ? (prevCustomerAcquisitionCost / prevAverageOrderValue) * 100
+    : 0;
+
   const returnRate = orders > 0 ? (returnedOrders / orders) * 100 : 0;
+  const prevReturnRate = prevOrders > 0 ? (prevReturnedOrders / prevOrders) * 100 : 0;
+
+  const discountRate = revenue > 0 ? (discounts / revenue) * 100 : 0;
+  const prevDiscountRate = prevRevenue > 0 ? (prevDiscounts / prevRevenue) * 100 : 0;
 
   const summary: OverviewComputation["summary"] = {
     revenue,
-    revenueChange: 0,
+    revenueChange: percentageChange(revenue, prevRevenue),
     grossSales,
-    grossSalesChange: 0,
+    grossSalesChange: percentageChange(grossSales, prevGrossSales),
     discounts,
-    discountsChange: 0,
-    discountRate: revenue > 0 ? (discounts / revenue) * 100 : 0,
-    discountRateChange: 0,
+    discountsChange: percentageChange(discounts, prevDiscounts),
+    discountRate,
+    discountRateChange: percentageChange(discountRate, prevDiscountRate),
     refunds: refundsAmount,
-    refundsChange: 0,
+    refundsChange: percentageChange(refundsAmount, prevRefundsAmount),
     profit: netProfit,
-    profitChange: 0,
+    profitChange: percentageChange(netProfit, prevNetProfit),
     profitMargin,
-    profitMarginChange: 0,
+    profitMarginChange: percentageChange(profitMargin, prevProfitMargin),
     grossProfit,
-    grossProfitChange: 0,
+    grossProfitChange: percentageChange(grossProfit, prevGrossProfit),
     grossProfitMargin,
-    grossProfitMarginChange: 0,
+    grossProfitMarginChange: percentageChange(grossProfitMargin, prevGrossProfitMargin),
     contributionMargin: contributionProfit,
-    contributionMarginChange: 0,
+    contributionMarginChange: percentageChange(contributionProfit, prevContributionProfit),
     contributionMarginPercentage,
-    contributionMarginPercentageChange: 0,
+    contributionMarginPercentageChange: percentageChange(
+      contributionMarginPercentage,
+      prevContributionMarginPercentage,
+    ),
     operatingMargin: profitMargin,
-    operatingMarginChange: 0,
+    operatingMarginChange: percentageChange(profitMargin, prevProfitMargin),
     blendedMarketingCost: marketingCost,
-    blendedMarketingCostChange: 0,
+    blendedMarketingCostChange: percentageChange(marketingCost, prevMarketingCost),
     metaAdSpend: 0,
     metaAdSpendChange: 0,
     googleAdSpend: 0,
@@ -594,89 +760,135 @@ function buildOverviewFromAggregates(aggregates: AggregatedDailyMetrics): Overvi
     metaSpendPercentage: 0,
     metaSpendPercentageChange: 0,
     marketingPercentageOfGross,
-    marketingPercentageOfGrossChange: 0,
+    marketingPercentageOfGrossChange: percentageChange(
+      marketingPercentageOfGross,
+      prevMarketingPercentageOfGross,
+    ),
     marketingPercentageOfNet,
-    marketingPercentageOfNetChange: 0,
+    marketingPercentageOfNetChange: percentageChange(
+      marketingPercentageOfNet,
+      prevMarketingPercentageOfNet,
+    ),
     metaROAS: 0,
     metaROASChange: 0,
     roas: blendedRoas,
-    roasChange: 0,
+    roasChange: percentageChange(blendedRoas, prevBlendedRoas),
     ncROAS: blendedRoas,
-    ncROASChange: 0,
+    ncROASChange: percentageChange(blendedRoas, prevBlendedRoas),
     poas,
-    poasChange: 0,
+    poasChange: percentageChange(poas, prevPoas),
     orders,
-    ordersChange: 0,
+    ordersChange: percentageChange(orders, prevOrders),
     unitsSold,
-    unitsSoldChange: 0,
+    unitsSoldChange: percentageChange(unitsSold, prevUnitsSold),
     avgOrderValue: averageOrderValue,
-    avgOrderValueChange: 0,
+    avgOrderValueChange: percentageChange(averageOrderValue, prevAverageOrderValue),
     avgOrderCost: averageOrderCost,
-    avgOrderCostChange: 0,
+    avgOrderCostChange: percentageChange(averageOrderCost, prevAverageOrderCost),
     avgOrderProfit: averageOrderProfit,
-    avgOrderProfitChange: 0,
+    avgOrderProfitChange: percentageChange(averageOrderProfit, prevAverageOrderProfit),
     adSpendPerOrder,
-    adSpendPerOrderChange: 0,
+    adSpendPerOrderChange: percentageChange(adSpendPerOrder, prevAdSpendPerOrder),
     profitPerOrder: averageOrderProfit,
-    profitPerOrderChange: 0,
+    profitPerOrderChange: percentageChange(averageOrderProfit, prevAverageOrderProfit),
     profitPerUnit,
-    profitPerUnitChange: 0,
+    profitPerUnitChange: percentageChange(profitPerUnit, prevProfitPerUnit),
     fulfillmentCostPerOrder,
-    fulfillmentCostPerOrderChange: 0,
+    fulfillmentCostPerOrderChange: percentageChange(
+      fulfillmentCostPerOrder,
+      prevFulfillmentCostPerOrder,
+    ),
     cogs,
-    cogsChange: 0,
+    cogsChange: percentageChange(cogs, prevCogs),
     cogsPercentageOfGross,
-    cogsPercentageOfGrossChange: 0,
+    cogsPercentageOfGrossChange: percentageChange(
+      cogsPercentageOfGross,
+      prevCogsPercentageOfGross,
+    ),
     cogsPercentageOfNet,
-    cogsPercentageOfNetChange: 0,
+    cogsPercentageOfNetChange: percentageChange(
+      cogsPercentageOfNet,
+      prevCogsPercentageOfNet,
+    ),
     shippingCosts,
-    shippingCostsChange: 0,
+    shippingCostsChange: percentageChange(shippingCosts, prevShippingCosts),
     shippingPercentageOfNet,
-    shippingPercentageOfNetChange: 0,
+    shippingPercentageOfNetChange: percentageChange(
+      shippingPercentageOfNet,
+      prevShippingPercentageOfNet,
+    ),
     transactionFees,
-    transactionFeesChange: 0,
+    transactionFeesChange: percentageChange(transactionFees, prevTransactionFees),
     handlingFees,
-    handlingFeesChange: 0,
+    handlingFeesChange: percentageChange(handlingFees, prevHandlingFees),
     taxesCollected,
-    taxesCollectedChange: 0,
+    taxesCollectedChange: percentageChange(taxesCollected, prevTaxesCollected),
     taxesPercentageOfRevenue,
-    taxesPercentageOfRevenueChange: 0,
+    taxesPercentageOfRevenueChange: percentageChange(
+      taxesPercentageOfRevenue,
+      prevTaxesPercentageOfRevenue,
+    ),
     customCosts,
-    customCostsChange: 0,
+    customCostsChange: percentageChange(customCosts, prevCustomCosts),
     customCostsPercentage: operatingCostPercentage,
-    customCostsPercentageChange: 0,
+    customCostsPercentageChange: percentageChange(
+      operatingCostPercentage,
+      prevOperatingCostPercentage,
+    ),
     customers: customersCount,
-    customersChange: 0,
+    customersChange: percentageChange(customersCount, prevCustomersCount),
     newCustomers,
-    newCustomersChange: 0,
+    newCustomersChange: percentageChange(newCustomers, prevNewCustomers),
     returningCustomers,
-    returningCustomersChange: 0,
+    returningCustomersChange: percentageChange(returningCustomers, prevReturningCustomers),
     repeatCustomerRate,
-    repeatCustomerRateChange: 0,
+    repeatCustomerRateChange: percentageChange(
+      repeatCustomerRate,
+      prevRepeatCustomerRate,
+    ),
     customerAcquisitionCost,
-    customerAcquisitionCostChange: 0,
+    customerAcquisitionCostChange: percentageChange(
+      customerAcquisitionCost,
+      prevCustomerAcquisitionCost,
+    ),
     cacPercentageOfAOV,
-    cacPercentageOfAOVChange: 0,
+    cacPercentageOfAOVChange: percentageChange(
+      cacPercentageOfAOV,
+      prevCacPercentageOfAOV,
+    ),
     returnRate,
-    returnRateChange: 0,
+    returnRateChange: percentageChange(returnRate, prevReturnRate),
     moMRevenueGrowth: 0,
     calendarMoMRevenueGrowth: 0,
-  };
-
-  const contributionMarginMetric = makeMetric(contributionProfit);
+  } satisfies OverviewComputation["summary"];
 
   const metrics: OverviewComputation["metrics"] = {
-    revenue: makeMetric(revenue),
-    profit: makeMetric(netProfit),
-    orders: makeMetric(orders),
-    avgOrderValue: makeMetric(averageOrderValue),
-    roas: makeMetric(blendedRoas),
-    poas: makeMetric(poas),
-    contributionMargin: contributionMarginMetric,
-    blendedMarketingCost: makeMetric(marketingCost),
-    customerAcquisitionCost: makeMetric(customerAcquisitionCost),
-    profitPerOrder: makeMetric(averageOrderProfit),
-  };
+    revenue: makeMetric(revenue, percentageChange(revenue, prevRevenue)),
+    profit: makeMetric(netProfit, percentageChange(netProfit, prevNetProfit)),
+    orders: makeMetric(orders, percentageChange(orders, prevOrders)),
+    avgOrderValue: makeMetric(
+      averageOrderValue,
+      percentageChange(averageOrderValue, prevAverageOrderValue),
+    ),
+    roas: makeMetric(blendedRoas, percentageChange(blendedRoas, prevBlendedRoas)),
+    poas: makeMetric(poas, percentageChange(poas, prevPoas)),
+    contributionMargin: makeMetric(
+      contributionProfit,
+      percentageChange(contributionProfit, prevContributionProfit),
+    ),
+    blendedMarketingCost: makeMetric(
+      marketingCost,
+      percentageChange(marketingCost, prevMarketingCost),
+    ),
+    customerAcquisitionCost: makeMetric(
+      customerAcquisitionCost,
+      percentageChange(customerAcquisitionCost, prevCustomerAcquisitionCost),
+    ),
+    profitPerOrder: makeMetric(
+      averageOrderProfit,
+      percentageChange(averageOrderProfit, prevAverageOrderProfit),
+    ),
+  } satisfies OverviewComputation["metrics"];
 
   return {
     summary,
@@ -691,6 +903,7 @@ function buildOverviewFromAggregates(aggregates: AggregatedDailyMetrics): Overvi
 
 function buildOrdersOverviewFromAggregates(
   aggregates: AggregatedDailyMetrics,
+  previous?: AggregatedDailyMetrics | null,
 ): OrdersOverviewMetrics {
   const totalOrders = aggregates.orders;
   const totalRevenue = aggregates.revenue;
@@ -720,6 +933,39 @@ function buildOrdersOverviewFromAggregates(
   const fulfilledOrders = Math.max(0, totalOrders - aggregates.cancelledOrders);
   const fulfillmentRate = totalOrders > 0 ? (fulfilledOrders / totalOrders) * 100 : 0;
 
+  const prev = previous ?? null;
+  const prevTotalOrders = prev?.orders ?? 0;
+  const prevTotalRevenue = prev?.revenue ?? 0;
+  const prevCogs = prev?.cogs ?? 0;
+  const prevShippingCosts = prev?.shippingCosts ?? 0;
+  const prevTransactionFees = prev?.transactionFees ?? 0;
+  const prevHandlingFees = prev?.handlingFees ?? 0;
+  const prevTaxesCollected = prev?.taxesCollected ?? 0;
+  const prevCustomCosts = prev?.customCosts ?? 0;
+  const prevMarketingCost = prev?.marketingCost ?? 0;
+  const prevRefundsAmount = prev?.refundsAmount ?? 0;
+  const prevTotalCosts =
+    prevCogs +
+    prevShippingCosts +
+    prevTransactionFees +
+    prevHandlingFees +
+    prevTaxesCollected +
+    prevCustomCosts +
+    prevMarketingCost +
+    prevRefundsAmount;
+  const prevNetProfit = prevTotalRevenue - prevTotalCosts;
+  const prevAvgOrderValue = prevTotalOrders > 0 ? prevTotalRevenue / prevTotalOrders : 0;
+  const prevGrossMargin = prevTotalRevenue > 0
+    ? ((prevTotalRevenue - prevCogs) / prevTotalRevenue) * 100
+    : 0;
+  const prevCustomerAcquisitionCost = prev && prev.newCustomers > 0
+    ? prev.marketingCost / prev.newCustomers
+    : 0;
+  const prevFulfilledOrders = prev ? Math.max(0, prev.orders - prev.cancelledOrders) : 0;
+  const prevFulfillmentRate = prevTotalOrders > 0
+    ? (prevFulfilledOrders / prevTotalOrders) * 100
+    : 0;
+
   return {
     totalOrders,
     cancelledOrders: aggregates.cancelledOrders || undefined,
@@ -732,13 +978,13 @@ function buildOrdersOverviewFromAggregates(
     grossMargin,
     fulfillmentRate,
     changes: {
-      totalOrders: 0,
-      revenue: 0,
-      netProfit: 0,
-      avgOrderValue: 0,
-      cac: 0,
-      margin: 0,
-      fulfillmentRate: 0,
+      totalOrders: percentageChange(totalOrders, prevTotalOrders),
+      revenue: percentageChange(totalRevenue, prevTotalRevenue),
+      netProfit: percentageChange(netProfit, prevNetProfit),
+      avgOrderValue: percentageChange(avgOrderValue, prevAvgOrderValue),
+      cac: percentageChange(customerAcquisitionCost, prevCustomerAcquisitionCost),
+      margin: percentageChange(grossMargin, prevGrossMargin),
+      fulfillmentRate: percentageChange(fulfillmentRate, prevFulfillmentRate),
     },
   } satisfies OrdersOverviewMetrics;
 }
@@ -766,6 +1012,43 @@ function finalizePnLMetrics(metrics: PnLMetrics): PnLMetrics {
     ...metrics,
     netProfitMargin,
   };
+}
+
+function aggregatedToPnLMetrics(aggregates: AggregatedDailyMetrics): PnLMetrics {
+  const revenue = aggregates.revenue;
+  const grossSales = Math.max(aggregates.grossSales, revenue);
+  const discounts = aggregates.discounts;
+  const refunds = aggregates.refundsAmount;
+  const cogs = aggregates.cogs;
+  const shippingCosts = aggregates.shippingCosts;
+  const transactionFees = aggregates.transactionFees;
+  const handlingFees = aggregates.handlingFees;
+  const taxesCollected = aggregates.taxesCollected;
+  const customCosts = aggregates.customCosts;
+  const marketingCost = aggregates.marketingCost;
+
+  const grossProfit = revenue - cogs;
+  const totalCostsWithoutAds =
+    cogs + shippingCosts + transactionFees + handlingFees + customCosts + taxesCollected;
+  const netProfit = revenue - totalCostsWithoutAds - marketingCost - refunds;
+  const netProfitMargin = revenue > 0 ? (netProfit / revenue) * 100 : 0;
+
+  return {
+    grossSales,
+    discounts,
+    refunds,
+    revenue,
+    cogs,
+    shippingCosts,
+    transactionFees,
+    handlingFees,
+    grossProfit,
+    taxesCollected,
+    customCosts,
+    totalAdSpend: marketingCost,
+    netProfit,
+    netProfitMargin,
+  } satisfies PnLMetrics;
 }
 
 function accumulatePnLMetrics(target: PnLMetrics, addition: PnLMetrics): void {
@@ -882,7 +1165,7 @@ function getPnLPeriodKey(date: Date, granularity: PnLGranularity) {
   }
 }
 
-function buildPnLKpisFromTotals(total: PnLMetrics): PnLKPIMetrics {
+function buildPnLKpisFromTotals(total: PnLMetrics, previous?: PnLMetrics | null): PnLKPIMetrics {
   const marketingCost = total.totalAdSpend;
   const operatingExpenses = total.customCosts;
   const ebitda = total.netProfit + marketingCost + total.customCosts;
@@ -902,17 +1185,20 @@ function buildPnLKpisFromTotals(total: PnLMetrics): PnLKPIMetrics {
     marketingROAS,
     marketingROI,
     changes: {
-      grossSales: 0,
-      discountsReturns: 0,
-      netRevenue: 0,
-      grossProfit: 0,
-      operatingExpenses: 0,
-      ebitda: 0,
-      netProfit: 0,
-      netMargin: 0,
-      marketingCost: 0,
-      marketingROAS: 0,
-      marketingROI: 0,
+      grossSales: percentageChange(total.grossSales, previous?.grossSales ?? 0),
+      discountsReturns: percentageChange(
+        total.discounts + total.refunds,
+        previous ? previous.discounts + previous.refunds : 0,
+      ),
+      netRevenue: percentageChange(total.revenue, previous?.revenue ?? 0),
+      grossProfit: percentageChange(total.grossProfit, previous?.grossProfit ?? 0),
+      operatingExpenses: percentageChange(operatingExpenses, previous?.customCosts ?? 0),
+      ebitda: percentageChange(ebitda, previous ? previous.netProfit + previous.totalAdSpend + previous.customCosts : 0),
+      netProfit: percentageChange(total.netProfit, previous?.netProfit ?? 0),
+      netMargin: percentageChange(total.netProfitMargin, previous?.netProfitMargin ?? 0),
+      marketingCost: percentageChange(marketingCost, previous?.totalAdSpend ?? 0),
+      marketingROAS: percentageChange(marketingROAS, previous ? (previous.totalAdSpend > 0 ? previous.revenue / previous.totalAdSpend : 0) : 0),
+      marketingROI: percentageChange(marketingROI, previous ? (previous.totalAdSpend > 0 ? (previous.netProfit / previous.totalAdSpend) * 100 : 0) : 0),
     },
   } satisfies PnLKPIMetrics;
 }
@@ -937,10 +1223,6 @@ export async function loadOverviewFromDailyMetrics(
 
   const aggregates = mergeDailyMetrics(fetched.docs);
 
-  const rangeStartMs = getRangeStartMs(range);
-  const rangeEndExclusiveMs = getRangeEndExclusiveMs(range);
-  const rangeEndMs = rangeEndExclusiveMs - 1;
-
   const activeOperationalCostDocs = await ctx.db
     .query("globalCosts")
     .withIndex("by_org_and_active", (q) =>
@@ -948,30 +1230,33 @@ export async function loadOverviewFromDailyMetrics(
     )
     .collect();
 
-  const operationalCostContext: CostComputationContext = {
-    ordersCount: aggregates.orders,
-    unitsSold: aggregates.unitsSold,
-    revenue: aggregates.revenue,
-    rangeStartMs: Number.isFinite(rangeStartMs) ? rangeStartMs : 0,
-    rangeEndMs: Number.isFinite(rangeEndMs) ? rangeEndMs : rangeEndExclusiveMs - 1,
-  };
+  const aggregatesWithCosts = applyOperationalCostsToAggregates(
+    aggregates,
+    activeOperationalCostDocs,
+    range,
+  );
 
-  const customCostsTotal = activeOperationalCostDocs.reduce((total, cost) => {
-    const type = String(cost.type ?? "");
-    if (type !== "operational" && type !== "custom") {
-      return total;
+  const previousRange = derivePreviousRange(range);
+  let previousAggregatesWithCosts: AggregatedDailyMetrics | null = null;
+
+  if (previousRange) {
+    const previousFetched = await fetchDailyMetricsDocs(ctx, organizationId, previousRange);
+    if (previousFetched) {
+      const merged = mergeDailyMetrics(previousFetched.docs);
+      previousAggregatesWithCosts = applyOperationalCostsToAggregates(
+        merged,
+        activeOperationalCostDocs,
+        previousRange,
+      );
     }
-    return total + computeOperationalCostAmount(cost, operationalCostContext);
-  }, 0);
+  }
 
-  const aggregatesWithCosts: AggregatedDailyMetrics = {
-    ...aggregates,
-    customCosts: customCostsTotal,
-  };
-
-  const overview = buildOverviewFromAggregates(aggregatesWithCosts);
+  const overview = buildOverviewFromAggregates(aggregatesWithCosts, previousAggregatesWithCosts);
   const platformMetrics = buildPlatformMetricsFromAggregates(aggregatesWithCosts);
-  const ordersOverview = buildOrdersOverviewFromAggregates(aggregatesWithCosts);
+  const ordersOverview = buildOrdersOverviewFromAggregates(
+    aggregatesWithCosts,
+    previousAggregatesWithCosts,
+  );
 
   const calendarMoMRevenueGrowth = await computeCalendarMoMRevenueGrowth(
     ctx,
@@ -986,7 +1271,7 @@ export async function loadOverviewFromDailyMetrics(
     aggregatesWithCosts.totalCustomers - aggregatesWithCosts.paidCustomers,
   );
 
-  const meta = {
+  const meta: Record<string, unknown> = {
     source: "dailyMetrics",
     days: fetched.availableDays,
     coverage: {
@@ -1010,7 +1295,21 @@ export async function loadOverviewFromDailyMetrics(
       repeatCustomers: aggregatesWithCosts.repeatCustomers,
       abandonedCustomers: derivedAbandoned,
     },
-  } satisfies Record<string, unknown>;
+  };
+
+  if (previousRange) {
+    meta.previousRange = previousRange;
+  }
+
+  if (previousAggregatesWithCosts) {
+    meta.previousAggregates = {
+      revenue: previousAggregatesWithCosts.revenue,
+      orders: previousAggregatesWithCosts.orders,
+      marketingCost: previousAggregatesWithCosts.marketingCost,
+      totalCustomers: previousAggregatesWithCosts.totalCustomers,
+      newCustomers: previousAggregatesWithCosts.newCustomers,
+    } satisfies Record<string, unknown>;
+  }
 
   return {
     overview,
@@ -1023,8 +1322,15 @@ export async function loadOverviewFromDailyMetrics(
 
 function percentageChange(current: number, previous: number): number {
   if (!Number.isFinite(previous) || previous === 0) {
+    if (current > 0) {
+      return 100;
+    }
+    if (current < 0) {
+      return -100;
+    }
     return 0;
   }
+
   const change = ((current - previous) / Math.abs(previous)) * 100;
   return Number.isFinite(change) ? change : 0;
 }
@@ -1174,17 +1480,17 @@ export async function loadCustomerOverviewFromDailyMetrics(
     hasFullCoverage: fetched.hasFullCoverage,
     previousRange,
     aggregates: {
-      revenue: adjustedAggregates.revenue,
-      orders: adjustedAggregates.orders,
-      marketingCost: adjustedAggregates.marketingCost,
-      totalCustomers: adjustedAggregates.totalCustomers,
-      paidCustomers: adjustedAggregates.paidCustomers,
-      newCustomers: adjustedAggregates.newCustomers,
-      returningCustomers: adjustedAggregates.returningCustomers,
-      repeatCustomers: adjustedAggregates.repeatCustomers,
-      prepaidOrders: adjustedAggregates.prepaidOrders,
-      codOrders: adjustedAggregates.codOrders,
-      otherOrders: adjustedAggregates.otherOrders,
+        revenue: adjustedAggregates.revenue,
+        orders: adjustedAggregates.orders,
+        marketingCost: adjustedAggregates.marketingCost,
+        totalCustomers: adjustedAggregates.totalCustomers,
+        paidCustomers: adjustedAggregates.paidCustomers,
+        newCustomers: adjustedAggregates.newCustomers,
+        returningCustomers: adjustedAggregates.returningCustomers,
+        repeatCustomers: adjustedAggregates.repeatCustomers,
+        prepaidOrders: adjustedAggregates.prepaidOrders,
+        codOrders: adjustedAggregates.codOrders,
+        otherOrders: adjustedAggregates.otherOrders,
     },
   } satisfies Record<string, unknown>;
 
@@ -1314,6 +1620,7 @@ export async function loadPnLAnalyticsFromDailyMetrics(
   const hasData = availableDays > 0;
 
   let totalOperationalCost = 0;
+  let costDocs: OperationalCostDoc[] = [];
   if (hasData) {
     const organizationCosts = await ctx.db
       .query("globalCosts")
@@ -1322,7 +1629,7 @@ export async function loadPnLAnalyticsFromDailyMetrics(
       )
       .collect();
 
-    const costDocs: OperationalCostDoc[] = organizationCosts.filter((cost) => {
+    costDocs = organizationCosts.filter((cost) => {
       const costType = String(cost.type ?? "");
       return costType === "operational" || costType === "custom";
     });
@@ -1429,6 +1736,19 @@ export async function loadPnLAnalyticsFromDailyMetrics(
 
   const totalsFinal = finalizePnLMetrics(totals);
 
+  let previousTotalsFinal: PnLMetrics | null = null;
+  const previousRange = derivePreviousRange(range);
+  if (previousRange) {
+    const previousFetched = await fetchDailyMetricsDocs(ctx, organizationId, previousRange);
+    if (previousFetched) {
+      const previousAggregates = mergeDailyMetrics(previousFetched.docs);
+      const previousWithCosts = costDocs.length > 0
+        ? applyOperationalCostsToAggregates(previousAggregates, costDocs, previousRange)
+        : previousAggregates;
+      previousTotalsFinal = aggregatedToPnLMetrics(previousWithCosts);
+    }
+  }
+
   const periods: PnLTablePeriod[] = hasData
     ? Array.from(buckets.values())
         .sort((a, b) => a.rangeStartMs - b.rangeStartMs)
@@ -1440,12 +1760,30 @@ export async function loadPnLAnalyticsFromDailyMetrics(
         }))
     : [];
 
+  if (periods.length > 0) {
+    for (let index = 0; index < periods.length; index += 1) {
+      const current = periods[index]!;
+      const previous = index > 0 ? periods[index - 1]! : null;
+      current.growth = previous
+        ? {
+            revenue: percentageChange(current.metrics.revenue, previous.metrics.revenue),
+            netProfit: percentageChange(current.metrics.netProfit, previous.metrics.netProfit),
+          }
+        : null;
+    }
+  }
+
   if (hasData && periods.length > 0) {
     periods.push({
       label: "Total",
       date: range.endDate,
       metrics: totalsFinal,
-      growth: null,
+      growth: previousTotalsFinal
+        ? {
+            revenue: percentageChange(totalsFinal.revenue, previousTotalsFinal.revenue),
+            netProfit: percentageChange(totalsFinal.netProfit, previousTotalsFinal.netProfit),
+          }
+        : null,
       isTotal: true,
     });
   }
@@ -1471,7 +1809,7 @@ export async function loadPnLAnalyticsFromDailyMetrics(
         }))
     : [];
 
-  const metrics = hasData ? buildPnLKpisFromTotals(totalsFinal) : null;
+  const metrics = hasData ? buildPnLKpisFromTotals(totalsFinal, previousTotalsFinal) : null;
 
   return {
     result: {

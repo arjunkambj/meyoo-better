@@ -10,6 +10,7 @@ import type {
   OrdersFulfillmentMetrics,
   OrdersOverviewMetrics,
   OverviewComputation,
+  OverviewSummary,
   PlatformMetrics,
   PnLAnalyticsResult,
   PnLGranularity,
@@ -165,7 +166,7 @@ function defaultMetric(value = 0, change = 0): MetricValue {
   return { value, change };
 }
 
-export function computeOverviewMetrics(
+function computeOverviewBaseline(
   response: AnalyticsSourceResponse<any> | null | undefined,
 ): OverviewComputation | null {
   if (!response) return null;
@@ -784,6 +785,73 @@ export function computeOverviewMetrics(
   } satisfies OverviewComputation;
 }
 
+function percentageChange(current: number, previous: number): number {
+  if (!Number.isFinite(previous) || previous === 0) {
+    if (current > 0) {
+      return 100;
+    }
+    if (current < 0) {
+      return -100;
+    }
+    return 0;
+  }
+
+  const change = ((current - previous) / Math.abs(previous)) * 100;
+  return Number.isFinite(change) ? change : 0;
+}
+
+function applySummaryChanges(current: OverviewSummary, previous: OverviewSummary): void {
+  const summaryRecord = current as unknown as Record<string, number>;
+  for (const key of Object.keys(current) as Array<keyof OverviewSummary>) {
+    if (!String(key).endsWith('Change')) continue;
+    const baseKey = String(key).slice(0, -6) as keyof OverviewSummary;
+    if (!(baseKey in current) || !(baseKey in previous)) continue;
+    const currentValue = current[baseKey];
+    const previousValue = previous[baseKey];
+    if (typeof currentValue !== 'number' || typeof previousValue !== 'number') continue;
+    summaryRecord[String(key)] = percentageChange(currentValue, previousValue);
+  }
+}
+
+function applyMetricChanges(
+  current: Record<string, MetricValue>,
+  previous: Record<string, MetricValue>,
+): void {
+  for (const [key, metric] of Object.entries(current)) {
+    const previousMetric = previous[key];
+    if (!previousMetric) continue;
+    metric.change = percentageChange(metric.value, previousMetric.value);
+  }
+}
+
+export function computeOverviewMetrics(
+  response: AnalyticsSourceResponse<any> | null | undefined,
+  previousResponse?: AnalyticsSourceResponse<any> | null | undefined,
+): OverviewComputation | null {
+  const current = computeOverviewBaseline(response);
+  if (!current) {
+    return current;
+  }
+
+  if (!previousResponse) {
+    return current;
+  }
+
+  const previous = computeOverviewBaseline(previousResponse);
+  if (!previous) {
+    return current;
+  }
+
+  applySummaryChanges(current.summary, previous.summary);
+  applyMetricChanges(current.metrics, previous.metrics);
+  current.extras.blendedSessionConversionRateChange = percentageChange(
+    current.extras.blendedSessionConversionRate,
+    previous.extras.blendedSessionConversionRate,
+  );
+
+  return current;
+}
+
 export function computePlatformMetrics(
   response: AnalyticsSourceResponse<any> | null | undefined,
 ): PlatformMetrics {
@@ -1074,29 +1142,12 @@ function deriveOrderDocuments(data: AnalyticsSourceData<any>): {
   };
 }
 
-export function computeOrdersAnalytics(
-  response: AnalyticsSourceResponse<any> | null | undefined,
-  options: OrdersAnalyticsOptions = {},
-): OrdersAnalyticsResult {
-  if (!response) {
-    return {
-      overview: null,
-      orders: null,
-      fulfillment: null,
-      exportRows: [],
-    } satisfies OrdersAnalyticsResult;
-  }
+type DerivedOrders = {
+  orders: AnalyticsOrder[];
+  refundedOrderIds: Set<string>;
+};
 
-  const data = ensureDataset(response);
-  if (!data) {
-    return {
-      overview: null,
-      orders: null,
-      fulfillment: null,
-      exportRows: [],
-    } satisfies OrdersAnalyticsResult;
-  }
-
+function deriveAnalyticsOrders(data: AnalyticsSourceData<any>): DerivedOrders {
   const { orders, orderItems, transactions, refunds, variantCosts, variants } =
     deriveOrderDocuments(data);
 
@@ -1109,7 +1160,6 @@ export function computeOrdersAnalytics(
   for (const component of variantCosts) {
     const variantId = toStringId(component.variantId ?? component.variant_id);
     if (!variantId) continue;
-    // For variants with multiple cost records, use the most recently updated one
     const current = componentMap.get(variantId);
     const currentTime = safeNumber(current?.updatedAt ?? current?.createdAt ?? 0);
     const componentTime = safeNumber(component.updatedAt ?? component.createdAt ?? 0);
@@ -1238,6 +1288,108 @@ export function computeOrdersAnalytics(
     } satisfies AnalyticsOrder;
   });
 
+  const refundedOrders = new Set(
+    refunds.map((refund) => toStringId(refund.orderId ?? refund.order_id)),
+  );
+
+  return {
+    orders: analyticsOrders,
+    refundedOrderIds: refundedOrders,
+  } satisfies DerivedOrders;
+}
+
+type OrdersAggregateSummary = {
+  totalOrders: number;
+  totalRevenue: number;
+  totalCosts: number;
+  netProfit: number;
+  totalTax: number;
+  grossMargin: number;
+  avgOrderValue: number;
+  fulfillmentRate: number;
+  avgFulfillmentCost: number;
+  returnRate: number;
+};
+
+function aggregateOrdersMetrics(
+  orders: AnalyticsOrder[],
+  refundedOrderIds: Set<string>,
+): OrdersAggregateSummary {
+  let totalRevenue = 0;
+  let totalCosts = 0;
+  let netProfit = 0;
+  let totalTax = 0;
+  let shippingTotal = 0;
+  let cogsTotal = 0;
+  let fulfilledCount = 0;
+  let returnCount = 0;
+
+  for (const order of orders) {
+    totalRevenue += order.totalPrice;
+    totalCosts += order.totalCost;
+    netProfit += order.profit;
+    totalTax += order.taxAmount;
+    shippingTotal += order.shippingCost;
+
+    const orderCogs = order.lineItems?.reduce((sum, item) => sum + item.cost, 0) ?? 0;
+    cogsTotal += orderCogs;
+
+    if (isFulfilledStatus(order.fulfillmentStatus)) {
+      fulfilledCount += 1;
+    }
+
+    if (refundedOrderIds.has(order.id)) {
+      returnCount += 1;
+    }
+  }
+
+  const totalOrders = orders.length;
+  const grossMargin = totalRevenue > 0 ? ((totalRevenue - cogsTotal) / totalRevenue) * 100 : 0;
+  const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+  const fulfillmentRate = totalOrders > 0 ? (fulfilledCount / totalOrders) * 100 : 0;
+  const avgFulfillmentCost = totalOrders > 0 ? shippingTotal / totalOrders : 0;
+  const returnRate = totalOrders > 0 ? (returnCount / totalOrders) * 100 : 0;
+
+  return {
+    totalOrders,
+    totalRevenue,
+    totalCosts,
+    netProfit,
+    totalTax,
+    grossMargin,
+    avgOrderValue,
+    fulfillmentRate,
+    avgFulfillmentCost,
+    returnRate,
+  } satisfies OrdersAggregateSummary;
+}
+
+export function computeOrdersAnalytics(
+  response: AnalyticsSourceResponse<any> | null | undefined,
+  options: OrdersAnalyticsOptions = {},
+  previousResponse?: AnalyticsSourceResponse<any> | null | undefined,
+): OrdersAnalyticsResult {
+  if (!response) {
+    return {
+      overview: null,
+      orders: null,
+      fulfillment: null,
+      exportRows: [],
+    } satisfies OrdersAnalyticsResult;
+  }
+
+  const data = ensureDataset(response);
+  if (!data) {
+    return {
+      overview: null,
+      orders: null,
+      fulfillment: null,
+      exportRows: [],
+    } satisfies OrdersAnalyticsResult;
+  }
+
+  const { orders: analyticsOrders, refundedOrderIds } = deriveAnalyticsOrders(data);
+
   const filtered = analyticsOrders.filter(
     (order) => matchesStatus(order, options.status) && matchesSearch(order, options.searchTerm),
   );
@@ -1251,59 +1403,57 @@ export function computeOrdersAnalytics(
   const start = (currentPage - 1) * pageSize;
   const paginated = sorted.slice(start, start + pageSize);
 
-  const aggregates = sorted.reduce(
-    (acc, order) => {
-      acc.revenue += order.totalPrice;
-      acc.totalCost += order.totalCost;
-      acc.netProfit += order.profit;
-      acc.tax += order.taxAmount;
-      acc.shipping += order.shippingCost;
-      acc.transaction += order.totalCost - order.shippingCost - order.taxAmount - (order.lineItems?.reduce((sum, item) => sum + item.cost, 0) ?? 0);
-      acc.cogs += order.lineItems?.reduce((sum, item) => sum + item.cost, 0) ?? 0;
-      acc.unitsSold += order.items;
-      if (isFulfilledStatus(order.fulfillmentStatus)) {
-        acc.fulfilled += 1;
-      }
-      return acc;
-    },
-    {
-      revenue: 0,
-      totalCost: 0,
-      netProfit: 0,
-      tax: 0,
-      shipping: 0,
-      transaction: 0,
-      cogs: 0,
-      unitsSold: 0,
-      fulfilled: 0,
-    },
-  );
+  const aggregates = aggregateOrdersMetrics(sorted, refundedOrderIds);
 
-  const refundedOrders = new Set(
-    refunds.map((refund) => toStringId(refund.orderId ?? refund.order_id)),
-  );
+  let previousAggregates: OrdersAggregateSummary | null = null;
+  if (previousResponse) {
+    const previousData = ensureDataset(previousResponse);
+    if (previousData) {
+      const { orders: previousOrders, refundedOrderIds: previousRefunded } =
+        deriveAnalyticsOrders(previousData);
+      const previousFiltered = previousOrders.filter(
+        (order) => matchesStatus(order, options.status) && matchesSearch(order, options.searchTerm),
+      );
+      previousAggregates = aggregateOrdersMetrics(previousFiltered, previousRefunded);
+    }
+  }
 
   const overview: OrdersOverviewMetrics = {
-    totalOrders: total,
-    totalRevenue: aggregates.revenue,
-    totalCosts: aggregates.totalCost,
+    totalOrders: aggregates.totalOrders,
+    totalRevenue: aggregates.totalRevenue,
+    totalCosts: aggregates.totalCosts,
     netProfit: aggregates.netProfit,
-    totalTax: aggregates.tax,
-    avgOrderValue: total > 0 ? aggregates.revenue / total : 0,
+    totalTax: aggregates.totalTax,
+    avgOrderValue: aggregates.avgOrderValue,
     customerAcquisitionCost: 0,
-    grossMargin:
-      aggregates.revenue > 0
-        ? ((aggregates.revenue - aggregates.cogs) / aggregates.revenue) * 100
-        : 0,
-    fulfillmentRate: total > 0 ? (aggregates.fulfilled / total) * 100 : 0,
+    grossMargin: aggregates.grossMargin,
+    fulfillmentRate: aggregates.fulfillmentRate,
     changes: {
-      totalOrders: 0,
-      revenue: 0,
-      netProfit: 0,
-      avgOrderValue: 0,
-      cac: 0,
-      margin: 0,
-      fulfillmentRate: 0,
+      totalOrders: percentageChange(
+        aggregates.totalOrders,
+        previousAggregates?.totalOrders ?? 0,
+      ),
+      revenue: percentageChange(
+        aggregates.totalRevenue,
+        previousAggregates?.totalRevenue ?? 0,
+      ),
+      netProfit: percentageChange(
+        aggregates.netProfit,
+        previousAggregates?.netProfit ?? 0,
+      ),
+      avgOrderValue: percentageChange(
+        aggregates.avgOrderValue,
+        previousAggregates?.avgOrderValue ?? 0,
+      ),
+      cac: percentageChange(0, 0),
+      margin: percentageChange(
+        aggregates.grossMargin,
+        previousAggregates?.grossMargin ?? 0,
+      ),
+      fulfillmentRate: percentageChange(
+        aggregates.fulfillmentRate,
+        previousAggregates?.fulfillmentRate ?? 0,
+      ),
     },
   };
 
@@ -1313,9 +1463,9 @@ export function computeOrdersAnalytics(
     avgDeliveryTime: 0,
     onTimeDeliveryRate: overview.fulfillmentRate,
     fulfillmentAccuracy: overview.fulfillmentRate,
-    returnRate: total > 0 ? (refundedOrders.size / total) * 100 : 0,
-    avgFulfillmentCost: total > 0 ? aggregates.shipping / total : 0,
-    totalOrders: total,
+    returnRate: aggregates.returnRate,
+    avgFulfillmentCost: aggregates.avgFulfillmentCost,
+    totalOrders: aggregates.totalOrders,
   };
 
   const exportRows: OrdersAnalyticsExportRow[] = sorted.map((order) => ({

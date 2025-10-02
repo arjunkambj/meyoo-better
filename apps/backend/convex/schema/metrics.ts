@@ -13,6 +13,8 @@ const customerBreakdown = v.object({
   repeatCustomers: v.optional(v.number()),
 });
 
+// NOTE: These snapshots are owned by the analytics engine.
+// Webhooks should enqueue a rebuild job instead of recalculating them inline.
 export const dailyMetrics = defineTable({
   organizationId: v.id("organizations"),
   date: v.string(), // YYYY-MM-DD

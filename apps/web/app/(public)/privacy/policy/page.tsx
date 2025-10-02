@@ -48,7 +48,7 @@ const sections = [
   {
     id: "meta-compliance",
     title: "Meta Platform Compliance",
-    icon: "solar:facebook-bold-duotone",
+    icon: "logos:meta-icon",
   },
   {
     id: "gdpr-ccpa",
@@ -544,7 +544,7 @@ export default function PrivacyPage() {
               <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
                 <Icon
                   className="w-6 h-6 text-primary"
-                  icon="solar:facebook-bold-duotone"
+                  icon="logos:meta-icon"
                 />
                 Meta Platform Compliance
               </h2>

@@ -432,7 +432,7 @@ export default function DataDeletionPage() {
                   <h3 className="font-semibold mb-3 flex items-center gap-2">
                     <Icon
                       className="w-5 h-5 text-primary"
-                      icon="solar:facebook-bold-duotone"
+                      icon="logos:meta-icon"
                     />
                     Meta Platform Data Deletion
                   </h3>

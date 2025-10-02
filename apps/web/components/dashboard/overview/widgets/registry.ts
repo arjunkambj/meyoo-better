@@ -16,7 +16,7 @@ export const WIDGETS: Record<string, Widget> = {
     id: "adSpendSummary",
     name: "Ad Spend Summary",
     description: "ROAS, POAS, ncROAS and ad spend metrics",
-    icon: "solar:ad-bold-duotone",
+    icon: "solar:chart-square-bold-duotone",
     component: "AdSpendSummaryWidget",
   },
   costBreakdown: {

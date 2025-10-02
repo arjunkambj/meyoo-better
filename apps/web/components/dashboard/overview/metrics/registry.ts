@@ -224,7 +224,7 @@ export const METRICS: Record<string, MetricDefinition> = {
   discountRate: {
     id: "discountRate",
     label: "Discount Rate",
-    icon: "solar:percent-bold-duotone",
+    icon: "solar:tag-price-bold-duotone",
     category: "revenue",
     format: "percentage",
     suffix: "%",
@@ -252,7 +252,7 @@ export const METRICS: Record<string, MetricDefinition> = {
   grossProfit: {
     id: "grossProfit",
     label: "Gross Profit",
-    icon: "solar:profit-bold-duotone",
+    icon: "solar:money-bag-bold-duotone",
     category: "revenue",
     format: "currency",
     prefix: "$",
@@ -280,7 +280,7 @@ export const METRICS: Record<string, MetricDefinition> = {
   contributionMarginPercentage: {
     id: "contributionMarginPercentage",
     label: "Contribution %",
-    icon: "solar:percent-bold-duotone",
+    icon: "solar:chart-square-bold-duotone",
     category: "revenue",
     format: "percentage",
     suffix: "%",
@@ -358,7 +358,7 @@ export const METRICS: Record<string, MetricDefinition> = {
   blendedMarketingCost: {
     id: "blendedMarketingCost",
     label: "Total Ad Spend",
-    icon: "solar:ad-bold-duotone",
+    icon: "solar:chart-square-bold-duotone",
     iconColor: "text-default-500",
     category: "marketing",
     format: "currency",
@@ -368,7 +368,8 @@ export const METRICS: Record<string, MetricDefinition> = {
   metaAdSpend: {
     id: "metaAdSpend",
     label: "Meta Ad Spend",
-    icon: "solar:facebook-bold-duotone",
+    icon: "mingcute:meta-fill",
+    iconColor: "text-default-500",
     category: "marketing",
     format: "currency",
     prefix: "$",
@@ -377,7 +378,8 @@ export const METRICS: Record<string, MetricDefinition> = {
   metaSpendPercentage: {
     id: "metaSpendPercentage",
     label: "Meta % of Ad Spend",
-    icon: "solar:percent-bold-duotone",
+    icon: "mingcute:meta-fill",
+    iconColor: "text-default-500",
     category: "marketing",
     format: "percentage",
     suffix: "%",
@@ -387,7 +389,7 @@ export const METRICS: Record<string, MetricDefinition> = {
   marketingPercentageOfGross: {
     id: "marketingPercentageOfGross",
     label: "Marketing % of Gross",
-    icon: "solar:percent-bold-duotone",
+    icon: "solar:pie-chart-2-bold-duotone",
     category: "marketing",
     format: "percentage",
     suffix: "%",
@@ -397,7 +399,7 @@ export const METRICS: Record<string, MetricDefinition> = {
   marketingPercentageOfNet: {
     id: "marketingPercentageOfNet",
     label: "Marketing % of Revenue",
-    icon: "solar:percent-bold-duotone",
+    icon: "solar:chart-2-bold-duotone",
     category: "marketing",
     format: "percentage",
     suffix: "%",
@@ -511,7 +513,7 @@ export const METRICS: Record<string, MetricDefinition> = {
   metaCPC: {
     id: "metaCPC",
     label: "Meta CPC",
-    icon: "solar:dollar-circle-bold-duotone",
+    icon: "solar:hand-money-bold-duotone",
     category: "metaInsights",
     format: "currency",
     prefix: "$",
@@ -580,7 +582,7 @@ export const METRICS: Record<string, MetricDefinition> = {
   metaLandingPageViews: {
     id: "metaLandingPageViews",
     label: "Meta Landing Views",
-    icon: "solar:browser-bold-duotone",
+    icon: "solar:monitor-bold-duotone",
     category: "metaInsights",
     format: "number",
     description: "Landing page views",
@@ -606,7 +608,7 @@ export const METRICS: Record<string, MetricDefinition> = {
   metaCostPerThruPlay: {
     id: "metaCostPerThruPlay",
     label: "Meta Cost/ThruPlay",
-    icon: "solar:dollar-circle-bold-duotone",
+    icon: "solar:videocamera-record-bold-duotone",
     category: "metaInsights",
     format: "currency",
     prefix: "$",
@@ -637,7 +639,7 @@ export const METRICS: Record<string, MetricDefinition> = {
   cogsPercentageOfGross: {
     id: "cogsPercentageOfGross",
     label: "COGS % of Gross",
-    icon: "solar:percent-bold-duotone",
+    icon: "solar:box-minimalistic-bold-duotone",
     category: "costStructure",
     format: "percentage",
     suffix: "%",
@@ -647,7 +649,7 @@ export const METRICS: Record<string, MetricDefinition> = {
   cogsPercentageOfNet: {
     id: "cogsPercentageOfNet",
     label: "COGS % of Revenue",
-    icon: "solar:percent-bold-duotone",
+    icon: "solar:box-bold-duotone",
     category: "costStructure",
     format: "percentage",
     suffix: "%",
@@ -666,7 +668,7 @@ export const METRICS: Record<string, MetricDefinition> = {
   shippingPercentageOfNet: {
     id: "shippingPercentageOfNet",
     label: "Shipping % of Revenue",
-    icon: "solar:percent-bold-duotone",
+    icon: "solar:tram-bold-duotone",
     category: "costStructure",
     format: "percentage",
     suffix: "%",
@@ -694,7 +696,7 @@ export const METRICS: Record<string, MetricDefinition> = {
   taxesPercentageOfRevenue: {
     id: "taxesPercentageOfRevenue",
     label: "Taxes % of Revenue",
-    icon: "solar:percent-bold-duotone",
+    icon: "solar:bill-list-bold-duotone",
     category: "costStructure",
     format: "percentage",
     suffix: "%",
@@ -722,7 +724,7 @@ export const METRICS: Record<string, MetricDefinition> = {
   customCostsPercentage: {
     id: "customCostsPercentage",
     label: "Operating % of Revenue",
-    icon: "solar:percent-bold-duotone",
+    icon: "solar:widget-5-bold-duotone",
     category: "costStructure",
     format: "percentage",
     suffix: "%",
@@ -779,7 +781,7 @@ export const METRICS: Record<string, MetricDefinition> = {
   cacPercentageOfAOV: {
     id: "cacPercentageOfAOV",
     label: "CAC % of AOV",
-    icon: "solar:percent-bold-duotone",
+    icon: "solar:user-id-bold-duotone",
     category: "customerEconomics",
     format: "percentage",
     suffix: "%",
@@ -808,7 +810,7 @@ export const METRICS: Record<string, MetricDefinition> = {
   avgOrderProfit: {
     id: "avgOrderProfit",
     label: "Avg Order Profit",
-    icon: "solar:profit-bold-duotone",
+    icon: "solar:money-bag-bold-duotone",
     category: "unitEconomics",
     format: "currency",
     prefix: "$",

@@ -154,7 +154,7 @@ const KPI = React.memo(function KPI({
   change,
   changeType,
   icon,
-  iconColor = "text-primary",
+  iconColor = "text-default-500",
   loading = false,
   className,
   size = "small",

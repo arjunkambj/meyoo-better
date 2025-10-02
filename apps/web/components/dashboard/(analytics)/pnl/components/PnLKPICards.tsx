@@ -82,7 +82,7 @@ export const PnLKPICards = memo(function PnLKPICards({
         (metrics?.changes?.marketingCost ?? 0) <= 0
           ? "positive"
           : ("negative" as const),
-      icon: "solar:megaphone-bold-duotone",
+      icon: "mingcute:meta-fill",
       iconColor: "text-default-500",
     },
     {

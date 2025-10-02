@@ -5,6 +5,7 @@ import { action, query, type ActionCtx, type QueryCtx } from "../_generated/serv
 import { api } from "../_generated/api";
 import {
   datasetValidator,
+  dateRangeValidator,
   defaultDateRange,
   loadAnalytics,
   responseValidator,
@@ -28,7 +29,7 @@ type IntegrationStatus = Awaited<ReturnType<typeof computeIntegrationStatus>>;
 
 const responseOrNull = v.union(v.null(), responseValidator);
 
-type DateRangeArg = { startDate: string; endDate: string };
+type DateRangeArg = DateRange;
 
 type OverviewPayload = {
   dateRange: DateRange;
@@ -110,7 +111,7 @@ export const getOverviewData = query({
   returns: v.union(
     v.null(),
     v.object({
-      dateRange: v.object({ startDate: v.string(), endDate: v.string() }),
+      dateRange: dateRangeValidator,
       organizationId: v.string(),
       overview: v.optional(v.any()),
       platformMetrics: v.optional(v.any()),
@@ -285,7 +286,7 @@ const getOverviewDataActionDefinition = {
   returns: v.union(
     v.null(),
     v.object({
-      dateRange: v.object({ startDate: v.string(), endDate: v.string() }),
+      dateRange: dateRangeValidator,
       organizationId: v.string(),
       overview: v.optional(v.any()),
       platformMetrics: v.optional(v.any()),
@@ -363,7 +364,7 @@ export const getDashboardSummary = query({
 
 export const getTrendingProducts = query({
   args: {
-    dateRange: v.optional(v.object({ startDate: v.string(), endDate: v.string() })),
+    dateRange: v.optional(dateRangeValidator),
     limit: v.optional(v.number()),
   },
   returns: responseOrNull,
@@ -387,7 +388,7 @@ export const getTrendingProducts = query({
 
 export const getRecentActivity = query({
   args: {
-    dateRange: v.optional(v.object({ startDate: v.string(), endDate: v.string() })),
+    dateRange: v.optional(dateRangeValidator),
   },
   returns: responseOrNull,
   handler: async (ctx, args) => {
@@ -398,7 +399,7 @@ export const getRecentActivity = query({
 
 export const getPerformanceIndicators = query({
   args: {
-    dateRange: v.optional(v.object({ startDate: v.string(), endDate: v.string() })),
+    dateRange: v.optional(dateRangeValidator),
   },
   returns: responseOrNull,
   handler: async (ctx, args) => {
@@ -409,7 +410,7 @@ export const getPerformanceIndicators = query({
 
 export const getTrendingMetrics = query({
   args: {
-    dateRange: v.optional(v.object({ startDate: v.string(), endDate: v.string() })),
+    dateRange: v.optional(dateRangeValidator),
   },
   returns: responseOrNull,
   handler: async (ctx, args) => {
@@ -420,7 +421,7 @@ export const getTrendingMetrics = query({
 
 export const getActivityFeed = query({
   args: {
-    dateRange: v.optional(v.object({ startDate: v.string(), endDate: v.string() })),
+    dateRange: v.optional(dateRangeValidator),
     limit: v.optional(v.number()),
   },
   returns: responseOrNull,
@@ -445,7 +446,7 @@ export const getSyncStatus = query({
   returns: v.union(
     v.null(),
     v.object({
-      dateRange: v.object({ startDate: v.string(), endDate: v.string() }),
+      dateRange: dateRangeValidator,
       data: datasetValidator,
       meta: v.optional(v.any()),
     }),

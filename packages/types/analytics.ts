@@ -20,6 +20,10 @@ export interface AnalyticsDateRange {
   startDate: string;
   endDate: string;
   preset?: string;
+  startDateTimeUtc?: string;
+  endDateTimeUtc?: string;
+  endDateTimeUtcExclusive?: string;
+  dayCount?: number;
 }
 
 export type AnalyticsSourceData<TRecord = unknown> = Record<
@@ -108,6 +112,8 @@ export interface OverviewSummary {
   profitPerOrderChange: number;
   profitPerUnit: number;
   profitPerUnitChange: number;
+  fulfillmentCostPerOrder: number;
+  fulfillmentCostPerOrderChange: number;
   cogs: number;
   cogsChange: number;
   cogsPercentageOfGross: number;

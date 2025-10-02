@@ -7,7 +7,7 @@ import { getUserAndOrg } from "../utils/auth";
 import { computeChannelRevenue, computePlatformMetrics } from "../utils/analyticsAggregations";
 import type { ChannelRevenueBreakdown, PlatformMetrics } from "@repo/types";
 
-import { loadAnalytics } from "./analyticsShared";
+import { dateRangeValidator, loadAnalytics } from "./analyticsShared";
 
 const PLATFORM_METRIC_DATASETS = [
   "analytics",
@@ -20,12 +20,12 @@ const CHANNEL_REVENUE_DATASETS = [
 
 export const getPlatformMetricsSummary = query({
   args: {
-    dateRange: v.object({ startDate: v.string(), endDate: v.string() }),
+    dateRange: dateRangeValidator,
   },
   returns: v.union(
     v.null(),
     v.object({
-      dateRange: v.object({ startDate: v.string(), endDate: v.string() }),
+      dateRange: dateRangeValidator,
       organizationId: v.string(),
       metrics: v.any(),
     }),
@@ -55,12 +55,12 @@ export const getPlatformMetricsSummary = query({
 
 export const getChannelRevenueSummary = query({
   args: {
-    dateRange: v.object({ startDate: v.string(), endDate: v.string() }),
+    dateRange: dateRangeValidator,
   },
   returns: v.union(
     v.null(),
     v.object({
-      dateRange: v.object({ startDate: v.string(), endDate: v.string() }),
+      dateRange: dateRangeValidator,
       organizationId: v.string(),
       channels: v.any(),
     }),

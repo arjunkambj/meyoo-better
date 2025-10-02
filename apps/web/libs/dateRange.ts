@@ -1,8 +1,13 @@
 import { parseDate } from "@internationalized/date";
-import { isIanaTimeZone, toUtcRangeForOffset } from "@repo/time";
+import {
+  isIanaTimeZone,
+  toUtcRangeForOffset,
+  type RangeYYYYMMDD,
+} from "@repo/time";
 
-type RangeYYYYMMDD = { startDate: string; endDate: string };
 type AtomRange = { start: string; end: string };
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 // Deprecated: previously derived browser timezone. Prefer org timezone from backend.
 export function getUserTimeZone(): string {
@@ -29,11 +34,18 @@ export function toUtcRangeStrings(
   const endNextLocalMidnight = parseDate(range.endDate)
     .add({ days: 1 })
     .toDate(tz);
-  const endUtc = new Date(endNextLocalMidnight.getTime() - 1);
+  const endExclusiveUtc = endNextLocalMidnight;
+  const endInclusiveUtc = new Date(endExclusiveUtc.getTime() - 1);
+  const spanMs = Math.max(0, endExclusiveUtc.getTime() - startUtc.getTime());
+  const dayCount = spanMs > 0 ? Math.round(spanMs / DAY_MS) : 1;
 
   return {
     startDate: startUtc.toISOString().slice(0, 10),
-    endDate: endUtc.toISOString().slice(0, 10),
+    endDate: endInclusiveUtc.toISOString().slice(0, 10),
+    startDateTimeUtc: startUtc.toISOString(),
+    endDateTimeUtc: endInclusiveUtc.toISOString(),
+    endDateTimeUtcExclusive: endExclusiveUtc.toISOString(),
+    dayCount: Math.max(1, dayCount),
   };
 }
 

@@ -1,6 +1,10 @@
 import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
-import type { DateRange } from "./analyticsSource";
+import {
+  getRangeEndExclusiveMs,
+  getRangeStartMs,
+  type DateRange,
+} from "./analyticsSource";
 import type {
   OverviewComputation,
   MetricValue,
@@ -60,6 +64,7 @@ type AggregatedDailyMetrics = {
   transactionFees: number;
   handlingFees: number;
   taxesCollected: number;
+  customCosts: number;
   marketingCost: number;
   blendedCtrSum: number;
   blendedCtrCount: number;
@@ -87,6 +92,7 @@ const EMPTY_AGGREGATES: AggregatedDailyMetrics = {
   transactionFees: 0,
   handlingFees: 0,
   taxesCollected: 0,
+  customCosts: 0,
   marketingCost: 0,
   blendedCtrSum: 0,
   blendedCtrCount: 0,
@@ -292,12 +298,13 @@ type DailyMetricsFetchResult = {
 };
 
 function inclusiveDaySpan(range: DateRange): number {
-  const start = Date.parse(`${range.startDate}T00:00:00.000Z`);
-  const end = Date.parse(`${range.endDate}T00:00:00.000Z`);
-  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) {
+  const start = getRangeStartMs(range);
+  const endExclusive = getRangeEndExclusiveMs(range);
+  if (!Number.isFinite(start) || !Number.isFinite(endExclusive) || endExclusive <= start) {
     return 0;
   }
-  return Math.floor((end - start) / DAY_MS) + 1;
+  const spanMs = endExclusive - start;
+  return Math.max(1, Math.round(spanMs / DAY_MS));
 }
 
 function shiftDateString(date: string, deltaDays: number): string {
@@ -308,6 +315,75 @@ function shiftDateString(date: string, deltaDays: number): string {
   const shifted = new Date(parsed);
   shifted.setUTCDate(shifted.getUTCDate() + deltaDays);
   return shifted.toISOString().slice(0, 10);
+}
+
+function calendarMonthBounds(date: Date): { startDate: string; endDate: string } {
+  const year = date.getUTCFullYear();
+  const month = date.getUTCMonth();
+  const start = new Date(Date.UTC(year, month, 1));
+  const end = new Date(Date.UTC(year, month + 1, 0));
+  return {
+    startDate: start.toISOString().slice(0, 10),
+    endDate: end.toISOString().slice(0, 10),
+  };
+}
+
+function previousCalendarMonth(date: Date): Date {
+  const year = date.getUTCFullYear();
+  const month = date.getUTCMonth();
+  return new Date(Date.UTC(year, month - 1, 1));
+}
+
+function isCalendarMonthRange(range: DateRange): { baseDate: Date; bounds: { startDate: string; endDate: string } } | null {
+  const startMs = Date.parse(`${range.startDate}T00:00:00.000Z`);
+  const endMs = Date.parse(`${range.endDate}T00:00:00.000Z`);
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) {
+    return null;
+  }
+
+  const startDate = new Date(startMs);
+  const endDate = new Date(endMs);
+
+  if (startDate.getUTCFullYear() !== endDate.getUTCFullYear() || startDate.getUTCMonth() !== endDate.getUTCMonth()) {
+    return null;
+  }
+
+  const bounds = calendarMonthBounds(startDate);
+  if (bounds.startDate !== range.startDate || bounds.endDate !== range.endDate) {
+    return null;
+  }
+
+  return { baseDate: startDate, bounds };
+}
+
+async function computeCalendarMoMRevenueGrowth(
+  ctx: QueryCtx,
+  organizationId: Id<"organizations">,
+  range: DateRange,
+  currentRevenue: number,
+): Promise<number> {
+  const calendarRange = isCalendarMonthRange(range);
+  if (!calendarRange) {
+    return 0;
+  }
+
+  const previousMonthDate = previousCalendarMonth(calendarRange.baseDate);
+  const previousBounds = calendarMonthBounds(previousMonthDate);
+
+  const previous = await fetchDailyMetricsDocs(ctx, organizationId, previousBounds);
+  if (!previous) {
+    return 0;
+  }
+
+  const previousAggregates = mergeDailyMetrics(previous.docs);
+  const previousRevenue = previousAggregates.revenue;
+
+  if (!(previousRevenue > 0)) {
+    return currentRevenue > 0 ? 100 : 0;
+  }
+
+  const growth = ((currentRevenue - previousRevenue) / previousRevenue) * 100;
+  return Number.isFinite(growth) ? growth : 0;
 }
 
 async function fetchDailyMetricsDocs(
@@ -334,22 +410,24 @@ async function fetchDailyMetricsDocs(
   const coverageStart = uniqueDates[0] ?? range.startDate;
   const coverageEnd = uniqueDates[uniqueDates.length - 1] ?? range.endDate;
 
-  const rangeStartMs = Date.parse(`${range.startDate}T00:00:00.000Z`);
-  const rangeEndMs = Date.parse(`${range.endDate}T00:00:00.000Z`);
+  const rangeStartMs = getRangeStartMs(range);
+  const rangeEndExclusiveMs = getRangeEndExclusiveMs(range);
   const coverageStartMs = Date.parse(`${coverageStart}T00:00:00.000Z`);
   const coverageEndMs = Date.parse(`${coverageEnd}T00:00:00.000Z`);
 
   const availableDays = uniqueDates.length;
-  const expectedDays = Number.isFinite(rangeStartMs) && Number.isFinite(rangeEndMs)
-    ? Math.floor((rangeEndMs - rangeStartMs) / DAY_MS) + 1
+  const expectedDays = Number.isFinite(rangeStartMs) && Number.isFinite(rangeEndExclusiveMs)
+    ? Math.max(1, Math.round((rangeEndExclusiveMs - rangeStartMs) / DAY_MS))
     : null;
+
+  const lastRangeDayStart = rangeEndExclusiveMs - DAY_MS;
 
   const hasFullCoverage =
     expectedDays !== null &&
     Number.isFinite(coverageStartMs) &&
     Number.isFinite(coverageEndMs) &&
     coverageStartMs <= rangeStartMs &&
-    coverageEndMs >= rangeEndMs &&
+    (coverageEndMs as number) >= lastRangeDayStart &&
     availableDays >= expectedDays;
 
   return {
@@ -380,9 +458,11 @@ function toNumber(value: unknown): number {
 
 function mergeDailyMetrics(docs: DailyMetricDoc[]): AggregatedDailyMetrics {
   return docs.reduce<AggregatedDailyMetrics>((acc, doc) => {
-    acc.revenue += toNumber(doc.totalRevenue);
-    acc.grossSales += toNumber(doc.totalRevenue);
-    acc.discounts += 0;
+    const revenue = toNumber(doc.totalRevenue);
+    const discounts = 'totalDiscounts' in doc ? toNumber((doc as Record<string, unknown>).totalDiscounts) : 0;
+    acc.revenue += revenue;
+    acc.grossSales += revenue + discounts;
+    acc.discounts += discounts;
     acc.refundsAmount += 0;
     acc.orders += toNumber(doc.totalOrders);
     acc.unitsSold += toNumber(doc.unitsSold);
@@ -437,6 +517,7 @@ function buildOverviewFromAggregates(aggregates: AggregatedDailyMetrics): Overvi
   const transactionFees = aggregates.transactionFees;
   const handlingFees = aggregates.handlingFees;
   const taxesCollected = aggregates.taxesCollected;
+  const customCosts = aggregates.customCosts;
   const marketingCost = aggregates.marketingCost;
   const paidCustomers = aggregates.paidCustomers;
   const totalCustomers = aggregates.totalCustomers;
@@ -445,10 +526,12 @@ function buildOverviewFromAggregates(aggregates: AggregatedDailyMetrics): Overvi
   const repeatCustomers = aggregates.repeatCustomers;
   const returnedOrders = aggregates.returnedOrders;
 
-  const totalCostsWithoutAds = cogs + shippingCosts + transactionFees + handlingFees + taxesCollected;
+  const totalCostsWithoutAds =
+    cogs + shippingCosts + transactionFees + handlingFees + taxesCollected + customCosts;
   const netProfit = revenue - totalCostsWithoutAds - marketingCost - refundsAmount;
   const grossProfit = revenue - cogs;
-  const contributionProfit = revenue - (cogs + shippingCosts + transactionFees + handlingFees);
+  const contributionProfit =
+    revenue - (cogs + shippingCosts + transactionFees + handlingFees + customCosts);
   const contributionMarginPercentage = revenue > 0 ? (contributionProfit / revenue) * 100 : 0;
   const profitMargin = revenue > 0 ? (netProfit / revenue) * 100 : 0;
   const grossProfitMargin = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
@@ -460,6 +543,7 @@ function buildOverviewFromAggregates(aggregates: AggregatedDailyMetrics): Overvi
   const profitPerUnit = unitsSold > 0 ? netProfit / unitsSold : 0;
   const blendedRoas = marketingCost > 0 ? revenue / marketingCost : 0;
   const poas = marketingCost > 0 ? netProfit / marketingCost : 0;
+  const fulfillmentCostPerOrder = orders > 0 ? handlingFees / orders : 0;
 
   const cogsPercentageOfGross = grossSales > 0 ? (cogs / grossSales) * 100 : 0;
   const cogsPercentageOfNet = revenue > 0 ? (cogs / revenue) * 100 : 0;
@@ -467,6 +551,7 @@ function buildOverviewFromAggregates(aggregates: AggregatedDailyMetrics): Overvi
   const taxesPercentageOfRevenue = revenue > 0 ? (taxesCollected / revenue) * 100 : 0;
   const marketingPercentageOfGross = grossSales > 0 ? (marketingCost / grossSales) * 100 : 0;
   const marketingPercentageOfNet = revenue > 0 ? (marketingCost / revenue) * 100 : 0;
+  const operatingCostPercentage = revenue > 0 ? (customCosts / revenue) * 100 : 0;
 
   const customersCount = totalCustomers > 0 ? totalCustomers : paidCustomers;
   const repeatCustomerBase = customersCount > 0 ? customersCount : paidCustomers;
@@ -536,6 +621,8 @@ function buildOverviewFromAggregates(aggregates: AggregatedDailyMetrics): Overvi
     profitPerOrderChange: 0,
     profitPerUnit,
     profitPerUnitChange: 0,
+    fulfillmentCostPerOrder,
+    fulfillmentCostPerOrderChange: 0,
     cogs,
     cogsChange: 0,
     cogsPercentageOfGross,
@@ -554,9 +641,9 @@ function buildOverviewFromAggregates(aggregates: AggregatedDailyMetrics): Overvi
     taxesCollectedChange: 0,
     taxesPercentageOfRevenue,
     taxesPercentageOfRevenueChange: 0,
-    customCosts: 0,
+    customCosts,
     customCostsChange: 0,
-    customCostsPercentage: 0,
+    customCostsPercentage: operatingCostPercentage,
     customCostsPercentageChange: 0,
     customers: customersCount,
     customersChange: 0,
@@ -612,6 +699,7 @@ function buildOrdersOverviewFromAggregates(
   const transactionFees = aggregates.transactionFees;
   const handlingFees = aggregates.handlingFees;
   const taxesCollected = aggregates.taxesCollected;
+  const customCosts = aggregates.customCosts;
   const marketingCost = aggregates.marketingCost;
   const refundsAmount = aggregates.refundsAmount;
   const totalCosts =
@@ -620,6 +708,7 @@ function buildOrdersOverviewFromAggregates(
     transactionFees +
     handlingFees +
     taxesCollected +
+    customCosts +
     marketingCost +
     refundsAmount;
   const netProfit = totalRevenue - totalCosts;
@@ -698,6 +787,7 @@ function accumulatePnLMetrics(target: PnLMetrics, addition: PnLMetrics): void {
 
 function metricsFromDailyMetricDoc(doc: DailyMetricDoc): PnLMetrics {
   const revenue = toNumber(doc.totalRevenue);
+  const discounts = 'totalDiscounts' in doc ? toNumber((doc as Record<string, unknown>).totalDiscounts) : 0;
   const cogs = toNumber(doc.totalCogs);
   const shippingCosts = toNumber(doc.totalShippingCost);
   const transactionFees = toNumber(doc.totalTransactionFees);
@@ -705,8 +795,7 @@ function metricsFromDailyMetricDoc(doc: DailyMetricDoc): PnLMetrics {
   const taxesCollected = toNumber(doc.totalTaxes);
   const adSpend = toNumber(doc.blendedMarketingCost);
 
-  const grossSales = revenue; // daily snapshot records net revenue only
-  const discounts = 0;
+  const grossSales = revenue + discounts; // add back discounts captured in the snapshot
   const refunds = 0;
   const customCosts = 0;
 
@@ -848,11 +937,54 @@ export async function loadOverviewFromDailyMetrics(
 
   const aggregates = mergeDailyMetrics(fetched.docs);
 
-  const overview = buildOverviewFromAggregates(aggregates);
-  const platformMetrics = buildPlatformMetricsFromAggregates(aggregates);
-  const ordersOverview = buildOrdersOverviewFromAggregates(aggregates);
+  const rangeStartMs = getRangeStartMs(range);
+  const rangeEndExclusiveMs = getRangeEndExclusiveMs(range);
+  const rangeEndMs = rangeEndExclusiveMs - 1;
 
-  const derivedAbandoned = Math.max(0, aggregates.totalCustomers - aggregates.paidCustomers);
+  const activeOperationalCostDocs = await ctx.db
+    .query("globalCosts")
+    .withIndex("by_org_and_active", (q) =>
+      q.eq("organizationId", organizationId).eq("isActive", true),
+    )
+    .collect();
+
+  const operationalCostContext: CostComputationContext = {
+    ordersCount: aggregates.orders,
+    unitsSold: aggregates.unitsSold,
+    revenue: aggregates.revenue,
+    rangeStartMs: Number.isFinite(rangeStartMs) ? rangeStartMs : 0,
+    rangeEndMs: Number.isFinite(rangeEndMs) ? rangeEndMs : rangeEndExclusiveMs - 1,
+  };
+
+  const customCostsTotal = activeOperationalCostDocs.reduce((total, cost) => {
+    const type = String(cost.type ?? "");
+    if (type !== "operational" && type !== "custom") {
+      return total;
+    }
+    return total + computeOperationalCostAmount(cost, operationalCostContext);
+  }, 0);
+
+  const aggregatesWithCosts: AggregatedDailyMetrics = {
+    ...aggregates,
+    customCosts: customCostsTotal,
+  };
+
+  const overview = buildOverviewFromAggregates(aggregatesWithCosts);
+  const platformMetrics = buildPlatformMetricsFromAggregates(aggregatesWithCosts);
+  const ordersOverview = buildOrdersOverviewFromAggregates(aggregatesWithCosts);
+
+  const calendarMoMRevenueGrowth = await computeCalendarMoMRevenueGrowth(
+    ctx,
+    organizationId,
+    range,
+    aggregatesWithCosts.revenue,
+  );
+  overview.summary.calendarMoMRevenueGrowth = calendarMoMRevenueGrowth;
+
+  const derivedAbandoned = Math.max(
+    0,
+    aggregatesWithCosts.totalCustomers - aggregatesWithCosts.paidCustomers,
+  );
 
   const meta = {
     source: "dailyMetrics",
@@ -866,16 +998,16 @@ export async function loadOverviewFromDailyMetrics(
       },
     },
     paymentBreakdown: {
-      prepaidOrders: aggregates.prepaidOrders,
-      codOrders: aggregates.codOrders,
-      otherOrders: aggregates.otherOrders,
+      prepaidOrders: aggregatesWithCosts.prepaidOrders,
+      codOrders: aggregatesWithCosts.codOrders,
+      otherOrders: aggregatesWithCosts.otherOrders,
     },
     customerBreakdown: {
-      paidCustomers: aggregates.paidCustomers,
-      totalCustomers: aggregates.totalCustomers,
-      newCustomers: aggregates.newCustomers,
-      returningCustomers: aggregates.returningCustomers,
-      repeatCustomers: aggregates.repeatCustomers,
+      paidCustomers: aggregatesWithCosts.paidCustomers,
+      totalCustomers: aggregatesWithCosts.totalCustomers,
+      newCustomers: aggregatesWithCosts.newCustomers,
+      returningCustomers: aggregatesWithCosts.returningCustomers,
+      repeatCustomers: aggregatesWithCosts.repeatCustomers,
       abandonedCustomers: derivedAbandoned,
     },
   } satisfies Record<string, unknown>;
@@ -1109,20 +1241,18 @@ export async function loadPnLAnalyticsFromDailyMetrics(
   const coverageStart = uniqueDates[0] ?? null;
   const coverageEnd = uniqueDates[uniqueDates.length - 1] ?? null;
 
-  const rangeStartMs = Date.parse(`${range.startDate}T00:00:00.000Z`);
-  const rangeEndMs = Date.parse(`${range.endDate}T00:00:00.000Z`);
-  const rangeEndInclusiveMs = Number.isFinite(rangeEndMs)
-    ? Date.parse(`${range.endDate}T23:59:59.999Z`)
-    : rangeEndMs;
+  const rangeStartMs = getRangeStartMs(range);
+  const rangeEndExclusiveMs = getRangeEndExclusiveMs(range);
+  const rangeEndMs = rangeEndExclusiveMs - 1;
   const coverageStartMs = coverageStart ? Date.parse(`${coverageStart}T00:00:00.000Z`) : null;
   const coverageEndMs = coverageEnd ? Date.parse(`${coverageEnd}T00:00:00.000Z`) : null;
 
-  const expectedDays = Number.isFinite(rangeStartMs) && Number.isFinite(rangeEndMs)
-    ? Math.floor((rangeEndMs - rangeStartMs) / DAY_MS) + 1
+  const expectedDays = Number.isFinite(rangeStartMs) && Number.isFinite(rangeEndExclusiveMs)
+    ? Math.max(1, Math.round((rangeEndExclusiveMs - rangeStartMs) / DAY_MS))
     : null;
 
   const hasFullCoverage = expectedDays !== null && coverageStartMs !== null && coverageEndMs !== null
-    ? coverageStartMs <= rangeStartMs && coverageEndMs >= rangeEndMs && availableDays >= expectedDays
+    ? coverageStartMs <= rangeStartMs && coverageEndMs >= (rangeEndExclusiveMs - DAY_MS) && availableDays >= expectedDays
     : null;
 
   const totals = createEmptyPnLMetrics();
@@ -1204,13 +1334,13 @@ export async function loadPnLAnalyticsFromDailyMetrics(
         bucketAllocations.set(key, 0);
       }
 
-      const contextEndMs = Number.isFinite(rangeEndInclusiveMs) ? rangeEndInclusiveMs : rangeEndMs;
+      const contextEndMs = Number.isFinite(rangeEndMs) ? rangeEndMs : rangeEndExclusiveMs - 1;
       const totalsContext: CostComputationContext = {
         ordersCount: totalOrdersCount,
         unitsSold: totalUnitsSold,
         revenue: totalRevenue,
         rangeStartMs: Number.isFinite(rangeStartMs) ? rangeStartMs : 0,
-        rangeEndMs: Number.isFinite(contextEndMs) ? contextEndMs : rangeEndMs,
+        rangeEndMs: Number.isFinite(contextEndMs) ? contextEndMs : rangeEndExclusiveMs - 1,
       };
 
       for (const cost of costDocs) {

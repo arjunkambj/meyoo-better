@@ -12,7 +12,7 @@ import {
   TableRow,
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback } from "react";
 
 import { OrderStatusBadge } from "@/components/shared/badges/StatusBadge";
 import { useUser } from "@/hooks";
@@ -52,17 +52,7 @@ export const OrdersTable = React.memo(function OrdersTable({
   pagination,
   loading,
 }: OrdersTableProps) {
-  const [page, setPage] = useState(pagination?.page || 1);
-
   const { primaryCurrency } = useUser();
-
-  useEffect(() => {
-    const nextPage = pagination?.page;
-
-    if (typeof nextPage === "number") {
-      setPage(nextPage);
-    }
-  }, [pagination?.page]);
 
   const renderCell = useCallback(
     (item: AnalyticsOrder, columnKey: React.Key) => {
@@ -196,12 +186,11 @@ export const OrdersTable = React.memo(function OrdersTable({
         <Pagination
           showControls
           boundaries={1}
-          page={page}
+          page={pagination.page}
           siblings={1}
           size="sm"
           total={Math.max(1, Math.ceil(pagination.total / Math.max(1, pagination.pageSize)))}
           onChange={(newPage) => {
-            setPage(newPage);
             pagination.setPage(newPage);
           }}
         />

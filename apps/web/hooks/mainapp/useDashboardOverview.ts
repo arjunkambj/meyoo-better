@@ -138,8 +138,8 @@ function buildOverviewMetrics(
     },
     moMRevenueGrowth: {
       label: "MoM Revenue Growth",
-      value: summary.revenueChange || 0,
-      change: summary.revenueChange || 0,
+      value: summary.moMRevenueGrowth || 0,
+      change: 0,
       suffix: "%",
       decimal: 1,
     },
@@ -311,7 +311,7 @@ function buildOverviewMetrics(
     customCostsPercentage: {
       label: "Operating % of Revenue",
       value: summary.customCostsPercentage || 0,
-      change: summary.customCostsChange || 0,
+      change: summary.customCostsPercentageChange || 0,
       suffix: "%",
       decimal: 1,
     },

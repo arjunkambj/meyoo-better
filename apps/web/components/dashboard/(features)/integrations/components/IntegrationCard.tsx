@@ -36,7 +36,7 @@ export function IntegrationCard({
 }: IntegrationCardProps) {
   return (
     <Card
-      className="relative overflow-hidden bg-content2 dark:bg-content1 rounded-2xl border border-default-200/50 transition-colors hover:border-primary/30"
+      className="relative shadow-none overflow-hidden bg-content2 dark:bg-content1 rounded-2xl border border-default-200/50 transition-colors hover:border-primary/30"
       isPressable={false}
     >
       {/* Connection Status Indicator */}

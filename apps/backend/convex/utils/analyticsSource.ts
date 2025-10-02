@@ -1,9 +1,15 @@
 import type { QueryCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 export interface DateRange {
   startDate: string;
   endDate: string;
+  startDateTimeUtc?: string;
+  endDateTimeUtc?: string;
+  endDateTimeUtcExclusive?: string;
+  dayCount?: number;
 }
 
 export interface TimestampRange {
@@ -74,25 +80,49 @@ type OrderId = Id<"shopifyOrders">;
 
 type OrganizationId = Id<"organizations">;
 
-function toTimestamp(date: string, end = false): number {
-  const normalized = `${date}T00:00:00.000Z`;
-  const parsed = new Date(normalized);
+function parseUtc(value: string, label: string): number {
+  const parsed = Date.parse(value);
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`Invalid ${label} provided: ${value}`);
+  }
+  return parsed;
+}
 
-  if (Number.isNaN(parsed.getTime())) {
-    throw new Error(`Invalid date string provided: ${date}`);
+function fallbackStartIso(range: DateRange): string {
+  return `${range.startDate}T00:00:00.000Z`;
+}
+
+function fallbackEndInclusiveIso(range: DateRange): string {
+  return `${range.endDate}T23:59:59.999Z`;
+}
+
+export function getRangeStartMs(range: DateRange): number {
+  const raw = range.startDateTimeUtc ?? fallbackStartIso(range);
+  return parseUtc(raw, "startDateTimeUtc");
+}
+
+export function getRangeEndExclusiveMs(range: DateRange): number {
+  if (range.endDateTimeUtcExclusive) {
+    return parseUtc(range.endDateTimeUtcExclusive, "endDateTimeUtcExclusive");
   }
 
-  if (end) {
-    parsed.setUTCHours(23, 59, 59, 999);
+  if (range.endDateTimeUtc) {
+    const inclusive = parseUtc(range.endDateTimeUtc, "endDateTimeUtc");
+    return inclusive + 1;
   }
 
-  return parsed.getTime();
+  const inclusive = parseUtc(fallbackEndInclusiveIso(range), "endDate");
+  return inclusive + 1;
+}
+
+export function getRangeEndMs(range: DateRange): number {
+  return getRangeEndExclusiveMs(range) - 1;
 }
 
 export function toTimestampRange(dateRange: DateRange): TimestampRange {
   return {
-    start: toTimestamp(dateRange.startDate),
-    end: toTimestamp(dateRange.endDate, true),
+    start: getRangeStartMs(dateRange),
+    end: getRangeEndMs(dateRange),
   };
 }
 
@@ -843,13 +873,22 @@ export function validateDateRange(range: DateRange): DateRange {
     throw new Error("Both startDate and endDate are required");
   }
 
-  // Ensure start <= end
-  const startTs = toTimestamp(range.startDate);
-  const endTs = toTimestamp(range.endDate, true);
+  const startMs = getRangeStartMs(range);
+  const endExclusiveMs = getRangeEndExclusiveMs(range);
+  const endMs = endExclusiveMs - 1;
 
-  if (startTs > endTs) {
+  if (startMs > endMs) {
     throw new Error("startDate must be before or equal to endDate");
   }
 
-  return range;
+  const spanMs = Math.max(0, endExclusiveMs - startMs);
+  const dayCount = spanMs > 0 ? Math.round(spanMs / DAY_MS) : 1;
+
+  return {
+    ...range,
+    startDateTimeUtc: new Date(startMs).toISOString(),
+    endDateTimeUtc: new Date(endMs).toISOString(),
+    endDateTimeUtcExclusive: new Date(endExclusiveMs).toISOString(),
+    dayCount: Math.max(1, dayCount),
+  } satisfies DateRange;
 }

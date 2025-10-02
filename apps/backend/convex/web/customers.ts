@@ -7,6 +7,7 @@ import { api } from "../_generated/api";
 import { validateDateRange } from "../utils/analyticsSource";
 import { getUserAndOrg } from "../utils/auth";
 import { loadCustomerOverviewFromDailyMetrics } from "../utils/dailyMetrics";
+import { dateRangeValidator } from "./analyticsShared";
 
 const MAX_CUSTOMER_PAGE_SIZE = 100;
 const MAX_CURSOR_CARRY = 100;
@@ -237,12 +238,7 @@ type CustomerAnalyticsResult = {
  */
 export const getCustomerOverview = query({
   args: {
-    dateRange: v.optional(
-      v.object({
-        startDate: v.string(),
-        endDate: v.string(),
-      }),
-    ),
+    dateRange: v.optional(dateRangeValidator),
   },
   returns: v.union(
     v.null(),
@@ -665,12 +661,7 @@ export const getCustomerOverview = query({
  */
 export const getRFMSegments = query({
   args: {
-    dateRange: v.optional(
-      v.object({
-        startDate: v.string(),
-        endDate: v.string(),
-      }),
-    ),
+    dateRange: v.optional(dateRangeValidator),
   },
   returns: v.array(
     v.object({
@@ -890,12 +881,7 @@ export const getRFMSegments = query({
  */
 export const getCohortAnalysis = query({
   args: {
-    dateRange: v.optional(
-      v.object({
-        startDate: v.string(),
-        endDate: v.string(),
-      }),
-    ),
+    dateRange: v.optional(dateRangeValidator),
     cohortType: v.optional(v.union(v.literal("monthly"), v.literal("weekly"))),
   },
   returns: v.array(
@@ -1071,12 +1057,7 @@ export const getCohortAnalysis = query({
  */
 export const getCustomerList = query({
   args: {
-    dateRange: v.optional(
-      v.object({
-        startDate: v.string(),
-        endDate: v.string(),
-      }),
-    ),
+    dateRange: v.optional(dateRangeValidator),
     searchTerm: v.optional(v.string()),
     segment: v.optional(v.string()),
     paginationOpts: v.optional(paginationOptsValidator),
@@ -1733,12 +1714,7 @@ function determineSegment(
  */
 export const getCustomerSegments = query({
   args: {
-    dateRange: v.optional(
-      v.object({
-        startDate: v.string(),
-        endDate: v.string(),
-      }),
-    ),
+    dateRange: v.optional(dateRangeValidator),
   },
   returns: v.union(
     v.null(),
@@ -1845,12 +1821,7 @@ export const getCustomerSegments = query({
  */
 export const getGeographicDistribution = query({
   args: {
-    dateRange: v.optional(
-      v.object({
-        startDate: v.string(),
-        endDate: v.string(),
-      }),
-    ),
+    dateRange: v.optional(dateRangeValidator),
   },
   returns: v.object({
     countries: v.array(
@@ -2085,12 +2056,7 @@ export const getGeographicDistribution = query({
  */
 export const getCustomerJourney = query({
   args: {
-    dateRange: v.optional(
-      v.object({
-        startDate: v.string(),
-        endDate: v.string(),
-      }),
-    ),
+    dateRange: v.optional(dateRangeValidator),
   },
   returns: v.array(
     v.object({
@@ -2244,10 +2210,7 @@ export const getCustomerJourney = query({
 
 export const getAnalytics = action({
   args: {
-    dateRange: v.object({
-      startDate: v.string(),
-      endDate: v.string(),
-    }),
+    dateRange: dateRangeValidator,
     page: v.optional(v.number()),
     pageSize: v.optional(v.number()),
     searchTerm: v.optional(v.string()),
@@ -2258,7 +2221,7 @@ export const getAnalytics = action({
   returns: v.union(
     v.null(),
     v.object({
-      dateRange: v.object({ startDate: v.string(), endDate: v.string() }),
+      dateRange: dateRangeValidator,
       organizationId: v.string(),
       result: customerAnalyticsResultValidator,
     }),
@@ -2274,68 +2237,79 @@ export const getAnalytics = action({
     const auth = await getUserAndOrg(ctx);
     if (!auth) return null;
 
+    const range = validateDateRange(args.dateRange);
     const page = Math.max(1, Math.floor(args.page ?? 1));
-    const pageSize = Math.min(
-      Math.max(args.pageSize ?? 50, 1),
-      MAX_CUSTOMER_PAGE_SIZE,
-    );
-    const searchTerm = args.searchTerm?.trim()
-      ? args.searchTerm.trim()
-      : undefined;
+    const pageSize = Math.min(Math.max(args.pageSize ?? 50, 1), MAX_CUSTOMER_PAGE_SIZE);
+    const searchTerm = args.searchTerm?.trim() ? args.searchTerm.trim() : undefined;
+    const segment = args.segment?.trim() ? args.segment.trim() : undefined;
+    const sortBy = args.sortBy ?? undefined;
     const sortOrder = args.sortOrder ?? "desc";
 
-    const [overview, cohorts, customerList, geographic, journey] =
-      await Promise.all([
-        ctx.runQuery(api.web.customers.getCustomerOverview, {
-          dateRange: args.dateRange,
-        }),
-        ctx.runQuery(api.web.customers.getCohortAnalysis, {
-          dateRange: args.dateRange,
-          cohortType: "monthly",
-        }),
-        ctx.runQuery(api.web.customers.getCustomerList, {
-          dateRange: args.dateRange,
-          page,
-          pageSize,
-          searchTerm,
-          segment: args.segment,
-          sortBy: args.sortBy,
-          sortOrder,
-        }),
-        ctx.runQuery(api.web.customers.getGeographicDistribution, {
-          dateRange: args.dateRange,
-        }),
-        ctx.runQuery(api.web.customers.getCustomerJourney, {
-          dateRange: args.dateRange,
-        }),
-      ]);
+    const [overview, cohorts, geographic, journey, customerList] = await Promise.all([
+      ctx.runQuery(api.web.customers.getCustomerOverview, {
+        dateRange: range,
+      }),
+      ctx.runQuery(api.web.customers.getCohortAnalysis, {
+        dateRange: range,
+        cohortType: "monthly",
+      }),
+      ctx.runQuery(api.web.customers.getGeographicDistribution, {
+        dateRange: range,
+      }),
+      ctx.runQuery(api.web.customers.getCustomerJourney, {
+        dateRange: range,
+      }),
+      ctx.runQuery(api.web.customers.getCustomerList, {
+        dateRange: range,
+        page,
+        pageSize,
+        searchTerm,
+        segment,
+        sortBy,
+        sortOrder,
+      }),
+    ]);
 
-    const listEntries = (customerList?.data ?? customerList?.page ?? []) as CustomerListEntry[];
+    const listData = customerList?.data ?? customerList?.page ?? [];
     const pagination = customerList?.pagination ?? {
       page,
       pageSize,
-      total: listEntries.length,
-      totalPages: Math.max(1, Math.ceil(Math.max(listEntries.length, 1) / pageSize)),
-    };
+      total:
+        customerList?.pagination?.total ??
+        Math.max((page - 1) * pageSize + listData.length, listData.length),
+      totalPages:
+        customerList?.pagination?.totalPages ??
+        Math.max(
+          1,
+          Math.ceil(
+            (customerList?.pagination?.total ?? Math.max((page - 1) * pageSize + listData.length, listData.length)) /
+              pageSize,
+          ),
+        ),
+    } satisfies CustomerListPagination;
 
-    const customersData = customerList
+    const customerListPayload = customerList
       ? {
-          data: listEntries,
+          data: listData as CustomerListEntry[],
           pagination,
-          continueCursor: customerList.continueCursor,
+          continueCursor: customerList.continueCursor ?? END_CURSOR,
         }
       : null;
 
     return {
-      dateRange: args.dateRange,
+      dateRange: range,
       organizationId: auth.orgId,
       result: {
         overview: overview ?? null,
-        cohorts: cohorts ?? [],
-        customerList: customersData,
+        cohorts: cohorts ?? null,
         geographic: geographic ?? null,
-        journey: journey ?? [],
+        journey: journey ?? null,
+        customerList: customerListPayload,
       },
+    } satisfies {
+      dateRange: { startDate: string; endDate: string };
+      organizationId: string;
+      result: CustomerAnalyticsResult;
     };
   },
 });

@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 
-import { Chip } from "@heroui/react";
+import { Chip, Progress } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { useQuery } from "convex-helpers/react/cache/hooks";
 
@@ -43,6 +43,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 export default function PlanOverview() {
   const userBilling = useQuery(api.core.users.getUserBilling);
+  const userUsage = useQuery(api.core.users.getUserUsage);
 
   const currentPlanKey = (userBilling?.plan ?? "free") as PlanKey;
   const planLabel = PLAN_KEY_TO_LABEL[currentPlanKey];
@@ -54,13 +55,17 @@ export default function PlanOverview() {
     [currentPlanKey],
   );
 
-  if (userBilling === undefined) {
+  if (userBilling === undefined || userUsage === undefined) {
     return <PlanOverviewSkeleton />;
   }
 
   const statusLabel = userBilling?.status
     ? STATUS_LABELS[userBilling.status] ?? userBilling.status
     : STATUS_LABELS.active;
+
+  const ordersLast30Days = userUsage?.ordersLast30Days ?? 0;
+  const orderLimit = userUsage?.orderLimit ?? 300;
+  const usagePercentage = orderLimit > 0 ? (ordersLast30Days / orderLimit) * 100 : 0;
 
   return (
     <div className="space-y-4">
@@ -88,13 +93,21 @@ export default function PlanOverview() {
         </div>
       </div>
 
-      <div className="rounded-lg border border-default-100 bg-content1/40 px-3 py-3">
-        <p className="text-xs text-default-600">
-          Plan changes are managed through your Shopify subscription. Visit
-          <span className="font-medium text-default-800">
-            {" "}Settings → Billing
-          </span>{" "}
-          to switch plans or manage invoices.
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-medium text-default-700">Plan Usage (Last 30 Days)</p>
+          <p className="text-sm text-default-600">
+            {ordersLast30Days.toLocaleString()} / {orderLimit.toLocaleString()} orders
+          </p>
+        </div>
+        <Progress
+          value={usagePercentage}
+          color={usagePercentage >= 90 ? "danger" : usagePercentage >= 75 ? "warning" : "primary"}
+          className="w-full"
+          size="sm"
+        />
+        <p className="text-xs text-default-500">
+          Track up to {orderLimit.toLocaleString()} orders per month with your {currentTier?.title || planLabel.replace(" Plan", "")} plan
         </p>
       </div>
     </div>

@@ -98,7 +98,7 @@ export const CohortAnalysis = memo(function CohortAnalysis({
   };
 
   return (
-    <Card className="p-6 bg-default-100/90 dark:bg-content1 border border-default-50 rounded-2xl">
+    <Card className="p-6 bg-default-100/90 shadow-none dark:bg-content1 border border-default-50 rounded-2xl">
       <div className="flex items-center justify-between mb-6">
         <div>
           <Tooltip
@@ -180,7 +180,8 @@ export const CohortAnalysis = memo(function CohortAnalysis({
                   className="p-6 text-center text-xs text-default-500"
                   colSpan={8}
                 >
-                  No cohort activity yet. Once repeat purchases start, retention will appear here.
+                  No cohort activity yet. Once repeat purchases start, retention
+                  will appear here.
                 </td>
               </tr>
             ) : (
@@ -190,44 +191,44 @@ export const CohortAnalysis = memo(function CohortAnalysis({
                     {cohort.cohort}
                   </td>
                   <td className="text-center p-3">
-                  <span className="text-xs font-medium  text-default-800">
-                    {cohort.size}
-                  </span>
-                </td>
-                {[0, 1, 2, 3, 4, 5].map((monthIndex) => {
-                  const monthData = cohort.months.find(
-                    (m) => m.month === monthIndex
-                  );
+                    <span className="text-xs font-medium  text-default-800">
+                      {cohort.size}
+                    </span>
+                  </td>
+                  {[0, 1, 2, 3, 4, 5].map((monthIndex) => {
+                    const monthData = cohort.months.find(
+                      (m) => m.month === monthIndex
+                    );
 
-                  if (!monthData) {
+                    if (!monthData) {
+                      return (
+                        <td key={monthIndex} className="p-2 text-center">
+                          <div className="text-default-800 text-xs">-</div>
+                        </td>
+                      );
+                    }
+
+                    const value =
+                      view === "retention"
+                        ? monthData.retention
+                        : monthData.revenue;
+
+                    const displayValue = formatDisplayValue(value, view);
+
                     return (
-                      <td key={monthIndex} className="p-2 text-center">
-                        <div className="text-default-800 text-xs">-</div>
+                      <td key={monthIndex} className="p-2">
+                        <div
+                          className={`rounded-lg p-1.5 text-center text-xs bg-default-100 font-medium ${getHeatmapColor(
+                            value,
+                            view === "retention" ? 100 : maxRevenue
+                          )}`}
+                        >
+                          {displayValue}
+                        </div>
                       </td>
                     );
-                  }
-
-                  const value =
-                    view === "retention"
-                      ? monthData.retention
-                      : monthData.revenue;
-
-                  const displayValue = formatDisplayValue(value, view);
-
-                  return (
-                    <td key={monthIndex} className="p-2">
-                      <div
-                        className={`rounded-lg p-1.5 text-center text-xs bg-default-100 font-medium ${getHeatmapColor(
-                          value,
-                          view === "retention" ? 100 : maxRevenue
-                        )}`}
-                      >
-                        {displayValue}
-                      </div>
-                    </td>
-                  );
-                })}
-              </tr>
+                  })}
+                </tr>
               ))
             )}
           </tbody>

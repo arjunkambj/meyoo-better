@@ -8,6 +8,7 @@ import {
   query,
 } from "../_generated/server";
 import { getUserAndOrg, requireUserAndOrg } from "../utils/auth";
+import { dateRangeValidator } from "../web/analyticsShared";
 
 /**
  * Cost management
@@ -32,12 +33,7 @@ export const COST_CATEGORIES = {
  */
 export const getCosts = query({
   args: {
-    dateRange: v.optional(
-      v.object({
-        startDate: v.string(),
-        endDate: v.string(),
-      }),
-    ),
+    dateRange: v.optional(dateRangeValidator),
     type: v.optional(v.union(v.literal("shipping"), v.literal("payment"), v.literal("operational"))),
   },
   handler: async (ctx, args) => {
@@ -110,17 +106,12 @@ export const getShippingCosts = query({
  */
 export const getCostSummary = query({
   args: {
-    dateRange: v.optional(
-      v.object({
-        startDate: v.string(),
-        endDate: v.string(),
-      }),
-    ),
+    dateRange: v.optional(dateRangeValidator),
   },
   returns: v.union(
     v.null(),
     v.object({
-      period: v.object({ startDate: v.string(), endDate: v.string() }),
+      period: dateRangeValidator,
       costs: v.array(v.any()),
     }),
   ),

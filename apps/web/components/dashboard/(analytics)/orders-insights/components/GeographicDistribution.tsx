@@ -88,7 +88,7 @@ export const GeographicDistribution = memo(function GeographicDistribution({
   };
 
   return (
-    <Card className="p-6 bg-default-100/90 dark:bg-content1 border border-default-50 rounded-2xl">
+    <Card className="p-6 bg-default-100/90 shadow-none dark:bg-content1 border border-default-50 rounded-2xl">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h3 className="text-lg font-medium text-default-900">
@@ -106,9 +106,7 @@ export const GeographicDistribution = memo(function GeographicDistribution({
 
       {/* Top 5 Zip Codes */}
       <div className="space-y-3 mb-6">
-        <p className="text-sm font-medium text-default-900">
-          Top Postal Codes
-        </p>
+        <p className="text-sm font-medium text-default-900">Top Postal Codes</p>
         {topZipCodes.length > 0 ? (
           <div className="grid grid-cols-2 gap-2">
             {topZipCodes.map((zip) => (

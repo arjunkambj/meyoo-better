@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import type { Doc } from "../_generated/dataModel";
 import { internalMutation, internalQuery } from "../_generated/server";
+import { dateRangeValidator } from "../web/analyticsShared";
 
 /**
  * Cost tracking for API calls
@@ -86,10 +87,7 @@ export const optimizeSyncFrequency = internalMutation({
 export const getCostAnalysis = internalQuery({
   args: {
     organizationId: v.id("organizations"),
-    dateRange: v.object({
-      startDate: v.string(),
-      endDate: v.string(),
-    }),
+    dateRange: dateRangeValidator,
   },
   returns: v.object({
     totalCost: v.number(),

@@ -7,6 +7,8 @@ import {
   Chip,
   Input,
   Pagination,
+  Select,
+  SelectItem,
   Skeleton,
   Spinner,
   Table,
@@ -18,6 +20,7 @@ import {
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import {
+  useCallback,
   useEffect,
   useMemo,
   useState,
@@ -93,13 +96,20 @@ export default function VariantCostsClient({
   const user = useCurrentUser();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const pageSize = 10;
-  const [bulkPct, setBulkPct] = useState<string>("10");
-  const { data, totalPages, loading } = useShopifyProductVariantsPaginated(
+  const pageSize = 200;
+  const [bulkValue, setBulkValue] = useState<string>("10");
+  const [bulkType, setBulkType] = useState<"percent" | "flat">("percent");
+  const { data, totalPages, currentPage, loading } = useShopifyProductVariantsPaginated(
     page,
     pageSize,
     hideSearch ? undefined : search
   );
+
+  useEffect(() => {
+    if (currentPage !== page) {
+      setPage(currentPage);
+    }
+  }, [currentPage, page, setPage]);
   const upsert = useUpsertVariantCosts();
   const saveAll = useSaveVariantCosts();
 
@@ -119,6 +129,11 @@ export default function VariantCostsClient({
   const [saving, setSaving] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [groupEdits, setGroupEdits] = useState<Record<string, RowEdit>>({});
+  const [appliedBulkOperations, setAppliedBulkOperations] = useState<{
+    cogs?: { value: number; type: "percent" | "flat" };
+    tax?: { value: number; type: "percent" | "flat" };
+    handling?: { value: number; type: "percent" | "flat" };
+  }>({});
 
   const formatStage = (stage?: string | null) =>
     stage ? stage.replace(/_/g, " ") : "pending";
@@ -149,6 +164,68 @@ export default function VariantCostsClient({
   useEffect(() => {
     trackOnboardingView("products");
   }, []);
+
+  // Auto-apply bulk operations to new data when page changes
+  useEffect(() => {
+    if (!data || Object.keys(appliedBulkOperations).length === 0) return;
+
+    const dataToProcess = data as VariantRow[];
+    let hasChanges = false;
+    const updates: Record<string, RowEdit> = {};
+
+    for (const v of dataToProcess) {
+      const id = String(v._id);
+
+      // Skip if this variant already has edits applied
+      if (edits[id]) continue;
+
+      const variantEdit: RowEdit = {};
+
+      // Apply COGS if bulk operation is set
+      if (appliedBulkOperations.cogs) {
+        const { value, type } = appliedBulkOperations.cogs;
+
+        if (type === "percent") {
+          const original = v.cogsPerUnit ?? 0;
+          // Only apply to empty values when using percentage
+          if (!isFinite(original) || original === 0) {
+            const price = Number(v.price ?? 0) || 0;
+            const computed = (price * value) / 100;
+            variantEdit.cogs = isFinite(computed) ? computed.toFixed(2) : "0.00";
+          }
+        } else {
+          variantEdit.cogs = value.toFixed(2);
+        }
+      }
+
+      // Apply Tax if bulk operation is set
+      if (appliedBulkOperations.tax) {
+        variantEdit.tax = String(appliedBulkOperations.tax.value);
+      }
+
+      // Apply Handling if bulk operation is set
+      if (appliedBulkOperations.handling) {
+        const { value, type } = appliedBulkOperations.handling;
+
+        if (type === "percent") {
+          const price = Number(v.price ?? 0) || 0;
+          const computed = (price * value) / 100;
+          variantEdit.handling = isFinite(computed) ? computed.toFixed(2) : "0.00";
+        } else {
+          variantEdit.handling = value.toFixed(2);
+        }
+      }
+
+      if (Object.keys(variantEdit).length > 0) {
+        updates[id] = variantEdit;
+        hasChanges = true;
+      }
+    }
+
+    if (hasChanges) {
+      setEdits((prev) => ({ ...prev, ...updates }));
+    }
+  }, [data, appliedBulkOperations, edits]);
 
   // sanitizeDecimal shared via components/shared/table/sanitize
 
@@ -195,6 +272,150 @@ export default function VariantCostsClient({
     return Array.from(map.values());
   }, [data]);
 
+  const handleSaveRow = useCallback(
+    async (variantId: string) => {
+      const e = edits[variantId];
+      if (!e) return;
+      try {
+        await upsert({
+          variantId,
+          cogsPerUnit:
+            e.cogs !== undefined && e.cogs !== "" ? Number(e.cogs) : undefined,
+          taxPercent:
+            e.tax !== undefined && e.tax !== "" ? Number(e.tax) : undefined,
+          handlingPerUnit:
+            !hideHandling && e.handling !== undefined && e.handling !== ""
+              ? Number(e.handling)
+              : undefined,
+          // Payment and Shipping are global (single) and edited elsewhere
+        });
+        // No per-row toast; aggregate feedback on Continue
+      } catch (_error) {
+        // swallow; navigation will be prevented by onNext if save fails
+      }
+    },
+    [edits, upsert, hideHandling]
+  );
+
+  const handleApplyCogs = useCallback(() => {
+    if (!bulkValue || !data) return;
+    const value = Number(bulkValue);
+
+    // Store bulk operation to auto-apply to all pages
+    setAppliedBulkOperations((prev) => ({
+      ...prev,
+      cogs: { value, type: bulkType },
+    }));
+
+    // Apply to current page data
+    const dataToProcess = data as VariantRow[];
+
+    setEdits((prev) => {
+      const next = { ...prev } as Record<string, RowEdit>;
+      dataToProcess.forEach((v) => {
+        const id = String(v._id);
+        const original = (
+          prev[id]?.cogs ??
+          v.cogsPerUnit ??
+          ""
+        ).toString();
+        const originalVal = Number(original || 0);
+
+        let computed: number;
+        if (bulkType === "percent") {
+          // Only apply to empty values when using percentage
+          if (!isFinite(originalVal) || originalVal === 0) {
+            const price = Number(v.price ?? 0) || 0;
+            computed = (price * value) / 100;
+          } else {
+            return; // Skip if already has value
+          }
+        } else {
+          // Flat value - always apply
+          computed = value;
+        }
+
+        const fixed = isFinite(computed) ? computed.toFixed(2) : "0.00";
+        next[id] = { ...(next[id] || {}), cogs: fixed };
+      });
+      return next;
+    });
+    trackOnboardingAction("products", "apply_cogs", {
+      value,
+      type: bulkType,
+    });
+  }, [bulkValue, data, bulkType]);
+
+  const handleApplyTax = useCallback(() => {
+    if (!bulkValue || !data) return;
+    const value = Number(bulkValue);
+
+    // Store bulk operation to auto-apply to all pages
+    setAppliedBulkOperations((prev) => ({
+      ...prev,
+      tax: { value, type: bulkType },
+    }));
+
+    const dataToProcess = data as VariantRow[];
+
+    setEdits((prev) => {
+      const next = { ...prev } as Record<string, RowEdit>;
+      dataToProcess.forEach((v) => {
+        const id = String(v._id);
+        // Tax is always treated as percentage regardless of bulkType
+        next[id] = { ...(next[id] || {}), tax: String(value) };
+      });
+      return next;
+    });
+    trackOnboardingAction("products", "apply_tax", {
+      value,
+      type: bulkType,
+    });
+  }, [bulkValue, data, bulkType]);
+
+  const handleApplyHandling = useCallback(() => {
+    if (!bulkValue || !data) return;
+    const value = Number(bulkValue);
+
+    // Store bulk operation to auto-apply to all pages
+    setAppliedBulkOperations((prev) => ({
+      ...prev,
+      handling: { value, type: bulkType },
+    }));
+
+    const dataToProcess = data as VariantRow[];
+
+    setEdits((prev) => {
+      const next = { ...prev } as Record<string, RowEdit>;
+      dataToProcess.forEach((v) => {
+        const id = String(v._id);
+
+        let computed: number;
+        if (bulkType === "percent") {
+          const price = Number(v.price ?? 0) || 0;
+          computed = (price * value) / 100;
+        } else {
+          computed = value;
+        }
+
+        const fixed = isFinite(computed) ? computed.toFixed(2) : "0.00";
+        next[id] = { ...(next[id] || {}), handling: fixed };
+      });
+      return next;
+    });
+    trackOnboardingAction("products", "apply_handling", {
+      value,
+      type: bulkType,
+    });
+  }, [bulkValue, data, bulkType]);
+
+  const handleClearAll = useCallback(() => {
+    // Clear all edits and bulk operations
+    setEdits({});
+    setAppliedBulkOperations({});
+    trackOnboardingAction("products", "clear_all");
+  }, []);
+
   if (!isProductDataReady) {
     return (
       <div className="mx-auto flex max-w-3xl flex-col items-center gap-4 py-16 text-center">
@@ -239,7 +460,6 @@ export default function VariantCostsClient({
         </Card>
         <div className="flex flex-wrap items-center justify-center gap-2">
           <Button
-            variant="flat"
             size="sm"
             color="primary"
             onPress={() => router.refresh()}
@@ -261,28 +481,6 @@ export default function VariantCostsClient({
       </div>
     );
   }
-
-  const handleSaveRow = async (variantId: string) => {
-    const e = edits[variantId];
-    if (!e) return;
-    try {
-      await upsert({
-        variantId,
-        cogsPerUnit:
-          e.cogs !== undefined && e.cogs !== "" ? Number(e.cogs) : undefined,
-        taxPercent:
-          e.tax !== undefined && e.tax !== "" ? Number(e.tax) : undefined,
-        handlingPerUnit:
-          !hideHandling && e.handling !== undefined && e.handling !== ""
-            ? Number(e.handling)
-            : undefined,
-        // Payment and Shipping are global (single) and edited elsewhere
-      });
-      // No per-row toast; aggregate feedback on Continue
-    } catch (_error) {
-      // swallow; navigation will be prevented by onNext if save fails
-    }
-  };
 
   const headerContent = hideTitle ? null : (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -316,125 +514,64 @@ export default function VariantCostsClient({
           ))}
         <Input
           size={compact ? "sm" : "md"}
-          className="w-48"
+          className="w-32"
           classNames={{
             inputWrapper: DATA_TABLE_INPUT_WRAPPER_CLASS,
             input: DATA_TABLE_INPUT_CLASS,
           }}
           type="number"
           placeholder="10"
-          endContent={<span className="text-default-500">%</span>}
-          value={bulkPct}
-          onValueChange={setBulkPct}
+          value={bulkValue}
+          onValueChange={setBulkValue}
         />
+        <Select
+          size={compact ? "sm" : "md"}
+          className="w-32"
+          classNames={{
+            trigger: DATA_TABLE_INPUT_WRAPPER_CLASS,
+          }}
+          selectedKeys={new Set([bulkType])}
+          onSelectionChange={(keys) => {
+            const value = Array.from(keys)[0] as "percent" | "flat";
+            setBulkType(value);
+          }}
+          aria-label="Bulk operation type"
+        >
+          <SelectItem key="percent">
+            Percent
+          </SelectItem>
+          <SelectItem key="flat">
+            Flat
+          </SelectItem>
+        </Select>
         <Button
           size={compact ? "sm" : "md"}
-          variant="flat"
           color="primary"
-          isDisabled={!bulkPct || isNaN(Number(bulkPct))}
-          onPress={() => {
-            if (!data || !bulkPct) return;
-            const pct = Number(bulkPct);
-            setEdits((prev) => {
-              const next = { ...prev } as Record<string, RowEdit>;
-              (data as VariantRow[]).forEach((v) => {
-                const id = String(v._id);
-                const original = (
-                  prev[id]?.cogs ??
-                  v.cogsPerUnit ??
-                  ""
-                ).toString();
-                const originalVal = Number(original || 0);
-                if (!isFinite(originalVal) || originalVal === 0) {
-                  const price = Number(v.price ?? 0) || 0;
-                  const computed = (price * pct) / 100;
-                  const fixed = isFinite(computed)
-                    ? computed.toFixed(2)
-                    : "0.00";
-                  next[id] = { ...(next[id] || {}), cogs: fixed };
-                }
-              });
-              return next;
-            });
-            trackOnboardingAction("products", "apply_cogs", {
-              pct: Number(bulkPct),
-            });
-          }}
+          isDisabled={!bulkValue || isNaN(Number(bulkValue))}
+          onPress={handleApplyCogs}
         >
           Apply COGS
         </Button>
         <Button
           size={compact ? "sm" : "md"}
-          variant="flat"
-          color="secondary"
-          isDisabled={!bulkPct || isNaN(Number(bulkPct))}
-          onPress={() => {
-            if (!data || !bulkPct) return;
-            const pct = Number(bulkPct);
-            setEdits((prev) => {
-              const next = { ...prev } as Record<string, RowEdit>;
-              (data as VariantRow[]).forEach((v) => {
-                const id = String(v._id);
-                next[id] = { ...(next[id] || {}), tax: String(pct) };
-              });
-              return next;
-            });
-            trackOnboardingAction("products", "apply_tax", {
-              pct: Number(bulkPct),
-            });
-          }}
+          color="primary"
+          isDisabled={!bulkValue || isNaN(Number(bulkValue))}
+          onPress={handleApplyTax}
         >
           Apply Tax
         </Button>
         <Button
           size={compact ? "sm" : "md"}
-          variant="flat"
-          isDisabled={!bulkPct || isNaN(Number(bulkPct))}
-          onPress={() => {
-            if (!data || !bulkPct) return;
-            const pct = Number(bulkPct);
-            setEdits((prev) => {
-              const next = { ...prev } as Record<string, RowEdit>;
-              (data as VariantRow[]).forEach((v) => {
-                const id = String(v._id);
-                const price = Number(v.price ?? 0) || 0;
-                const computed = (price * pct) / 100;
-                const fixed = isFinite(computed)
-                  ? computed.toFixed(2)
-                  : "0.00";
-                next[id] = { ...(next[id] || {}), handling: fixed };
-              });
-              return next;
-            });
-            trackOnboardingAction("products", "apply_handling", {
-              pct: Number(bulkPct),
-            });
-          }}
+          color="primary"
+          isDisabled={!bulkValue || isNaN(Number(bulkValue))}
+          onPress={handleApplyHandling}
         >
           Apply Handling
         </Button>
         <Button
           size={compact ? "sm" : "md"}
-          variant="flat"
-          onPress={() => {
-            if (!data) {
-              setEdits({});
-              return;
-            }
-            setEdits((prev) => {
-              const next: Record<string, RowEdit> = { ...prev };
-              (data as VariantRow[]).forEach((v) => {
-                const id = String(v._id);
-                next[id] = {
-                  cogs: "",
-                  tax: "",
-                  handling: "",
-                };
-              });
-              return next;
-            });
-            trackOnboardingAction("products", "clear_all");
-          }}
+          color="danger"
+          onPress={handleClearAll}
         >
           Clear All
         </Button>
@@ -446,7 +583,7 @@ export default function VariantCostsClient({
     totalPages > 1 ? (
       <div className="flex justify-center pt-2">
         <Pagination
-          page={page}
+          page={currentPage}
           total={totalPages}
           size="sm"
           showControls
@@ -971,7 +1108,7 @@ export default function VariantCostsClient({
                               <TableCell key="save">
                                 <Button
                                   size="sm"
-                                  variant="flat"
+                                  color="primary"
                                   onPress={() => handleSaveRow(String(v._id))}
                                 >
                                   Save

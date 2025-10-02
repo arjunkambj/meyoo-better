@@ -10,6 +10,15 @@ import {
   type AnalyticsSourceKey,
 } from "../utils/analyticsSource";
 
+export const dateRangeValidator = v.object({
+  startDate: v.string(),
+  endDate: v.string(),
+  startDateTimeUtc: v.optional(v.string()),
+  endDateTimeUtc: v.optional(v.string()),
+  endDateTimeUtcExclusive: v.optional(v.string()),
+  dayCount: v.optional(v.number()),
+});
+
 export const datasetValidator = v.object({
   orders: v.array(v.any()),
   orderItems: v.array(v.any()),
@@ -27,7 +36,7 @@ export const datasetValidator = v.object({
 });
 
 export const responseValidator = v.object({
-  dateRange: v.object({ startDate: v.string(), endDate: v.string() }),
+  dateRange: dateRangeValidator,
   organizationId: v.string(),
   data: datasetValidator,
   meta: v.optional(v.any()),

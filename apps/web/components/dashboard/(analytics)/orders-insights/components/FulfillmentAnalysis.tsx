@@ -120,7 +120,7 @@ export function FulfillmentAnalysis({ metrics }: FulfillmentAnalysisProps) {
   }
 
   return (
-    <Card className="p-6 bg-default-100/90 dark:bg-content1 border border-default-50 rounded-2xl">
+    <Card className="p-6 bg-default-100/90 shadow-none dark:bg-content1 border border-default-50 rounded-2xl">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h3 className="text-lg font-medium text-default-900">

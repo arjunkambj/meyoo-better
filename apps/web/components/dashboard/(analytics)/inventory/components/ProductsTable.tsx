@@ -16,7 +16,7 @@ import {
   Tooltip,
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
 import { useUser } from "@/hooks";
 import { getStockStatusConfig } from "@/libs/utils/dashboard-formatters";
 import { getCurrencySymbol, formatNumber } from "@/libs/utils/format";
@@ -81,6 +81,8 @@ interface ProductsTableProps {
     page: number;
     setPage: (page: number) => void;
     total: number;
+    pageSize?: number;
+    totalPages?: number;
   };
 }
 
@@ -102,18 +104,9 @@ export const ProductsTable = React.memo(function ProductsTable({
   loading,
   pagination,
 }: ProductsTableProps) {
-  const [page, setPage] = useState(pagination?.page || 1);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const { primaryCurrency } = useUser();
   const currencySymbol = getCurrencySymbol(primaryCurrency);
-
-  useEffect(() => {
-    const nextPage = pagination?.page;
-
-    if (typeof nextPage === "number") {
-      setPage(nextPage);
-    }
-  }, [pagination?.page]);
 
   const renderCell = useCallback(
     (item: Product, columnKey: React.Key) => {
@@ -272,14 +265,23 @@ export const ProductsTable = React.memo(function ProductsTable({
         <Pagination
           showControls
           boundaries={1}
-          page={page}
+          page={pagination.page}
           siblings={1}
           size="sm"
-          total={Math.ceil(pagination.total / 50)}
-          onChange={(newPage) => {
-            setPage(newPage);
-            pagination.setPage(newPage);
-          }}
+          total={
+            pagination.totalPages ??
+            Math.max(
+              pagination.page,
+              Math.max(
+                1,
+                Math.ceil(
+                  Math.max(pagination.total, 0) /
+                    Math.max(pagination.pageSize ?? 50, 1),
+                ),
+              ),
+            )
+          }
+          onChange={pagination.setPage}
         />
       </div>
     ) : null;

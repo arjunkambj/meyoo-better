@@ -174,7 +174,7 @@ export default function ContactSupport() {
       {/* Content Grid: Left form card, Right info panel */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left: Support Form Card */}
-        <Card className="rounded-2xl bg-background lg:col-span-2">
+        <Card className="rounded-2xl bg-background shadow-none lg:col-span-2">
           <CardBody className="px-5 py-5">
             <form className="space-y-6" onSubmit={handleSubmit}>
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2">

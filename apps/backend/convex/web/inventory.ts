@@ -1,9 +1,11 @@
 import { v } from "convex/values";
+import { paginationOptsValidator } from "convex/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import { action, query } from "../_generated/server";
 import type { QueryCtx } from "../_generated/server";
 import { getUserAndOrg } from "../utils/auth";
 import { api } from "../_generated/api";
+import { dateRangeValidator } from "./analyticsShared";
 
 /**
  * Inventory Management API
@@ -99,6 +101,30 @@ const DEFAULT_ANALYSIS_DAYS = 30;
 const EXTENDED_ANALYSIS_DAYS = 90;
 const DEFAULT_LEAD_TIME_DAYS = 7;
 const SAFETY_STOCK_DAYS = 3;
+
+const INVENTORY_END_CURSOR = "__end__";
+
+const encodeInventoryCursor = (state: { page: number }): string =>
+  JSON.stringify({ page: Math.max(1, Math.floor(state.page)) });
+
+const decodeInventoryCursor = (
+  rawCursor: string | null | undefined,
+): { page: number } => {
+  if (!rawCursor) {
+    return { page: 1 };
+  }
+
+  try {
+    const parsed = JSON.parse(rawCursor) as { page?: unknown };
+    const value =
+      typeof parsed.page === "number" && Number.isFinite(parsed.page)
+        ? Math.max(1, Math.floor(parsed.page))
+        : 1;
+    return { page: value };
+  } catch (_error) {
+    return { page: 1 };
+  }
+};
 
 const normalizeDateRange = (
   range: { startDate: string; endDate: string } | undefined,
@@ -442,12 +468,7 @@ const assignABCCategories = (
  */
 export const getInventoryOverview = query({
   args: {
-    dateRange: v.optional(
-      v.object({
-        startDate: v.string(),
-        endDate: v.string(),
-      }),
-    ),
+    dateRange: v.optional(dateRangeValidator),
   },
   returns: v.union(
     v.null(),
@@ -701,6 +722,7 @@ export const getInventoryOverview = query({
  */
 export const getProductsList = query({
   args: {
+    paginationOpts: v.optional(paginationOptsValidator),
     page: v.optional(v.number()),
     pageSize: v.optional(v.number()),
     stockLevel: v.optional(v.string()),
@@ -708,15 +730,10 @@ export const getProductsList = query({
     searchTerm: v.optional(v.string()),
     sortBy: v.optional(v.string()),
     sortOrder: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
-    dateRange: v.optional(
-      v.object({
-        startDate: v.string(),
-        endDate: v.string(),
-      }),
-    ),
+    dateRange: v.optional(dateRangeValidator),
   },
   returns: v.object({
-    data: v.array(
+    page: v.array(
       v.object({
         id: v.string(),
         name: v.string(),
@@ -756,6 +773,55 @@ export const getProductsList = query({
         abcCategory: v.union(v.literal("A"), v.literal("B"), v.literal("C")),
       }),
     ),
+    data: v.optional(
+      v.array(
+        v.object({
+          id: v.string(),
+          name: v.string(),
+          sku: v.string(),
+          image: v.optional(v.string()),
+          category: v.string(),
+          vendor: v.string(),
+          stock: v.number(),
+          reserved: v.number(),
+          available: v.number(),
+          reorderPoint: v.number(),
+          stockStatus: v.union(
+            v.literal("healthy"),
+            v.literal("low"),
+            v.literal("critical"),
+            v.literal("out"),
+          ),
+          price: v.number(),
+          cost: v.number(),
+          margin: v.number(),
+          turnoverRate: v.number(),
+          unitsSold: v.optional(v.number()),
+          lastSold: v.optional(v.string()),
+          variants: v.optional(
+            v.array(
+              v.object({
+                id: v.string(),
+                sku: v.string(),
+                title: v.string(),
+                price: v.number(),
+                stock: v.number(),
+                reserved: v.number(),
+                available: v.number(),
+              }),
+            ),
+          ),
+          abcCategory: v.union(v.literal("A"), v.literal("B"), v.literal("C")),
+        }),
+      ),
+    ),
+    continueCursor: v.string(),
+    isDone: v.boolean(),
+    info: v.object({
+      pageSize: v.number(),
+      returned: v.number(),
+      hasMore: v.boolean(),
+    }),
     pagination: v.object({
       page: v.number(),
       pageSize: v.number(),
@@ -765,17 +831,42 @@ export const getProductsList = query({
   }),
   handler: async (ctx, args) => {
     const auth = await getUserAndOrg(ctx);
+    const fallbackPageSize = Math.max(
+      1,
+      Math.floor(args.paginationOpts?.numItems ?? args.pageSize ?? 50),
+    );
+
     if (!auth)
       return {
+        page: [],
         data: [],
-        pagination: { page: 1, pageSize: 50, total: 0, totalPages: 0 },
+        continueCursor: INVENTORY_END_CURSOR,
+        isDone: true,
+        info: {
+          pageSize: fallbackPageSize,
+          returned: 0,
+          hasMore: false,
+        },
+        pagination: {
+          page: 1,
+          pageSize: fallbackPageSize,
+          total: 0,
+          totalPages: 0,
+        },
       };
     const orgId = auth.orgId as Id<"organizations">;
 
     await primeVariantCostComponents(ctx, orgId);
 
-    const page = args.page || 1;
-    const pageSize = args.pageSize || 50;
+    const cursorState = decodeInventoryCursor(args.paginationOpts?.cursor);
+    const legacyPage = args.page ?? 1;
+    const pageSize = Math.max(
+      1,
+      Math.floor(args.paginationOpts?.numItems ?? args.pageSize ?? 50),
+    );
+    const requestedPage = args.paginationOpts
+      ? cursorState.page
+      : Math.max(1, Math.floor(legacyPage));
 
     const [products, variants, inventory] = await Promise.all([
       ctx.db
@@ -970,17 +1061,30 @@ export const getProductsList = query({
 
     const total = filteredProducts.length;
     const totalPages = total > 0 ? Math.ceil(total / pageSize) : 0;
-    const safePage = totalPages > 0 ? Math.min(page, totalPages) : 1;
+    const safePage = totalPages > 0 ? Math.min(requestedPage, totalPages) : 1;
     const startIndex = (safePage - 1) * pageSize;
     const paginatedData = filteredProducts.slice(
       startIndex,
       startIndex + pageSize,
     );
 
+    const hasMore = totalPages > 0 && safePage < totalPages;
+    const continueCursor = hasMore
+      ? encodeInventoryCursor({ page: safePage + 1 })
+      : INVENTORY_END_CURSOR;
+
     return {
+      page: paginatedData,
       data: paginatedData,
+      continueCursor,
+      isDone: !hasMore,
+      info: {
+        pageSize,
+        returned: paginatedData.length,
+        hasMore,
+      },
       pagination: {
-        page: safePage,
+        page: totalPages === 0 ? 1 : safePage,
         pageSize,
         total,
         totalPages,
@@ -994,12 +1098,7 @@ export const getProductsList = query({
  */
 export const getStockHealth = query({
   args: {
-    dateRange: v.optional(
-      v.object({
-        startDate: v.string(),
-        endDate: v.string(),
-      }),
-    ),
+    dateRange: v.optional(dateRangeValidator),
   },
   returns: v.array(
     v.object({
@@ -1103,12 +1202,7 @@ export const getStockHealth = query({
  */
 export const getABCAnalysis = query({
   args: {
-    dateRange: v.optional(
-      v.object({
-        startDate: v.string(),
-        endDate: v.string(),
-      }),
-    ),
+    dateRange: v.optional(dateRangeValidator),
   },
   returns: v.array(
     v.object({
@@ -1482,12 +1576,7 @@ export const getStockAlerts = query({
  */
 export const getTopPerformers = query({
   args: {
-    dateRange: v.optional(
-      v.object({
-        startDate: v.string(),
-        endDate: v.string(),
-      }),
-    ),
+    dateRange: v.optional(dateRangeValidator),
     limit: v.optional(v.number()),
   },
   returns: v.object({
@@ -1658,12 +1747,7 @@ export const getTopPerformers = query({
  */
 export const getStockMovement = query({
   args: {
-    dateRange: v.optional(
-      v.object({
-        startDate: v.string(),
-        endDate: v.string(),
-      }),
-    ),
+    dateRange: v.optional(dateRangeValidator),
     periods: v.optional(v.number()),
   },
   returns: v.array(
@@ -1805,12 +1889,7 @@ export const getStockMovement = query({
  */
 export const getInventoryTurnover = query({
   args: {
-    dateRange: v.optional(
-      v.object({
-        startDate: v.string(),
-        endDate: v.string(),
-      }),
-    ),
+    dateRange: v.optional(dateRangeValidator),
     periods: v.optional(v.number()),
   },
   returns: v.array(
@@ -1979,7 +2058,7 @@ export const getInventoryTurnover = query({
 
 export const getInventoryMetrics = action({
   args: {
-    dateRange: v.optional(v.object({ startDate: v.string(), endDate: v.string() })),
+    dateRange: v.optional(dateRangeValidator),
   },
   returns: v.union(
     v.null(),

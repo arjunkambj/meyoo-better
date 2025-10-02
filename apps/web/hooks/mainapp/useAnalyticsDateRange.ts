@@ -22,13 +22,12 @@ const isPresetKey = (value: string | undefined): value is DateRangePresetKey => 
 };
 
 const normalizeRange = (range: AnalyticsDateRange): AnalyticsDateRange => {
-  const normalized: AnalyticsDateRange = {
-    startDate: range.startDate,
-    endDate: range.endDate,
-  };
-  if (range.preset && isPresetKey(range.preset)) {
-    normalized.preset = range.preset;
+  const normalized: AnalyticsDateRange = { ...range };
+
+  if (normalized.preset && !isPresetKey(normalized.preset)) {
+    normalized.preset = undefined;
   }
+
   return normalized;
 };
 

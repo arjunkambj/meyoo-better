@@ -4,6 +4,7 @@ import type { Id } from "../_generated/dataModel";
 import { action, query, type QueryCtx } from "../_generated/server";
 import { api } from "../_generated/api";
 import {
+  dateRangeValidator,
   defaultDateRange,
   loadAnalytics,
   responseValidator,
@@ -12,6 +13,7 @@ import {
 import {
   fetchAnalyticsOrderChunk,
   type AnalyticsSourceKey,
+  type DateRange,
   validateDateRange,
 } from "../utils/analyticsSource";
 import { getUserAndOrg } from "../utils/auth";
@@ -22,7 +24,7 @@ import { loadOverviewFromDailyMetrics } from "../utils/dailyMetrics";
 
 const responseOrNull = v.union(v.null(), responseValidator);
 
-type DateRangeArg = { startDate: string; endDate: string };
+type DateRangeArg = DateRange;
 
 const ORDER_ANALYTICS_DATASETS = [
   "orders",
@@ -216,7 +218,7 @@ async function handleOrdersQuery(
 
 export const getOrdersOverview = query({
   args: {
-    dateRange: v.object({ startDate: v.string(), endDate: v.string() }),
+    dateRange: dateRangeValidator,
   },
   returns: responseOrNull,
   handler: async (ctx, args) => {
@@ -226,7 +228,7 @@ export const getOrdersOverview = query({
 
 export const getOrdersOverviewMetrics = query({
   args: {
-    dateRange: v.object({ startDate: v.string(), endDate: v.string() }),
+    dateRange: dateRangeValidator,
   },
   returns: v.union(
     v.null(),
@@ -315,7 +317,7 @@ export const getOrdersOverviewMetrics = query({
 
 export const getRevenueSumForRange = query({
   args: {
-    dateRange: v.object({ startDate: v.string(), endDate: v.string() }),
+    dateRange: dateRangeValidator,
   },
   returns: responseOrNull,
   handler: async (ctx, args) => {
@@ -325,7 +327,7 @@ export const getRevenueSumForRange = query({
 
 export const getOrdersList = query({
   args: {
-    dateRange: v.object({ startDate: v.string(), endDate: v.string() }),
+    dateRange: dateRangeValidator,
     limit: v.optional(v.number()),
   },
   returns: responseOrNull,
@@ -346,7 +348,7 @@ export const getOrdersList = query({
 
 export const getOrdersTablePage = query({
   args: {
-    dateRange: v.object({ startDate: v.string(), endDate: v.string() }),
+    dateRange: dateRangeValidator,
     status: v.optional(v.string()),
     searchTerm: v.optional(v.string()),
     sortBy: v.optional(v.string()),
@@ -521,7 +523,7 @@ export const getOrdersTablePage = query({
 
 export const getStatusDistribution = query({
   args: {
-    dateRange: v.object({ startDate: v.string(), endDate: v.string() }),
+    dateRange: dateRangeValidator,
   },
   returns: responseOrNull,
   handler: async (ctx, args) => {
@@ -531,7 +533,7 @@ export const getStatusDistribution = query({
 
 export const getFulfillmentMetrics = query({
   args: {
-    dateRange: v.object({ startDate: v.string(), endDate: v.string() }),
+    dateRange: dateRangeValidator,
   },
   returns: v.union(v.null(), fulfillmentMetricsValidator),
   handler: async (ctx, args) => {
@@ -557,7 +559,7 @@ export const getFulfillmentMetrics = query({
 
 export const getOrderTimeline = query({
   args: {
-    dateRange: v.optional(v.object({ startDate: v.string(), endDate: v.string() })),
+    dateRange: v.optional(dateRangeValidator),
   },
   returns: responseOrNull,
   handler: async (ctx, args) => {
@@ -569,7 +571,7 @@ export const getOrderTimeline = query({
 const analyticsActionReturns = v.union(
   v.null(),
   v.object({
-    dateRange: v.object({ startDate: v.string(), endDate: v.string() }),
+    dateRange: dateRangeValidator,
     organizationId: v.string(),
     result: v.optional(v.any()),
   }),
@@ -577,7 +579,7 @@ const analyticsActionReturns = v.union(
 
 export const getAnalytics = action({
   args: {
-    dateRange: v.object({ startDate: v.string(), endDate: v.string() }),
+    dateRange: dateRangeValidator,
     status: v.optional(v.string()),
     searchTerm: v.optional(v.string()),
     sortBy: v.optional(v.string()),
@@ -630,7 +632,7 @@ export const getAnalytics = action({
 
 export const getOrdersMetrics = action({
   args: {
-    dateRange: v.object({ startDate: v.string(), endDate: v.string() }),
+    dateRange: dateRangeValidator,
   },
   returns: v.union(
     v.null(),

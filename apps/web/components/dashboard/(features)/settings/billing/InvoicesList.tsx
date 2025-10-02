@@ -1,9 +1,11 @@
 "use client";
-import { Button, Chip } from "@heroui/react";
+import { Button, Chip, Skeleton } from "@heroui/react";
 import { Icon } from "@iconify/react";
+import { useState } from "react";
 
-import { useInvoices } from "@/hooks";
+import { useInvoices, useDeleteInvoice } from "@/hooks";
 export default function InvoicesList() {
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const pageSize = 5;
   const {
     invoices,
@@ -13,6 +15,16 @@ export default function InvoicesList() {
     loadMore,
     loadingMore,
   } = useInvoices(pageSize);
+  const deleteInvoice = useDeleteInvoice();
+
+  const handleDelete = async (invoiceId: string) => {
+    setDeletingId(invoiceId);
+    try {
+      await deleteInvoice(invoiceId);
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   // Format amount for display
   const formatAmount = (amount: number, currency: string = "USD") => {
@@ -55,20 +67,47 @@ export default function InvoicesList() {
       {/* Compact Table Header */}
       <div className="px-4 py-2 border-b border-divider bg-content1">
         <div className="grid grid-cols-12 gap-3 text-xs font-medium text-default-500">
-          <div className="col-span-4">Invoice</div>
+          <div className="col-span-3">Invoice</div>
           <div className="col-span-3">Date</div>
           <div className="col-span-2">Amount</div>
-          <div className="col-span-3">Status</div>
+          <div className="col-span-2">Status</div>
+          <div className="col-span-2">Actions</div>
         </div>
       </div>
 
       {/* Table Body */}
       <div className="divide-y divide-divider">
         {loading ? (
-          <div className="px-4 py-8 text-center">
-            <p className="text-xs text-default-500">
-              Loading billing history...
-            </p>
+          <div className="space-y-1.5">
+            {[0, 1].map((index) => (
+              <div
+                key={index}
+                className={`px-4 py-2.5 ${
+                  index % 2 === 0
+                    ? "bg-content1/40 dark:bg-content1/10"
+                    : "bg-transparent dark:bg-transparent"
+                }`}
+              >
+                <div className="grid grid-cols-12 gap-3 items-center">
+                  <div className="col-span-3 space-y-1">
+                    <Skeleton className="h-3 w-24 rounded-full" />
+                    <Skeleton className="h-3 w-32 rounded-full" />
+                  </div>
+                  <div className="col-span-3">
+                    <Skeleton className="h-3 w-20 rounded-full" />
+                  </div>
+                  <div className="col-span-2">
+                    <Skeleton className="h-3 w-16 rounded-full" />
+                  </div>
+                  <div className="col-span-2">
+                    <Skeleton className="h-4 w-16 rounded-full" />
+                  </div>
+                  <div className="col-span-2">
+                    <Skeleton className="h-7 w-7 rounded-md" />
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         ) : invoices.length === 0 ? (
           <div className="px-4 py-8 text-center">
@@ -106,7 +145,7 @@ export default function InvoicesList() {
               >
                 <div className="grid grid-cols-12 gap-3 items-center">
                   {/* Invoice ID */}
-                  <div className="col-span-4">
+                  <div className="col-span-3">
                     <p className="text-xs font-semibold text-default-800 truncate">
                       {invoice.invoiceNumber}
                     </p>
@@ -134,7 +173,7 @@ export default function InvoicesList() {
                   </div>
 
                   {/* Status */}
-                  <div className="col-span-3">
+                  <div className="col-span-2">
                     <Chip
                       color={getStatusColor(invoice.status)}
                       size="sm"
@@ -152,6 +191,21 @@ export default function InvoicesList() {
                       {invoice.status.charAt(0).toUpperCase() +
                         invoice.status.slice(1)}
                     </Chip>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="col-span-2">
+                    <Button
+                      size="sm"
+                      variant="flat"
+                      color="danger"
+                      isIconOnly
+                      isLoading={deletingId === invoice.id}
+                      isDisabled={deletingId === invoice.id}
+                      onPress={() => handleDelete(invoice.id)}
+                    >
+                      <Icon icon="solar:trash-bin-trash-bold" width={16} />
+                    </Button>
                   </div>
                 </div>
               </div>

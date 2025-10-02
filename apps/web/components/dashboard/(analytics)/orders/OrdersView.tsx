@@ -1,7 +1,7 @@
 "use client";
 
 import { Skeleton, Spacer } from "@heroui/react";
-import { lazy, memo, Suspense, useCallback, useState } from "react";
+import { lazy, memo, Suspense, useCallback, useEffect, useState } from "react";
 import { AnalyticsHeader } from "@/components/shared/AnalyticsHeader";
 import { ExportButton } from "@/components/shared/actions/ExportButton";
 import { FilterBar } from "@/components/shared/filters/FilterBar";
@@ -31,6 +31,13 @@ export const OrdersView = memo(function OrdersView() {
       status: selectedStatus,
       page: currentPage,
     });
+
+  useEffect(() => {
+    const resolvedPage = orders?.pagination?.page;
+    if (typeof resolvedPage === "number" && resolvedPage !== currentPage) {
+      setCurrentPage(resolvedPage);
+    }
+  }, [orders?.pagination?.page, currentPage, setCurrentPage]);
 
   const handleFilterChange = useCallback(
     (key: string, value: unknown) => {

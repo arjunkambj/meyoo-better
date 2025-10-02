@@ -8,6 +8,7 @@ import type { Id } from "../_generated/dataModel";
 import { internalAction } from "../_generated/server";
 import { createJob, PRIORITY } from "../engine/workpool";
 import { toStringArray } from "../utils/shopify";
+import { dateRangeValidator } from "../web/analyticsShared";
 
 // Minimal GraphQL types to avoid `any`
 type ShopifyMoney = { amount?: string; currencyCode?: string };
@@ -1778,10 +1779,7 @@ export const syncSessions = internalAction({
   args: {
     organizationId: v.id("organizations"),
     storeId: v.id("shopifyStores"),
-    dateRange: v.object({
-      startDate: v.string(), // YYYY-MM-DD
-      endDate: v.string(), // YYYY-MM-DD
-    }),
+    dateRange: dateRangeValidator, // YYYY-MM-DD (shop-local)
   },
   handler: async (
     ctx,

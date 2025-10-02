@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
 import { query, type QueryCtx } from "../_generated/server";
 import {
+  dateRangeValidator,
   defaultDateRange,
   loadAnalytics,
   responseValidator,
@@ -46,7 +47,7 @@ async function handleQuery(
 
 export const getMetrics = query({
   args: {
-    dateRange: v.object({ startDate: v.string(), endDate: v.string() }),
+    dateRange: dateRangeValidator,
   },
   returns: responseOrNull,
   handler: async (ctx, args) => {
@@ -56,7 +57,7 @@ export const getMetrics = query({
 
 export const getWaterfallData = query({
   args: {
-    dateRange: v.object({ startDate: v.string(), endDate: v.string() }),
+    dateRange: dateRangeValidator,
   },
   returns: responseOrNull,
   handler: async (ctx, args) => {
@@ -66,7 +67,7 @@ export const getWaterfallData = query({
 
 export const getCostBreakdown = query({
   args: {
-    dateRange: v.object({ startDate: v.string(), endDate: v.string() }),
+    dateRange: dateRangeValidator,
   },
   returns: responseOrNull,
   handler: async (ctx, args) => {
@@ -76,7 +77,7 @@ export const getCostBreakdown = query({
 
 export const getMarginAnalysis = query({
   args: {
-    dateRange: v.object({ startDate: v.string(), endDate: v.string() }),
+    dateRange: dateRangeValidator,
   },
   returns: responseOrNull,
   handler: async (ctx, args) => {
@@ -86,7 +87,7 @@ export const getMarginAnalysis = query({
 
 export const getTrends = query({
   args: {
-    dateRange: v.object({ startDate: v.string(), endDate: v.string() }),
+    dateRange: dateRangeValidator,
   },
   returns: responseOrNull,
   handler: async (ctx, args) => {
@@ -96,8 +97,8 @@ export const getTrends = query({
 
 export const getComparison = query({
   args: {
-    currentRange: v.object({ startDate: v.string(), endDate: v.string() }),
-    previousRange: v.optional(v.object({ startDate: v.string(), endDate: v.string() })),
+    currentRange: dateRangeValidator,
+    previousRange: v.optional(dateRangeValidator),
   },
   returns: v.union(
     v.null(),
@@ -133,7 +134,7 @@ export const getComparison = query({
 
 export const getMarketingEfficiency = query({
   args: {
-    dateRange: v.optional(v.object({ startDate: v.string(), endDate: v.string() })),
+    dateRange: v.optional(dateRangeValidator),
   },
   returns: responseOrNull,
   handler: async (ctx, args) => {
@@ -144,7 +145,7 @@ export const getMarketingEfficiency = query({
 
 export const getContributionMargin = query({
   args: {
-    dateRange: v.object({ startDate: v.string(), endDate: v.string() }),
+    dateRange: dateRangeValidator,
   },
   returns: responseOrNull,
   handler: async (ctx, args) => {
@@ -154,7 +155,7 @@ export const getContributionMargin = query({
 
 export const getTableData = query({
   args: {
-    dateRange: v.object({ startDate: v.string(), endDate: v.string() }),
+    dateRange: dateRangeValidator,
     granularity: v.optional(
       v.union(v.literal("daily"), v.literal("weekly"), v.literal("monthly")),
     ),
@@ -167,7 +168,7 @@ export const getTableData = query({
 
 export const getAnalytics = query({
   args: {
-    dateRange: v.object({ startDate: v.string(), endDate: v.string() }),
+    dateRange: dateRangeValidator,
     granularity: v.optional(
       v.union(v.literal("daily"), v.literal("weekly"), v.literal("monthly")),
     ),
@@ -175,7 +176,7 @@ export const getAnalytics = query({
   returns: v.union(
     v.null(),
     v.object({
-      dateRange: v.object({ startDate: v.string(), endDate: v.string() }),
+      dateRange: dateRangeValidator,
       organizationId: v.string(),
       result: v.optional(v.any()),
       meta: v.optional(v.any()),

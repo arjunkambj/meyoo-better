@@ -234,6 +234,8 @@ export function computeOverviewMetrics(
         profitPerOrderChange: 0,
         profitPerUnit: 0,
         profitPerUnitChange: 0,
+        fulfillmentCostPerOrder: 0,
+        fulfillmentCostPerOrderChange: 0,
         cogs: 0,
         cogsChange: 0,
         cogsPercentageOfGross: 0,
@@ -640,6 +642,7 @@ export function computeOverviewMetrics(
   const cogsPercentageOfNet = revenue > 0 ? (cogs / revenue) * 100 : 0;
   const shippingPercentageOfNet = revenue > 0 ? (shippingCosts / revenue) * 100 : 0;
   const taxesPercentageOfRevenue = revenue > 0 ? (taxesCollected / revenue) * 100 : 0;
+  const fulfillmentCostPerOrder = activeOrderCount > 0 ? handlingCostTotal / activeOrderCount : 0;
 
   const returnRate = activeOrderCount > 0 ? (refunds.length / activeOrderCount) * 100 : 0;
   const paidCustomersCount = uniqueCustomerIds.size;
@@ -710,6 +713,8 @@ export function computeOverviewMetrics(
     profitPerOrderChange: 0,
     profitPerUnit,
     profitPerUnitChange: 0,
+    fulfillmentCostPerOrder,
+    fulfillmentCostPerOrderChange: 0,
     cogs,
     cogsChange: 0,
     cogsPercentageOfGross,

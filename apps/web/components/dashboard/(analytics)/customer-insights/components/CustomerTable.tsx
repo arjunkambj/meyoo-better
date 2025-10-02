@@ -18,7 +18,7 @@ import {
   TableRow,
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback } from "react";
 
 import { CustomerStatusBadge } from "@/components/shared/badges/StatusBadge";
 import { useUser } from "@/hooks";
@@ -77,18 +77,9 @@ export const CustomerTable = React.memo(function CustomerTable({
   loading,
   statusFilter = "all",
 }: CustomerTableProps) {
-  const [page, setPage] = useState(pagination?.page || 1);
   const pageSize = pagination?.pageSize ?? 50;
   const { primaryCurrency } = useUser();
   const currencySymbol = getCurrencySymbol(primaryCurrency);
-
-  useEffect(() => {
-    const nextPage = pagination?.page;
-
-    if (typeof nextPage === "number") {
-      setPage(nextPage);
-    }
-  }, [pagination?.page]);
 
   // Filter customers based on search and status
   const filteredCustomers = customers.filter((customer) => {
@@ -267,7 +258,10 @@ export const CustomerTable = React.memo(function CustomerTable({
   );
 
   const totalPages = pagination
-    ? Math.max(page, Math.ceil((pagination.total || 0) / pageSize) || 1)
+    ? Math.max(
+        pagination.page,
+        Math.max(1, Math.ceil(Math.max(pagination.total || 0, 0) / pageSize)),
+      )
     : 1;
 
   const paginationNode =
@@ -276,12 +270,11 @@ export const CustomerTable = React.memo(function CustomerTable({
         <Pagination
           showControls
           boundaries={1}
-          page={page}
+          page={pagination.page}
           siblings={1}
           size="sm"
           total={totalPages}
           onChange={(newPage) => {
-            setPage(newPage);
             pagination.setPage(newPage);
           }}
         />

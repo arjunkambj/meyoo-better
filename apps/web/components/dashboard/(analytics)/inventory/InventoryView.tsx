@@ -1,7 +1,7 @@
 "use client";
 
 import { Skeleton, Spacer } from "@heroui/react";
-import { lazy, Suspense, useCallback, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { AnalyticsHeader } from "@/components/shared/AnalyticsHeader";
 import { ExportButton } from "@/components/shared/actions/ExportButton";
 import { FilterBar } from "@/components/shared/filters/FilterBar";
@@ -36,6 +36,13 @@ export function InventoryView() {
     category: categoryFilter,
     page: currentPage,
   });
+
+  useEffect(() => {
+    const resolvedPage = products?.pagination?.page;
+    if (typeof resolvedPage === "number" && resolvedPage !== currentPage) {
+      setCurrentPage(resolvedPage);
+    }
+  }, [products?.pagination?.page, currentPage]);
 
   const handleAnalyticsRangeChange = useCallback(
     (...args: Parameters<typeof updateInventoryRange>) => {
@@ -192,13 +199,15 @@ export function InventoryView() {
 
       {/* Products Table */}
       <ProductsTable
-        loading={products === undefined}
+        loading={isLoading}
         pagination={
           products?.pagination
             ? {
                 page: products.pagination.page,
                 setPage: setCurrentPage,
                 total: products.pagination.total,
+                pageSize: products.pagination.pageSize,
+                totalPages: products.pagination.totalPages,
               }
             : undefined
         }

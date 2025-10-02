@@ -167,6 +167,67 @@ export const getUserBilling = query({
 });
 
 /**
+ * Get usage data for current user's organization (last 30 days)
+ */
+export const getUserUsage = query({
+  args: {},
+  returns: v.union(
+    v.null(),
+    v.object({
+      ordersLast30Days: v.number(),
+      orderLimit: v.number(),
+    }),
+  ),
+  handler: async (ctx) => {
+    const auth = await getUserAndOrg(ctx);
+    if (!auth) return null;
+
+    // Calculate date 30 days ago
+    const today = new Date();
+    const thirtyDaysAgo = new Date(today);
+    thirtyDaysAgo.setDate(today.getDate() - 30);
+    const startDate = thirtyDaysAgo.toISOString().slice(0, 10); // YYYY-MM-DD
+
+    // Get daily metrics for the last 30 days
+    const dailyMetrics = await ctx.db
+      .query("dailyMetrics")
+      .withIndex("by_organization_date", (q) =>
+        q
+          .eq("organizationId", auth.user.organizationId as Id<"organizations">)
+          .gte("date", startDate)
+      )
+      .collect();
+
+    // Sum total orders from last 30 days
+    const ordersLast30Days = dailyMetrics.reduce((sum, metric) => {
+      return sum + (metric.totalOrders ?? 0);
+    }, 0);
+
+    // Get plan limits
+    const billing = await ctx.db
+      .query("billing")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", auth.user.organizationId as Id<"organizations">),
+      )
+      .first();
+
+    const plan = billing?.shopifyBilling?.plan ?? "free";
+
+    const planLimits: Record<string, number> = {
+      free: 300,
+      starter: 1200,
+      growth: 3000,
+      business: 7500,
+    };
+
+    return {
+      ordersLast30Days,
+      orderLimit: planLimits[plan] ?? 300,
+    };
+  },
+});
+
+/**
  * Get team members for organization
  */
 export const getTeamMembers = query({

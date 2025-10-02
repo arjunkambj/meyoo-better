@@ -1155,46 +1155,20 @@ export const getProductVariantsPaginated = query({
     const page = args.page || 1;
     const pageSize = Math.min(args.pageSize || 20, 100); // Cap at 100 for safety
 
-    const variantsQuery = () =>
-      ctx.db
-        .query("shopifyProductVariants")
-        .withIndex("by_organization", (q) => q.eq("organizationId", orgId));
+    // Build query with organization filter
+    const variantsQuery = ctx.db
+      .query("shopifyProductVariants")
+      .withIndex("by_organization", (q) => q.eq("organizationId", orgId));
 
     // For search, we still need to collect all (can be optimized with full-text search later)
     let paginatedVariants: any[];
     let totalItems: number;
 
-    const getVariantCountForOrg = async (): Promise<number> => {
-      const PRODUCT_COUNT_BATCH = 200;
-      let cursor: string | null = null;
-      let total = 0;
-
-      while (true) {
-        const page = await ctx.db
-          .query("shopifyProducts")
-          .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
-          .order("desc")
-          .paginate({
-            numItems: PRODUCT_COUNT_BATCH,
-            cursor,
-          });
-
-        for (const product of page.page) {
-          total += typeof product.totalVariants === "number" ? product.totalVariants : 0;
-        }
-
-        if (page.isDone || !page.continueCursor) break;
-        cursor = page.continueCursor;
-      }
-
-      return total;
-    };
-
     if (args.searchTerm) {
       const searchLower = args.searchTerm.toLowerCase();
 
       // Collect for search filtering
-      const allVariants = await variantsQuery().collect();
+      const allVariants = await variantsQuery.collect();
 
       // Get products for search join
       const products = await ctx.db
@@ -1222,50 +1196,13 @@ export const getProductVariantsPaginated = query({
       const startIndex = (page - 1) * pageSize;
       paginatedVariants = filtered.slice(startIndex, startIndex + pageSize);
     } else {
-      totalItems = await getVariantCountForOrg();
+      const allVariants = await variantsQuery
+        .order("desc")
+        .collect();
 
-      let cursor: string | null = null;
-      let currentPage = 1;
-      let pageResult: {
-        page: typeof paginatedVariants;
-        isDone: boolean;
-        continueCursor: string | null;
-      } | null = null;
-
-      while (currentPage <= page) {
-        const nextPage = await variantsQuery()
-          .order("desc")
-          .paginate({
-            cursor,
-            numItems: pageSize,
-          });
-
-        if (currentPage === page) {
-          pageResult = nextPage;
-          break;
-        }
-
-        if (nextPage.isDone) {
-          pageResult = {
-            page: [],
-            isDone: true,
-            continueCursor: null,
-          };
-          break;
-        }
-
-        cursor = nextPage.continueCursor ?? null;
-        currentPage += 1;
-      }
-
-      if (!pageResult) {
-        const firstPage = await variantsQuery()
-          .order("desc")
-          .paginate({ numItems: pageSize, cursor: null });
-        pageResult = firstPage;
-      }
-
-      paginatedVariants = pageResult.page;
+      totalItems = allVariants.length;
+      const startIndex = Math.max(0, (page - 1) * pageSize);
+      paginatedVariants = allVariants.slice(startIndex, startIndex + pageSize);
     }
 
     // Get products for join (only for paginated variants)
@@ -1992,6 +1929,7 @@ export const storeProductsInternal = internalMutation({
             organizationId: variant.organizationId,
             variantId,
             locationId: invLevel.locationId,
+            locationName: invLevel.locationName,
             available,
             incoming,
             committed,
@@ -2008,6 +1946,7 @@ export const storeProductsInternal = internalMutation({
           organizationId: variant.organizationId,
           variantId,
           locationId: "default",
+          locationName: "Default Location",
           available,
           incoming: 0,
           committed: 0,

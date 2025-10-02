@@ -14,7 +14,13 @@ import {
   TableRow,
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
-import { useMemo, useState, type ComponentProps, type ReactElement } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type ComponentProps,
+  type ReactElement,
+} from "react";
 import { sanitizeDecimal } from "@/components/shared/table/sanitize";
 
 import {
@@ -62,16 +68,23 @@ export default function ProductCostTable() {
   const currencySymbol = useMemo(() => getCurrencySymbol(currency), [currency]);
 
   const [page, setPage] = useState(1);
-  const pageSize = 10; // smaller page keeps DOM manageable while grouping
+  const pageSize = 200;
   const {
     data: variantData,
     totalPages,
+    currentPage,
     loading,
   } = useShopifyProductVariantsPaginated(
     page,
     pageSize,
     undefined
   );
+
+  useEffect(() => {
+    if (currentPage !== page) {
+      setPage(currentPage);
+    }
+  }, [currentPage, page, setPage]);
 
   const variants = useMemo<VariantRow[]>(
     () => (Array.isArray(variantData) ? (variantData as VariantRow[]) : []),
@@ -219,7 +232,7 @@ export default function ProductCostTable() {
         </Button>
         <Button
           variant="flat"
-          color="secondary"
+          color="primary"
           isDisabled={!bulkPct || isNaN(Number(bulkPct))}
           onPress={() => {
             if (!variants.length || !bulkPct) return;
@@ -238,6 +251,7 @@ export default function ProductCostTable() {
         </Button>
         <Button
           variant="flat"
+          color="primary"
           isDisabled={!bulkPct || isNaN(Number(bulkPct))}
           onPress={() => {
             if (!variants.length || !bulkPct) return;
@@ -274,7 +288,7 @@ export default function ProductCostTable() {
     !loading && totalPages > 1 ? (
       <div className="flex justify-center">
         <Pagination
-          page={page}
+          page={currentPage}
           total={totalPages}
           showControls
           onChange={setPage}

@@ -1,6 +1,6 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { paginationOptsValidator } from "convex/server";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 
 import {
   internalMutation,
@@ -768,5 +768,44 @@ export const createInvoice = internalMutation({
     });
 
     return { invoiceId };
+  },
+});
+
+/**
+ * Delete invoice
+ */
+export const deleteInvoice = mutation({
+  args: {
+    invoiceId: v.id("invoices"),
+  },
+  returns: v.object({
+    success: v.boolean(),
+  }),
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new ConvexError("Unauthorized");
+    }
+
+    const user = await ctx.db.get(userId);
+    if (!user?.organizationId) {
+      throw new ConvexError("User not part of an organization");
+    }
+
+    // Get the invoice to verify ownership
+    const invoice = await ctx.db.get(args.invoiceId);
+    if (!invoice) {
+      throw new ConvexError("Invoice not found");
+    }
+
+    // Verify the invoice belongs to the user's organization
+    if (invoice.organizationId !== user.organizationId) {
+      throw new ConvexError("Unauthorized to delete this invoice");
+    }
+
+    // Delete the invoice
+    await ctx.db.delete(args.invoiceId);
+
+    return { success: true };
   },
 });

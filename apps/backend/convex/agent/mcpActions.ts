@@ -3,6 +3,7 @@ import { action, internalMutation } from "../_generated/server";
 import type { ActionCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { api, internal } from "../_generated/api";
+import { dateRangeValidator } from "../web/analyticsShared";
 import { rag } from "../rag";
 import { resend } from "../integrations/resend";
 import type {
@@ -230,10 +231,7 @@ export const metaAdsOverview = action({
   },
   returns: v.object({
     summary: v.string(),
-    dateRange: v.object({
-      startDate: v.string(),
-      endDate: v.string(),
-    }),
+    dateRange: dateRangeValidator,
     meta: v.object({
       sessions: v.number(),
       conversionRate: v.number(),
@@ -335,10 +333,7 @@ export const ordersSummary = action({
     endDate: v.optional(v.string()),
   },
   returns: v.object({
-    dateRange: v.object({
-      startDate: v.string(),
-      endDate: v.string(),
-    }),
+    dateRange: dateRangeValidator,
     totals: v.object({
       totalOrders: v.number(),
       pendingOrders: v.number(),
@@ -570,10 +565,7 @@ export const pnlSnapshot = action({
   },
   returns: v.object({
     summary: v.string(),
-    dateRange: v.object({
-      startDate: v.string(),
-      endDate: v.string(),
-    }),
+    dateRange: dateRangeValidator,
     revenue: v.number(),
     grossProfit: v.number(),
     netProfit: v.number(),

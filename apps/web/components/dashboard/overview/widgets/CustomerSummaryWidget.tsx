@@ -95,15 +95,8 @@ function Metric({
               aria-label={`Change ${change >= 0 ? "up" : "down"} ${Math.abs(change).toFixed(0)} percent`}
               className={`flex items-center gap-0.5 px-2 py-1 rounded-lg ${changeBadgeClasses}`}
             >
-              <Icon
-                icon={
-                  change >= 0
-                    ? "solar:arrow-up-bold"
-                    : "solar:arrow-down-bold"
-                }
-                width={14}
-              />
               <span className="text-xs font-semibold">
+                {change >= 0 ? "+" : "-"}
                 {Math.abs(change).toFixed(0)}%
               </span>
             </div>

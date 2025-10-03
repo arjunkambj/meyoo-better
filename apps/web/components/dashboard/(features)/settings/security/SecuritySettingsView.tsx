@@ -11,7 +11,10 @@ import ApiKeyManagement from "./ApiKeyManagement";
 export default function SecuritySettingsView() {
   const { role, loading } = useUser();
   const [devToolsVisible, setDevToolsVisible] = useAtom(devToolsVisibleAtom);
-  const isStoreOwner = role === 'StoreOwner';
+
+  const canToggleDevTools = ['StoreOwner', 'MeyooFounder', 'MeyooTeam', 'MeyooAdmin'].includes(
+    role ?? '',
+  );
 
   return (
     <div className="space-y-6">
@@ -23,7 +26,7 @@ export default function SecuritySettingsView() {
         </Card>
       ) : null}
 
-      {!loading && isStoreOwner ? (
+      {!loading && canToggleDevTools ? (
         <Card className="rounded-2xl border border-default-100 shadow-none bg-content2 dark:bg-content1">
           <CardHeader className="flex items-center gap-2">
             <Icon icon="solar:code-bold-duotone" width={20} />

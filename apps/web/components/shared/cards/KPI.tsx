@@ -258,25 +258,26 @@ const KPI = React.memo(function KPI({
           )}
         </div>
 
-        <Divider className="mb-2 bg-default-200" />
-
         {/* Change indicator at bottom */}
         {changeData && (
-          <div className="flex items-center justify-between">
-            <div className="text-xs font-medium text-default-500">vs last period</div>
-            <div
-              className={cn(
-                "text-xs font-semibold",
-                changeData.type === "positive"
-                  ? "text-success-600"
-                  : changeData.type === "neutral"
-                    ? "text-warning-600"
-                    : "text-danger-600"
-              )}
-            >
-              <span>{changeData.text}</span>
+          <>
+            <Divider className="mb-2 bg-default-200" />
+            <div className="flex items-center justify-between">
+              <div className="text-xs font-medium text-default-500">vs last period</div>
+              <div
+                className={cn(
+                  "text-xs font-semibold",
+                  changeData.type === "positive"
+                    ? "text-success-600"
+                    : changeData.type === "neutral"
+                      ? "text-warning-600"
+                      : "text-danger-600"
+                )}
+              >
+                <span>{changeData.text}</span>
+              </div>
             </div>
-          </div>
+          </>
         )}
       </div>
     </Card>

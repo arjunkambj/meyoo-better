@@ -1290,7 +1290,7 @@ export class ShopifyGraphQLClient {
 
         if (shouldRetryThrottle) {
           const waitTime = this.calculateThrottleDelay(throttleStatus, attempt);
-          logger.warn(`GraphQL throttled attempt retry ${attempt + 1}`, {
+          logger.info(`GraphQL throttled attempt retry ${attempt + 1}`, {
             waitMs: waitTime,
             maxRetries: this.MAX_GRAPHQL_RETRIES,
             code: throttleError?.extensions?.code,
@@ -1312,7 +1312,7 @@ export class ShopifyGraphQLClient {
         }
 
         if (errors && errors.length > 0) {
-          logger.error("GraphQL errors during request detected", {
+          logger.error("GraphQL errors during request detected", undefined, {
             summary: summarizeGraphQLErrors(errors),
             querySnippet: query.substring(0, 120),
           });

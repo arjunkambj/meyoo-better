@@ -2,7 +2,9 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
+import type { MutationCtx } from "../_generated/server";
 import { action, internalMutation, internalQuery, mutation, query } from "../_generated/server";
+import { createNewUserData } from "../authHelpers";
 import { createJob, PRIORITY } from "../engine/workpool";
 import { optionalEnv } from "../utils/env";
 import { buildDateSpan } from "../utils/date";
@@ -206,6 +208,7 @@ const ORG_SCOPED_TABLES = [
   "syncProfiles",
   "syncSessions",
   "globalCosts",
+  "manualReturnRates",
   "variantCosts",
   "dashboards",
   "gdprRequests",
@@ -425,6 +428,25 @@ export const resetMembersBatch = internalMutation({
     let updated = 0;
 
     for (const member of page.page) {
+      const resetTimestamp = Date.now();
+
+      // Mark any existing memberships as removed so the user leaves the organization
+      const memberships = await ctx.db
+        .query("memberships")
+        .withIndex("by_org_user", (q) =>
+          q.eq("organizationId", args.organizationId).eq("userId", member._id),
+        )
+        .collect();
+
+      for (const membership of memberships) {
+        if (membership.status !== "removed") {
+          await ctx.db.patch(membership._id, {
+            status: "removed",
+            updatedAt: resetTimestamp,
+          });
+        }
+      }
+
       const onboarding = await ctx.db
         .query("onboarding")
         .withIndex("by_user_organization", (q) =>
@@ -447,12 +469,18 @@ export const resetMembersBatch = internalMutation({
             completedSteps: [],
             setupDate: new Date().toISOString(),
           },
-          updatedAt: Date.now(),
+          updatedAt: resetTimestamp,
         });
       }
 
+      // Recreate the user in a fresh personal organization similar to leave/remove flows
+      await createNewUserData(ctx as unknown as MutationCtx, member._id, {
+        name: member.name || null,
+        email: member.email || null,
+      });
+
       await ctx.db.patch(member._id, {
-        isOnboarded: false,
+        appDeletedAt: resetTimestamp,
         updatedAt: Date.now(),
       });
 
@@ -1878,7 +1906,11 @@ export const resetEverything = action({
     }
 
     // Cost tracking tables
-    for (const table of ["globalCosts", "variantCosts"] satisfies OrgScopedTable[]) {
+    for (const table of [
+      "globalCosts",
+      "manualReturnRates",
+      "variantCosts",
+    ] satisfies OrgScopedTable[]) {
       await deleteTable(table);
     }
 

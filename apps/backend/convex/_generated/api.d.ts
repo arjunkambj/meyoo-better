@@ -18,6 +18,7 @@ import type * as agent_firecrawlSeed from "../agent/firecrawlSeed.js";
 import type * as agent_mcpActions from "../agent/mcpActions.js";
 import type * as agent_tools from "../agent/tools.js";
 import type * as auth from "../auth.js";
+import type * as authFinalize from "../authFinalize.js";
 import type * as authHelpers from "../authHelpers.js";
 import type * as billing_organizationHelpers from "../billing/organizationHelpers.js";
 import type * as billing_trackUsage from "../billing/trackUsage.js";
@@ -130,6 +131,7 @@ declare const fullApi: ApiFromModules<{
   "agent/mcpActions": typeof agent_mcpActions;
   "agent/tools": typeof agent_tools;
   auth: typeof auth;
+  authFinalize: typeof authFinalize;
   authHelpers: typeof authHelpers;
   "billing/organizationHelpers": typeof billing_organizationHelpers;
   "billing/trackUsage": typeof billing_trackUsage;

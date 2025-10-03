@@ -13,11 +13,13 @@ import {
   query,
 } from "../_generated/server";
 
+import type { MutationCtx } from "../_generated/server";
 import { createIntegration, type SyncResult } from "./_base";
 import { normalizeShopDomain } from "../utils/shop";
 import { msToDateString } from "../utils/date";
 import { createJob, PRIORITY } from "../engine/workpool";
 import { toStringArray } from "../utils/shopify";
+import { createNewUserData } from "../authHelpers";
 
 const logger = createSimpleLogger("Shopify");
 
@@ -161,6 +163,7 @@ const ORGANIZATION_TABLES = [
   "metaInsights",
   "shopifyAnalytics",
   "globalCosts",
+  "manualReturnRates",
   "variantCosts",
   "integrationSessions",
   "syncSessions",
@@ -191,6 +194,7 @@ const organizationTableValidator = v.union(
   v.literal("metaInsights"),
   v.literal("shopifyAnalytics"),
   v.literal("globalCosts"),
+  v.literal("manualReturnRates"),
   v.literal("variantCosts"),
   v.literal("integrationSessions"),
   v.literal("syncSessions"),
@@ -4537,75 +4541,99 @@ export const handleAppUninstalled = internalMutation({
         .collect();
 
       for (const user of users) {
-        // Reset onboarding record - ensure all integrations are marked as disconnected
-        const onboarding = await ctx.db
-          .query("onboarding")
-          .withIndex("by_user_organization", (q) =>
-            q
-              .eq("userId", user._id)
-              .eq("organizationId", user.organizationId as Id<"organizations">)
-          )
-          .first();
+        const uninstallTimestamp = Date.now();
 
-        if (onboarding) {
-          // Complete reset of onboarding state
-          await ctx.db.patch(onboarding._id, {
-            // Reset all connection flags
-            hasShopifyConnection: false,
-            hasShopifySubscription: false,
-            hasMetaConnection: false,
-            hasGoogleConnection: false,
-            
-            // Reset sync and setup flags
-            isInitialSyncComplete: false,
-            isProductCostSetup: false,
-            isExtraCostSetup: false,
-            
-            // Reset completion status
-            isCompleted: false,
-            onboardingStep: 1,
-            
-            // Clear all onboarding data
-            onboardingData: {
-              completedSteps: [],
-              setupDate: new Date().toISOString(),
-            },
-            
+        try {
+          // Mark existing memberships as removed so the user no longer belongs to the org
+          const memberships = await ctx.db
+            .query("memberships")
+            .withIndex("by_org_user", (q) =>
+              q
+                .eq("organizationId", organizationId)
+                .eq("userId", user._id),
+            )
+            .collect();
+
+          for (const membership of memberships) {
+            if (membership.status !== "removed") {
+              await ctx.db.patch(membership._id, {
+                status: "removed",
+                updatedAt: uninstallTimestamp,
+              });
+            }
+          }
+
+          // Reset onboarding record so any residual data is cleared before cleanup
+          const onboarding = await ctx.db
+            .query("onboarding")
+            .withIndex("by_user_organization", (q) =>
+              q
+                .eq("userId", user._id)
+                .eq("organizationId", user.organizationId as Id<"organizations">),
+            )
+            .first();
+
+          if (onboarding) {
+            await ctx.db.patch(onboarding._id, {
+              hasShopifyConnection: false,
+              hasShopifySubscription: false,
+              hasMetaConnection: false,
+              hasGoogleConnection: false,
+              isInitialSyncComplete: false,
+              isProductCostSetup: false,
+              isExtraCostSetup: false,
+              isCompleted: false,
+              onboardingStep: 1,
+              onboardingData: {
+                completedSteps: [],
+                setupDate: new Date().toISOString(),
+              },
+              updatedAt: uninstallTimestamp,
+            });
+          } else {
+            await ctx.db.insert("onboarding", {
+              userId: user._id,
+              organizationId: user.organizationId as Id<"organizations">,
+              hasShopifyConnection: false,
+              hasShopifySubscription: false,
+              hasMetaConnection: false,
+              hasGoogleConnection: false,
+              isInitialSyncComplete: false,
+              isProductCostSetup: false,
+              isExtraCostSetup: false,
+              isCompleted: false,
+              onboardingStep: 1,
+              onboardingData: {
+                completedSteps: [],
+                setupDate: new Date().toISOString(),
+              },
+              createdAt: uninstallTimestamp,
+              updatedAt: uninstallTimestamp,
+            });
+          }
+
+          // Move the user into a fresh personal organization so they can re-onboard later
+          await createNewUserData(ctx as unknown as MutationCtx, user._id, {
+            name: user.name || null,
+            email: user.email || null,
+          });
+
+          // Record uninstall timestamp on the user for audit purposes
+          await ctx.db.patch(user._id, {
+            appDeletedAt: uninstallTimestamp,
             updatedAt: Date.now(),
           });
-        } else {
-          // Create a fresh onboarding record if it doesn't exist
-          await ctx.db.insert("onboarding", {
+
+          logger.info("Detached user from organization after uninstall", {
+            organizationId: args.organizationId,
             userId: user._id,
-            organizationId: user.organizationId as Id<"organizations">,
-            hasShopifyConnection: false,
-            hasShopifySubscription: false,
-            hasMetaConnection: false,
-            hasGoogleConnection: false,
-            isInitialSyncComplete: false,
-            isProductCostSetup: false,
-            isExtraCostSetup: false,
-            isCompleted: false,
-            onboardingStep: 1,
-            onboardingData: {
-              completedSteps: [],
-              setupDate: new Date().toISOString(),
-            },
-            updatedAt: Date.now(),
+          });
+        } catch (error) {
+          logger.error("Failed to detach user during uninstall", error, {
+            organizationId: args.organizationId,
+            userId: user._id,
           });
         }
-
-        // Reset user state
-        await ctx.db.patch(user._id, {
-          // Reset onboarding flag
-          isOnboarded: false,
-
-          // Set app deleted timestamp
-          appDeletedAt: Date.now(),
-
-          // Update timestamp
-          updatedAt: Date.now(),
-        });
       }
 
       // STEP 2: RESET ORGANIZATION STATE

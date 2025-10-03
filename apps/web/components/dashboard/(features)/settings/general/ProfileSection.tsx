@@ -8,12 +8,14 @@ import { useSetAtom } from "jotai";
 import { setSettingsPendingAtom } from "@/store/atoms";
 import { FormSkeleton } from "@/components/shared/skeletons";
 import { api } from "@/libs/convexApi";
-import { useUser } from "@/hooks";
+import { useUser, useOrganization } from "@/hooks";
 import { usePassword } from "@/hooks/usePassword";
 import EmailChangeModal from "./EmailChangeModal";
 import PasswordChangeModal from "./PasswordChangeModal";
 export default function ProfileSection() {
   const { user, updateProfile } = useUser();
+  const { organizationId, organizationName, updateOrganizationName } =
+    useOrganization();
   const { hasPassword, changePassword } = usePassword();
   const changeEmailAction = useAction(api.core.users.changeEmail);
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
@@ -31,6 +33,8 @@ export default function ProfileSection() {
     lastName: "",
     email: "",
     phone: "",
+    organizationId: "",
+    organizationName: "",
   });
 
   // Update form data when Clerk user or Convex user loads
@@ -43,9 +47,11 @@ export default function ProfileSection() {
         lastName,
         email: user?.email || "",
         phone: user?.phone || "",
+        organizationId: organizationId || "",
+        organizationName: organizationName || "",
       });
     }
-  }, [user]);
+  }, [user, organizationId, organizationName]);
 
   const handleSubmit = useCallback(async () => {
     setIsLoading(true);
@@ -65,6 +71,7 @@ export default function ProfileSection() {
       const nextEmail = formData.email.trim().toLowerCase();
       const currentEmail = (user?.email || "").trim().toLowerCase();
       const emailChanged = nextEmail !== currentEmail;
+      const orgNameChanged = formData.organizationName !== organizationName;
 
       if (nameChanged || phoneChanged || emailChanged) {
         const updates: {
@@ -83,6 +90,11 @@ export default function ProfileSection() {
         await updateProfile(updates);
       }
 
+      // Update organization name if changed
+      if (orgNameChanged) {
+        await updateOrganizationName(formData.organizationName);
+      }
+
       addToast({
         title: "Profile updated",
         description: "Your changes have been saved",
@@ -98,7 +110,14 @@ export default function ProfileSection() {
       setIsLoading(false);
       setPending(false);
     }
-  }, [formData, user, updateProfile, setPending]);
+  }, [
+    formData,
+    user,
+    updateProfile,
+    setPending,
+    organizationName,
+    updateOrganizationName,
+  ]);
 
   const hasChanges = useMemo(() => {
     const [firstName = "", lastName = ""] = (user?.name || "").split(" ", 2);
@@ -108,9 +127,10 @@ export default function ProfileSection() {
       formData.lastName !== lastName ||
       formData.email.trim().toLowerCase() !==
         (user?.email || "").trim().toLowerCase() ||
-      formData.phone !== (user?.phone || "")
+      formData.phone !== (user?.phone || "") ||
+      formData.organizationName !== organizationName
     );
-  }, [formData, user]);
+  }, [formData, user, organizationName]);
 
   // Get full name for avatar
   const fullName = useMemo(
@@ -135,6 +155,12 @@ export default function ProfileSection() {
   const handlePhoneChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) =>
       setFormData((prev) => ({ ...prev, phone: e.target.value })),
+    []
+  );
+
+  const handleOrganizationNameChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) =>
+      setFormData((prev) => ({ ...prev, organizationName: e.target.value })),
     []
   );
 
@@ -190,13 +216,72 @@ export default function ProfileSection() {
           value={formData.lastName}
           onChange={handleLastNameChange}
         />
+        <Input
+          classNames={{
+            label: "text-sm font-medium text-foreground",
+          }}
+          description="Your unique organization identifier"
+          endContent={
+            <Button
+              isIconOnly
+              size="sm"
+              variant="light"
+              onPress={() => {
+                navigator.clipboard.writeText(formData.organizationId);
+                addToast({
+                  title: "Copied",
+                  description: "Organization ID copied to clipboard",
+                  color: "default",
+                  timeout: 2000,
+                });
+              }}
+            >
+              <Icon icon="solar:copy-bold" width={18} />
+            </Button>
+          }
+          isReadOnly
+          label="Organization ID"
+          labelPlacement="outside"
+          placeholder="Organization ID"
+          value={formData.organizationId}
+        />
+        <Input
+          classNames={{
+            label: "text-sm font-medium text-foreground",
+          }}
+          description="The name of your organization"
+          isDisabled={isLoading}
+          label="Organization Name"
+          labelPlacement="outside"
+          placeholder="Enter organization name"
+          value={formData.organizationName}
+          onChange={handleOrganizationNameChange}
+        />
         <div className="flex flex-col gap-2">
           <Input
             classNames={{
               label: "text-sm font-medium text-foreground",
             }}
             description="Email is your login identifier"
-            isDisabled
+            endContent={
+              <Button
+                isIconOnly
+                size="sm"
+                variant="light"
+                onPress={() => {
+                  navigator.clipboard.writeText(formData.email);
+                  addToast({
+                    title: "Copied",
+                    description: "Email copied to clipboard",
+                    color: "default",
+                    timeout: 2000,
+                  });
+                }}
+              >
+                <Icon icon="solar:copy-bold" width={18} />
+              </Button>
+            }
+            isReadOnly
             label="Email Address"
             labelPlacement="outside"
             placeholder="your@email.com"

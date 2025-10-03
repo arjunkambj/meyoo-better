@@ -52,6 +52,7 @@ function createEmptyAnalyticsData(): AnalyticsSourceData {
     metaInsights: [],
     globalCosts: [],
     variantCosts: [],
+    manualReturnRates: [],
     sessions: [],
     analytics: [],
   };

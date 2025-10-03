@@ -1493,6 +1493,7 @@ export const saveInitialCosts = mutation({
     shippingCost: v.optional(v.number()),
     paymentFeePercent: v.optional(v.number()),
     operatingCosts: v.optional(v.number()),
+    manualReturnRate: v.optional(v.number()),
   },
   returns: v.object({
     success: v.boolean(),
@@ -1702,6 +1703,21 @@ export const saveInitialCosts = mutation({
       onboardingStep: actualNextStep,
       updatedAt: Date.now(),
     });
+
+    if (args.manualReturnRate !== undefined) {
+      const manualRateResult = await ctx.runMutation(
+        internal.core.costs.upsertManualReturnRate,
+        {
+          organizationId: user.organizationId as Id<"organizations">,
+          userId: user._id,
+          ratePercent: args.manualReturnRate,
+          isActive: (args.manualReturnRate ?? 0) > 0,
+        },
+      );
+      if (manualRateResult.changed) {
+        analyticsNeedsRefresh = true;
+      }
+    }
 
     if (analyticsNeedsRefresh) {
       await ctx.scheduler.runAfter(0, internal.engine.analytics.calculateAnalytics, {

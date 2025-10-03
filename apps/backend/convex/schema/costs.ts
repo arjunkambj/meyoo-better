@@ -86,3 +86,23 @@ export const variantCosts = defineTable({
   .index("by_organization", ["organizationId"])
   .index("by_variant", ["variantId"])
   .index("by_org_variant", ["organizationId", "variantId"]);
+
+// Organization-level manual return / RTO rate overrides
+export const manualReturnRates = defineTable({
+  organizationId: v.id("organizations"),
+  userId: v.optional(v.id("users")),
+
+  ratePercent: v.number(), // Percentage (0-100) used to estimate RTO revenue loss
+  note: v.optional(v.string()),
+
+  effectiveFrom: v.number(),
+  effectiveTo: v.optional(v.number()),
+
+  isActive: v.boolean(),
+
+  createdAt: v.optional(v.number()),
+  updatedAt: v.optional(v.number()),
+})
+  .index("by_organization", ["organizationId"])
+  .index("by_org_active", ["organizationId", "isActive"])
+  .index("by_org_effective_from", ["organizationId", "effectiveFrom"]);

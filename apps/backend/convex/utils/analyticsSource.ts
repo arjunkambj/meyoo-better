@@ -58,6 +58,7 @@ export interface AnalyticsSourceData {
   metaInsights: Doc<"metaInsights">[];
   globalCosts: Doc<"globalCosts">[];
   variantCosts: Doc<"variantCosts">[];
+  manualReturnRates: Doc<"manualReturnRates">[];
   sessions: Doc<"shopifySessions">[];
   analytics: Doc<"shopifyAnalytics">[];
 }
@@ -539,6 +540,23 @@ async function fetchGlobalCosts(
   });
 }
 
+async function fetchManualReturnRates(
+  ctx: QueryCtx,
+  organizationId: OrganizationId,
+  timestamps: TimestampRange,
+): Promise<Doc<"manualReturnRates">[]> {
+  const rates = await ctx.db
+    .query("manualReturnRates")
+    .withIndex("by_organization", (q) => q.eq("organizationId", organizationId))
+    .collect();
+
+  return rates.filter((rate) => {
+    const from = typeof rate.effectiveFrom === "number" ? rate.effectiveFrom : 0;
+    const to = typeof rate.effectiveTo === "number" ? rate.effectiveTo : Number.POSITIVE_INFINITY;
+    return from <= timestamps.end && to >= timestamps.start;
+  });
+}
+
 export async function fetchMetaInsightsPage(
   ctx: QueryCtx,
   organizationId: OrganizationId,
@@ -681,6 +699,7 @@ export async function fetchAnalyticsSourceData(
     metaInsights: [],
     globalCosts: [],
     variantCosts: [],
+    manualReturnRates: [],
     sessions: [],
     analytics: [],
   };
@@ -836,6 +855,14 @@ export async function fetchAnalyticsSourceData(
     data.globalCosts = await fetchGlobalCosts(ctx, organizationId, timestamps);
   }
 
+  if (shouldFetch("manualReturnRates")) {
+    data.manualReturnRates = await fetchManualReturnRates(
+      ctx,
+      organizationId,
+      timestamps,
+    );
+  }
+
   if (shouldFetch("sessions")) {
     data.sessions = await fetchSessions(
       ctx,
@@ -864,6 +891,7 @@ export const ANALYTICS_SOURCE_KEYS = [
   "metaInsights",
   "globalCosts",
   "variantCosts",
+  "manualReturnRates",
   "sessions",
   "analytics",
 ] as const;

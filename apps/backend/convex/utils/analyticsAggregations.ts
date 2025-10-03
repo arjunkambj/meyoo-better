@@ -166,6 +166,67 @@ function defaultMetric(value = 0, change = 0): MetricValue {
   return { value, change };
 }
 
+function clampPercentage(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  if (value < 0) return 0;
+  if (value > 100) return 100;
+  return value;
+}
+
+function overlapsWindow(
+  entryStart: number,
+  entryEnd: number,
+  window?: { start: number; end: number },
+): boolean {
+  if (!window) return true;
+  const normalizedStart = Number.isFinite(entryStart)
+    ? entryStart
+    : Number.NEGATIVE_INFINITY;
+  const normalizedEnd = Number.isFinite(entryEnd)
+    ? entryEnd
+    : Number.POSITIVE_INFINITY;
+  return normalizedStart <= window.end && normalizedEnd >= window.start;
+}
+
+function resolveManualReturnRate(
+  entries: AnyRecord[] | undefined,
+  window?: { start: number; end: number },
+): { ratePercent: number } {
+  if (!entries?.length) {
+    return { ratePercent: 0 };
+  }
+
+  const filtered = entries.filter((entry) => {
+    const activeFlag = entry.isActive;
+    if (activeFlag === false) {
+      // Allow inactive entries if they overlap the requested window (for history)
+      const from = safeNumber(entry.effectiveFrom ?? entry.createdAt ?? 0);
+      const toRaw = entry.effectiveTo;
+      const to = toRaw === undefined || toRaw === null ? Number.POSITIVE_INFINITY : safeNumber(toRaw);
+      return overlapsWindow(from, to, window) && window !== undefined;
+    }
+
+    const from = safeNumber(entry.effectiveFrom ?? entry.createdAt ?? 0);
+    const toRaw = entry.effectiveTo;
+    const to = toRaw === undefined || toRaw === null ? Number.POSITIVE_INFINITY : safeNumber(toRaw);
+    return overlapsWindow(from, to, window);
+  });
+
+  if (filtered.length === 0) {
+    return { ratePercent: 0 };
+  }
+
+  filtered.sort((a, b) => {
+    const aTimestamp = safeNumber(a.updatedAt ?? a.effectiveFrom ?? a.createdAt ?? 0);
+    const bTimestamp = safeNumber(b.updatedAt ?? b.effectiveFrom ?? b.createdAt ?? 0);
+    return bTimestamp - aTimestamp;
+  });
+
+  const selected = filtered[0];
+  const rawRate = safeNumber(selected.ratePercent ?? selected.rate ?? selected.value ?? 0);
+  return { ratePercent: clampPercentage(rawRate) };
+}
+
 function computeOverviewBaseline(
   response: AnalyticsSourceResponse<any> | null | undefined,
 ): OverviewComputation | null {
@@ -185,6 +246,10 @@ function computeOverviewBaseline(
         discountRateChange: 0,
         refunds: 0,
         refundsChange: 0,
+        rtoRevenueLost: 0,
+        rtoRevenueLostChange: 0,
+        manualReturnRate: 0,
+        manualReturnRateChange: 0,
         profit: 0,
         profitChange: 0,
         profitMargin: 0,
@@ -296,6 +361,19 @@ function computeOverviewBaseline(
   const variants = (data.variants || []) as AnyRecord[];
   const customers = (data.customers || []) as AnyRecord[];
   const analytics = (data.analytics || []) as AnyRecord[];
+  const manualReturnRateEntries = (data.manualReturnRates || []) as AnyRecord[];
+
+  let manualReturnRatePercent = 0;
+  if (response?.dateRange?.startDate && response.dateRange?.endDate) {
+    const rangeStartMs = parseDateBoundary(response.dateRange.startDate);
+    const rangeEndMs = parseDateBoundary(response.dateRange.endDate, true);
+    manualReturnRatePercent = resolveManualReturnRate(manualReturnRateEntries, {
+      start: rangeStartMs,
+      end: rangeEndMs,
+    }).ratePercent;
+  } else {
+    manualReturnRatePercent = resolveManualReturnRate(manualReturnRateEntries).ratePercent;
+  }
 
   const toOrderKey = (order: AnyRecord): string =>
     toStringId(order._id ?? order.id ?? order.orderId ?? order.shopifyId ?? order.order_id);
@@ -620,7 +698,14 @@ function computeOverviewBaseline(
 
   const totalCostsWithoutAds =
     cogs + shippingCosts + transactionFees + handlingCostTotal + customCostTotal + taxesCollected;
-  const netProfit = revenue - totalCostsWithoutAds - totalAdSpend - refundsAmount;
+  const rtoRevenueLost = manualReturnRatePercent > 0
+    ? Math.min(
+        Math.max((revenue * manualReturnRatePercent) / 100, 0),
+        Math.max(revenue, 0),
+      )
+    : 0;
+  const totalReturnImpact = refundsAmount + rtoRevenueLost;
+  const netProfit = revenue - totalCostsWithoutAds - totalAdSpend - totalReturnImpact;
   const grossProfit = revenue - cogs;
   const contributionProfit = revenue - (cogs + shippingCosts + transactionFees + handlingCostTotal + customCostTotal);
 
@@ -664,6 +749,10 @@ function computeOverviewBaseline(
     discountRateChange: 0,
     refunds: refundsAmount,
     refundsChange: 0,
+    rtoRevenueLost,
+    rtoRevenueLostChange: 0,
+    manualReturnRate: manualReturnRatePercent,
+    manualReturnRateChange: 0,
     profit: netProfit,
     profitChange: 0,
     profitMargin,
@@ -767,6 +856,8 @@ function computeOverviewBaseline(
     blendedMarketingCost: defaultMetric(totalAdSpend, 0),
     customerAcquisitionCost: defaultMetric(customerAcquisitionCost, 0),
     profitPerOrder: defaultMetric(averageOrderProfit, 0),
+    rtoRevenueLost: defaultMetric(rtoRevenueLost, 0),
+    manualReturnRate: defaultMetric(manualReturnRatePercent, 0),
   };
 
   const totalSessions = sumBy(analytics, (entry) => safeNumber(entry.sessions ?? entry.visitors ?? entry.visits));
@@ -1570,6 +1661,7 @@ function aggregatePnLMetrics(items: AnyRecord[]): PnLMetrics {
     grossSales: sumBy(items, (item) => safeNumber(item.grossSales ?? item.totalSales ?? item.sales)),
     discounts: sumBy(items, (item) => safeNumber(item.discounts ?? item.totalDiscounts ?? 0)),
     refunds: sumBy(items, (item) => safeNumber(item.refunds ?? item.totalRefunds ?? 0)),
+    rtoRevenueLost: sumBy(items, (item) => safeNumber(item.rtoRevenueLost ?? 0)),
     revenue: sumBy(items, (item) => safeNumber(item.revenue ?? item.netSales ?? item.totalPrice ?? 0)),
     cogs: sumBy(items, (item) => safeNumber(item.cogs ?? item.totalCostOfGoods ?? 0)),
     shippingCosts: sumBy(items, (item) => safeNumber(item.shippingCosts ?? item.totalShipping ?? 0)),
@@ -1658,12 +1750,14 @@ function computeCostAmountForRange(cost: AnyRecord, ctx: CostComputationContext)
 function calculatePnLMetricsForRange({
   orders,
   costs,
+  manualReturnRates,
   metaInsights,
   rangeStartMs,
   rangeEndMs,
 }: {
   orders: AnyRecord[];
   costs: AnyRecord[];
+  manualReturnRates: AnyRecord[];
   metaInsights: AnyRecord[];
   rangeStartMs: number;
   rangeEndMs: number;
@@ -1730,7 +1824,18 @@ function calculatePnLMetricsForRange({
   const totalAdSpend = metaSpend;
   const customCosts = operationalCostsAmount;
 
-  const netRevenue = revenue - refunds;
+  const manualRateWindow = Number.isFinite(rangeStartMs) && Number.isFinite(rangeEndMs)
+    ? { start: rangeStartMs, end: rangeEndMs }
+    : undefined;
+  const manualReturnRatePercent = resolveManualReturnRate(manualReturnRates, manualRateWindow).ratePercent;
+  const rtoRevenueLost = manualReturnRatePercent > 0
+    ? Math.min(
+        Math.max((revenue * manualReturnRatePercent) / 100, 0),
+        Math.max(revenue, 0),
+      )
+    : 0;
+
+  const netRevenue = revenue - refunds - rtoRevenueLost;
   const grossProfit = netRevenue - cogs;
   const netProfit = grossProfit - (shippingCosts + transactionFees + handlingFees + taxesCollected + customCosts + totalAdSpend);
 
@@ -1738,6 +1843,7 @@ function calculatePnLMetricsForRange({
     grossSales,
     discounts,
     refunds,
+    rtoRevenueLost,
     revenue: netRevenue,
     cogs,
     shippingCosts,
@@ -1766,7 +1872,7 @@ function buildPnLKPIs(total: PnLMetrics, marketingCost: number): PnLKPIMetrics {
 
   return {
     grossSales: total.grossSales,
-    discountsReturns: total.discounts + total.refunds,
+    discountsReturns: total.discounts + total.refunds + total.rtoRevenueLost,
     netRevenue,
     grossProfit: total.grossProfit,
     operatingExpenses,
@@ -1808,6 +1914,7 @@ export function computePnLAnalytics(
 
   const orders = (data.orders || []) as AnyRecord[];
   const costs = (data.globalCosts || []) as AnyRecord[];
+  const manualReturnRates = (data.manualReturnRates || []) as AnyRecord[];
   const metaInsights = (data.metaInsights || []) as AnyRecord[];
   const buckets = new Map<
     string,
@@ -1861,6 +1968,7 @@ export function computePnLAnalytics(
   const totalComputation = calculatePnLMetricsForRange({
     orders,
     costs,
+    manualReturnRates,
     metaInsights,
     rangeStartMs: totalRangeStart,
     rangeEndMs: totalRangeEnd,
@@ -1870,6 +1978,7 @@ export function computePnLAnalytics(
     const { metrics } = calculatePnLMetricsForRange({
       orders: bucket.orders,
       costs,
+      manualReturnRates,
       metaInsights,
       rangeStartMs: bucket.rangeStartMs,
       rangeEndMs: bucket.rangeEndMs,

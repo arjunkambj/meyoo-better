@@ -481,6 +481,7 @@ export const getOrdersTablePage = query({
           metaInsights: [],
           globalCosts: [],
           variantCosts: chunk.data.variantCosts,
+          manualReturnRates: [],
           sessions: [],
           analytics: [],
         },

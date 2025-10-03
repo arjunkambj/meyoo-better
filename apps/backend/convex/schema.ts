@@ -15,7 +15,7 @@ import {
   usage,
   users,
 } from "./schema/core";
-import { globalCosts, variantCosts } from "./schema/costs";
+import { globalCosts, manualReturnRates, variantCosts } from "./schema/costs";
 import { metaAdAccounts, metaInsights } from "./schema/meta";
 import { dailyMetrics } from "./schema/metrics";
 import { gdprRequests, auditLogs, webhookReceipts, apiKeys } from "./schema/security";
@@ -102,6 +102,7 @@ export default defineSchema({
   // Cost management tables (simplified)
   globalCosts,
   variantCosts,
+  manualReturnRates,
 
   // Admin & Support tables (omitted)
   integrationRequests,

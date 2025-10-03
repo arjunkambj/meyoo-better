@@ -10,6 +10,7 @@ export const ANALYTICS_DATASET_KEYS = [
   "metaInsights",
   "globalCosts",
   "variantCosts",
+  "manualReturnRates",
   "sessions",
   "analytics",
 ] as const;
@@ -62,6 +63,10 @@ export interface OverviewSummary {
   discountRateChange: number;
   refunds: number;
   refundsChange: number;
+  rtoRevenueLost: number;
+  rtoRevenueLostChange: number;
+  manualReturnRate: number;
+  manualReturnRateChange: number;
   profit: number;
   profitChange: number;
   profitMargin: number;
@@ -318,6 +323,7 @@ export interface PnLMetrics {
   grossSales: number;
   discounts: number;
   refunds: number;
+  rtoRevenueLost: number;
   revenue: number;
   cogs: number;
   shippingCosts: number;

@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { roundMoney } from "../../libs/utils/money";
 import type { Doc, Id } from "../_generated/dataModel";
+import { internal } from "../_generated/api";
 import {
   internalMutation,
   internalQuery,
@@ -25,6 +26,33 @@ export const COST_CATEGORIES = {
   OPERATIONAL: "operational", // Operational expenses
   RETURNS: "returns", // Return processing costs
 } as const;
+
+const clampPercentage = (value: number | undefined | null): number => {
+  if (value === undefined || value === null) return 0;
+  if (!Number.isFinite(value)) return 0;
+  if (value < 0) return 0;
+  if (value > 100) return 100;
+  return value;
+};
+
+const sortManualRateDocs = (
+  docs: Doc<"manualReturnRates">[],
+): Doc<"manualReturnRates">[] =>
+  docs
+    .slice()
+    .sort(
+      (a, b) =>
+        (b.updatedAt ?? b.effectiveFrom ?? b.createdAt ?? 0) -
+        (a.updatedAt ?? a.effectiveFrom ?? a.createdAt ?? 0),
+    );
+
+const pickLatestManualRate = (
+  docs: Doc<"manualReturnRates">[],
+): Doc<"manualReturnRates"> | null => {
+  if (docs.length === 0) return null;
+  const sorted = sortManualRateDocs(docs);
+  return sorted.find((doc) => doc.isActive) ?? sorted[0] ?? null;
+};
 
 // ============ QUERIES ============
 
@@ -145,6 +173,45 @@ export const getCostSummary = query({
     return {
       period: dateRange,
       costs: filteredCosts,
+    } as const;
+  },
+});
+
+export const getManualReturnRate = query({
+  args: {},
+  returns: v.union(
+    v.null(),
+    v.object({
+      ratePercent: v.number(),
+      isActive: v.boolean(),
+      note: v.optional(v.string()),
+      effectiveFrom: v.optional(v.number()),
+      effectiveTo: v.optional(v.number()),
+      updatedAt: v.optional(v.number()),
+    }),
+  ),
+  handler: async (ctx) => {
+    const auth = await getUserAndOrg(ctx);
+    if (!auth) return null;
+
+    const orgId = auth.orgId as Id<"organizations">;
+    const docs = await ctx.db
+      .query("manualReturnRates")
+      .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
+      .collect();
+
+    const latest = pickLatestManualRate(docs);
+    if (!latest) {
+      return null;
+    }
+
+    return {
+      ratePercent: latest.ratePercent,
+      isActive: latest.isActive,
+      note: latest.note,
+      effectiveFrom: latest.effectiveFrom,
+      effectiveTo: latest.effectiveTo,
+      updatedAt: latest.updatedAt,
     } as const;
   },
 });
@@ -394,6 +461,46 @@ export const bulkImportCosts = mutation({
       success: true,
       imported: importedIds.length,
     };
+  },
+});
+
+export const setManualReturnRate = mutation({
+  args: {
+    ratePercent: v.optional(v.number()),
+    note: v.optional(v.string()),
+    effectiveFrom: v.optional(v.number()),
+  },
+  returns: v.object({
+    success: v.boolean(),
+    ratePercent: v.number(),
+    isActive: v.boolean(),
+  }),
+  handler: async (ctx, args) => {
+    const { user, orgId } = await requireUserAndOrg(ctx);
+
+    const normalizedRate = clampPercentage(args.ratePercent);
+    const result = await ctx.runMutation(internal.core.costs.upsertManualReturnRate, {
+      organizationId: orgId as Id<"organizations">,
+      userId: user._id,
+      ratePercent: normalizedRate,
+      note: args.note,
+      effectiveFrom: args.effectiveFrom ?? Date.now(),
+      isActive: normalizedRate > 0,
+    });
+
+    if (result.changed) {
+      await ctx.scheduler.runAfter(0, internal.engine.analytics.calculateAnalytics, {
+        organizationId: orgId,
+        dateRange: { daysBack: 90 },
+        syncType: "incremental",
+      });
+    }
+
+    return {
+      success: result.success,
+      ratePercent: result.isActive ? result.ratePercent : 0,
+      isActive: result.isActive,
+    } as const;
   },
 });
 
@@ -801,6 +908,118 @@ export const saveVariantCosts = mutation({
 /**
  * Create product cost components for synced variants
  */
+export const upsertManualReturnRate = internalMutation({
+  args: {
+    organizationId: v.id("organizations"),
+    userId: v.optional(v.id("users")),
+    ratePercent: v.optional(v.number()),
+    note: v.optional(v.string()),
+    effectiveFrom: v.optional(v.number()),
+    isActive: v.optional(v.boolean()),
+  },
+  returns: v.object({
+    success: v.boolean(),
+    isActive: v.boolean(),
+    ratePercent: v.number(),
+    changed: v.boolean(),
+  }),
+  handler: async (ctx, args) => {
+    const docs = await ctx.db
+      .query("manualReturnRates")
+      .withIndex("by_organization", (q) => q.eq("organizationId", args.organizationId))
+      .collect();
+
+    const normalizedRate = clampPercentage(args.ratePercent);
+    const shouldActivate = args.isActive ?? normalizedRate > 0;
+    const now = Date.now();
+    const latest = pickLatestManualRate(docs);
+    const note = args.note;
+
+    if (!latest) {
+      if (!shouldActivate) {
+        return { success: true, isActive: false, ratePercent: 0, changed: false } as const;
+      }
+
+      await ctx.db.insert("manualReturnRates", {
+        organizationId: args.organizationId,
+        userId: args.userId,
+        ratePercent: normalizedRate,
+        note,
+        isActive: true,
+        effectiveFrom: args.effectiveFrom ?? now,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      return {
+        success: true,
+        isActive: true,
+        ratePercent: normalizedRate,
+        changed: true,
+      } as const;
+    }
+
+    if (!shouldActivate) {
+      if (!latest.isActive) {
+        return { success: true, isActive: false, ratePercent: 0, changed: false } as const;
+      }
+
+      await ctx.db.patch(latest._id, {
+        isActive: false,
+        ratePercent: normalizedRate,
+        note: note !== undefined ? note : latest.note,
+        effectiveTo: now,
+        updatedAt: now,
+      });
+
+      return {
+        success: true,
+        isActive: false,
+        ratePercent: 0,
+        changed: true,
+      } as const;
+    }
+
+    const updates: Record<string, unknown> = {
+      ratePercent: normalizedRate,
+      isActive: true,
+      updatedAt: now,
+      effectiveTo: undefined,
+    };
+
+    if (args.userId) {
+      updates.userId = args.userId;
+    }
+
+    if (args.effectiveFrom !== undefined) {
+      updates.effectiveFrom = args.effectiveFrom;
+    } else if (!latest.effectiveFrom) {
+      updates.effectiveFrom = now;
+    }
+
+    if (note !== undefined) {
+      updates.note = note;
+    }
+
+    const hasChanged =
+      latest.ratePercent !== normalizedRate ||
+      !latest.isActive ||
+      (note !== undefined && note !== latest.note) ||
+      (updates.effectiveFrom !== undefined && updates.effectiveFrom !== latest.effectiveFrom);
+
+    if (hasChanged) {
+      await ctx.db.patch(latest._id, updates);
+    }
+
+    return {
+      success: true,
+      isActive: true,
+      ratePercent: normalizedRate,
+      changed: hasChanged,
+    } as const;
+  },
+});
+
 export const createVariantCosts = internalMutation({
   args: {
     organizationId: v.id("organizations"),

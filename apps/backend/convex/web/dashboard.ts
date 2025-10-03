@@ -58,6 +58,7 @@ const DASHBOARD_SUMMARY_DATASETS = [
   "variantCosts",
   "customers",
   "globalCosts",
+  "manualReturnRates",
   "metaInsights",
   "analytics",
 ] as const satisfies readonly AnalyticsSourceKey[];

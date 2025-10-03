@@ -31,7 +31,7 @@ export default function ShopifyOnboardingClient({ installUri }: Props) {
   const router = useRouter();
   const [connecting, setConnecting] = useState(false);
   const joinDemoOrganization = useMutation(
-    api.core.onboarding.joinDemoOrganization,
+    api.core.onboarding.joinDemoOrganization
   );
   const [isDemoModalOpen, setIsDemoModalOpen] = useState(false);
   const [joiningDemo, setJoiningDemo] = useState(false);
@@ -148,58 +148,75 @@ export default function ShopifyOnboardingClient({ installUri }: Props) {
 
       {/* Demo access CTA */}
       {!user?.hasShopifyConnection && (
-        <div className="mt-10 flex flex-col items-center gap-3 text-center">
-          <Icon
-            aria-hidden="true"
-            className="text-primary"
-            icon="solar:planet-bold-duotone"
-            width={32}
-          />
-          <div className="space-y-1">
-            <p className="text-base font-medium text-default-900">
-              No Shopify store yet?
-            </p>
-            <p className="text-sm text-default-600">
-              Preview the Meyoo dashboard using our demo workspace with sample data.
-            </p>
+        <>
+          <div className="relative my-10">
+            <Divider />
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-background px-4">
+              <span className="text-xs font-medium text-default-400">OR</span>
+            </div>
           </div>
-          <Button
-            color="primary"
-            radius="full"
-            size="lg"
-            startContent={
-              <Icon
-                aria-hidden="true"
-                icon="solar:play-circle-bold-duotone"
-                width={20}
-              />
-            }
-            variant="shadow"
-            onPress={handleOpenDemoModal}
-          >
-            Explore Demo Workspace
-          </Button>
-        </div>
+
+          <div className="rounded-lg border border-default-200 bg-default-50 p-6">
+            <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
+              <div className="rounded-full bg-default-100 p-3">
+                <Icon
+                  aria-hidden="true"
+                  className="text-default-600"
+                  icon="solar:planet-bold-duotone"
+                  width={24}
+                />
+              </div>
+              <div className="flex-1 space-y-1">
+                <h3 className="text-base font-medium text-default-900">
+                  Don&apos;t have a store yet?
+                </h3>
+                <p className="text-sm text-default-600">
+                  Explore Meyoo with our demo workspace to see how it works
+                </p>
+              </div>
+              <Button
+                color="default"
+                variant="flat"
+                radius="lg"
+                size="md"
+                startContent={
+                  <Icon
+                    aria-hidden="true"
+                    icon="solar:play-circle-bold-duotone"
+                    width={18}
+                  />
+                }
+                onPress={handleOpenDemoModal}
+              >
+                View Demo
+              </Button>
+            </div>
+          </div>
+        </>
       )}
 
       {/* Action Buttons */}
       <SimpleNavigationButtons
         isNextDisabled={!user?.hasShopifyConnection}
         nextLabel={
-          user?.hasShopifyConnection ? "Continue" : "Connect Shopify"
+          user?.hasShopifyConnection ? "Continue" : "Continue Onboarding"
         }
         showPrevious={false}
-        onNext={user?.hasShopifyConnection ? async () => {
-          trackOnboardingAction("shopify", "continue");
-          router.push("/onboarding/billing");
-          return true;
-        } : undefined}
+        onNext={
+          user?.hasShopifyConnection
+            ? async () => {
+                trackOnboardingAction("shopify", "continue");
+                router.push("/onboarding/billing");
+                return true;
+              }
+            : undefined
+        }
       />
 
       <Modal
         isDismissable={!joiningDemo}
         isOpen={isDemoModalOpen}
-        className="bg-default-50"
+        size="md"
         hideCloseButton={joiningDemo}
         placement="center"
         onOpenChange={(open) => {
@@ -219,31 +236,17 @@ export default function ShopifyOnboardingClient({ installUri }: Props) {
         <ModalContent>
           {() => (
             <>
-              <ModalHeader className="flex gap-3 pb-2">
-                <span className="rounded-lg bg-primary/10 p-2">
-                  <Icon
-                    aria-hidden="true"
-                    className="text-primary"
-                    icon="solar:planet-bold-duotone"
-                    width={20}
-                  />
-                </span>
-                <div className="flex flex-col">
-                  <span className="text-base font-semibold text-default-900">
-                    Explore Meyoo with demo data
-                  </span>
-                  <span className="text-xs text-default-500">
-                    Join the Meyoo demo organization to try features risk-free.
-                  </span>
-                </div>
+              <ModalHeader className="flex flex-col gap-2">
+                <h2 className="text-lg font-semibold text-default-900">
+                  Join Demo Workspace
+                </h2>
               </ModalHeader>
-              <Divider />
-              <ModalBody className="gap-4 py-6">
+              <ModalBody className="gap-4 pb-6">
                 {demoError && (
-                  <div className="flex items-start gap-2 rounded-lg border border-danger/20 bg-danger/10 p-3">
+                  <div className="flex items-start gap-2 rounded-lg bg-danger/10 p-3">
                     <Icon
                       aria-hidden="true"
-                      className="mt-0.5 text-danger"
+                      className="mt-0.5 flex-shrink-0 text-danger"
                       icon="solar:danger-triangle-bold"
                       width={18}
                     />
@@ -251,16 +254,11 @@ export default function ShopifyOnboardingClient({ installUri }: Props) {
                   </div>
                 )}
 
-                <div className="space-y-3 text-sm text-default-500">
-                  <p>
-                    We will add you to the Meyoo demo organization so you can navigate the dashboard using live sample data.
-                  </p>
-                  <p>
-                    Your current workspace stays untouched, and you can leave the demo later from team settings.
-                  </p>
-                </div>
+                <p className="text-sm text-default-600">
+                  Explore the dashboard with sample e-commerce data. You can
+                  leave anytime from team settings.
+                </p>
               </ModalBody>
-              <Divider />
               <ModalFooter className="gap-2">
                 <Button
                   variant="flat"
@@ -272,18 +270,9 @@ export default function ShopifyOnboardingClient({ installUri }: Props) {
                 <Button
                   color="primary"
                   isLoading={joiningDemo}
-                  startContent={
-                    !joiningDemo ? (
-                      <Icon
-                        aria-hidden="true"
-                        icon="solar:play-circle-bold-duotone"
-                        width={18}
-                      />
-                    ) : undefined
-                  }
                   onPress={handleJoinDemo}
                 >
-                  Join Demo Workspace
+                  {joiningDemo ? "Joining..." : "Join Demo"}
                 </Button>
               </ModalFooter>
             </>

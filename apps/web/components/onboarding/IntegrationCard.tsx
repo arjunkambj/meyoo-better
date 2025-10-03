@@ -4,7 +4,6 @@ import { Button, Card, CardBody, Chip, cn, Spinner } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import React from "react";
 
-
 interface SimpleIntegrationCardProps {
   name: string;
   description: string;
@@ -35,53 +34,54 @@ const SimpleIntegrationCard = React.memo(function SimpleIntegrationCard({
   return (
     <Card
       className={cn(
-        "bg-default-50 border border-default-200 rounded-2xl shadow-none transition-all duration-200",
-        !isConnected && "hover:border-primary/50 hover:bg-default-100"
+        "bg-default-50 dark:bg-default-100/50 border border-default-200 rounded-xl shadow-none transition-all duration-200",
+        !isConnected && "hover:border-primary/20"
       )}
     >
-      <CardBody className="p-5 sm:p-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-6">
-          {/* Left side - Logo and info */}
-          <div className="flex items-center gap-4 flex-1">
-            <div className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-xl flex items-center justify-center shrink-0 transition-colors bg-background">
-              <Icon className="text-foreground" icon={icon} width={32} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                <h3 className="font-bold text-base text-default-900">
-                  {name}
-                </h3>
-                {required && (
-                  <Chip color="danger" size="sm" variant="flat">
-                    Required
-                  </Chip>
-                )}
-                {comingSoon && (
-                  <Chip color="warning" size="sm" variant="flat">
-                    Coming soon
-                  </Chip>
-                )}
-              </div>
-              <p className="text-sm text-default-600 line-clamp-2">
-                {description}
-              </p>
-            </div>
+      <CardBody className="px-5 py-6">
+        <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
+          {/* Logo */}
+          <div className="rounded-lg border border-default-100 bg-default-50 p-3">
+            <Icon className="text-foreground" icon={icon} width={20} />
           </div>
 
-          {/* Right side - Status/Action */}
-          <div className="shrink-0 w-full sm:w-auto">
+          {/* Info */}
+          <div className="flex-1 space-y-0.5">
+            <div className="flex items-center gap-2 justify-center sm:justify-start flex-wrap">
+              <h3 className="font-medium text-default-900">{name}</h3>
+              {required && (
+                <Chip color="danger" size="sm" className="px-3">
+                  Required
+                </Chip>
+              )}
+              {comingSoon && (
+                <Chip color="warning" size="sm">
+                  Coming soon
+                </Chip>
+              )}
+            </div>
+            <p className="text-sm mt-0.5 text-default-700">{description}</p>
+          </div>
+
+          {/* Action Button */}
+          <div className="shrink-0">
             {isLoading ? (
-              <div className="flex items-center justify-center sm:justify-start gap-2.5 text-default-600 bg-default-100 px-4 py-2.5 rounded-lg">
-                <Spinner color="primary" size="sm" />
-                <span className="text-sm font-medium">
-                  Connecting...
-                </span>
-              </div>
+              <Button
+                color="default"
+                variant="flat"
+                radius="lg"
+                size="md"
+                isDisabled
+                startContent={<Spinner color="primary" size="sm" />}
+              >
+                Connecting...
+              </Button>
             ) : isConnected ? (
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 <Button
                   color="success"
-                  variant="flat"
+                  size="md"
+                  radius="lg"
                   startContent={
                     <Icon icon="solar:check-circle-bold-duotone" width={18} />
                   }
@@ -92,6 +92,8 @@ const SimpleIntegrationCard = React.memo(function SimpleIntegrationCard({
                   <Button
                     color="danger"
                     variant="flat"
+                    size="md"
+                    radius="lg"
                     startContent={
                       <Icon icon="solar:unlink-bold-duotone" width={16} />
                     }
@@ -103,26 +105,26 @@ const SimpleIntegrationCard = React.memo(function SimpleIntegrationCard({
               </div>
             ) : comingSoon ? (
               <Button
-                className="w-full sm:w-auto"
                 color="default"
+                size="md"
+                radius="lg"
                 isDisabled
                 variant="flat"
               >
                 {comingSoonLabel ?? "Coming soon"}
               </Button>
             ) : (
-              <div className="flex flex-col items-stretch sm:items-end">
-                <Button
-                  className="w-full sm:w-auto font-semibold"
-                  color="primary"
-                  endContent={
-                    <Icon icon="solar:arrow-right-line-duotone" width={18} />
-                  }
-                  onPress={onConnect}
-                >
-                  Connect
-                </Button>
-              </div>
+              <Button
+                color="primary"
+                size="md"
+                radius="lg"
+                endContent={
+                  <Icon icon="solar:arrow-right-line-duotone" width={18} />
+                }
+                onPress={onConnect}
+              >
+                Connect
+              </Button>
             )}
           </div>
         </div>

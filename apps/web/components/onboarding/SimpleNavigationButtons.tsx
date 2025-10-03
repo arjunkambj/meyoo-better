@@ -47,9 +47,9 @@ export default function SimpleNavigationButtons({
   };
 
   return (
-    <div className="flex items-center justify-between gap-4 mt-8">
+    <div className="fixed bottom-0 right-0 p-6 flex items-center justify-end gap-4">
       {/* Previous Button */}
-      {showPrevious ? (
+      {showPrevious && (
         <Button
           variant="flat"
           size="md"
@@ -59,8 +59,6 @@ export default function SimpleNavigationButtons({
         >
           {previousLabel}
         </Button>
-      ) : (
-        <div />
       )}
 
       {/* Next/Complete Button */}

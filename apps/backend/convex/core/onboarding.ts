@@ -3,10 +3,12 @@ import { internal, api } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation, mutation, query } from "../_generated/server";
+import { ensureActiveMembership } from "../authHelpers";
 import { createJob, PRIORITY } from "../engine/workpool";
 import { normalizeShopDomain } from "../utils/shop";
 import { getUserAndOrg, requireUserAndOrg } from "../utils/auth";
 import { buildDateSpan } from "../utils/date";
+import { optionalEnv } from "../utils/env";
 import { isIanaTimeZone } from "@repo/time";
 import { ONBOARDING_STEPS } from "@repo/types";
 
@@ -659,6 +661,144 @@ export const updateOnboardingState = mutation({
     return {
       success: true,
       shouldTriggerAnalytics: shouldTriggerAnalytics || false,
+    };
+  },
+});
+
+/**
+ * Join demo organization for trial experience
+ */
+export const joinDemoOrganization = mutation({
+  args: {},
+  returns: v.object({
+    success: v.boolean(),
+    message: v.string(),
+  }),
+  handler: async (ctx) => {
+    const demoOrgEnv = optionalEnv("DEMO_ORG");
+    if (!demoOrgEnv) {
+      return {
+        success: false,
+        message: "Demo organization is not configured yet.",
+      };
+    }
+
+    const { user, orgId: currentOrgId } = await requireUserAndOrg(ctx);
+
+    const demoOrgId = demoOrgEnv as Id<"organizations">;
+    if (currentOrgId === demoOrgId) {
+      return {
+        success: true,
+        message: "You already have access to the demo organization.",
+      };
+    }
+
+    const demoOrg = await ctx.db.get(demoOrgId);
+    if (!demoOrg) {
+      return {
+        success: false,
+        message: "Demo organization is unavailable right now.",
+      };
+    }
+
+    const now = Date.now();
+
+    const existingMembership = await ctx.db
+      .query("memberships")
+      .withIndex("by_org_user", (q) =>
+        q.eq("organizationId", currentOrgId).eq("userId", user._id),
+      )
+      .first();
+
+    if (existingMembership && existingMembership.status !== "removed") {
+      await ctx.db.patch(existingMembership._id, {
+        status: "removed",
+        updatedAt: now,
+      });
+    }
+
+    await ctx.db.patch(user._id, {
+      organizationId: demoOrgId,
+      role: "StoreTeam",
+      status: "active",
+      isOnboarded: true,
+      lastLoginAt: now,
+      updatedAt: now,
+    });
+
+    await ensureActiveMembership(ctx, demoOrgId, user._id, "StoreTeam", {
+      seatType: existingMembership?.seatType ?? "free",
+      hasAiAddOn: existingMembership?.hasAiAddOn ?? false,
+      assignedAt: now,
+      assignedBy: demoOrg.ownerId,
+    });
+
+    const onboarding = await ctx.db
+      .query("onboarding")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .first();
+
+    const demoStepOrder = [
+      "shopify",
+      "billing",
+      "marketing",
+      "accounts",
+      "products",
+      "cost",
+      "complete",
+    ];
+
+    const completedStepsSet = new Set(
+      onboarding?.onboardingData?.completedSteps ?? [],
+    );
+    for (const step of demoStepOrder) {
+      completedStepsSet.add(step);
+    }
+
+    const onboardingData = {
+      ...onboarding?.onboardingData,
+      completedSteps: demoStepOrder.filter((step) =>
+        completedStepsSet.has(step),
+      ),
+      setupDate:
+        onboarding?.onboardingData?.setupDate ?? new Date().toISOString(),
+    };
+
+    if (onboarding) {
+      await ctx.db.patch(onboarding._id, {
+        organizationId: demoOrgId,
+        onboardingStep: ONBOARDING_STEPS.COMPLETE,
+        isCompleted: true,
+        hasShopifyConnection: true,
+        hasShopifySubscription: true,
+        hasMetaConnection: true,
+        isInitialSyncComplete: true,
+        isProductCostSetup: true,
+        isExtraCostSetup: true,
+        onboardingData,
+        updatedAt: now,
+      });
+    } else {
+      await ctx.db.insert("onboarding", {
+        userId: user._id,
+        organizationId: demoOrgId,
+        onboardingStep: ONBOARDING_STEPS.COMPLETE,
+        isCompleted: true,
+        hasShopifyConnection: true,
+        hasShopifySubscription: true,
+        hasMetaConnection: true,
+        isInitialSyncComplete: true,
+        isProductCostSetup: true,
+        isExtraCostSetup: true,
+        onboardingData,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    return {
+      success: true,
+      message: "Demo organization enabled. Explore Meyoo with sample data.",
     };
   },
 });

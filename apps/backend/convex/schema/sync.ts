@@ -21,7 +21,7 @@ export const syncProfiles = defineTable({
       type: v.string(), // "login", "dashboard", "report", etc.
       points: v.number(),
       metadata: v.optional(v.any()),
-    }),
+    })
   ),
 
   // Sync frequency
@@ -45,21 +45,21 @@ export const syncProfiles = defineTable({
           webhooksEnabled: v.boolean(),
           realTimeProducts: v.boolean(),
           realTimeOrders: v.boolean(),
-        }),
+        })
       ),
       meta: v.optional(
         v.object({
           insightsFields: v.array(v.string()),
           datePreset: v.string(),
-        }),
+        })
       ),
       google: v.optional(
         v.object({
           customerIds: v.array(v.string()),
           reportTypes: v.array(v.string()),
-        }),
+        })
       ),
-    }),
+    })
   ),
 
   createdAt: v.number(),
@@ -89,13 +89,7 @@ export const schedulerState = defineTable({
   name: v.string(), // e.g. "meta:cursor"
   value: v.any(),
   updatedAt: v.number(),
-})
-  .index("by_name", ["name"]);
-
-/**
- * Presence sessions for lightweight online detection
- */
-// presenceSessions removed: presence/heartbeat was eliminated in favor of simpler scheduling
+}).index("by_name", ["name"]);
 
 /**
  * Aggregated integration status snapshot per organization.
@@ -133,5 +127,4 @@ export const integrationStatus = defineTable({
   }),
 
   updatedAt: v.number(),
-})
-  .index("by_organization", ["organizationId"]);
+}).index("by_organization", ["organizationId"]);

@@ -29,8 +29,9 @@ const DEFAULT_METRICS = [
   "avgOrderValue",
   "blendedRoas", // ROAS
   "blendedMarketingCost",
+  "customCosts",
+  "marketingPercentageOfNet",
   "repeatCustomerRate",
-  "moMRevenueGrowth",
 ];
 
 export function MetricsContainer({

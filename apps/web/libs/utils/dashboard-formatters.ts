@@ -10,7 +10,7 @@ import { getCurrencySymbol, formatDate } from "./format";
  */
 export const formatCurrency = (
   value: number,
-  currency: string = "USD",
+  currency: string = "USD"
 ): string => {
   const absValue = Math.abs(value);
   const symbol = getCurrencySymbol(currency);
@@ -31,7 +31,7 @@ export const formatCurrency = (
  */
 export const formatCurrencyPrecise = (
   value: number,
-  currency: string = "USD",
+  currency: string = "USD"
 ): string => {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -63,7 +63,7 @@ export const formatNumber = (value: number): string => {
  */
 export const formatChange = (
   value: number,
-  inverse: boolean = false,
+  inverse: boolean = false
 ): {
   text: string;
   type: "positive" | "negative";
@@ -114,7 +114,7 @@ export const formatFutureTime = (timestamp: number): string => {
  */
 export const getProgressColor = (
   value: number,
-  target: number,
+  target: number
 ): "success" | "warning" | "danger" => {
   const percentage = (value / target) * 100;
 
@@ -128,7 +128,7 @@ export const getProgressColor = (
  * Get color for stock status
  */
 export const getStockStatusConfig = (
-  status: "healthy" | "low" | "critical" | "out",
+  status: "healthy" | "low" | "critical" | "out"
 ): { color: "success" | "warning" | "danger" | "default"; label: string } => {
   switch (status) {
     case "healthy":
@@ -146,7 +146,7 @@ export const getStockStatusConfig = (
  * Get color for ABC category
  */
 export const getABCColor = (
-  category: "A" | "B" | "C",
+  category: "A" | "B" | "C"
 ): "success" | "warning" | "default" => {
   switch (category) {
     case "A":
@@ -166,7 +166,7 @@ export const getSegmentStyle = (segment: string): string => {
     case "new":
       return "bg-info/10 text-info";
     case "repeated":
-      return "bg-success/10 text-success";
+      return "bg-success text-white";
     default:
       return "bg-default/10 text-default";
   }

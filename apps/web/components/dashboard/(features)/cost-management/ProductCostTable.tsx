@@ -74,11 +74,7 @@ export default function ProductCostTable() {
     totalPages,
     currentPage,
     loading,
-  } = useShopifyProductVariantsPaginated(
-    page,
-    pageSize,
-    undefined
-  );
+  } = useShopifyProductVariantsPaginated(page, pageSize, undefined);
 
   useEffect(() => {
     if (currentPage !== page) {
@@ -88,7 +84,7 @@ export default function ProductCostTable() {
 
   const variants = useMemo<VariantRow[]>(
     () => (Array.isArray(variantData) ? (variantData as VariantRow[]) : []),
-    [variantData],
+    [variantData]
   );
 
   const variantGroups = useMemo(() => {
@@ -262,9 +258,7 @@ export default function ProductCostTable() {
                 const id = String(v._id);
                 const price = Number(v.price ?? 0) || 0;
                 const computed = (price * pct) / 100;
-                const fixed = isFinite(computed)
-                  ? computed.toFixed(2)
-                  : "0.00";
+                const fixed = isFinite(computed) ? computed.toFixed(2) : "0.00";
                 next[id] = { ...(next[id] || {}), handling: fixed };
               });
               return next;
@@ -273,11 +267,7 @@ export default function ProductCostTable() {
         >
           Apply Handling
         </Button>
-        <Button
-          color="primary"
-          isLoading={savingAll}
-          onPress={handleSaveAll}
-        >
+        <Button color="primary" isLoading={savingAll} onPress={handleSaveAll}>
           Save All Changes
         </Button>
       </div>
@@ -447,7 +437,7 @@ export default function ProductCostTable() {
                 );
                 headerCells.push(
                   <TableCell key="status">
-                    <Chip color={statusChipColor} size="sm" variant="flat">
+                    <Chip color={statusChipColor} size="sm">
                       {s ? s.charAt(0).toUpperCase() + s.slice(1) : "-"}
                     </Chip>
                   </TableCell>
@@ -583,8 +573,10 @@ export default function ProductCostTable() {
                   <TableRow
                     key={`grp-h-${grp.key}`}
                     className={cn(
-                      stripe ? DATA_TABLE_ROW_STRIPE_BG : DATA_TABLE_ROW_BASE_BG,
-                      DATA_TABLE_GROUP_ROW_BORDER_CLASS,
+                      stripe
+                        ? DATA_TABLE_ROW_STRIPE_BG
+                        : DATA_TABLE_ROW_BASE_BG,
+                      DATA_TABLE_GROUP_ROW_BORDER_CLASS
                     )}
                   >
                     {headerCells}
@@ -599,7 +591,7 @@ export default function ProductCostTable() {
                       key={String(v._id)}
                       className={cn(
                         DATA_TABLE_ROW_BASE_BG,
-                        stripe && DATA_TABLE_ROW_STRIPE_CHILD_BG,
+                        stripe && DATA_TABLE_ROW_STRIPE_CHILD_BG
                       )}
                     >
                       <TableCell>

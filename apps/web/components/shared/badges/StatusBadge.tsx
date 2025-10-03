@@ -96,22 +96,87 @@ export const FULFILLMENT_STATUS_CONFIG: Record<string, StatusConfig> = {
     type: "default",
     icon: "solar:inbox-linear",
   },
+  pending: {
+    label: "Pending",
+    type: "warning",
+    icon: "solar:clock-circle-linear",
+  },
+  scheduled: {
+    label: "Scheduled",
+    type: "info",
+    icon: "solar:calendar-linear",
+  },
+  on_hold: {
+    label: "On Hold",
+    type: "warning",
+    icon: "solar:pause-circle-linear",
+  },
   partial: {
     label: "Partial",
     type: "warning",
     icon: "solar:archive-minimalistic-linear",
   },
+  partially_fulfilled: {
+    label: "Partially Fulfilled",
+    type: "warning",
+    icon: "solar:archive-minimalistic-linear",
+  },
   fulfilled: { label: "Fulfilled", type: "success", icon: "solar:box-linear" },
   shipped: { label: "Shipped", type: "primary", icon: "solar:delivery-linear" },
+  in_transit: {
+    label: "In Transit",
+    type: "primary",
+    icon: "solar:delivery-linear",
+  },
+  out_for_delivery: {
+    label: "Out for Delivery",
+    type: "primary",
+    icon: "solar:delivery-linear",
+  },
+  ready_for_pickup: {
+    label: "Ready for Pickup",
+    type: "info",
+    icon: "solar:bag-check-linear",
+  },
+  label_printed: {
+    label: "Label Printed",
+    type: "info",
+    icon: "solar:document-text-linear",
+  },
+  label_purchased: {
+    label: "Label Purchased",
+    type: "info",
+    icon: "solar:wallet-linear",
+  },
+  attempted_delivery: {
+    label: "Attempted Delivery",
+    type: "warning",
+    icon: "solar:map-point-wave-linear",
+  },
   delivered: {
     label: "Delivered",
     type: "success",
     icon: "solar:check-read-linear",
   },
+  not_delivered: {
+    label: "Not Delivered",
+    type: "danger",
+    icon: "solar:close-circle-linear",
+  },
   returned: {
     label: "Returned",
     type: "warning",
     icon: "solar:undo-left-linear",
+  },
+  canceled: {
+    label: "Canceled",
+    type: "danger",
+    icon: "solar:close-circle-linear",
+  },
+  cancelled: {
+    label: "Cancelled",
+    type: "danger",
+    icon: "solar:close-circle-linear",
   },
 };
 
@@ -243,7 +308,7 @@ export function StatusBadge({
             className={cn(
               size === "sm" && "w-3 h-3",
               size === "md" && "w-4 h-4",
-              size === "lg" && "w-5 h-5",
+              size === "lg" && "w-5 h-5"
             )}
             icon={statusConfig.icon}
           />
@@ -258,11 +323,11 @@ export function StatusBadge({
 
 // Export a compound component for easy access to specific status types
 export const OrderStatusBadge: React.FC<Omit<StatusBadgeProps, "config">> = (
-  props,
+  props
 ) => <StatusBadge {...props} config={ORDER_STATUS_CONFIG} />;
 
 export const PaymentStatusBadge: React.FC<Omit<StatusBadgeProps, "config">> = (
-  props,
+  props
 ) => <StatusBadge {...props} config={PAYMENT_STATUS_CONFIG} />;
 
 export const FulfillmentStatusBadge: React.FC<
@@ -270,13 +335,13 @@ export const FulfillmentStatusBadge: React.FC<
 > = (props) => <StatusBadge {...props} config={FULFILLMENT_STATUS_CONFIG} />;
 
 export const StockStatusBadge: React.FC<Omit<StatusBadgeProps, "config">> = (
-  props,
+  props
 ) => <StatusBadge {...props} config={STOCK_STATUS_CONFIG} />;
 
 export const ProductStatusBadge: React.FC<Omit<StatusBadgeProps, "config">> = (
-  props,
+  props
 ) => <StatusBadge {...props} config={PRODUCT_STATUS_CONFIG} />;
 
 export const CustomerStatusBadge: React.FC<Omit<StatusBadgeProps, "config">> = (
-  props,
+  props
 ) => <StatusBadge {...props} config={CUSTOMER_STATUS_CONFIG} />;

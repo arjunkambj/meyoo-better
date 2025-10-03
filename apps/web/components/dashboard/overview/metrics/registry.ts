@@ -18,7 +18,7 @@ export const METRIC_CATEGORIES: Record<string, MetricCategory> = {
       "blendedMarketingCost",  // Total Ad Spend
       "customCosts",           // Operating Costs
       "marketingPercentageOfNet", // Marketing % of Revenue
-      "repeatCustomerRate",    // Returning Customers % (proxy for New vs Returning)
+      "rtoRevenueLost",        // Estimated revenue lost to returns/RTO overrides
     ],
   },
   revenue: {

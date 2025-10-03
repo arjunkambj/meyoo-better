@@ -74,7 +74,7 @@ const heroConfig = heroui({
           700: "#9f6b17",
           800: "#744e11",
           900: "#4a320b",
-          foreground: "#000",
+          foreground: "#fff",
           DEFAULT: "#f5a524",
         },
         danger: {
@@ -187,7 +187,7 @@ const heroConfig = heroui({
           700: "#fad497",
           800: "#fce4bd",
           900: "#fef4e4",
-          foreground: "#000000",
+          foreground: "#ffffff",
           DEFAULT: "#f5a524",
         },
         danger: {

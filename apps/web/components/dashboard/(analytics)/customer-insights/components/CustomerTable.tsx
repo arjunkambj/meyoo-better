@@ -115,7 +115,13 @@ export const CustomerTable = React.memo(function CustomerTable({
           );
 
         case "status":
-          return <CustomerStatusBadge size="sm" status={item.status} />;
+          return (
+            <CustomerStatusBadge
+              size="sm"
+              status={item.status}
+              variant="solid"
+            />
+          );
 
         case "ltv":
           return (
@@ -140,11 +146,7 @@ export const CustomerTable = React.memo(function CustomerTable({
 
         case "segment":
           return (
-            <Chip
-              className={getSegmentStyle(item.segment)}
-              size="sm"
-              variant="flat"
-            >
+            <Chip className={getSegmentStyle(item.segment)} size="sm">
               {item.segment}
             </Chip>
           );
@@ -260,7 +262,7 @@ export const CustomerTable = React.memo(function CustomerTable({
   const totalPages = pagination
     ? Math.max(
         pagination.page,
-        Math.max(1, Math.ceil(Math.max(pagination.total || 0, 0) / pageSize)),
+        Math.max(1, Math.ceil(Math.max(pagination.total || 0, 0) / pageSize))
       )
     : 1;
 

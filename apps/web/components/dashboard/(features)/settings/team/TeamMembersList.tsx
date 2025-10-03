@@ -30,7 +30,7 @@ export default function TeamMembersList() {
   const { teamMembers, canManageTeam, isLoading } =
     useTeamMembersWithManagement();
   const [removingUserId, setRemovingUserId] = useState<Id<"users"> | null>(
-    null,
+    null
   );
   const setPending = useSetAtom(setSettingsPendingAtom);
 
@@ -41,7 +41,7 @@ export default function TeamMembersList() {
       wrapper: "shadow-none border-0",
       th: "dark:bg-background",
     }),
-    [],
+    []
   );
 
   const handleRemoveMember = useCallback(
@@ -67,7 +67,7 @@ export default function TeamMembersList() {
         setPending(false);
       }
     },
-    [removeTeamMember, setPending],
+    [removeTeamMember, setPending]
   );
 
   if (isLoading) {
@@ -165,7 +165,6 @@ export default function TeamMembersList() {
               <Chip
                 color={member.role === "StoreOwner" ? "primary" : "default"}
                 size="sm"
-                variant="flat"
               >
                 {member.role === "StoreOwner" ? "Owner" : "Team"}
               </Chip>
@@ -184,9 +183,7 @@ export default function TeamMembersList() {
             </TableCell>
             <TableCell>
               <p className="text-sm text-default-500">
-                {member.createdAt
-                  ? formatDate(member.createdAt)
-                  : "—"}
+                {member.createdAt ? formatDate(member.createdAt) : "—"}
               </p>
             </TableCell>
             <TableCell>

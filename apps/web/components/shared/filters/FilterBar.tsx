@@ -322,7 +322,7 @@ export function FilterBar({
         {/* Active filters indicator and reset - kept inline */}
         {activeFilters > 0 && (
           <>
-            <Chip color="primary" size="sm" variant="flat">
+            <Chip color="primary" size="sm" variant="solid">
               {activeFilters} active
             </Chip>
             {onReset && (

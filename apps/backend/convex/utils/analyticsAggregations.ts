@@ -1242,6 +1242,301 @@ function deriveAnalyticsOrders(data: AnalyticsSourceData<any>): DerivedOrders {
   const { orders, orderItems, transactions, refunds, variantCosts, variants } =
     deriveOrderDocuments(data);
 
+  const normalizeStatusCandidate = (value: unknown): string => {
+    if (typeof value !== "string") return "";
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : "";
+  };
+
+  const toStatusSlug = (value: string): string =>
+    value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "");
+
+  const resolveFulfillmentStatus = (orderRaw: AnyRecord): string => {
+    const directCandidates: Array<unknown> = [
+      orderRaw.fulfillmentStatus,
+      orderRaw.displayFulfillmentStatus,
+      orderRaw.display_fulfillment_status,
+      orderRaw.fulfillment_status,
+      orderRaw.status,
+    ];
+
+    for (const candidate of directCandidates) {
+      const normalized = normalizeStatusCandidate(candidate);
+      if (normalized) {
+        return normalized;
+      }
+    }
+
+    const collectStatuses = (records: AnyRecord[] | undefined): string[] => {
+      if (!Array.isArray(records)) return [];
+      return records
+        .map((entry) =>
+          normalizeStatusCandidate(
+            entry.status ??
+              entry.displayStatus ??
+              entry.display_status ??
+              entry.state ??
+              entry.fulfillmentStatus ??
+              entry.fulfillment_status,
+          ),
+        )
+        .filter((status): status is string => Boolean(status));
+    };
+
+    const flattenEdgeStatuses = (edgeContainer: AnyRecord | undefined): string[] => {
+      if (!edgeContainer || typeof edgeContainer !== "object") return [];
+      const edges = (edgeContainer as AnyRecord).edges;
+      if (!Array.isArray(edges)) return [];
+      return edges
+        .map((edge) => {
+          if (!edge || typeof edge !== "object") return "";
+          const node = (edge as AnyRecord).node;
+          if (!node || typeof node !== "object") return "";
+          return normalizeStatusCandidate(
+            (node as AnyRecord).status ??
+              (node as AnyRecord).displayStatus ??
+              (node as AnyRecord).display_status ??
+              (node as AnyRecord).state ??
+              (node as AnyRecord).fulfillmentStatus ??
+              (node as AnyRecord).fulfillment_status,
+          );
+        })
+        .filter((status): status is string => Boolean(status));
+    };
+
+    const statusBuckets: string[] = [];
+
+    statusBuckets.push(
+      ...collectStatuses(orderRaw.fulfillments as AnyRecord[] | undefined),
+      ...collectStatuses(orderRaw.fulfillmentOrders as AnyRecord[] | undefined),
+      ...collectStatuses(orderRaw.fulfillment_orders as AnyRecord[] | undefined),
+      ...flattenEdgeStatuses(orderRaw.fulfillments as AnyRecord | undefined),
+      ...flattenEdgeStatuses(orderRaw.fulfillmentOrders as AnyRecord | undefined),
+      ...flattenEdgeStatuses(orderRaw.fulfillment_orders as AnyRecord | undefined),
+    );
+
+    if (!statusBuckets.length && Array.isArray(orderRaw.lineItems)) {
+      statusBuckets.push(
+        ...collectStatuses(orderRaw.lineItems as AnyRecord[]),
+      );
+    }
+
+    const slugs = statusBuckets.map(toStatusSlug).filter(Boolean);
+    if (!slugs.length) {
+      return "";
+    }
+
+    const has = (match: string) => slugs.some((slug) => slug.includes(match));
+    const all = (match: string) => slugs.every((slug) => slug.includes(match));
+
+    if (all("fulfilled") || (has("success") && !has("open") && !has("pending"))) {
+      return "fulfilled";
+    }
+
+    if (has("cancel")) {
+      return "cancelled";
+    }
+
+    if (has("partial") || has("partially_fulfilled")) {
+      return "partially_fulfilled";
+    }
+
+    if (has("out_for_delivery")) {
+      return "out_for_delivery";
+    }
+
+    if (has("in_transit")) {
+      return "in_transit";
+    }
+
+    if (has("ready_for_pickup")) {
+      return "ready_for_pickup";
+    }
+
+    if (has("label_printed")) {
+      return "label_printed";
+    }
+
+    if (has("label_purchased")) {
+      return "label_purchased";
+    }
+
+    if (has("pending")) {
+      return "pending";
+    }
+
+    if (has("scheduled")) {
+      return "scheduled";
+    }
+
+    if (has("on_hold")) {
+      return "on_hold";
+    }
+
+    if (has("shipped")) {
+      return "shipped";
+    }
+
+    if (has("delivered")) {
+      return "delivered";
+    }
+
+    if (has("returned")) {
+      return "returned";
+    }
+
+    if (has("not_delivered")) {
+      return "not_delivered";
+    }
+
+    if (has("unfulfilled")) {
+      return "unfulfilled";
+    }
+
+    return statusBuckets[0] ?? "";
+  };
+
+  const toRecord = (value: unknown): AnyRecord | null =>
+    value && typeof value === "object" ? (value as AnyRecord) : null;
+
+  const resolveShippingCost = (orderRaw: AnyRecord): number => {
+    let fallback: number | null = null;
+    let primary: number | null = null;
+
+    const consider = (value: unknown) => {
+      if (value === undefined || value === null) {
+        return;
+      }
+      const resolved = safeNumber(value);
+      if (fallback === null) {
+        fallback = resolved;
+      }
+      if (primary === null && resolved !== 0) {
+        primary = resolved;
+      }
+    };
+
+    consider(orderRaw.shippingCosts);
+    consider(orderRaw.totalShippingCost);
+    consider(orderRaw.totalShipping);
+    consider(orderRaw.shippingCost);
+    consider(orderRaw.shipping_cost);
+    consider(orderRaw.shippingTotal);
+    consider(orderRaw.total_shipping);
+    consider(orderRaw.totalShippingPrice);
+    consider(orderRaw.totalShippingAmount);
+    consider(orderRaw.totalShippingAmountSet);
+
+    const totalsRecord = toRecord(orderRaw.totals);
+    if (totalsRecord) {
+      consider(totalsRecord.shipping);
+      consider(totalsRecord.shippingPrice);
+      consider(totalsRecord.shipping_price);
+    }
+
+    const totalShippingPriceSet =
+      toRecord(orderRaw.total_shipping_price_set) ??
+      toRecord(orderRaw.totalShippingPriceSet);
+    if (totalShippingPriceSet) {
+      const shopMoney =
+        toRecord(totalShippingPriceSet.shop_money) ??
+        toRecord(totalShippingPriceSet.shopMoney);
+      if (shopMoney) {
+        consider(shopMoney.amount);
+      }
+      const presentmentMoney =
+        toRecord(totalShippingPriceSet.presentment_money) ??
+        toRecord(totalShippingPriceSet.presentmentMoney);
+      if (presentmentMoney) {
+        consider(presentmentMoney.amount);
+      }
+    }
+
+    const considerCollection = (collection: AnyRecord[] | undefined) => {
+      if (!collection || collection.length === 0) {
+        return;
+      }
+
+      const total = collection.reduce((sum, entry) => {
+        if (!entry || typeof entry !== "object") {
+          return sum;
+        }
+
+        const amountCandidates: Array<unknown> = [
+          (entry as AnyRecord).price,
+          (entry as AnyRecord).discountedPrice,
+          (entry as AnyRecord).discounted_price,
+          (entry as AnyRecord).originalPrice,
+          (entry as AnyRecord).original_price,
+          (entry as AnyRecord).amount,
+          (entry as AnyRecord).value,
+          (entry as AnyRecord).cost,
+        ];
+
+        let lineValue: number | null = null;
+        for (const candidate of amountCandidates) {
+          if (candidate === undefined || candidate === null) continue;
+          const resolved = safeNumber(candidate);
+          if (lineValue === null) {
+            lineValue = resolved;
+          }
+          if (resolved !== 0) {
+            lineValue = resolved;
+            break;
+          }
+        }
+
+        return sum + (lineValue ?? 0);
+      }, 0);
+
+      if (primary === null && total !== 0) {
+        primary = total;
+      }
+      if (fallback === null) {
+        fallback = total;
+      }
+    };
+
+    const shippingLinesArray = orderRaw.shippingLines ?? orderRaw.shipping_lines;
+    if (Array.isArray(shippingLinesArray)) {
+      considerCollection(shippingLinesArray as AnyRecord[]);
+    }
+
+    const edgeContainers = [
+      toRecord(orderRaw.shippingLines as AnyRecord | undefined),
+      toRecord(orderRaw.shipping_lines as AnyRecord | undefined),
+    ];
+
+    for (const container of edgeContainers) {
+      if (!container) continue;
+      const edges = container.edges;
+      if (!Array.isArray(edges)) continue;
+      const nodes = edges
+        .map((edge) =>
+          edge && typeof edge === "object"
+            ? toRecord((edge as AnyRecord).node)
+            : null,
+        )
+        .filter((node): node is AnyRecord => Boolean(node));
+      considerCollection(nodes);
+    }
+
+    const adjustments = orderRaw.shippingAdjustments ?? orderRaw.shipping_adjustments;
+    if (Array.isArray(adjustments)) {
+      considerCollection(adjustments as AnyRecord[]);
+    }
+
+    if (primary !== null) {
+      return primary;
+    }
+
+    return fallback ?? 0;
+  };
+
   const variantMap = new Map<string, AnyRecord>();
   for (const variant of variants) {
     variantMap.set(toStringId(variant._id ?? variant.id ?? variant.variantId), variant);
@@ -1296,7 +1591,7 @@ function deriveAnalyticsOrders(data: AnalyticsSourceData<any>): DerivedOrders {
     });
 
     const revenue = safeNumber(orderRaw.totalPrice);
-    const shippingCost = safeNumber(orderRaw.shippingCosts ?? 0);
+    const shippingCost = resolveShippingCost(orderRaw);
     const taxAmount = safeNumber(orderRaw.taxesCollected ?? 0);
     const cogsAmount = lineItems.reduce((total, item) => total + item.cost, 0);
     const transactionFee = txs.reduce((total, tx) => total + safeNumber(tx.fee), 0);
@@ -1354,7 +1649,7 @@ function deriveAnalyticsOrders(data: AnalyticsSourceData<any>): DerivedOrders {
         email: String(resolvedCustomerEmail),
       },
       status: String(orderRaw.status ?? ""),
-      fulfillmentStatus: String(orderRaw.fulfillmentStatus ?? ""),
+      fulfillmentStatus: resolveFulfillmentStatus(orderRaw),
       financialStatus: String(orderRaw.financialStatus ?? ""),
       items: itemCount,
       totalPrice: revenue,

@@ -186,7 +186,6 @@ export const ProductsTable = React.memo(function ProductsTable({
                     : "danger"
               }
               size="sm"
-              variant="flat"
             >
               {item.margin.toFixed(1)}%
             </Chip>
@@ -276,9 +275,9 @@ export const ProductsTable = React.memo(function ProductsTable({
                 1,
                 Math.ceil(
                   Math.max(pagination.total, 0) /
-                    Math.max(pagination.pageSize ?? 50, 1),
-                ),
-              ),
+                    Math.max(pagination.pageSize ?? 50, 1)
+                )
+              )
             )
           }
           onChange={pagination.setPage}
@@ -348,8 +347,10 @@ export const ProductsTable = React.memo(function ProductsTable({
                     <TableRow
                       key={`p-h-${item.id}`}
                       className={cn(
-                        stripe ? DATA_TABLE_ROW_STRIPE_BG : DATA_TABLE_ROW_BASE_BG,
-                        DATA_TABLE_GROUP_ROW_BORDER_CLASS,
+                        stripe
+                          ? DATA_TABLE_ROW_STRIPE_BG
+                          : DATA_TABLE_ROW_BASE_BG,
+                        DATA_TABLE_GROUP_ROW_BORDER_CLASS
                       )}
                     >
                       <TableCell>
@@ -433,7 +434,7 @@ export const ProductsTable = React.memo(function ProductsTable({
                       className={cn(
                         "pointer-events-none",
                         DATA_TABLE_ROW_BASE_BG,
-                        stripe && DATA_TABLE_ROW_STRIPE_CHILD_BG,
+                        stripe && DATA_TABLE_ROW_STRIPE_CHILD_BG
                       )}
                     >
                       <TableCell>

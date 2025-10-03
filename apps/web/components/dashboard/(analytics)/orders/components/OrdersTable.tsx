@@ -14,7 +14,7 @@ import {
 import { Icon } from "@iconify/react";
 import React, { useCallback } from "react";
 
-import { OrderStatusBadge } from "@/components/shared/badges/StatusBadge";
+import { FulfillmentStatusBadge } from "@/components/shared/badges/StatusBadge";
 import { useUser } from "@/hooks";
 import { formatCurrencyPrecise } from "@/libs/utils/dashboard-formatters";
 import { formatDate } from "@/libs/utils/format";
@@ -40,9 +40,6 @@ const columns = [
   { name: "Customer", uid: "customer" },
   { name: "Fulfillment", uid: "status" },
   { name: "Revenue", uid: "revenue" },
-  { name: "Costs", uid: "globalCosts" },
-  { name: "Shipping", uid: "shipping" },
-  { name: "Profit", uid: "profit" },
   { name: "Payment", uid: "payment" },
   { name: "Ship To", uid: "location" },
 ];
@@ -73,13 +70,7 @@ export const OrdersTable = React.memo(function OrdersTable({
               {item.tags && item.tags.length > 0 ? (
                 <div className="mt-2 flex flex-wrap gap-1">
                   {item.tags.map((tag) => (
-                    <Chip
-                      key={tag}
-                      className="h-5 text-xs"
-                      color="secondary"
-                      size="sm"
-                      variant="flat"
-                    >
+                    <Chip key={tag} color="secondary" size="sm" variant="flat">
                       {tag}
                     </Chip>
                   ))}
@@ -101,44 +92,19 @@ export const OrdersTable = React.memo(function OrdersTable({
           );
 
         case "status":
-          return <OrderStatusBadge size="sm" status={item.fulfillmentStatus} />;
+          return (
+            <FulfillmentStatusBadge
+              size="sm"
+              status={item.fulfillmentStatus || "unfulfilled"}
+              variant="solid"
+            />
+          );
 
         case "revenue":
           return (
             <div>
               <p className="font-medium">{formatCurrency(item.totalPrice)}</p>
               <p className="text-xs text-default-500">{item.items} items</p>
-            </div>
-          );
-
-        case "globalCosts":
-          return (
-            <div>
-              <p className="font-medium">{formatCurrency(item.totalCost)}</p>
-              <p className="text-xs text-default-500">
-                Tax: {formatCurrency(item.taxAmount)}
-              </p>
-            </div>
-          );
-
-        case "shipping":
-          return (
-            <div>
-              <p className="font-medium">{formatCurrency(item.shippingCost)}</p>
-            </div>
-          );
-
-        case "profit":
-          return (
-            <div>
-              <p
-                className={`font-medium ${item.profit >= 0 ? "text-success" : "text-danger"}`}
-              >
-                {formatCurrency(item.profit)}
-              </p>
-              <p className="text-xs text-default-500">
-                {item.profitMargin.toFixed(1)}% margin
-              </p>
             </div>
           );
 

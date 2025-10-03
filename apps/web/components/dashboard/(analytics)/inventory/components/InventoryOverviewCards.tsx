@@ -83,12 +83,12 @@ export function InventoryOverviewCards({
       subtitle: "Items not sold in 90+ days",
     },
     {
-      title: "Stock Turnover",
-      value: `${(metrics.stockTurnoverRate || 0).toFixed(1)}x`,
-      change: metrics.changes.stockTurnoverRate,
-      icon: "solar:refresh-circle-bold-duotone",
+      title: "COGS Value",
+      value: `${currencySymbol}${formatNumber(metrics.totalCOGS)}`,
+      change: metrics.changes.totalCOGS,
+      icon: "solar:wallet-money-bold-duotone",
       iconColor: "text-default-500",
-      subtitle: "Inventory turns per year",
+      subtitle: "Cost of goods for active range",
     },
   ];
 

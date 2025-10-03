@@ -31,7 +31,7 @@ const DEFAULT_METRICS = [
   "blendedMarketingCost",
   "customCosts",
   "marketingPercentageOfNet",
-  "repeatCustomerRate",
+  "rtoRevenueLost",
 ];
 
 export function MetricsContainer({

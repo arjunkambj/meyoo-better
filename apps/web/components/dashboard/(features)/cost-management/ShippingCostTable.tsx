@@ -36,8 +36,7 @@ import {
 } from "@/components/shared/table/DataTableCard";
 
 const columns = [
-  { name: "Name", uid: "name" },
-  { name: "Shipping Price", uid: "baseRate" },
+  { name: "Shipping Method", uid: "name" },
   { name: "Actions", uid: "actions" },
 ];
 
@@ -58,7 +57,6 @@ interface ShippingCostItem {
 }
 
 export default function ShippingCostTable() {
-  
   const [formData, setFormData] = useState<ShippingFormData>({});
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
 
@@ -70,7 +68,11 @@ export default function ShippingCostTable() {
   const upsertShippingCost = useUpsertShippingCost();
 
   const handleEdit = (item: ShippingCostItem) => {
-    setFormData(item);
+    setFormData({
+      _id: item._id,
+      name: item.name,
+      baseRate: typeof item.value === "number" ? item.value : item.baseRate,
+    });
     onOpen();
   };
 
@@ -90,7 +92,7 @@ export default function ShippingCostTable() {
         calculation: "FIXED",
       });
       addToast({
-        title: formData._id ? "Shipping cost updated" : "Shipping cost added",
+        title: formData._id ? "Shipping rate updated" : "Shipping rate added",
         color: "default",
         timeout: 3000,
       });
@@ -109,15 +111,17 @@ export default function ShippingCostTable() {
   const renderCell = (item: ShippingCostItem, columnKey: React.Key) => {
     switch (columnKey) {
       case "name":
-        return <span className="font-medium">{item.name}</span>;
-
-      case "baseRate":
         return (
-          <span>
-            {typeof item.value === "number"
-              ? `${getCurrencySymbol(currency)}${(item.value || 0).toFixed(2)}`
-              : "-"}
-          </span>
+          <div className="flex flex-col">
+            <span className="font-medium">{item.name}</span>
+            <span className="text-xs text-default-500">
+              {typeof item.value === "number"
+                ? `Rate: ${getCurrencySymbol(currency)}${item.value.toFixed(2)}`
+                : typeof item.baseRate === "number"
+                  ? `Rate: ${getCurrencySymbol(currency)}${item.baseRate.toFixed(2)}`
+                  : "No rate set"}
+            </span>
+          </div>
         );
 
       case "actions":
@@ -142,7 +146,7 @@ export default function ShippingCostTable() {
   const topContent = (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Shipping Costs</h2>
+        <h2 className="text-xl font-semibold">Shipping Rates</h2>
         {shippingCosts.length === 0 ? (
           <Button
             color="primary"
@@ -150,7 +154,7 @@ export default function ShippingCostTable() {
             isDisabled={loading}
             onPress={handleAdd}
           >
-            Set Shipping Cost
+            Set Shipping Rate
           </Button>
         ) : null}
       </div>
@@ -166,7 +170,7 @@ export default function ShippingCostTable() {
           <div className={DATA_TABLE_TABLE_CLASS}>
             <TableSkeleton
               rows={3}
-              columns={3}
+              columns={2}
               showHeader={false}
               showPagination={false}
               className="border border-default-200/60"
@@ -175,7 +179,7 @@ export default function ShippingCostTable() {
         ) : (
           <Table
             removeWrapper
-            aria-label="Shipping costs table"
+            aria-label="Shipping rates table"
             className={DATA_TABLE_TABLE_CLASS}
             classNames={{
               th: DATA_TABLE_HEADER_CLASS,
@@ -194,9 +198,9 @@ export default function ShippingCostTable() {
                     icon="solar:delivery-bold-duotone"
                     width={48}
                   />
-                  <p className="mb-2 text-default-500">No shipping costs added yet</p>
+                  <p className="mb-2 text-default-500">No shipping rates added yet</p>
                   <p className="text-small text-default-400">
-                    Add shipping costs to track delivery expenses
+                    Add shipping rates to track delivery expenses
                   </p>
                 </div>
               }
@@ -220,7 +224,7 @@ export default function ShippingCostTable() {
           {(onClose) => (
             <>
               <ModalHeader>
-                {formData._id ? "Edit Shipping Cost" : "Set Shipping Cost"}
+                {formData._id ? "Edit Shipping Rate" : "Set Shipping Rate"}
               </ModalHeader>
               <ModalBody className="bg-default-50 gap-6">
                 <div className="grid grid-cols-2 gap-4">
@@ -236,7 +240,7 @@ export default function ShippingCostTable() {
                   />
                   <Input
                     isRequired
-                    label="Shipping Price"
+                    label="Shipping Rate"
                     labelPlacement="outside"
                     size="sm"
                     startContent={getCurrencySymbol(currency)}

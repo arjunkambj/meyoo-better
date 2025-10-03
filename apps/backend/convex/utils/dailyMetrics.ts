@@ -103,7 +103,7 @@ function resolveManualReturnRate(
     return bTimestamp - aTimestamp;
   });
 
-  const selected = filtered[0];
+  const selected = filtered[0]!;
   const rawRate = toNumber(selected.ratePercent ?? selected.rate ?? selected.value ?? 0);
   return clampPercentage(rawRate);
 }

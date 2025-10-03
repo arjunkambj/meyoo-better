@@ -61,6 +61,19 @@ export async function hasCompletedInitialShopifySync(
   return Boolean(onboarding.isInitialSyncComplete);
 }
 
+export const getInitialSyncStatusInternal = internalQuery({
+  args: {
+    organizationId: v.id("organizations"),
+  },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    return await hasCompletedInitialShopifySync(
+      ctx,
+      args.organizationId as Id<"organizations">,
+    );
+  },
+});
+
 const toOptionalString = (value: unknown): string | undefined => {
   if (value === null || value === undefined) return undefined;
 
@@ -2078,6 +2091,7 @@ export const storeOrdersInternal = internalMutation({
     organizationId: v.id("organizations"),
     // Prefer passing storeId when available to avoid race conditions
     storeId: v.optional(v.id("shopifyStores")),
+    shouldScheduleAnalytics: v.optional(v.boolean()),
     orders: v.array(
       v.object({
         shopifyId: v.string(),
@@ -2484,10 +2498,13 @@ export const storeOrdersInternal = internalMutation({
       }
     }
 
-    const canSchedule = await hasCompletedInitialShopifySync(
-      ctx,
-      args.organizationId as Id<"organizations">,
-    );
+    const canSchedule =
+      args.shouldScheduleAnalytics !== undefined
+        ? args.shouldScheduleAnalytics
+        : await hasCompletedInitialShopifySync(
+            ctx,
+            args.organizationId as Id<"organizations">,
+          );
 
     if (canSchedule && affectedDates.size > 0) {
       const dates = Array.from(affectedDates);
@@ -2784,6 +2801,7 @@ export const storeTransactionsInternal = internalMutation({
   args: {
     organizationId: v.id("organizations"),
     transactions: v.array(v.any()),
+    shouldScheduleAnalytics: v.optional(v.boolean()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -2840,10 +2858,13 @@ export const storeTransactionsInternal = internalMutation({
       }
     }
 
-    const canSchedule = await hasCompletedInitialShopifySync(
-      ctx,
-      args.organizationId as Id<"organizations">,
-    );
+    const canSchedule =
+      args.shouldScheduleAnalytics !== undefined
+        ? args.shouldScheduleAnalytics
+        : await hasCompletedInitialShopifySync(
+            ctx,
+            args.organizationId as Id<"organizations">,
+          );
 
     if (canSchedule && affectedDates.size > 0) {
       const dates = Array.from(affectedDates);
@@ -2872,6 +2893,7 @@ export const storeRefundsInternal = internalMutation({
   args: {
     organizationId: v.id("organizations"),
     refunds: v.array(v.any()),
+    shouldScheduleAnalytics: v.optional(v.boolean()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -2924,10 +2946,13 @@ export const storeRefundsInternal = internalMutation({
       }
     }
 
-    const canSchedule = await hasCompletedInitialShopifySync(
-      ctx,
-      args.organizationId as Id<"organizations">,
-    );
+    const canSchedule =
+      args.shouldScheduleAnalytics !== undefined
+        ? args.shouldScheduleAnalytics
+        : await hasCompletedInitialShopifySync(
+            ctx,
+            args.organizationId as Id<"organizations">,
+          );
 
     if (canSchedule && affectedDates.size > 0) {
       const dates = Array.from(affectedDates);
@@ -2956,6 +2981,7 @@ export const storeFulfillmentsInternal = internalMutation({
   args: {
     organizationId: v.id("organizations"),
     fulfillments: v.array(v.any()),
+    shouldScheduleAnalytics: v.optional(v.boolean()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {

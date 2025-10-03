@@ -19,6 +19,7 @@ const buildZeroMetrics = (): PnLMetrics => ({
   grossSales: 0,
   discounts: 0,
   refunds: 0,
+  rtoRevenueLost: 0,
   revenue: 0,
   cogs: 0,
   shippingCosts: 0,
@@ -144,6 +145,13 @@ const metricConfig: Record<
   refunds: {
     label: "Returns",
     icon: "solar:rewind-back-bold-duotone",
+    iconColor: "text-default-500",
+    category: "revenue",
+    isSubItem: true,
+  },
+  rtoRevenueLost: {
+    label: "RTO Revenue Lost",
+    icon: "solar:trend-down-bold-duotone",
     iconColor: "text-default-500",
     category: "revenue",
     isSubItem: true,

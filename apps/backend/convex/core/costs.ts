@@ -479,16 +479,24 @@ export const setManualReturnRate = mutation({
     const { user, orgId } = await requireUserAndOrg(ctx);
 
     const normalizedRate = clampPercentage(args.ratePercent);
-    const result = await ctx.runMutation(internal.core.costs.upsertManualReturnRate, {
-      organizationId: orgId as Id<"organizations">,
-      userId: user._id,
-      ratePercent: normalizedRate,
-      note: args.note,
-      effectiveFrom: args.effectiveFrom ?? Date.now(),
-      isActive: normalizedRate > 0,
-    });
+    const manualRateResult = await ctx.runMutation(
+      internal.core.costs.upsertManualReturnRate,
+      {
+        organizationId: orgId as Id<"organizations">,
+        userId: user._id,
+        ratePercent: normalizedRate,
+        note: args.note,
+        effectiveFrom: args.effectiveFrom ?? Date.now(),
+        isActive: normalizedRate > 0,
+      },
+    ) as {
+      success: boolean;
+      isActive: boolean;
+      ratePercent: number;
+      changed: boolean;
+    };
 
-    if (result.changed) {
+    if (manualRateResult.changed) {
       await ctx.scheduler.runAfter(0, internal.engine.analytics.calculateAnalytics, {
         organizationId: orgId,
         dateRange: { daysBack: 90 },
@@ -497,9 +505,9 @@ export const setManualReturnRate = mutation({
     }
 
     return {
-      success: result.success,
-      ratePercent: result.isActive ? result.ratePercent : 0,
-      isActive: result.isActive,
+      success: manualRateResult.success,
+      ratePercent: manualRateResult.isActive ? manualRateResult.ratePercent : 0,
+      isActive: manualRateResult.isActive,
     } as const;
   },
 });
@@ -908,6 +916,35 @@ export const saveVariantCosts = mutation({
 /**
  * Create product cost components for synced variants
  */
+export const getManualReturnRateEntries = internalQuery({
+  args: {
+    organizationId: v.id("organizations"),
+    windowStart: v.optional(v.number()),
+    windowEnd: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const docs = await ctx.db
+      .query("manualReturnRates")
+      .withIndex("by_organization", (q) => q.eq("organizationId", args.organizationId))
+      .collect();
+
+    const start = args.windowStart ?? Number.NEGATIVE_INFINITY;
+    const end = args.windowEnd ?? Number.POSITIVE_INFINITY;
+
+    return docs.filter((doc) => {
+      const from = typeof doc.effectiveFrom === "number" ? doc.effectiveFrom : 0;
+      const rawTo = doc.effectiveTo;
+      const to =
+        rawTo === undefined || rawTo === null
+          ? Number.POSITIVE_INFINITY
+          : typeof rawTo === "number"
+            ? rawTo
+            : Number.POSITIVE_INFINITY;
+      return from <= end && to >= start;
+    });
+  },
+});
+
 export const upsertManualReturnRate = internalMutation({
   args: {
     organizationId: v.id("organizations"),

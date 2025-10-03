@@ -1,12 +1,20 @@
 "use client";
 
-import { Button, Card, CardBody, Input, Spinner, addToast } from "@heroui/react";
+import {
+  Button,
+  Card,
+  CardBody,
+  Input,
+  Spinner,
+  addToast,
+} from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import {
   useCost,
+  useManualReturnRate,
   useOnboarding,
   useOnboardingCosts,
   useUpdateOnboardingState,
@@ -60,6 +68,7 @@ export default function SimpleCostsClient() {
     shippingCost: "",
     // handling moved to product-level cost management
     paymentFeePercent: "",
+    manualReturnRate: "",
   });
   const [saving, setSaving] = useState(false);
 
@@ -76,12 +85,14 @@ export default function SimpleCostsClient() {
     useCost("OPERATIONAL");
   const { costs: shippingCosts, loading: shipLoading } = useCost("SHIPPING");
   const { costs: paymentCosts, loading: payLoading } = useCost("PAYMENT");
+  const { manualReturnRate: manualReturnRateData, loading: manualRateLoading } =
+    useManualReturnRate();
 
   // Prefill only once when data loads to avoid infinite update loops
   const hasPrefilled = useRef(false);
   useEffect(() => {
     if (hasPrefilled.current) return;
-    if (opLoading || shipLoading || payLoading) return;
+    if (opLoading || shipLoading || payLoading || manualRateLoading) return;
 
     setForm((prev) => {
       let next = prev;
@@ -129,6 +140,19 @@ export default function SimpleCostsClient() {
         }
       }
 
+      if (
+        !prev.manualReturnRate &&
+        manualReturnRateData &&
+        manualReturnRateData.isActive &&
+        typeof manualReturnRateData.ratePercent === "number"
+      ) {
+        next = {
+          ...next,
+          manualReturnRate: String(manualReturnRateData.ratePercent ?? ""),
+        };
+        anySet = true;
+      }
+
       // Mark as prefilled if any value was set
       if (anySet) {
         hasPrefilled.current = true;
@@ -141,9 +165,11 @@ export default function SimpleCostsClient() {
     opLoading,
     shipLoading,
     payLoading,
+    manualRateLoading,
     operationalCosts,
     shippingCosts,
     paymentCosts,
+    manualReturnRateData,
   ]);
 
   // Analytics: step view
@@ -176,11 +202,16 @@ export default function SimpleCostsClient() {
         paymentFeePercent: form.paymentFeePercent
           ? Number(form.paymentFeePercent)
           : 0,
+        manualReturnRate:
+          form.manualReturnRate !== ""
+            ? Number(form.manualReturnRate)
+            : undefined,
       };
       trackOnboardingAction("cost", "save", {
         operatingCosts: payload.operatingCosts,
         shippingCost: payload.shippingCost,
         paymentFeePercent: payload.paymentFeePercent,
+        manualReturnRate: payload.manualReturnRate ?? null,
       });
       const result = await saveInitialCosts(payload);
       if (result?.success) {
@@ -211,7 +242,8 @@ export default function SimpleCostsClient() {
               </div>
               <div className="text-start space-y-1">
                 <p className="font-semibold text-warning-600">
-                  Shopify sync {hasShopifySyncError ? "needs attention" : "is still running"}
+                  Shopify sync{" "}
+                  {hasShopifySyncError ? "needs attention" : "is still running"}
                 </p>
                 <p className="text-sm leading-relaxed">
                   {hasShopifySyncError
@@ -219,16 +251,29 @@ export default function SimpleCostsClient() {
                     : "We\u2019re still importing orders and products from Shopify. Once the import completes you can finish setting up costs."}
                 </p>
                 <p className="text-xs uppercase tracking-wide text-warning-500">
-                  Products: {productStageLabel} • Inventory: {inventoryStageLabel} • Orders stage: {ordersStageLabel}
-                  {typeof shopifySyncProgress.ordersProcessed === 'number' ?
-                    (() => {
-                      const seen = shopifySyncProgress.totalOrdersSeen as number | null;
-                      const queued = shopifySyncProgress.ordersQueued as number | null;
-                      const denom = typeof seen === 'number' ? seen : (queued && queued > 0 ? queued : undefined);
-                      const suffix = denom !== undefined ? ` of ${denom}` : '';
-                      return ` • Orders processed: ${shopifySyncProgress.ordersProcessed}${suffix}`;
-                    })()
-                    : (shopifySyncProgress.recordsProcessed ? ` • Records processed: ${shopifySyncProgress.recordsProcessed}` : '')}
+                  Products: {productStageLabel} • Inventory:{" "}
+                  {inventoryStageLabel} • Orders stage: {ordersStageLabel}
+                  {typeof shopifySyncProgress.ordersProcessed === "number"
+                    ? (() => {
+                        const seen = shopifySyncProgress.totalOrdersSeen as
+                          | number
+                          | null;
+                        const queued = shopifySyncProgress.ordersQueued as
+                          | number
+                          | null;
+                        const denom =
+                          typeof seen === "number"
+                            ? seen
+                            : queued && queued > 0
+                              ? queued
+                              : undefined;
+                        const suffix =
+                          denom !== undefined ? ` of ${denom}` : "";
+                        return ` • Orders processed: ${shopifySyncProgress.ordersProcessed}${suffix}`;
+                      })()
+                    : shopifySyncProgress.recordsProcessed
+                      ? ` • Records processed: ${shopifySyncProgress.recordsProcessed}`
+                      : ""}
                 </p>
               </div>
             </div>
@@ -236,7 +281,8 @@ export default function SimpleCostsClient() {
               <div className="flex items-center justify-start gap-2 text-warning-500">
                 <Spinner size="sm" color="warning" />
                 <span className="text-xs">
-                  We&apos;ll unlock this step automatically when the sync finishes.
+                  We&apos;ll unlock this step automatically when the sync
+                  finishes.
                 </span>
               </div>
             )}
@@ -283,7 +329,8 @@ export default function SimpleCostsClient() {
         </div>
         <p className="text-default-600 text-base">
           Set global costs here. Product-specific costs (COGS, tax, handling)
-          are configured in the next step. You can refine all costs later in Cost Management.
+          are configured in the next step. You can refine all costs later in
+          Cost Management.
         </p>
       </div>
 
@@ -315,7 +362,9 @@ export default function SimpleCostsClient() {
           label="Payment Gateway Fee %"
           labelPlacement="outside"
           description="Percentage fee charged by your payment processor"
-          endContent={<span className="text-default-400 text-base font-medium">%</span>}
+          endContent={
+            <span className="text-default-400 text-base font-medium">%</span>
+          }
           placeholder="e.g. 2.9"
           type="number"
           inputMode="decimal"
@@ -345,12 +394,33 @@ export default function SimpleCostsClient() {
           value={form.shippingCost}
           onValueChange={onChange("shippingCost")}
         />
+
+        <Input
+          className="max-w-md"
+          size="lg"
+          label="Manual Return / RTO Rate (Average Monthly)"
+          labelPlacement="outside"
+          description="Only set this if Shopify doesn't capture returns/RTO. Leave blank to disable."
+          endContent={
+            <span className="text-default-400 text-base font-medium">%</span>
+          }
+          placeholder="e.g. 5"
+          type="number"
+          inputMode="decimal"
+          min={0}
+          max={100}
+          step="0.1"
+          value={form.manualReturnRate}
+          onValueChange={onChange("manualReturnRate")}
+        />
       </div>
 
       {/* Actions */}
       <div className="flex items-center justify-between pt-4 border-t border-divider">
         <Button
-          startContent={<Icon icon="solar:arrow-left-line-duotone" width={18} />}
+          startContent={
+            <Icon icon="solar:arrow-left-line-duotone" width={18} />
+          }
           variant="flat"
           size="lg"
           isDisabled={saving}
@@ -372,7 +442,9 @@ export default function SimpleCostsClient() {
           isLoading={saving}
           className="font-bold min-w-40"
           onPress={handleSave}
-          endContent={!saving && <Icon icon="solar:arrow-right-line-duotone" width={20} />}
+          endContent={
+            !saving && <Icon icon="solar:arrow-right-line-duotone" width={20} />
+          }
         >
           Save & Continue
         </Button>

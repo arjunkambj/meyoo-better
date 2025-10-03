@@ -6,6 +6,7 @@ export type DashboardConfig = {
 export const DEFAULT_DASHBOARD_CONFIG: DashboardConfig = {
   kpis: [
     "netProfit",
+    "rtoRevenueLost",
     "revenue",
     "netProfitMargin",
     "orders",

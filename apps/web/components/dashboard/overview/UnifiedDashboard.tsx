@@ -133,6 +133,8 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
       grossSales: overviewMetrics?.revenue?.value ?? 0,
       discounts: overviewMetrics?.discounts?.value || 0,
       discountRate: overviewMetrics?.discountRate?.value || 0,
+      rtoRevenueLost: overviewMetrics?.rtoRevenueLost?.value || 0,
+      manualReturnRate: overviewMetrics?.manualReturnRate?.value || 0,
       grossProfit: overviewMetrics?.grossProfit?.value || 0,
       grossProfitMargin: overviewMetrics?.grossProfitMargin?.value || 0,
       contributionMargin: overviewMetrics?.contributionMargin?.value || 0,

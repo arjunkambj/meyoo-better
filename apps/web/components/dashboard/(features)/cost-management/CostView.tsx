@@ -6,6 +6,7 @@ import OtherCostsTable from "./OtherCostsTable";
 import PaymentFeesTable from "./PaymentFeesTable";
 import ProductCostTable from "./ProductCostTable";
 import ShippingCostTable from "./ShippingCostTable";
+import ReturnRateSettings from "./ReturnRateSettings";
 
 export default function CostView() {
   return (
@@ -76,6 +77,18 @@ export default function CostView() {
             }
           >
             <OtherCostsTable />
+          </Tab>
+
+          <Tab
+            key="returns"
+            title={
+              <div className="flex items-center gap-2">
+                <Icon icon="solar:refresh-circle-bold-duotone" width={18} />
+                <span>RTO & Returns</span>
+              </div>
+            }
+          >
+            <ReturnRateSettings />
           </Tab>
         </Tabs>
       </div>

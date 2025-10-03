@@ -163,6 +163,19 @@ function buildOverviewMetrics(
       suffix: "%",
       decimal: 1,
     },
+    rtoRevenueLost: {
+      label: "RTO Revenue Lost",
+      value: summary.rtoRevenueLost || 0,
+      change: summary.rtoRevenueLostChange || 0,
+      prefix: currencySymbol,
+    },
+    manualReturnRate: {
+      label: "Manual Return Rate",
+      value: summary.manualReturnRate || 0,
+      change: summary.manualReturnRateChange || 0,
+      suffix: "%",
+      decimal: 1,
+    },
     grossProfit: {
       label: "Gross Profit",
       value: summary.grossProfit || 0,

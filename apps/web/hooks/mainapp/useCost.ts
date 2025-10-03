@@ -119,6 +119,33 @@ export function useExpenses() {
   };
 }
 
+export function useManualReturnRate() {
+  const rate = useQuery(api.core.costs.getManualReturnRate, {});
+
+  return {
+    manualReturnRate: rate || null,
+    loading: rate === undefined,
+    error: null,
+  };
+}
+
+export function useSetManualReturnRate() {
+  const mutation = useMutation(api.core.costs.setManualReturnRate);
+
+  return async (data: { ratePercent?: number; note?: string }) => {
+    const payload = {
+      ratePercent:
+        typeof data.ratePercent === "number" && !Number.isNaN(data.ratePercent)
+          ? data.ratePercent
+          : undefined,
+      note: data.note,
+    } as { ratePercent?: number; note?: string };
+
+    const result = await mutation(payload);
+    return result;
+  };
+}
+
 // ============ MUTATION HOOKS ============
 
 /**

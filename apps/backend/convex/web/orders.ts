@@ -32,6 +32,7 @@ const ORDER_ANALYTICS_DATASETS = [
   "variants",
   "variantCosts",
   "globalCosts",
+  "manualReturnRates",
   "metaInsights",
   "analytics",
 ] as const satisfies readonly AnalyticsSourceKey[];

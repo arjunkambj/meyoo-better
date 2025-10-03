@@ -1,10 +1,12 @@
 import { internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { ActionCtx } from "../_generated/server";
-import type {
-  AnalyticsSourceData,
-  AnalyticsSourceKey,
-  DateRange,
+import {
+  type AnalyticsSourceData,
+  type AnalyticsSourceKey,
+  type DateRange,
+  getRangeEndExclusiveMs,
+  getRangeStartMs,
 } from "./analyticsSource";
 
 const DEFAULT_ORDER_CHUNK_SIZE = 20;
@@ -147,6 +149,9 @@ export async function loadAnalyticsWithChunks(
     startDate: range.startDate,
     endDate: range.endDate,
   } as const;
+
+  const rangeStartMs = getRangeStartMs(range);
+  const rangeEndExclusiveMs = getRangeEndExclusiveMs(range);
 
   let orderCursor: string | null = null;
   let orderChunkSize = DEFAULT_ORDER_CHUNK_SIZE;
@@ -329,6 +334,22 @@ export async function loadAnalyticsWithChunks(
     if (supplementalMeta.reduced) {
       meta[`${dataset.key}ChunkSize`] = supplementalMeta.pageSize;
     }
+  }
+
+  if (shouldFetch("manualReturnRates")) {
+    const windowStart = Number.isFinite(rangeStartMs) ? rangeStartMs : undefined;
+    const windowEnd = Number.isFinite(rangeEndExclusiveMs)
+      ? rangeEndExclusiveMs - 1
+      : undefined;
+
+    data.manualReturnRates = await ctx.runQuery(
+      internal.core.costs.getManualReturnRateEntries,
+      {
+        organizationId: organizationId as Id<"organizations">,
+        windowStart,
+        windowEnd,
+      },
+    );
   }
 
   data.metaInsights = shouldFetch("metaInsights")

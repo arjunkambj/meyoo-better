@@ -14,6 +14,7 @@ export function useOnboardingCosts() {
     shippingCost?: number;
     paymentFeePercent?: number;
     operatingCosts?: number;
+    manualReturnRate?: number;
   }) => {
     try {
       const result = await saveInitialCostsMutation(costs);

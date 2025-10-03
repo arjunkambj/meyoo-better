@@ -222,7 +222,7 @@ function resolveManualReturnRate(
     return bTimestamp - aTimestamp;
   });
 
-  const selected = filtered[0];
+  const selected = filtered[0]!;
   const rawRate = safeNumber(selected.ratePercent ?? selected.rate ?? selected.value ?? 0);
   return { ratePercent: clampPercentage(rawRate) };
 }

@@ -1712,6 +1712,7 @@ export const saveInitialCosts = mutation({
           userId: user._id,
           ratePercent: args.manualReturnRate,
           isActive: (args.manualReturnRate ?? 0) > 0,
+          effectiveFrom: retroactiveEffectiveFrom,
         },
       );
       if (manualRateResult.changed) {

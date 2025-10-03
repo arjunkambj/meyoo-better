@@ -62,7 +62,7 @@ export default function CreateApiKeyModal({
           <>
             <ModalHeader className="flex flex-col gap-1">
               <div className="flex items-center gap-2">
-                <Icon icon="solar:key-bold" width={20} />
+                <Icon icon="solar:key-bold-duotone" width={20} />
                 Create New API Key
               </div>
             </ModalHeader>
@@ -88,7 +88,7 @@ export default function CreateApiKeyModal({
                 <div className="bg-warning-50 dark:bg-warning-100/10 p-3 rounded-lg">
                   <div className="flex gap-2">
                     <Icon
-                      icon="solar:danger-triangle-bold"
+                      icon="solar:danger-triangle-bold-duotone"
                       className="text-warning-600 dark:text-warning mt-0.5"
                       width={16}
                     />
@@ -121,7 +121,7 @@ export default function CreateApiKeyModal({
                 isLoading={isCreating}
                 startContent={
                   !isCreating && (
-                    <Icon icon="solar:add-circle-bold" width={18} />
+                    <Icon icon="solar:add-circle-bold-duotone" width={18} />
                   )
                 }
               >

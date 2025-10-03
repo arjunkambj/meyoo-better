@@ -92,7 +92,7 @@ export default function ApiKeyTable({
                 isDisabled={!item.isActive}
                 onPress={() => onDelete(item._id, item.name)}
               >
-                <Icon icon="solar:trash-bin-trash-bold" width={16} />
+                <Icon icon="solar:trash-bin-trash-bold-duotone" width={16} />
               </Button>
             </Tooltip>
           </div>

@@ -98,7 +98,7 @@ export default function InviteTeamModal() {
     <>
       <Button
         color="primary"
-        startContent={<Icon icon="solar:add-circle-linear" width={18} />}
+        startContent={<Icon icon="solar:add-circle-bold-duotone" width={18} />}
         onPress={() => setIsOpen(true)}
       >
         Invite Members
@@ -152,7 +152,7 @@ export default function InviteTeamModal() {
                       startContent={
                         <Icon
                           className="text-default-400"
-                          icon="solar:letter-linear"
+                          icon="solar:letter-bold-duotone"
                           width={18}
                         />
                       }
@@ -171,7 +171,7 @@ export default function InviteTeamModal() {
                         <div className="p-2 bg-warning/10 rounded-lg">
                           <Icon
                             className="text-warning"
-                            icon="solar:lock-keyhole-bold"
+                            icon="solar:lock-keyhole-bold-duotone"
                             width={18}
                           />
                         </div>
@@ -199,7 +199,7 @@ export default function InviteTeamModal() {
                       startContent={
                         !isLoading && (
                           <Icon
-                            icon="solar:user-plus-rounded-bold"
+                            icon="solar:user-plus-rounded-bold-duotone"
                             width={18}
                           />
                         )
@@ -218,7 +218,7 @@ export default function InviteTeamModal() {
                     <div className="p-3 bg-success/10 rounded-full">
                       <Icon
                         className="text-success"
-                        icon="solar:check-circle-bold"
+                        icon="solar:check-circle-bold-duotone"
                         width={48}
                       />
                     </div>
@@ -238,7 +238,7 @@ export default function InviteTeamModal() {
                       <div className="flex items-start gap-2">
                         <Icon
                           className="text-primary mt-0.5"
-                          icon="solar:info-circle-linear"
+                          icon="solar:info-circle-bold-duotone"
                           width={16}
                         />
                         <p className="text-xs text-default-500">

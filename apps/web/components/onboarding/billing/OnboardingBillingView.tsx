@@ -221,7 +221,7 @@ export default function OnboardingBillingView() {
                 isLoading: isLoadingTier,
                 endContent:
                   isActive || isLoadingTier ? undefined : (
-                    <Icon icon="solar:arrow-right-linear" width={16} />
+                    <Icon icon="solar:arrow-right-line-duotone" width={16} />
                   ),
                 onPress: () => {
                   if (isActive || isLoadingTier) return;

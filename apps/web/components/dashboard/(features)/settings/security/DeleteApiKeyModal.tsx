@@ -33,7 +33,7 @@ export default function DeleteApiKeyModal({
             <ModalHeader className="flex flex-col gap-1">
               <div className="flex items-center gap-2">
                 <Icon
-                  icon="solar:trash-bin-trash-bold"
+                  icon="solar:trash-bin-trash-bold-duotone"
                   className="text-danger"
                   width={20}
                 />
@@ -53,7 +53,7 @@ export default function DeleteApiKeyModal({
                 <div className="bg-danger-50 dark:bg-danger-100/10 p-3 rounded-lg">
                   <div className="flex gap-2">
                     <Icon
-                      icon="solar:danger-triangle-bold"
+                      icon="solar:danger-triangle-bold-duotone"
                       className="text-danger-600 dark:text-danger mt-0.5 flex-shrink-0"
                       width={16}
                     />

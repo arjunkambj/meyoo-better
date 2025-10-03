@@ -76,7 +76,7 @@ const UserProfile = React.memo(
         {
           key: "settings",
           href: "/settings",
-          icon: "solar:settings-linear",
+          icon: "solar:settings-bold-duotone",
           label: "Settings",
         },
       ],
@@ -122,8 +122,8 @@ const UserProfile = React.memo(
                 <Icon
                   icon={
                     theme === "dark"
-                      ? "solar:moon-stars-bold"
-                      : "solar:sun-bold"
+                      ? "solar:moon-stars-bold-duotone"
+                      : "solar:sun-bold-duotone"
                   }
                   width={20}
                   className="text-default-500"
@@ -141,9 +141,9 @@ const UserProfile = React.memo(
                     }}
                     thumbIcon={({ isSelected }) =>
                       isSelected ? (
-                        <Icon icon="solar:moon-bold" width={12} />
+                        <Icon icon="solar:moon-bold-duotone" width={12} />
                       ) : (
-                        <Icon icon="solar:sun-bold" width={12} />
+                        <Icon icon="solar:sun-bold-duotone" width={12} />
                       )
                     }
                   />
@@ -179,7 +179,7 @@ const UserProfile = React.memo(
             <DropdownItem
               key="logout"
               className="text-danger data-[hover=true]:bg-danger-50 data-[hover=true]:text-danger py-2"
-              startContent={<Icon icon="solar:logout-2-bold" width={20} />}
+              startContent={<Icon icon="solar:logout-2-bold-duotone" width={20} />}
               onPress={handleLogout}
             >
               <span className="text-small font-semibold">Log Out</span>

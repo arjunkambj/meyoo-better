@@ -246,7 +246,7 @@ export default function GlobalDateRangePicker({
           size={size}
           variant="bordered"
           startContent={<Icon icon="solar:calendar-bold-duotone" width={18} className="text-primary" />}
-          endContent={<Icon icon="solar:alt-arrow-down-linear" width={14} className="text-default-400" />}
+          endContent={<Icon icon="solar:alt-arrow-down-line-duotone" width={14} className="text-default-400" />}
         >
           {label ? (
             <div className="flex flex-col items-start">
@@ -272,7 +272,7 @@ export default function GlobalDateRangePicker({
                     variant={isActive ? "flat" : "light"}
                     color={isActive ? "primary" : "default"}
                     className="justify-start text-left text-sm font-medium"
-                    startContent={isActive && <Icon icon="solar:check-circle-bold" width={16} />}
+                    startContent={isActive && <Icon icon="solar:check-circle-bold-duotone" width={16} />}
                     onPress={() => handlePresetChange(presetItem.key)}
                   >
                     {presetItem.label}
@@ -289,14 +289,14 @@ export default function GlobalDateRangePicker({
                 placeholder="Start date"
                 value={calendarDateToString(draftRange.start)}
                 onValueChange={(input) => handleInputChange('start', input)}
-                startContent={<Icon icon="solar:calendar-minimalistic-linear" width={16} className="text-default-400" />}
+                startContent={<Icon icon="solar:calendar-minimalistic-bold-duotone" width={16} className="text-default-400" />}
               />
               <Input
                 size="sm"
                 placeholder="End date"
                 value={calendarDateToString(draftRange.end)}
                 onValueChange={(input) => handleInputChange('end', input)}
-                startContent={<Icon icon="solar:calendar-minimalistic-linear" width={16} className="text-default-400" />}
+                startContent={<Icon icon="solar:calendar-minimalistic-bold-duotone" width={16} className="text-default-400" />}
               />
             </div>
 
@@ -319,7 +319,7 @@ export default function GlobalDateRangePicker({
               <Button size="sm" variant="light" onPress={() => setIsOpen(false)}>
                 Cancel
               </Button>
-              <Button size="sm" color="primary" onPress={handleApply} startContent={<Icon icon="solar:check-circle-bold" width={16} />}>
+              <Button size="sm" color="primary" onPress={handleApply} startContent={<Icon icon="solar:check-circle-bold-duotone" width={16} />}>
                 Apply
               </Button>
             </div>

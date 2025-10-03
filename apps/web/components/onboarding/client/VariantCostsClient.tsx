@@ -485,7 +485,7 @@ export default function VariantCostsClient({
   const headerContent = hideTitle ? null : (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
       <div className="flex items-start gap-2">
-        <Icon icon="solar:box-minimalistic-bold" className="mt-1 text-primary" />
+        <Icon icon="solar:box-minimalistic-bold-duotone" className="mt-1 text-primary" />
         <div>
           <h2 className="text-xl font-semibold">Variant Costs</h2>
           <p className="text-xs text-default-500">
@@ -507,7 +507,7 @@ export default function VariantCostsClient({
                 input: DATA_TABLE_INPUT_CLASS,
               }}
               placeholder="Search..."
-              startContent={<Icon icon="solar:search-outline" width={16} />}
+              startContent={<Icon icon="solar:search-bold-duotone" width={16} />}
               value={search}
               onValueChange={setSearch}
             />
@@ -736,7 +736,7 @@ export default function VariantCostsClient({
                           />
                         ) : (
                           <div className="w-8 h-8 rounded bg-default-100 flex items-center justify-center text-default-400 flex-none">
-                            <Icon icon="solar:box-outline" width={16} />
+                            <Icon icon="solar:box-bold-duotone" width={16} />
                           </div>
                         )}
                         <div className="min-w-0">

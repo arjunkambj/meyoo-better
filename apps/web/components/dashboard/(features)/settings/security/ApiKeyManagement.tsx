@@ -72,12 +72,12 @@ export default function ApiKeyManagement() {
       <Card className="rounded-2xl border border-default-100 shadow-none bg-content2 dark:bg-content1">
         <CardHeader className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Icon icon="solar:key-bold" width={20} />
+            <Icon icon="solar:key-bold-duotone" width={20} />
             <h3 className="text-lg font-semibold text-default-800">API Keys</h3>
           </div>
           <Button
             color="primary"
-            startContent={<Icon icon="solar:add-circle-bold" width={18} />}
+            startContent={<Icon icon="solar:add-circle-bold-duotone" width={18} />}
             onPress={() => setShowCreateModal(true)}
           >
             Generate New Key

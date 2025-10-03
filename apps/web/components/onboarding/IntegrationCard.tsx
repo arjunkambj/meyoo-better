@@ -116,7 +116,7 @@ const SimpleIntegrationCard = React.memo(function SimpleIntegrationCard({
                   className="w-full sm:w-auto font-semibold"
                   color="primary"
                   endContent={
-                    <Icon icon="solar:arrow-right-bold-duotone" width={18} />
+                    <Icon icon="solar:arrow-right-line-duotone" width={18} />
                   }
                   onPress={onConnect}
                 >

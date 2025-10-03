@@ -32,7 +32,7 @@ export default function CostView() {
             key="products"
             title={
               <div className="flex items-center gap-2">
-                <Icon icon="solar:box-bold" width={18} />
+                <Icon icon="solar:box-bold-duotone" width={18} />
                 <span>Products</span>
               </div>
             }
@@ -44,7 +44,7 @@ export default function CostView() {
             key="shipping"
             title={
               <div className="flex items-center gap-2">
-                <Icon icon="solar:delivery-bold" width={18} />
+                <Icon icon="solar:delivery-bold-duotone" width={18} />
                 <span>Shipping</span>
               </div>
             }
@@ -56,7 +56,7 @@ export default function CostView() {
             key="payment"
             title={
               <div className="flex items-center gap-2">
-                <Icon icon="solar:card-bold" width={18} />
+                <Icon icon="solar:card-bold-duotone" width={18} />
                 <span>Payment Fees</span>
               </div>
             }
@@ -70,7 +70,7 @@ export default function CostView() {
             key="operating"
             title={
               <div className="flex items-center gap-2">
-                <Icon icon="solar:wallet-bold" width={18} />
+                <Icon icon="solar:wallet-bold-duotone" width={18} />
                 <span>Operating Costs</span>
               </div>
             }

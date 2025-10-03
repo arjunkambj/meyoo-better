@@ -113,7 +113,7 @@ export default function InvoicesList() {
           <div className="px-4 py-8 text-center">
             <Icon
               className="mx-auto mb-2 text-default-300"
-              icon="solar:document-text-linear"
+              icon="solar:document-text-bold-duotone"
               width={32}
             />
             <p className="text-xs text-default-500">No billing history yet</p>
@@ -179,7 +179,7 @@ export default function InvoicesList() {
                       size="sm"
                       startContent={
                         invoice.status === "paid" && (
-                          <Icon icon="solar:check-circle-bold" width={12} />
+                          <Icon icon="solar:check-circle-bold-duotone" width={12} />
                         )
                       }
                       variant="flat"
@@ -204,7 +204,7 @@ export default function InvoicesList() {
                       isDisabled={deletingId === invoice.id}
                       onPress={() => handleDelete(invoice.id)}
                     >
-                      <Icon icon="solar:trash-bin-trash-bold" width={16} />
+                      <Icon icon="solar:trash-bin-trash-bold-duotone" width={16} />
                     </Button>
                   </div>
                 </div>
@@ -219,7 +219,7 @@ export default function InvoicesList() {
         <div className="px-4 py-2 border-t border-divider">
           <Button
             color="primary"
-            endContent={<Icon icon="solar:arrow-down-linear" width={14} />}
+            endContent={<Icon icon="solar:arrow-down-line-duotone" width={14} />}
             size="sm"
             variant="flat"
             className="w-full h-7 text-xs"

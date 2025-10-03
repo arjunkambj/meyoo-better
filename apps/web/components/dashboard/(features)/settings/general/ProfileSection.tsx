@@ -236,7 +236,7 @@ export default function ProfileSection() {
                 });
               }}
             >
-              <Icon icon="solar:copy-bold" width={18} />
+              <Icon icon="solar:copy-bold-duotone" width={18} />
             </Button>
           }
           isReadOnly
@@ -278,7 +278,7 @@ export default function ProfileSection() {
                   });
                 }}
               >
-                <Icon icon="solar:copy-bold" width={18} />
+                <Icon icon="solar:copy-bold-duotone" width={18} />
               </Button>
             }
             isReadOnly
@@ -293,7 +293,7 @@ export default function ProfileSection() {
               className="w-full sm:w-auto"
               color="default"
               size="sm"
-              startContent={<Icon icon="solar:letter-bold" width={16} />}
+              startContent={<Icon icon="solar:letter-bold-duotone" width={16} />}
               variant="flat"
               onPress={onEmailOpen}
             >
@@ -303,7 +303,7 @@ export default function ProfileSection() {
               className="w-full sm:w-auto"
               color="default"
               size="sm"
-              startContent={<Icon icon="solar:lock-keyhole-bold" width={16} />}
+              startContent={<Icon icon="solar:lock-keyhole-bold-duotone" width={16} />}
               variant="flat"
               onPress={onOpen}
             >

@@ -127,7 +127,7 @@ export default function TeamSettingsView() {
             <div className="flex items-start gap-3">
               <Icon
                 className="text-default-500 mt-1"
-                icon="solar:info-circle-linear"
+                icon="solar:info-circle-bold-duotone"
                 width={20}
               />
               <div className="space-y-1">

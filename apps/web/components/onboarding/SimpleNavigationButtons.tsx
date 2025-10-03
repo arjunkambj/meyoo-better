@@ -55,7 +55,7 @@ export default function SimpleNavigationButtons({
           size="md"
           onPress={onPrevious}
           isDisabled={isLoading}
-          startContent={<Icon icon="solar:arrow-left-linear" />}
+          startContent={<Icon icon="solar:arrow-left-line-duotone" />}
         >
           {previousLabel}
         </Button>
@@ -73,9 +73,9 @@ export default function SimpleNavigationButtons({
           isLoading ? (
             <Icon icon="solar:spinner-linear" className="animate-spin" />
           ) : isLastStep ? (
-            <Icon icon="solar:check-circle-linear" />
+            <Icon icon="solar:check-circle-bold-duotone" />
           ) : (
-            <Icon icon="solar:arrow-right-linear" />
+            <Icon icon="solar:arrow-right-line-duotone" />
           )
         }
       >

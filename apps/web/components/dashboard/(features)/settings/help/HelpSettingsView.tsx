@@ -55,15 +55,15 @@ export default function HelpSettingsView() {
   const getStatusIcon = useCallback((status: string) => {
     switch (status) {
       case "open":
-        return "solar:clock-circle-bold";
+        return "solar:clock-circle-bold-duotone";
       case "in_progress":
-        return "solar:refresh-circle-bold";
+        return "solar:refresh-circle-bold-duotone";
       case "resolved":
-        return "solar:check-circle-bold";
+        return "solar:check-circle-bold-duotone";
       case "closed":
-        return "solar:close-circle-bold";
+        return "solar:close-circle-bold-duotone";
       default:
-        return "solar:question-circle-bold";
+        return "solar:question-circle-bold-duotone";
     }
   }, []);
 
@@ -230,7 +230,7 @@ export default function HelpSettingsView() {
                                 }
                               >
                                 <Icon
-                                  icon="solar:trash-bin-trash-bold"
+                                  icon="solar:trash-bin-trash-bold-duotone"
                                   className="text-danger"
                                   width={20}
                                 />
@@ -241,7 +241,7 @@ export default function HelpSettingsView() {
                             <div className="flex items-center gap-1 mt-2">
                               <Icon
                                 className="text-default-400"
-                                icon="solar:chat-square-bold"
+                                icon="solar:chat-square-bold-duotone"
                                 width={14}
                               />
                               <span className="text-xs text-default-500">
@@ -263,7 +263,7 @@ export default function HelpSettingsView() {
                       size="sm"
                       startContent={
                         <Icon
-                          icon="solar:archive-minimalistic-bold"
+                          icon="solar:archive-minimalistic-bold-duotone"
                           width={16}
                         />
                       }

@@ -79,7 +79,7 @@ export default function PlanOverview() {
             size="sm"
             startContent={
               currentPlanKey === "free" ? null : (
-                <Icon icon="solar:crown-star-bold" width={14} />
+                <Icon icon="solar:crown-star-bold-duotone" width={14} />
               )
             }
             variant="flat"

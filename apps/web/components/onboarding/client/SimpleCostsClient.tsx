@@ -350,7 +350,7 @@ export default function SimpleCostsClient() {
       {/* Actions */}
       <div className="flex items-center justify-between pt-4 border-t border-divider">
         <Button
-          startContent={<Icon icon="solar:arrow-left-bold-duotone" width={18} />}
+          startContent={<Icon icon="solar:arrow-left-line-duotone" width={18} />}
           variant="flat"
           size="lg"
           isDisabled={saving}
@@ -372,7 +372,7 @@ export default function SimpleCostsClient() {
           isLoading={saving}
           className="font-bold min-w-40"
           onPress={handleSave}
-          endContent={!saving && <Icon icon="solar:arrow-right-bold-duotone" width={20} />}
+          endContent={!saving && <Icon icon="solar:arrow-right-line-duotone" width={20} />}
         >
           Save & Continue
         </Button>

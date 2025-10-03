@@ -119,7 +119,7 @@ export default function AvailablePlans() {
           <div className="flex gap-2.5">
             <Icon
               className="text-danger shrink-0 mt-0.5"
-              icon="solar:danger-bold"
+              icon="solar:danger-bold-duotone"
               width={16}
             />
             <div className="flex-1 space-y-1">
@@ -129,7 +129,7 @@ export default function AvailablePlans() {
               <Button
                 color="danger"
                 size="sm"
-                startContent={<Icon icon="solar:refresh-linear" width={14} />}
+                startContent={<Icon icon="solar:refresh-bold-duotone" width={14} />}
                 variant="flat"
                 className="h-6 text-xs px-2"
                 onPress={clearError}
@@ -193,7 +193,7 @@ export default function AvailablePlans() {
                   disabled || !planName || isCurrentPlan
                     ? undefined
                     : (
-                        <Icon icon="solar:arrow-right-linear" width={14} />
+                        <Icon icon="solar:arrow-right-line-duotone" width={14} />
                       ),
                 onPress: () => {
                   if (!planName || disabled) return;
@@ -210,7 +210,7 @@ export default function AvailablePlans() {
         <div className="flex gap-2.5 items-start">
           <Icon
             className="text-success shrink-0 mt-0.5"
-            icon="solar:gift-bold"
+            icon="solar:gift-bold-duotone"
             width={16}
           />
           <p className="text-xs text-default-700">

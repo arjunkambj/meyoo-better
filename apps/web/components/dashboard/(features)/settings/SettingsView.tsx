@@ -34,7 +34,7 @@ export default function SettingsView() {
             key="general"
             title={
               <div className="flex items-center gap-2">
-                <Icon icon="solar:user-bold" width={18} />
+                <Icon icon="solar:user-bold-duotone" width={18} />
                 <span>General</span>
               </div>
             }
@@ -46,7 +46,7 @@ export default function SettingsView() {
             key="billing"
             title={
               <div className="flex items-center gap-2">
-                <Icon icon="solar:card-bold" width={18} />
+                <Icon icon="solar:card-bold-duotone" width={18} />
                 <span>Billing &amp; Invoices</span>
               </div>
             }
@@ -58,7 +58,7 @@ export default function SettingsView() {
             key="team"
             title={
               <div className="flex items-center gap-2">
-                <Icon icon="solar:users-group-rounded-bold" width={18} />
+                <Icon icon="solar:users-group-rounded-bold-duotone" width={18} />
                 <span>Team</span>
               </div>
             }
@@ -70,7 +70,7 @@ export default function SettingsView() {
             key="security"
             title={
               <div className="flex items-center gap-2">
-                <Icon icon="solar:lock-keyhole-bold" width={18} />
+                <Icon icon="solar:lock-keyhole-bold-duotone" width={18} />
                 <span>MCP &amp; Security</span>
               </div>
             }
@@ -82,7 +82,7 @@ export default function SettingsView() {
             key="support"
             title={
               <div className="flex items-center gap-2">
-                <Icon icon="solar:question-circle-bold" width={18} />
+                <Icon icon="solar:question-circle-bold-duotone" width={18} />
                 <span>Help &amp; Support</span>
               </div>
             }

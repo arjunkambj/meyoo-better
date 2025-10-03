@@ -130,7 +130,7 @@ export function IntegrationsView() {
             key="all"
             title={
               <div className="flex items-center gap-2">
-                <Icon icon="solar:widget-2-bold" width={18} />
+                <Icon icon="solar:widget-2-bold-duotone" width={18} />
                 <span>All ({allIntegrations.length})</span>
               </div>
             }
@@ -165,7 +165,7 @@ export function IntegrationsView() {
             key="connected"
             title={
               <div className="flex items-center gap-2">
-                <Icon icon="solar:link-circle-bold" width={18} />
+                <Icon icon="solar:link-circle-bold-duotone" width={18} />
                 <span>Connected ({connectedIntegrations.length})</span>
               </div>
             }
@@ -219,7 +219,7 @@ export function IntegrationsView() {
             key="available"
             title={
               <div className="flex items-center gap-2">
-                <Icon icon="solar:add-square-bold" width={18} />
+                <Icon icon="solar:add-square-bold-duotone" width={18} />
                 <span>Available ({availableIntegrations.length})</span>
               </div>
             }
@@ -268,7 +268,7 @@ export function IntegrationsView() {
             key="upcoming"
             title={
               <div className="flex items-center gap-2">
-                <Icon icon="solar:hourglass-line-duotone" width={18} />
+                <Icon icon="solar:hourglass-bold-duotone" width={18} />
                 <span>Upcoming</span>
               </div>
             }

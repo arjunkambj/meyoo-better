@@ -54,7 +54,7 @@ export default function LeaveOrganizationButton() {
     <>
       <Button
         color="danger"
-        startContent={<Icon icon="solar:logout-2-linear" width={18} />}
+        startContent={<Icon icon="solar:logout-2-bold-duotone" width={18} />}
         onPress={() => setOpen(true)}
       >
         Leave Organization
@@ -67,7 +67,7 @@ export default function LeaveOrganizationButton() {
               <ModalHeader className="flex items-center gap-2">
                 <Icon
                   className="text-danger"
-                  icon="solar:warning-triangle-bold"
+                  icon="solar:warning-triangle-bold-duotone"
                   width={20}
                 />
                 <span>Leave Organization</span>

@@ -60,7 +60,7 @@ export default function ApiKeyDisplayModal({
           <>
             <ModalHeader className="flex flex-col gap-1">
               <div className="flex items-center gap-2">
-                <Icon icon="solar:key-bold" className="text-success" width={20} />
+                <Icon icon="solar:key-bold-duotone" className="text-success" width={20} />
                 API Key Created Successfully
               </div>
             </ModalHeader>
@@ -75,7 +75,7 @@ export default function ApiKeyDisplayModal({
                 <div className="bg-danger-50 dark:bg-danger-100/10 p-3 rounded-lg">
                   <div className="flex gap-2">
                     <Icon
-                      icon="solar:danger-triangle-bold"
+                      icon="solar:danger-triangle-bold-duotone"
                       className="text-danger-600 dark:text-danger mt-0.5 flex-shrink-0"
                       width={16}
                     />
@@ -122,7 +122,7 @@ export default function ApiKeyDisplayModal({
                 onPress={handleCopy}
                 startContent={
                   <Icon
-                    icon={copied ? "solar:check-circle-bold" : "solar:copy-bold"}
+                    icon={copied ? "solar:check-circle-bold-duotone" : "solar:copy-bold-duotone"}
                     width={18}
                   />
                 }

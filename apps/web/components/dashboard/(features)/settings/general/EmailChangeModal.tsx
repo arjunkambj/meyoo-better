@@ -132,7 +132,7 @@ export default function EmailChangeModal({
         {(onClose) => (
           <>
             <ModalHeader className="flex items-center gap-2">
-              <Icon icon="solar:letter-bold" width={20} />
+              <Icon icon="solar:letter-bold-duotone" width={20} />
               <span>Change Email</span>
             </ModalHeader>
             <ModalBody>
@@ -186,7 +186,7 @@ export default function EmailChangeModal({
                     startContent={
                       <Icon
                         className="text-default-400"
-                        icon="solar:lock-keyhole-bold"
+                        icon="solar:lock-keyhole-bold-duotone"
                         width={20}
                       />
                     }
@@ -202,8 +202,8 @@ export default function EmailChangeModal({
                           className="text-default-400"
                           icon={
                             showCurrentPassword
-                              ? "solar:eye-closed-linear"
-                              : "solar:eye-linear"
+                              ? "solar:eye-closed-bold-duotone"
+                              : "solar:eye-bold-duotone"
                           }
                           width={20}
                         />

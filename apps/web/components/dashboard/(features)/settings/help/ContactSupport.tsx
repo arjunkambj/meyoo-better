@@ -3,7 +3,6 @@ import {
   Button,
   Card,
   CardBody,
-  Divider,
   Input,
   Spacer,
   Textarea,
@@ -137,7 +136,7 @@ export default function ContactSupport() {
         <div className="bg-success/10 border border-success/20 rounded-lg p-4 flex items-start gap-3">
           <Icon
             className="text-success mt-0.5"
-            icon="solar:check-circle-bold"
+            icon="solar:check-circle-bold-duotone"
             width={20}
           />
           <div>
@@ -157,7 +156,7 @@ export default function ContactSupport() {
         <div className="bg-danger/10 border border-danger/20 rounded-lg p-4 flex items-start gap-3">
           <Icon
             className="text-danger mt-0.5"
-            icon="solar:danger-triangle-bold"
+            icon="solar:danger-triangle-bold-duotone"
             width={20}
           />
           <div>
@@ -190,7 +189,7 @@ export default function ContactSupport() {
                   startContent={
                     <Icon
                       className="text-default-400"
-                      icon="solar:user-bold"
+                      icon="solar:user-bold-duotone"
                       width={18}
                     />
                   }
@@ -212,7 +211,7 @@ export default function ContactSupport() {
                   startContent={
                     <Icon
                       className="text-default-400"
-                      icon="solar:letter-bold"
+                      icon="solar:letter-bold-duotone"
                       width={18}
                     />
                   }
@@ -238,7 +237,7 @@ export default function ContactSupport() {
                 startContent={
                   <Icon
                     className="text-default-400"
-                    icon="solar:chat-square-bold"
+                    icon="solar:chat-square-bold-duotone"
                     width={18}
                   />
                 }
@@ -268,7 +267,7 @@ export default function ContactSupport() {
                   <div className="flex items-center gap-1">
                     <Icon
                       className="text-success"
-                      icon="solar:shield-check-bold"
+                      icon="solar:shield-check-bold-duotone"
                       width={16}
                     />
                     <span>Secure & private</span>
@@ -277,7 +276,7 @@ export default function ContactSupport() {
                   <div className="flex items-center gap-1">
                     <Icon
                       className="text-primary"
-                      icon="solar:clock-circle-bold"
+                      icon="solar:clock-circle-bold-duotone"
                       width={16}
                     />
                     <span>Avg. response 2–4 hrs</span>
@@ -291,7 +290,7 @@ export default function ContactSupport() {
                   size="md"
                   startContent={
                     !isSubmitting && (
-                      <Icon icon="solar:letter-send-bold" width={18} />
+                      <Icon icon="solar:letter-send-bold-duotone" width={18} />
                     )
                   }
                   type="submit"
@@ -352,7 +351,7 @@ export default function ContactSupport() {
               <span className="p-2 rounded-md bg-warning/10">
                 <Icon
                   className="text-warning"
-                  icon="solar:calendar-bold"
+                  icon="solar:calendar-bold-duotone"
                   width={18}
                 />
               </span>
@@ -371,7 +370,7 @@ export default function ContactSupport() {
               <span className="p-2 rounded-md bg-default/10">
                 <Icon
                   className="text-default-500"
-                  icon="solar:shield-keyhole-bold"
+                  icon="solar:shield-keyhole-bold-duotone"
                   width={18}
                 />
               </span>

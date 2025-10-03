@@ -198,7 +198,7 @@ const NavigationButtons = memo(function NavigationButtons({
             variant="flat"
             onPress={handlePrevious}
             isDisabled={internalLoading || isNextLoading}
-            startContent={<Icon icon="solar:arrow-left-bold-duotone" width={18} />}
+            startContent={<Icon icon="solar:arrow-left-line-duotone" width={18} />}
             className="font-semibold"
           >
             {previousLabel}

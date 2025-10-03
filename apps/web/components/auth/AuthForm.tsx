@@ -211,7 +211,7 @@ export const AuthForm = React.memo(function AuthForm({
                   startContent={
                     <Icon
                       className="mr-1 text-default-400"
-                      icon="solar:letter-bold"
+                      icon="solar:letter-bold-duotone"
                       width={20}
                     />
                   }
@@ -236,8 +236,8 @@ export const AuthForm = React.memo(function AuthForm({
                         className="text-default-400"
                         icon={
                           showPassword
-                            ? "solar:eye-closed-linear"
-                            : "solar:eye-linear"
+                            ? "solar:eye-closed-bold-duotone"
+                            : "solar:eye-bold-duotone"
                         }
                         width={20}
                       />
@@ -250,7 +250,7 @@ export const AuthForm = React.memo(function AuthForm({
                   startContent={
                     <Icon
                       className="mr-1 text-default-400"
-                      icon="solar:lock-keyhole-bold"
+                      icon="solar:lock-keyhole-bold-duotone"
                       width={20}
                     />
                   }

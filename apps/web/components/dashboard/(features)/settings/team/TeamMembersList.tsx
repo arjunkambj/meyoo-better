@@ -165,7 +165,7 @@ export default function TeamMembersList() {
                   size="sm"
                   startContent={
                     !removingUserId && (
-                      <Icon icon="solar:trash-bin-2-linear" width={16} />
+                      <Icon icon="solar:trash-bin-2-bold-duotone" width={16} />
                     )
                   }
                   variant="light"

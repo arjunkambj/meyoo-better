@@ -161,7 +161,7 @@ export function CustomerSummaryWidget({
 
   return (
     <Card
-      className="p-5 bg-default-100 dark:bg-content1 border border-default-50 rounded-2xl"
+      className="p-5 bg-default-100 dark:bg-content1 border border-default-50 rounded-2xl h-full"
       shadow="none"
     >
       <div className="mb-4 pb-4 border-b border-divider">

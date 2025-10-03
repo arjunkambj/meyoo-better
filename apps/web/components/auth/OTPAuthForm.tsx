@@ -177,7 +177,7 @@ export const OTPAuthForm = React.memo(function OTPAuthForm({
           radius="lg"
           size="lg"
           startContent={
-            <Icon className="mr-1" icon="solar:letter-bold" width={20} />
+            <Icon className="mr-1" icon="solar:letter-bold-duotone" width={20} />
           }
           type="email"
           value={email}
@@ -212,7 +212,7 @@ export const OTPAuthForm = React.memo(function OTPAuthForm({
         placeholder="Enter 6-digit code"
         radius="lg"
         size="lg"
-        startContent={<Icon icon="solar:shield-keyhole-bold" width={18} />}
+        startContent={<Icon icon="solar:shield-keyhole-bold-duotone" width={18} />}
         value={code}
         variant="bordered"
         onChange={(e) => setCode(e.target.value)}

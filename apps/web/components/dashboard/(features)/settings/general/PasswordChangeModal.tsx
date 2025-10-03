@@ -161,13 +161,13 @@ export default function PasswordChangeModal({
                           {showCurrentPassword ? (
                             <Icon
                               className="text-default-400"
-                              icon="solar:eye-closed-linear"
+                              icon="solar:eye-closed-bold-duotone"
                               width={20}
                             />
                           ) : (
                             <Icon
                               className="text-default-400"
-                              icon="solar:eye-linear"
+                              icon="solar:eye-bold-duotone"
                               width={20}
                             />
                           )}
@@ -182,7 +182,7 @@ export default function PasswordChangeModal({
                       startContent={
                         <Icon
                           className="text-default-400"
-                          icon="solar:lock-keyhole-bold"
+                          icon="solar:lock-keyhole-bold-duotone"
                           width={20}
                         />
                       }

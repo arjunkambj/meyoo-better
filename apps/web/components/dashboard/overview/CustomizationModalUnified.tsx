@@ -3,6 +3,7 @@
 import {
   Button,
   Chip,
+  Input,
   Modal,
   ModalBody,
   ModalContent,
@@ -41,11 +42,33 @@ export function CustomizationModalUnified({
   const [activeTab, setActiveTab] = useState<"kpi" | "widget">("kpi");
   const [selectedKpis, setSelectedKpis] = useState<string[]>(kpiItems);
   const [selectedWidgets, setSelectedWidgets] = useState<string[]>(widgetItems);
+  const [searchQuery, setSearchQuery] = useState("");
   const [_isPending, startTransition] = useTransition();
 
   // Memoize all metrics and widgets to avoid recalculation
   const allMetrics = useMemo(() => Object.values(METRICS), []);
   const allWidgets = useMemo(() => getAllWidgets(), []);
+
+  // Filter items based on search query
+  const filteredMetrics = useMemo(() => {
+    if (!searchQuery.trim()) return allMetrics;
+    const query = searchQuery.toLowerCase();
+    return allMetrics.filter(
+      (m) =>
+        m.label.toLowerCase().includes(query) ||
+        m.description?.toLowerCase().includes(query)
+    );
+  }, [allMetrics, searchQuery]);
+
+  const filteredWidgets = useMemo(() => {
+    if (!searchQuery.trim()) return allWidgets;
+    const query = searchQuery.toLowerCase();
+    return allWidgets.filter(
+      (w) =>
+        w.name.toLowerCase().includes(query) ||
+        w.description?.toLowerCase().includes(query)
+    );
+  }, [allWidgets, searchQuery]);
 
   // Get items based on active tab - with section headers for better organization
   const displayItems = useMemo(() => {
@@ -63,7 +86,7 @@ export function CustomizationModalUnified({
       > = [];
 
       for (const category of Object.values(METRIC_CATEGORIES)) {
-        const metricsInCategory = allMetrics.filter(
+        const metricsInCategory = filteredMetrics.filter(
           (m) => m.category === category.id
         );
         if (metricsInCategory.length === 0) continue;
@@ -96,9 +119,9 @@ export function CustomizationModalUnified({
       return itemsWithHeaders;
     } else {
       // Return all widgets
-      return allWidgets;
+      return filteredWidgets;
     }
-  }, [activeTab, allMetrics, allWidgets]);
+  }, [activeTab, filteredMetrics, filteredWidgets]);
 
   // no-op
 
@@ -152,79 +175,156 @@ export function CustomizationModalUnified({
     [activeTab]
   );
 
+  const handleSelectAll = useCallback(() => {
+    if (activeTab === "kpi") {
+      const allIds = filteredMetrics.map((m) => m.id);
+      setSelectedKpis((prev) => [...new Set([...prev, ...allIds])]);
+    } else {
+      const allIds = filteredWidgets.map((w) => w.id);
+      setSelectedWidgets((prev) => [...new Set([...prev, ...allIds])]);
+    }
+  }, [activeTab, filteredMetrics, filteredWidgets]);
+
+  const handleDeselectAll = useCallback(() => {
+    if (activeTab === "kpi") {
+      const idsToRemove = new Set(filteredMetrics.map((m) => m.id));
+      setSelectedKpis((prev) => prev.filter((id) => !idsToRemove.has(id)));
+    } else {
+      const idsToRemove = new Set(filteredWidgets.map((w) => w.id));
+      setSelectedWidgets((prev) => prev.filter((id) => !idsToRemove.has(id)));
+    }
+  }, [activeTab, filteredMetrics, filteredWidgets]);
+
+  const handleResetToDefault = useCallback(() => {
+    if (activeTab === "kpi") {
+      setSelectedKpis([...DEFAULT_DASHBOARD_CONFIG.kpis]);
+    } else {
+      setSelectedWidgets([...DEFAULT_DASHBOARD_CONFIG.widgets]);
+    }
+  }, [activeTab]);
+
+  // Calculate counts
+  const totalCount = useMemo(
+    () => (activeTab === "kpi" ? allMetrics.length : allWidgets.length),
+    [activeTab, allMetrics.length, allWidgets.length]
+  );
+
+  const selectedCount = useMemo(
+    () => (activeTab === "kpi" ? selectedKpis.length : selectedWidgets.length),
+    [activeTab, selectedKpis.length, selectedWidgets.length]
+  );
+
   return (
     <Modal isOpen={isOpen} scrollBehavior="inside" size="4xl" onClose={onClose}>
-      <ModalContent className="max-h-[85vh]">
+      <ModalContent className="max-h-[85vh] rounded-2xl">
         {(onClose) => (
           <>
-            <ModalHeader className="pb-3 pt-5 flex-shrink-0">
-              <div>
-                <h2 className="text-xl font-bold text-default-900">
-                  Customize Dashboard
-                </h2>
-                <p className="text-xs text-default-600 mt-1">
-                  Select KPIs and widgets for your dashboard
-                </p>
+            <ModalHeader className="pb-3 pt-5 bg-background flex-shrink-0 rounded-t-2xl">
+              <div className="w-full">
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <h2 className="text-xl font-bold text-default-900">
+                      Customize Dashboard
+                    </h2>
+                    <p className="text-xs text-default-500 mt-1">
+                      Select and organize{" "}
+                      {activeTab === "kpi" ? "KPI metrics" : "widgets"} for your
+                      dashboard
+                    </p>
+                  </div>
+                  <Chip size="sm" variant="flat" color="default">
+                    {selectedCount} of {totalCount} selected
+                  </Chip>
+                </div>
               </div>
             </ModalHeader>
-            <ModalBody className="p-4 overflow-hidden flex flex-col bg-default-50 gap-4">
-              {/* Tabs and Clear button in same row */}
-              <div className="flex items-center justify-between">
-                <Tabs
-                  aria-label="Customization tabs"
-                  selectedKey={activeTab}
-                  onSelectionChange={(key) => {
-                    startTransition(() => {
-                      setActiveTab(key as "kpi" | "widget");
-                    });
+            <ModalBody className="p-4 overflow-hidden flex flex-col bg-background gap-4">
+              {/* Tabs */}
+              <Tabs
+                aria-label="Customization tabs"
+                selectedKey={activeTab}
+                onSelectionChange={(key) => {
+                  startTransition(() => {
+                    setActiveTab(key as "kpi" | "widget");
+                    setSearchQuery(""); // Clear search on tab change
+                  });
+                }}
+                classNames={{
+                  tabList: "border border-default-100",
+                }}
+              >
+                <Tab
+                  key="kpi"
+                  title={
+                    <div className="flex items-center gap-1.5">
+                      <Icon icon="solar:chart-2-bold-duotone" width={14} />
+                      <span className="text-sm">KPI Cards</span>
+                      <Chip className="h-5 text-xs" color="primary" size="sm">
+                        {selectedKpis.length}
+                      </Chip>
+                    </div>
+                  }
+                />
+                <Tab
+                  key="widget"
+                  title={
+                    <div className="flex items-center gap-1.5">
+                      <Icon icon="solar:widget-bold-duotone" width={14} />
+                      <span className="text-sm">Widgets</span>
+                      <Chip className="h-5 text-xs" color="primary" size="sm">
+                        {selectedWidgets.length}
+                      </Chip>
+                    </div>
+                  }
+                />
+              </Tabs>
+
+              {/* Search and action buttons */}
+              <div className="flex gap-2">
+                <Input
+                  size="sm"
+                  placeholder={`Search ${activeTab === "kpi" ? "metrics" : "widgets"}...`}
+                  value={searchQuery}
+                  onValueChange={setSearchQuery}
+                  startContent={
+                    <Icon
+                      icon="solar:magnifer-linear"
+                      width={16}
+                      className="text-default-400"
+                    />
+                  }
+                  isClearable
+                  onClear={() => setSearchQuery("")}
+                  classNames={{
+                    input: "text-sm",
+                    inputWrapper: "h-9",
                   }}
-                >
-                  <Tab
-                    key="kpi"
-                    title={
-                      <div className="flex items-center gap-1.5">
-                        <Icon icon="solar:chart-2-bold-duotone" width={14} />
-                        <span className="text-sm">KPI Cards</span>
-                        <Chip
-                          className="h-5 text-xs"
-                          color="primary"
-                          size="sm"
-                          variant="flat"
-                        >
-                          {selectedKpis.length}
-                        </Chip>
-                      </div>
-                    }
-                  />
-                  <Tab
-                    key="widget"
-                    title={
-                      <div className="flex items-center gap-1.5">
-                        <Icon icon="solar:widget-bold-duotone" width={14} />
-                        <span className="text-sm">Widgets</span>
-                        <Chip
-                          className="h-5 text-xs"
-                          color="secondary"
-                          size="sm"
-                          variant="flat"
-                        >
-                          {selectedWidgets.length}
-                        </Chip>
-                      </div>
-                    }
-                  />
-                </Tabs>
+                />
                 <Button
                   size="sm"
-                  variant="light"
-                  startContent={<Icon icon="solar:eraser-linear" width={14} />}
-                  onPress={() =>
-                    activeTab === "kpi"
-                      ? setSelectedKpis([...DEFAULT_DASHBOARD_CONFIG.kpis])
-                      : setSelectedWidgets([...DEFAULT_DASHBOARD_CONFIG.widgets])
-                  }
+                  variant="flat"
+                  onPress={handleSelectAll}
+                  className="flex-shrink-0"
                 >
-                  Clear
+                  Select All
+                </Button>
+                <Button
+                  size="sm"
+                  variant="flat"
+                  onPress={handleDeselectAll}
+                  className="flex-shrink-0"
+                >
+                  Deselect All
+                </Button>
+                <Button
+                  size="sm"
+                  variant="flat"
+                  color="danger"
+                  startContent={<Icon icon="solar:restart-linear" width={14} />}
+                  onPress={handleResetToDefault}
+                  className="flex-shrink-0"
+                >
+                  Reset
                 </Button>
               </div>
 
@@ -251,8 +351,8 @@ export function CustomizationModalUnified({
                 />
               </div>
             </ModalBody>
-            <ModalFooter>
-              <Button variant="light" onPress={onClose}>
+            <ModalFooter className="bg-background rounded-b-2xl">
+              <Button variant="flat" onPress={onClose}>
                 Cancel
               </Button>
               <Button color="primary" onPress={handleApply}>

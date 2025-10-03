@@ -67,7 +67,7 @@ export const SelectedItemsList = React.memo(function SelectedItemsList({
 
   return (
     <div
-      className={`border-l pl-4 overflow-hidden ${className || ""}`}
+      className={`px-3 py-2 rounded-lg bg-background overflow-hidden ${className || ""}`}
       style={style}
     >
       <div className="flex items-center justify-between mb-3">

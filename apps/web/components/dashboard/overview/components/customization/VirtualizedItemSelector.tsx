@@ -51,14 +51,16 @@ const ItemRow = React.memo(
 
     return (
       <div
-        className={`py-1.5 px-2 border border-divider rounded-md hover:bg-default-50 transition-colors ${
-          isSelected ? "bg-primary-50 border-primary-200" : ""
+        className={`group relative rounded-md border transition-all ${
+          isSelected
+            ? "bg-primary-50/40 border-default-100 dark:bg-primary-100/5 dark:border-default-200/30"
+            : "bg-default-50/50 border-default-100 hover:bg-primary-50/30 hover:border-default-150 dark:bg-default-50/5 dark:border-default-200/20 dark:hover:bg-primary-50/10"
         }`}
       >
         <Checkbox
           classNames={{
-            base: "p-0 m-0 min-w-full",
-            wrapper: "m-0 mr-2 w-4 h-4",
+            base: "py-1.5 px-2 m-0 min-w-full",
+            wrapper: "m-0 mr-1.5 w-4 h-4",
             label: "w-full",
           }}
           isSelected={isSelected}
@@ -70,13 +72,15 @@ const ItemRow = React.memo(
             <Icon
               className={
                 isSelected
-                  ? "text-primary-500"
-                  : item.iconColor || "text-default-400"
+                  ? "text-primary-600 dark:text-primary-400"
+                  : item.iconColor || "text-default-500"
               }
               icon={item.icon}
               width={14}
             />
-            <span className="text-xs font-medium text-default-700 flex-1 truncate">
+            <span className={`text-xs font-medium flex-1 truncate leading-tight ${
+              isSelected ? "text-primary-700 dark:text-primary-300" : "text-default-700 dark:text-default-300"
+            }`}>
               {item.label || item.name}
             </span>
           </div>
@@ -146,28 +150,28 @@ export function VirtualizedItemSelector({
   }, [items]);
 
   return (
-    <div className={cn("px-2 flex flex-col", className)} style={style}>
+    <div className={cn("px-3 py-2 flex flex-col rounded-lg bg-background", className)} style={style}>
       <ScrollShadow hideScrollBar className="h-[430px]" visibility="none">
-        <div className="">
+        <div className="pr-1">
           {renderableRows.map((row, index) => {
             if (row.type === "section") {
               const section = row.section;
               return (
-                <div key={section.id} className="w-full mt-5 mb-3 first:mt-0">
-                  <div className="flex items-center justify-between px-3 py-2 bg-gradient-to-r from-default-100 to-default-50 rounded-lg border border-default-200">
-                    <div className="flex items-center gap-2.5">
+                <div key={section.id} className="w-full mt-4 mb-2 first:mt-0">
+                  <div className="flex items-center justify-between px-2 py-1.5 bg-default-100/50 dark:bg-default-100/5 rounded-md border border-default-100 dark:border-default-200/20">
+                    <div className="flex items-center gap-2">
                       <Icon
-                        className="text-primary-500"
+                        className="text-primary-600 dark:text-primary-400"
                         icon={section.icon}
-                        width={18}
+                        width={14}
                       />
-                      <span className="text-sm font-semibold text-default-800">
+                      <span className="text-xs font-semibold text-default-800 dark:text-default-200">
                         {section.label}
                       </span>
                     </div>
                     {section.count && (
-                      <span className="text-xs font-medium text-default-600 bg-default-100 px-2 py-0.5 rounded-full">
-                        {section.count} metrics
+                      <span className="text-xs font-medium text-default-600 dark:text-default-400 bg-default-200/50 dark:bg-default-300/20 px-2 py-0.5 rounded-full">
+                        {section.count}
                       </span>
                     )}
                   </div>

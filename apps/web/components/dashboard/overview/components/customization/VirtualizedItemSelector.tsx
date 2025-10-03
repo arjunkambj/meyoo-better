@@ -53,8 +53,8 @@ const ItemRow = React.memo(
       <div
         className={`group relative rounded-md border transition-all ${
           isSelected
-            ? "bg-primary-50/40 border-default-100 dark:bg-primary-100/5 dark:border-default-200/30"
-            : "bg-default-50/50 border-default-100 hover:bg-primary-50/30 hover:border-default-150 dark:bg-default-50/5 dark:border-default-200/20 dark:hover:bg-primary-50/10"
+            ? "bg-primary-50/80 dark:bg-primary-50/20 border-default-200/20"
+            : "bg-default-100 border-default-200/20"
         }`}
       >
         <Checkbox
@@ -73,14 +73,18 @@ const ItemRow = React.memo(
               className={
                 isSelected
                   ? "text-primary-600 dark:text-primary-400"
-                  : item.iconColor || "text-default-500"
+                  : item.iconColor || "text-default-700"
               }
               icon={item.icon}
               width={14}
             />
-            <span className={`text-xs font-medium flex-1 truncate leading-tight ${
-              isSelected ? "text-primary-700 dark:text-primary-300" : "text-default-700 dark:text-default-300"
-            }`}>
+            <span
+              className={`text-xs font-medium flex-1 truncate leading-tight ${
+                isSelected
+                  ? "text-primary-700 dark:text-primary-400"
+                  : "text-default-800"
+              }`}
+            >
               {item.label || item.name}
             </span>
           </div>
@@ -150,7 +154,13 @@ export function VirtualizedItemSelector({
   }, [items]);
 
   return (
-    <div className={cn("px-3 py-2 flex flex-col rounded-lg bg-background", className)} style={style}>
+    <div
+      className={cn(
+        "px-3 py-2 flex flex-col rounded-lg bg-background",
+        className
+      )}
+      style={style}
+    >
       <ScrollShadow hideScrollBar className="h-[430px]" visibility="none">
         <div className="pr-1">
           {renderableRows.map((row, index) => {
@@ -158,19 +168,19 @@ export function VirtualizedItemSelector({
               const section = row.section;
               return (
                 <div key={section.id} className="w-full mt-4 mb-2 first:mt-0">
-                  <div className="flex items-center justify-between px-2 py-1.5 bg-default-100/50 dark:bg-default-100/5 rounded-md border border-default-100 dark:border-default-200/20">
+                  <div className="flex items-center justify-between px-2 py-1.5 bg-default-100 rounded-md border border-default-200/80">
                     <div className="flex items-center gap-2">
                       <Icon
                         className="text-primary-600 dark:text-primary-400"
                         icon={section.icon}
                         width={14}
                       />
-                      <span className="text-xs font-semibold text-default-800 dark:text-default-200">
+                      <span className="text-xs font-semibold text-default-800">
                         {section.label}
                       </span>
                     </div>
                     {section.count && (
-                      <span className="text-xs font-medium text-default-600 dark:text-default-400 bg-default-200/50 dark:bg-default-300/20 px-2 py-0.5 rounded-full">
+                      <span className="text-xs font-medium text-default-600 bg-default-200/50 px-2 py-0.5 rounded-full">
                         {section.count}
                       </span>
                     )}

@@ -42,8 +42,8 @@ export function SortableItem({
     <div
       ref={setNodeRef}
       className={cn(
-        "flex items-center justify-between p-1.5 rounded-lg border border-divider bg-content1 mb-1.5",
-        isDragging && "opacity-50",
+        "flex items-center justify-between p-1.5 rounded-lg border border-200/50 bg-default-100  mb-1.5",
+        isDragging && "opacity-50"
       )}
       style={style}
     >
@@ -54,9 +54,9 @@ export function SortableItem({
           className="cursor-grab active:cursor-grabbing p-0.5 flex-shrink-0"
         >
           <Icon
-            className="text-default-400"
+            className="text-default-700"
             icon="solar:hamburger-menu-linear"
-            width={14}
+            width={16}
           />
         </div>
         <Icon className="flex-shrink-0" icon={icon} width={14} />

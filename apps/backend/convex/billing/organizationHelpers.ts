@@ -259,11 +259,6 @@ export const updateOrganizationPlanInternalWithTracking = internalMutation({
       throw new Error(`Organization not found: ${organizationId}`);
     }
 
-    // Update organization plan - only include fields that exist in organizations schema
-    await ctx.db.patch(organization._id, {
-      updatedAt: Date.now(),
-    });
-
     // Update or create billing record
     const billing = await ctx.db
       .query("billing")

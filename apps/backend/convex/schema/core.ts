@@ -405,6 +405,7 @@ export const onboarding = defineTable({
           startedAt: v.number(),
         }),
       ),
+      firecrawlLastAttemptAt: v.optional(v.number()),
       syncPendingPlatforms: v.optional(v.array(v.string())),
       syncCheckAttempts: v.optional(v.number()),
       lastSyncCheckAt: v.optional(v.number()),

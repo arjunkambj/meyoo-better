@@ -1119,7 +1119,7 @@ export const monitorInitialSyncs = internalMutation({
 
     let processed = 0;
     let completedCount = 0;
-    const analyticsCount = 0;
+    let analyticsCount = 0;
     let pendingCount = 0;
 
     // Heal sync sessions that imported data but never flipped to "completed" so onboarding can finish.
@@ -1403,6 +1403,8 @@ export const monitorInitialSyncs = internalMutation({
           completedPlatforms.size === platforms.length &&
           pendingPlatforms.size === 0;
 
+        const justCompletedCandidate = !wasComplete && allCompleted;
+
         if (pendingPlatforms.size > 0) {
           pendingCount += 1;
         } else if (allCompleted) {
@@ -1418,6 +1420,9 @@ export const monitorInitialSyncs = internalMutation({
 
           onboardingData.syncCheckAttempts = previousAttempts + 1;
           onboardingData.lastSyncCheckAt = now;
+          if (justCompletedCandidate) {
+            onboardingData.analyticsTriggeredAt = now;
+          }
 
           await ctx.db.patch(onboarding._id, {
             isInitialSyncComplete: allCompleted,
@@ -1426,7 +1431,7 @@ export const monitorInitialSyncs = internalMutation({
           });
 
           appliedUpdate = true;
-          justCompleted = !wasComplete && allCompleted;
+          justCompleted = justCompletedCandidate;
         }
 
         // Best-effort snapshot refresh
@@ -1472,6 +1477,7 @@ export const monitorInitialSyncs = internalMutation({
                 },
               },
             );
+            analyticsCount += 1;
           }
         }
       } catch (error) {

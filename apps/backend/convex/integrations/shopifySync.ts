@@ -980,8 +980,11 @@ export const initial = internalAction({
                             (edge: {
                               node: {
                                 available?: number | null;
+                                availableQuantity?: number | null;
                                 incoming?: number | null;
+                                incomingQuantity?: number | null;
                                 committed?: number | null;
+                                reservedQuantity?: number | null;
                                 location?:
                                   | {
                                       id?: string | null;
@@ -990,24 +993,33 @@ export const initial = internalAction({
                               };
                             }) => {
                               const location = edge.node.location;
+                              const availableValue =
+                                typeof edge.node.availableQuantity === "number"
+                                  ? edge.node.availableQuantity
+                                  : typeof edge.node.available === "number"
+                                    ? edge.node.available
+                                    : 0;
+                              const incomingValue =
+                                typeof edge.node.incomingQuantity === "number"
+                                  ? edge.node.incomingQuantity
+                                  : typeof edge.node.incoming === "number"
+                                    ? edge.node.incoming
+                                    : 0;
+                              const reservedValue =
+                                typeof edge.node.reservedQuantity === "number"
+                                  ? edge.node.reservedQuantity
+                                  : typeof edge.node.committed === "number"
+                                    ? edge.node.committed
+                                    : 0;
                               return {
                                 locationId:
                                   location?.id?.replace(
                                     "gid://shopify/Location/",
                                     ""
                                   ) || "",
-                                available:
-                                  typeof edge.node.available === "number"
-                                    ? edge.node.available
-                                    : 0,
-                                incoming:
-                                  typeof edge.node.incoming === "number"
-                                    ? edge.node.incoming
-                                    : 0,
-                                committed:
-                                  typeof edge.node.committed === "number"
-                                    ? edge.node.committed
-                                    : 0,
+                                available: availableValue,
+                                incoming: incomingValue,
+                                committed: reservedValue,
                               };
                             }
                           );

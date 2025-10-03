@@ -6,13 +6,16 @@ import Firecrawl, {
 import { action } from '../_generated/server';
 import { v } from 'convex/values';
 import { rag } from '../rag';
-import { internal } from '../_generated/api';
+import { internal, api } from '../_generated/api';
 import type { Id } from '../_generated/dataModel';
 import { resolveOrgIdForContext } from '../utils/org';
 import { requireEnv } from '../utils/env';
 
+type CrawlOptions = Parameters<Firecrawl['crawl']>[1];
+
 const FIRECRAWL_API_KEY = requireEnv('FIRECRAWL_API_KEY');
 const DEFAULT_MAX_PAGES: number | undefined = undefined;
+const FALLBACK_PAGE_LIMITS: number[] = [120, 80, 40, 20, 10];
 const SUMMARY_PAGE_LIMIT = 5;
 const SUMMARY_SNIPPET_LENGTH = 600;
 
@@ -105,6 +108,67 @@ function buildSummary(rootUrl: string, pages: FirecrawlDocument[]): string {
   ].join('\n\n');
 }
 
+function extractFirecrawlErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  if (error && typeof error === 'object') {
+    const withMessage = error as { message?: unknown; error?: unknown };
+    if (withMessage.message) {
+      return String(withMessage.message);
+    }
+    if (withMessage.error) {
+      return String(withMessage.error);
+    }
+
+    const details = (error as { details?: { error?: unknown } }).details;
+    if (details?.error) {
+      return String(details.error);
+    }
+  }
+
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
+}
+
+function isInsufficientCreditsError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  const status = (error as { status?: unknown }).status;
+  if (typeof status === 'number' && status === 402) {
+    return true;
+  }
+
+  const message = extractFirecrawlErrorMessage(error).toLowerCase();
+  return message.includes('insufficient credits');
+}
+
+function formatFirecrawlError(
+  url: string,
+  error: unknown,
+  limit: number | undefined,
+): string {
+  const baseMessage = `Failed to crawl ${url}`;
+  const errorMessage = extractFirecrawlErrorMessage(error);
+
+  if (isInsufficientCreditsError(error)) {
+    const limitMessage =
+      limit !== undefined ? ` with page limit ${limit}` : '';
+    return (
+      `${baseMessage}${limitMessage}: ${errorMessage}. ` +
+      'Try lowering the page limit or ensure your Firecrawl plan has enough credits.'
+    );
+  }
+
+  return `${baseMessage}: ${errorMessage}`;
+}
+
 export const seedDocsFromFirecrawl = action({
   args: {
     url: v.string(),
@@ -134,10 +198,27 @@ export const seedDocsFromFirecrawl = action({
       { orgId: orgId as Id<'organizations'> },
     );
 
-    const firecrawlStatus = onboarding?.onboardingData?.firecrawlSeedingStatus;
-    const alreadySeeded = Boolean(
-      onboarding?.onboardingData?.firecrawlSeededAt,
-    );
+    const onboardingData = onboarding?.onboardingData || {};
+    const lastAttemptAt = onboardingData.firecrawlLastAttemptAt;
+    const firecrawlStatus = onboardingData.firecrawlSeedingStatus;
+    const alreadySeeded = Boolean(onboardingData.firecrawlSeededAt);
+    const hasAttemptedFirecrawl = Boolean(lastAttemptAt);
+    const isScheduledRetry = firecrawlStatus?.status === 'scheduled';
+
+    if (hasAttemptedFirecrawl && !isScheduledRetry && args.force !== true) {
+      const lastAttemptIso =
+        typeof lastAttemptAt === 'number'
+          ? new Date(lastAttemptAt).toISOString()
+          : 'unknown time';
+      console.log(
+        `Skipping Firecrawl crawl for ${args.url} because an attempt already ran at ${lastAttemptIso}.`,
+      );
+      return {
+        skipped: true,
+        reason:
+          'Firecrawl seeding already attempted for this organization. Use force=true to rerun.',
+      };
+    }
 
     if (alreadySeeded && args.force !== true) {
       return {
@@ -169,23 +250,90 @@ export const seedDocsFromFirecrawl = action({
     }
 
     const firecrawl = createFirecrawlClient();
-    const maxPages = args.maxPages ?? DEFAULT_MAX_PAGES;
+    const enqueueRetry = async (
+      delayMs: number,
+      reason: string,
+    ): Promise<void> => {
+      const nextAttempt = Date.now() + delayMs;
+      console.warn(
+        `Firecrawl rate limited for ${args.url}. Retrying at ${new Date(nextAttempt).toISOString()} (${reason}).`,
+      );
+
+      if (onboardingId) {
+        await ctx.runMutation(
+          internal.agent.firecrawl.markFirecrawlSeedingScheduled,
+          {
+            onboardingId,
+            retryAt: nextAttempt,
+          },
+        );
+      }
+
+      await ctx.scheduler.runAfter(delayMs, api.agent.firecrawlSeed.seedDocsFromFirecrawl, {
+        url: args.url,
+        includePaths: args.includePaths,
+        excludePaths: args.excludePaths,
+        maxPages: args.maxPages,
+        organizationId: args.organizationId ?? undefined,
+        shopDomain: args.shopDomain ?? undefined,
+        force: true,
+      });
+    };
+    const initialLimit = args.maxPages ?? DEFAULT_MAX_PAGES;
+    const fallbackLimits =
+      args.maxPages === undefined ? FALLBACK_PAGE_LIMITS : [];
+
+    const limitsToTry: Array<number | undefined> = [];
+    const ensureLimit = (limit: number | undefined) => {
+      if (limit === undefined) {
+        if (!limitsToTry.includes(undefined)) {
+          limitsToTry.push(undefined);
+        }
+        return;
+      }
+
+      if (!Number.isFinite(limit) || limit <= 0) {
+        return;
+      }
+
+      if (!limitsToTry.includes(limit)) {
+        limitsToTry.push(limit);
+      }
+    };
+
+    ensureLimit(initialLimit);
+    for (const limit of fallbackLimits) {
+      ensureLimit(limit);
+    }
+
+    if (limitsToTry.length === 0) {
+      limitsToTry.push(undefined);
+    }
+
+    const formatLimitLogValue = (limit: number | undefined): string =>
+      limit === undefined ? 'unbounded' : String(limit);
 
     console.log(
-      `Starting Firecrawl crawl for ${args.url} with limit ${maxPages}`,
+      `Starting Firecrawl crawl for ${args.url} with limit ${formatLimitLogValue(limitsToTry[0])}`,
     );
 
     try {
-      let crawlResult;
-      try {
-        const crawlOptions: Parameters<typeof firecrawl.crawl>[1] = {
+      let crawlResult: Awaited<ReturnType<typeof firecrawl.crawl>> | null = null;
+      let usedLimit: number | undefined = limitsToTry[0];
+      let lastError: unknown;
+
+      for (let attemptIndex = 0; attemptIndex < limitsToTry.length; attemptIndex += 1) {
+        const limit = limitsToTry[attemptIndex];
+        usedLimit = limit;
+
+        const crawlOptions: CrawlOptions = {
           scrapeOptions: {
             formats: ['markdown'],
           },
         };
 
-        if (maxPages !== undefined) {
-          crawlOptions.limit = maxPages;
+        if (limit !== undefined) {
+          crawlOptions.limit = limit;
         }
 
         if (args.includePaths && args.includePaths.length > 0) {
@@ -196,11 +344,73 @@ export const seedDocsFromFirecrawl = action({
           crawlOptions.excludePaths = args.excludePaths;
         }
 
-        crawlResult = await firecrawl.crawl(args.url, crawlOptions);
-      } catch (error) {
-        console.error('Firecrawl crawl failed:', error);
+        try {
+          crawlResult = await firecrawl.crawl(args.url, crawlOptions);
+          break;
+        } catch (error) {
+          const hasMoreAttempts = attemptIndex < limitsToTry.length - 1;
+          if (isInsufficientCreditsError(error) && hasMoreAttempts) {
+            const nextLimit = limitsToTry[attemptIndex + 1];
+            console.warn(
+              `Firecrawl reported insufficient credits for ${args.url} with page limit ${formatLimitLogValue(limit)}. Retrying with ${formatLimitLogValue(nextLimit)}.`,
+            );
+            lastError = error;
+            continue;
+          }
+
+          const status = (error as { status?: number }).status;
+          if (status === 429) {
+            const resetTs = (() => {
+              const details = (error as { details?: { resetAt?: string; error?: string } }).details;
+              if (details?.resetAt) {
+                const parsed = Date.parse(details.resetAt);
+                if (!Number.isNaN(parsed)) {
+                  return parsed;
+                }
+              }
+
+              const message = extractFirecrawlErrorMessage(error);
+              const match = message.match(/resets at ([^.]+)/i);
+              if (match && match[1]) {
+                const parsed = Date.parse(match[1]);
+                if (!Number.isNaN(parsed)) {
+                  return parsed;
+                }
+              }
+              return undefined;
+            })();
+
+            const delay = (() => {
+              if (resetTs) {
+                const ms = resetTs - Date.now();
+                if (ms > 0) {
+                  return Math.min(ms, 5 * 60 * 1000);
+                }
+              }
+              return 60 * 1000;
+            })();
+
+            await enqueueRetry(delay, "429 rate limit");
+            return {
+              skipped: true,
+              reason: `Firecrawl rate limited. Retry scheduled in ${Math.round(delay / 1000)}s.`,
+            };
+          }
+
+          console.error('Firecrawl crawl failed:', error);
+          throw new Error(formatFirecrawlError(args.url, error, limit));
+        }
+      }
+
+      if (!crawlResult) {
+        const errorToReport =
+          lastError ?? new Error('Firecrawl crawl failed for an unknown reason.');
+        console.error(
+          'Firecrawl crawl failed after applying all fallback limits:',
+          errorToReport,
+        );
         throw new Error(
-          `Failed to crawl ${args.url}: ${error instanceof Error ? error.message : String(error)}`,
+          formatFirecrawlError(args.url, errorToReport, limitsToTry.at(-1)),
         );
       }
 
@@ -212,7 +422,7 @@ export const seedDocsFromFirecrawl = action({
       }
 
       console.log(
-        `Crawl completed successfully. Processing ${crawlResult.data?.length ?? 0} pages...`,
+        `Crawl completed successfully with limit ${formatLimitLogValue(usedLimit)}. Processing ${crawlResult.data?.length ?? 0} pages...`,
       );
 
       const relevantPages: FirecrawlDocument[] =

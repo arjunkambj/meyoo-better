@@ -65,6 +65,44 @@ const scheduleAnalyticsRebuild = async (
   );
 };
 
+const safeSerialize = (value: unknown): string => {
+  if (value === undefined) return "undefined";
+  if (value === null) return "null";
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "bigint"
+  ) {
+    return String(value);
+  }
+  if (typeof value === "symbol") {
+    return value.toString();
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return "[unserializable]";
+  }
+};
+
+const normalizeError = (
+  error: unknown,
+): { error: Error; context: Record<string, unknown> } => {
+  if (error instanceof Error) {
+    return { error, context: {} };
+  }
+
+  const rawError = safeSerialize(error);
+  return {
+    error: new Error(rawError),
+    context: {
+      rawError,
+      errorType: typeof error,
+    },
+  };
+};
+
 /**
  * Shopify Webhook HTTP Handler (fast path)
  * - Verify HMAC
@@ -92,11 +130,15 @@ export const shopifyWebhook = httpAction(async (ctx, request) => {
 
     // Validate required headers
     if (!topic || !domain) {
-      logger.error("Missing required headers", {
-        topic,
-        domain,
-        requestId,
-      });
+      logger.error(
+        "Missing required headers",
+        undefined,
+        {
+          topic,
+          domain,
+          requestId,
+        },
+      );
       return new Response(
         JSON.stringify({ error: "Missing required headers" }),
         {
@@ -117,10 +159,14 @@ export const shopifyWebhook = httpAction(async (ctx, request) => {
         : false);
 
     if (!isValid) {
-      logger.error("Invalid signature", {
-        domain,
-        requestId,
-      });
+      logger.error(
+        "Invalid signature",
+        undefined,
+        {
+          domain,
+          requestId,
+        },
+      );
       return new Response(JSON.stringify({ error: "Invalid signature" }), {
         status: 401,
         headers: { "Content-Type": "application/json" },
@@ -197,11 +243,16 @@ export const shopifyWebhook = httpAction(async (ctx, request) => {
     });
   } catch (error) {
     const processingTime = Date.now() - requestStart;
-    logger.error("Processing error", {
-      error,
-      requestId,
-      processingTime,
-    });
+    const { error: normalizedError, context } = normalizeError(error);
+    logger.error(
+      "Processing error",
+      normalizedError,
+      {
+        requestId,
+        processingTime,
+        ...context,
+      },
+    );
     return new Response(
       JSON.stringify({
         success: false,
@@ -345,10 +396,13 @@ async function handleTopicInline(
     case "orders/delete": {
       if (!organizationId) break;
       const shopifyId = String((payload as any).id);
-      const existingOrder = await ctx.db
-        .query("shopifyOrders")
-        .withIndex("by_shopify_id", (q: any) => q.eq("shopifyId", shopifyId))
-        .first();
+      const existingOrder = await ctx.runQuery(
+        (internal.integrations.shopify as any).getOrderByShopifyIdInternal,
+        {
+          organizationId,
+          shopifyId,
+        },
+      );
 
       await ctx.runMutation(
         internal.integrations.shopify.deleteOrderByShopifyIdInternal,
@@ -457,11 +511,23 @@ async function handleTopicInline(
       if (!organizationId || !storeId) break;
       // Best-effort delete by id
       const shopifyId = String((payload as any).id);
-      const existing = await ctx.db
-        .query("shopifyCustomers")
-        .withIndex("by_shopify_id_store", (q: any) => q.eq("shopifyId", shopifyId).eq("storeId", storeId))
-        .first();
-      if (existing) await ctx.db.delete(existing._id);
+      const existing = await ctx.runQuery(
+        (internal.integrations.shopify as any).getCustomerByShopifyIdInternal,
+        {
+          organizationId,
+          storeId,
+          shopifyId,
+        },
+      );
+      if (existing) {
+        await ctx.runMutation(
+          internal.integrations.shopify.deleteCustomerInternal,
+          {
+            organizationId,
+            customerId: shopifyId,
+          },
+        );
+      }
       const canSchedule = await hasCompletedInitialShopifySync(ctx as any, organizationId);
       const today = msToDateString(Date.now());
       if (canSchedule && today) {
@@ -732,10 +798,15 @@ async function handleTopicInline(
             organizationId: orgId,
           });
         } catch (e) {
-          logger.error("Failed to find organization by shop domain", {
-            shopDomain,
-            error: String(e),
-          });
+          const { error: normalizedError, context } = normalizeError(e);
+          logger.error(
+            "Failed to find organization by shop domain",
+            normalizedError,
+            {
+              shopDomain,
+              ...context,
+            },
+          );
         }
       }
 
@@ -748,10 +819,15 @@ async function handleTopicInline(
             { shopDomain },
           );
         } catch (e) {
-          logger.error("Failed to mark store inactive", {
-            shopDomain,
-            error: String(e),
-          });
+          const { error: normalizedError, context } = normalizeError(e);
+          logger.error(
+            "Failed to mark store inactive",
+            normalizedError,
+            {
+              shopDomain,
+              ...context,
+            },
+          );
         }
       }
 
@@ -766,10 +842,15 @@ async function handleTopicInline(
             category: "integration",
           });
         } catch (e) {
-          logger.error("Failed to emit integration:disconnected event", {
-            organizationId: orgId,
-            error: String(e),
-          });
+          const { error: normalizedError, context } = normalizeError(e);
+          logger.error(
+            "Failed to emit integration:disconnected event",
+            normalizedError,
+            {
+              organizationId: orgId,
+              ...context,
+            },
+          );
         }
 
         // Call the main uninstall handler to reset user state and delete data
@@ -783,18 +864,22 @@ async function handleTopicInline(
             internal.integrations.shopify.handleAppUninstalled as any,
             { organizationId: String(orgId), shopDomain },
           );
-          
+
           logger.info("Successfully called handleAppUninstalled", {
             organizationId: String(orgId),
             shopDomain,
           });
         } catch (e) {
-          logger.error("Failed to call handleAppUninstalled", {
-            organizationId: String(orgId),
-            shopDomain,
-            error: String(e),
-            errorStack: (e as any)?.stack,
-          });
+          const { error: normalizedError, context } = normalizeError(e);
+          logger.error(
+            "Failed to call handleAppUninstalled",
+            normalizedError,
+            {
+              organizationId: String(orgId),
+              shopDomain,
+              ...context,
+            },
+          );
         }
       } else {
         logger.warn("Cannot reset user state - missing organizationId", {

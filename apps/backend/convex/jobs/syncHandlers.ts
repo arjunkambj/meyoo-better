@@ -405,13 +405,10 @@ export const handleShopifyOrdersBatch = internalAction({
             },
           });
 
-          await ctx.runMutation(
-            internal.core.onboarding.monitorInitialSyncs,
-            {
-              organizationId: args.organizationId,
-              limit: 1,
-            },
-          );
+          await ctx.runMutation(internal.core.onboarding.monitorInitialSyncs, {
+            organizationId: args.organizationId,
+            limit: 1,
+          });
         }
       }
 

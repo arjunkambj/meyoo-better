@@ -429,6 +429,16 @@ export const resetMembersBatch = internalMutation({
 
     for (const member of page.page) {
       const resetTimestamp = Date.now();
+      const onboardingResetData = {
+        completedSteps: [],
+        setupDate: new Date(resetTimestamp).toISOString(),
+        firecrawlSeededAt: undefined,
+        firecrawlSeededUrl: undefined,
+        firecrawlSummary: undefined,
+        firecrawlPageCount: undefined,
+        firecrawlSeedingStatus: undefined,
+        firecrawlLastAttemptAt: undefined,
+      };
 
       // Mark any existing memberships as removed so the user leaves the organization
       const memberships = await ctx.db
@@ -465,10 +475,7 @@ export const resetMembersBatch = internalMutation({
           isInitialSyncComplete: false,
           isProductCostSetup: false,
           isExtraCostSetup: false,
-          onboardingData: {
-            completedSteps: [],
-            setupDate: new Date().toISOString(),
-          },
+          onboardingData: onboardingResetData,
           updatedAt: resetTimestamp,
         });
       }
@@ -1905,11 +1912,12 @@ export const resetEverything = action({
       await deleteTable(table);
     }
 
-    // Cost tracking tables
+    // Cost tracking and analytics tables
     for (const table of [
       "globalCosts",
       "manualReturnRates",
       "variantCosts",
+      "dailyMetrics",
     ] satisfies OrgScopedTable[]) {
       await deleteTable(table);
     }

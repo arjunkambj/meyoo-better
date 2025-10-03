@@ -49,6 +49,29 @@ export const markFirecrawlSeedingInProgress = internalMutation({
           status: "in_progress",
           startedAt: Date.now(),
         },
+        firecrawlLastAttemptAt: Date.now(),
+      },
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+export const markFirecrawlSeedingScheduled = internalMutation({
+  args: {
+    onboardingId: v.id("onboarding"),
+    retryAt: v.number(),
+  },
+  handler: async (ctx, { onboardingId, retryAt }) => {
+    const existing = await ctx.db.get(onboardingId);
+    if (!existing) return;
+
+    await ctx.db.patch(onboardingId, {
+      onboardingData: {
+        ...(existing.onboardingData || {}),
+        firecrawlSeedingStatus: {
+          status: "scheduled",
+          retryAt,
+        },
       },
       updatedAt: Date.now(),
     });

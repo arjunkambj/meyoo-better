@@ -1457,9 +1457,9 @@ export class ShopifyGraphQLClient {
             inventoryLevels(first: 10) {
               edges {
                 node {
-                  available
-                  incoming
-                  committed
+                  availableQuantity: available
+                  incomingQuantity: incoming
+                  reservedQuantity: committed
                   location {
                     id
                   }
@@ -1477,9 +1477,9 @@ export class ShopifyGraphQLClient {
         inventoryLevels: {
           edges: Array<{
             node: {
-              available?: number | null;
-              incoming?: number | null;
-              committed?: number | null;
+              availableQuantity?: number | null;
+              incomingQuantity?: number | null;
+              reservedQuantity?: number | null;
               location?: {
                 id?: string | null;
               } | null;

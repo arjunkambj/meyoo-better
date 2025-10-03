@@ -13,7 +13,7 @@ import {
   query,
 } from "../_generated/server";
 
-import type { MutationCtx } from "../_generated/server";
+import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { createIntegration, type SyncResult } from "./_base";
 import { normalizeShopDomain } from "../utils/shop";
 import { msToDateString } from "../utils/date";
@@ -29,6 +29,9 @@ const BULK_OPS = {
   LOOKUP_SIZE: 200,
 } as const;
 
+const ORDER_WEBHOOK_RETRY_DELAY_MS = 5_000;
+const ORDER_WEBHOOK_MAX_RETRIES = 5;
+
 function chunkArray<T>(values: T[], chunkSize: number): T[][] {
   if (values.length === 0) return [];
 
@@ -43,24 +46,49 @@ function chunkArray<T>(values: T[], chunkSize: number): T[][] {
 }
 
 type ContextWithDb = {
-  db: any;
+  db?: QueryCtx["db"] | MutationCtx["db"];
+  runQuery?: MutationCtx["runQuery"];
 };
 
 export async function hasCompletedInitialShopifySync(
   ctx: ContextWithDb,
   organizationId: Id<"organizations">,
 ): Promise<boolean> {
-  const onboarding = await (ctx.db.query("onboarding") as any)
-    .withIndex("by_organization", (q: any) =>
-      q.eq("organizationId", organizationId),
-    )
-    .first();
+  if (ctx?.db?.query) {
+    const onboarding = await (ctx.db.query("onboarding") as any)
+      .withIndex("by_organization", (q: any) =>
+        q.eq("organizationId", organizationId),
+      )
+      .first();
 
-  if (!onboarding) {
-    return true;
+    if (!onboarding) {
+      return true;
+    }
+
+    return Boolean(onboarding.isInitialSyncComplete);
   }
 
-  return Boolean(onboarding.isInitialSyncComplete);
+  if (typeof ctx?.runQuery === "function") {
+    const onboardingRecords = (await ctx.runQuery(
+      internal.webhooks.processor.getOnboardingByOrganization as any,
+      { organizationId },
+    )) as unknown;
+
+    const onboarding = Array.isArray(onboardingRecords)
+      ? onboardingRecords[0]
+      : onboardingRecords;
+
+    if (!onboarding) {
+      return true;
+    }
+
+    return Boolean((onboarding as Record<string, unknown>).isInitialSyncComplete);
+  }
+
+  logger.warn("Unable to determine initial sync status - missing db/runQuery", {
+    organizationId,
+  });
+  return true;
 }
 
 export const getInitialSyncStatusInternal = internalQuery({
@@ -73,6 +101,45 @@ export const getInitialSyncStatusInternal = internalQuery({
       ctx,
       args.organizationId as Id<"organizations">,
     );
+  },
+});
+
+export const getOrderByShopifyIdInternal = internalQuery({
+  args: {
+    organizationId: v.id("organizations"),
+    shopifyId: v.string(),
+  },
+  returns: v.union(v.null(), v.any()),
+  handler: async (ctx, args) => {
+    const order = await ctx.db
+      .query("shopifyOrders")
+      .withIndex("by_shopify_id", (q) => q.eq("shopifyId", args.shopifyId))
+      .first();
+
+    if (!order) return null;
+    if (order.organizationId !== args.organizationId) return null;
+    return order;
+  },
+});
+
+export const getCustomerByShopifyIdInternal = internalQuery({
+  args: {
+    organizationId: v.id("organizations"),
+    storeId: v.id("shopifyStores"),
+    shopifyId: v.string(),
+  },
+  returns: v.union(v.null(), v.any()),
+  handler: async (ctx, args) => {
+    const customer = await ctx.db
+      .query("shopifyCustomers")
+      .withIndex("by_shopify_id_store", (q) =>
+        q.eq("shopifyId", args.shopifyId).eq("storeId", args.storeId),
+      )
+      .first();
+
+    if (!customer) return null;
+    if (customer.organizationId !== args.organizationId) return null;
+    return customer;
   },
 });
 
@@ -165,6 +232,7 @@ const ORGANIZATION_TABLES = [
   "globalCosts",
   "manualReturnRates",
   "variantCosts",
+  "dailyMetrics",
   "integrationSessions",
   "syncSessions",
   "invites",
@@ -196,6 +264,7 @@ const organizationTableValidator = v.union(
   v.literal("globalCosts"),
   v.literal("manualReturnRates"),
   v.literal("variantCosts"),
+  v.literal("dailyMetrics"),
   v.literal("integrationSessions"),
   v.literal("syncSessions"),
   v.literal("invites"),
@@ -2806,10 +2875,12 @@ export const storeTransactionsInternal = internalMutation({
     organizationId: v.id("organizations"),
     transactions: v.array(v.any()),
     shouldScheduleAnalytics: v.optional(v.boolean()),
+    retryCount: v.optional(v.number()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     const affectedDates = new Set<string>();
+    const retryTransactions: Array<(typeof args.transactions)[number]> = [];
     for (const transaction of args.transactions) {
       // Find the order first
       const order = await ctx.db
@@ -2823,7 +2894,9 @@ export const storeTransactionsInternal = internalMutation({
         logger.warn("Order not found for transaction", {
           orderId: transaction.shopifyOrderId,
           transactionId: transaction.shopifyId,
+          retryCount: args.retryCount ?? 0,
         });
+        retryTransactions.push(transaction);
         continue;
       }
 
@@ -2859,6 +2932,27 @@ export const storeTransactionsInternal = internalMutation({
       const date = msToDateString(transaction.shopifyCreatedAt);
       if (date) {
         affectedDates.add(date);
+      }
+    }
+
+    if (retryTransactions.length > 0) {
+      const attempt = (args.retryCount ?? 0) + 1;
+      if (attempt <= ORDER_WEBHOOK_MAX_RETRIES) {
+        await ctx.scheduler.runAfter(
+          ORDER_WEBHOOK_RETRY_DELAY_MS,
+          internal.integrations.shopify.storeTransactionsInternal,
+          {
+            organizationId: args.organizationId,
+            transactions: retryTransactions as any,
+            shouldScheduleAnalytics: args.shouldScheduleAnalytics,
+            retryCount: attempt,
+          },
+        );
+      } else {
+        logger.error("Exceeded retry attempts for Shopify transactions", {
+          organizationId: args.organizationId,
+          transactions: retryTransactions.map((tx) => tx.shopifyId),
+        });
       }
     }
 
@@ -2898,10 +2992,12 @@ export const storeRefundsInternal = internalMutation({
     organizationId: v.id("organizations"),
     refunds: v.array(v.any()),
     shouldScheduleAnalytics: v.optional(v.boolean()),
+    retryCount: v.optional(v.number()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     const affectedDates = new Set<string>();
+    const retryRefunds: Array<(typeof args.refunds)[number]> = [];
     for (const refund of args.refunds) {
       // Find the order first
       const order = await ctx.db
@@ -2915,7 +3011,9 @@ export const storeRefundsInternal = internalMutation({
         logger.warn("Order not found for refund", {
           orderId: refund.shopifyOrderId,
           refundId: refund.shopifyId,
+          retryCount: args.retryCount ?? 0,
         });
+        retryRefunds.push(refund);
         continue;
       }
 
@@ -2947,6 +3045,27 @@ export const storeRefundsInternal = internalMutation({
       const date = msToDateString(refund.shopifyCreatedAt);
       if (date) {
         affectedDates.add(date);
+      }
+    }
+
+    if (retryRefunds.length > 0) {
+      const attempt = (args.retryCount ?? 0) + 1;
+      if (attempt <= ORDER_WEBHOOK_MAX_RETRIES) {
+        await ctx.scheduler.runAfter(
+          ORDER_WEBHOOK_RETRY_DELAY_MS,
+          internal.integrations.shopify.storeRefundsInternal,
+          {
+            organizationId: args.organizationId,
+            refunds: retryRefunds as any,
+            shouldScheduleAnalytics: args.shouldScheduleAnalytics,
+            retryCount: attempt,
+          },
+        );
+      } else {
+        logger.error("Exceeded retry attempts for Shopify refunds", {
+          organizationId: args.organizationId,
+          refunds: retryRefunds.map((refund) => refund.shopifyId),
+        });
       }
     }
 
@@ -2985,9 +3104,11 @@ export const storeFulfillmentsInternal = internalMutation({
   args: {
     organizationId: v.id("organizations"),
     fulfillments: v.array(v.any()),
+    retryCount: v.optional(v.number()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    const retryFulfillments: Array<(typeof args.fulfillments)[number]> = [];
     for (const fulfillment of args.fulfillments) {
       // Find the order first
       const order = await ctx.db
@@ -3001,7 +3122,9 @@ export const storeFulfillmentsInternal = internalMutation({
         logger.warn("Order not found for fulfillment", {
           orderId: fulfillment.shopifyOrderId,
           fulfillmentId: fulfillment.shopifyId,
+          retryCount: args.retryCount ?? 0,
         });
+        retryFulfillments.push(fulfillment);
         continue;
       }
 
@@ -3044,6 +3167,26 @@ export const storeFulfillmentsInternal = internalMutation({
         await ctx.db.patch(existing._id, fulfillmentData);
       } else {
         await ctx.db.insert("shopifyFulfillments", fulfillmentData);
+      }
+    }
+
+    if (retryFulfillments.length > 0) {
+      const attempt = (args.retryCount ?? 0) + 1;
+      if (attempt <= ORDER_WEBHOOK_MAX_RETRIES) {
+        await ctx.scheduler.runAfter(
+          ORDER_WEBHOOK_RETRY_DELAY_MS,
+          internal.integrations.shopify.storeFulfillmentsInternal,
+          {
+            organizationId: args.organizationId,
+            fulfillments: retryFulfillments as any,
+            retryCount: attempt,
+          },
+        );
+      } else {
+        logger.error("Exceeded retry attempts for Shopify fulfillments", {
+          organizationId: args.organizationId,
+          fulfillments: retryFulfillments.map((fulfillment) => fulfillment.shopifyId),
+        });
       }
     }
 
@@ -4542,6 +4685,16 @@ export const handleAppUninstalled = internalMutation({
 
       for (const user of users) {
         const uninstallTimestamp = Date.now();
+          const onboardingResetData = {
+            completedSteps: [],
+            setupDate: new Date(uninstallTimestamp).toISOString(),
+            firecrawlSeededAt: undefined,
+            firecrawlSeededUrl: undefined,
+            firecrawlSummary: undefined,
+            firecrawlPageCount: undefined,
+            firecrawlSeedingStatus: undefined,
+            firecrawlLastAttemptAt: undefined,
+          };
 
         try {
           // Mark existing memberships as removed so the user no longer belongs to the org
@@ -4584,10 +4737,7 @@ export const handleAppUninstalled = internalMutation({
               isExtraCostSetup: false,
               isCompleted: false,
               onboardingStep: 1,
-              onboardingData: {
-                completedSteps: [],
-                setupDate: new Date().toISOString(),
-              },
+              onboardingData: onboardingResetData,
               updatedAt: uninstallTimestamp,
             });
           } else {
@@ -4603,10 +4753,7 @@ export const handleAppUninstalled = internalMutation({
               isExtraCostSetup: false,
               isCompleted: false,
               onboardingStep: 1,
-              onboardingData: {
-                completedSteps: [],
-                setupDate: new Date().toISOString(),
-              },
+              onboardingData: onboardingResetData,
               createdAt: uninstallTimestamp,
               updatedAt: uninstallTimestamp,
             });

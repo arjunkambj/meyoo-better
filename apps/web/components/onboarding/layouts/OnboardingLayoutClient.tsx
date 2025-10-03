@@ -149,17 +149,14 @@ export const OnboardingLayoutClient = memo(function OnboardingLayoutClient({
             currentStep={currentStep}
             totalSteps={TOTAL_STEPS}
           />
-          {/* Logo and step indicator */}
+          {/* Logo, step indicator, and user profile */}
           <div className="px-4 sm:px-6 py-4">
             <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
               <Logo size="sm" />
-              <div className="flex flex-wrap items-center justify-end gap-3">
-                <span className="text-xs font-medium text-default-500">
-                  Step {currentStep} of {TOTAL_STEPS}
-                </span>
-                <div aria-hidden className="hidden sm:block h-6 w-px bg-default-200" />
-                <UserProfile showNavigationLinks={false} />
-              </div>
+              <span className="text-xs font-medium text-default-500">
+                Step {currentStep} of {TOTAL_STEPS}
+              </span>
+              <UserProfile showNavigationLinks={false} />
             </div>
           </div>
         </header>

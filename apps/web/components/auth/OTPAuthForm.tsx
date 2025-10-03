@@ -31,7 +31,7 @@ export const OTPAuthForm = React.memo(function OTPAuthForm({
     if (resendCooldown > 0) {
       const timer = setTimeout(
         () => setResendCooldown(resendCooldown - 1),
-        1000,
+        1000
       );
       return () => clearTimeout(timer);
     }
@@ -81,7 +81,7 @@ export const OTPAuthForm = React.memo(function OTPAuthForm({
         setIsLoading(false);
       }
     },
-    [email, signIn],
+    [email, signIn]
   );
 
   // Handle OTP verify with memoization
@@ -128,7 +128,7 @@ export const OTPAuthForm = React.memo(function OTPAuthForm({
         setIsLoading(false);
       }
     },
-    [code, email, mode, returnUrl, router, signIn],
+    [code, email, mode, returnUrl, router, signIn]
   );
 
   // Resend OTP with memoization
@@ -175,8 +175,9 @@ export const OTPAuthForm = React.memo(function OTPAuthForm({
           isDisabled={isLoading}
           placeholder="you@example.com"
           radius="lg"
+          size="lg"
           startContent={
-            <Icon className="mr-1" icon="solar:letter-bold" width={18} />
+            <Icon className="mr-1" icon="solar:letter-bold" width={20} />
           }
           type="email"
           value={email}
@@ -255,4 +256,3 @@ export const OTPAuthForm = React.memo(function OTPAuthForm({
     </form>
   );
 });
-

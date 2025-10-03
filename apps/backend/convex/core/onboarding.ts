@@ -382,8 +382,13 @@ export const getOnboardingStatus = query({
         : shopifyOrdersQueued !== undefined
           ? shopifyOrdersQueued
           : undefined;
+    const latestShopifyStatus = latestShopifySession?.status;
+    const shouldSampleOrders =
+      expectedOrders !== undefined &&
+      expectedOrders > 0 &&
+      (!latestShopifyStatus || !ACTIVE_SYNC_STATUSES.has(latestShopifyStatus));
     let dbHasExpectedOrders = false;
-    if (expectedOrders !== undefined && expectedOrders > 0) {
+    if (shouldSampleOrders) {
       const limit = Math.min(Math.max(expectedOrders - 2 + 5, 500), 5000);
       const slice = await ctx.db
         .query("shopifyOrders")
@@ -1131,14 +1136,22 @@ export const monitorInitialSyncs = internalMutation({
         return { finalized: true };
       }
 
+      const metadata = (session.metadata || {}) as Record<string, any>;
+      const metadataLastActivity =
+        typeof metadata.lastActivityAt === "number"
+          ? metadata.lastActivityAt
+          : typeof metadata.progressUpdatedAt === "number"
+            ? metadata.progressUpdatedAt
+            : undefined;
+      const lastProgressAt =
+        metadataLastActivity ?? session.completedAt ?? session.startedAt;
       const isActivelySyncing =
         (session.status === "processing" || session.status === "syncing") &&
-        Date.now() - session.startedAt < 2 * 60 * 1000;
+        Date.now() - lastProgressAt < 2 * 60 * 1000;
       if (isActivelySyncing) {
         return { finalized: false };
       }
 
-      const metadata = (session.metadata || {}) as Record<string, any>;
       const totalBatches =
         typeof metadata.totalBatches === "number"
           ? metadata.totalBatches

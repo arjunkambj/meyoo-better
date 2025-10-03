@@ -99,12 +99,12 @@ const Footer = () => {
                   <ul className="space-y-2 sm:space-y-4">
                     {section.links.map((link) => (
                       <li key={link.name}>
-                        <a
+                        <Link
                           href={link.href}
                           className="inline-block text-sm sm:text-base text-muted-foreground transition-colors duration-300 hover:text-primary"
                         >
                           {link.name}
-                        </a>
+                        </Link>
                       </li>
                     ))}
                   </ul>

@@ -126,7 +126,7 @@ export default function ShippingCostTable() {
             <Button
               isIconOnly
               size="sm"
-              variant="light"
+              variant="flat"
               onPress={() => handleEdit(item)}
             >
               <Icon icon="solar:pen-linear" width={16} />

@@ -12,18 +12,41 @@ export const upsertReceipt = internalMutation({
   returns: v.object({ duplicate: v.boolean() }),
   handler: async (ctx, args) => {
     if (!args.providerWebhookId) return { duplicate: false };
-    const existing = await ctx.db
-      .query("webhookReceipts")
-      .withIndex("by_provider", (q) => q.eq("providerWebhookId", args.providerWebhookId))
-      .first();
-    if (existing) return { duplicate: true };
-    await ctx.db.insert("webhookReceipts", {
+
+    const receiptId = await ctx.db.insert("webhookReceipts", {
       providerWebhookId: args.providerWebhookId,
       topic: args.topic,
       shopDomain: args.shopDomain,
       status: "processed",
       processedAt: Date.now(),
     });
+
+    const receipts = await ctx.db
+      .query("webhookReceipts")
+      .withIndex("by_provider", (q) =>
+        q.eq("providerWebhookId", args.providerWebhookId),
+      )
+      .collect();
+    if (receipts.length <= 1) {
+      return { duplicate: false };
+    }
+
+    const newReceipt = receipts.find((receipt) => receipt._id === receiptId);
+    const newCreationTime = newReceipt?._creationTime ?? Number.MAX_SAFE_INTEGER;
+    const hasOlderReceipt = receipts.some((receipt) => {
+      if (receipt._id === receiptId) return false;
+      if (receipt._creationTime < newCreationTime) return true;
+      if (receipt._creationTime > newCreationTime) return false;
+
+      // Tie-break on id to avoid treating simultaneous inserts as duplicates
+      return receipt._id < receiptId;
+    });
+
+    if (hasOlderReceipt) {
+      await ctx.db.delete(receiptId);
+      return { duplicate: true };
+    }
+
     return { duplicate: false };
   },
 });

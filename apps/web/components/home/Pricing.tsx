@@ -65,10 +65,7 @@ const Pricing = () => {
   );
 
   return (
-    <section
-      id="pricing"
-      className={`relative ${designSystem.spacing.section} ${designSystem.background.gradient} w-full scroll-mt-24`}
-    >
+    <section className={`relative ${designSystem.spacing.section} ${designSystem.background.gradient} w-full`}>
       <div
         className={`${designSystem.spacing.container} flex flex-col gap-8 sm:gap-10`}
       >

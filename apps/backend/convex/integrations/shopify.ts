@@ -2981,7 +2981,6 @@ export const storeFulfillmentsInternal = internalMutation({
   args: {
     organizationId: v.id("organizations"),
     fulfillments: v.array(v.any()),
-    shouldScheduleAnalytics: v.optional(v.boolean()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {

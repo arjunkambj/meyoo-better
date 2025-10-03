@@ -1,11 +1,9 @@
 "use client";
 
-import { Button, Card, CardBody, Input, addToast } from "@heroui/react";
-import { Icon } from "@iconify/react";
+import { Button, Input, addToast, Skeleton } from "@heroui/react";
 import { useEffect, useMemo, useState } from "react";
 
 import { useManualReturnRate, useSetManualReturnRate } from "@/hooks";
-import { formatDistanceToNow } from "date-fns";
 
 const sanitizePercentage = (value: string) => {
   if (!value) return "";
@@ -49,15 +47,6 @@ export default function ReturnRateSettings() {
 
   const saveDisabled = saving || hasInvalidInput;
 
-  const lastUpdatedLabel = useMemo(() => {
-    if (!manualReturnRate?.updatedAt) return null;
-    try {
-      return formatDistanceToNow(new Date(manualReturnRate.updatedAt), { addSuffix: true });
-    } catch (_error) {
-      return null;
-    }
-  }, [manualReturnRate?.updatedAt]);
-
   const handleSave = async () => {
     if (saveDisabled) return;
     setSaving(true);
@@ -71,72 +60,67 @@ export default function ReturnRateSettings() {
     }
   };
 
+  const topContent = (
+    <div className="flex items-center justify-between">
+      <h2 className="text-xl font-semibold">RTO & Return Rate Override</h2>
+      <Button
+        color="primary"
+        className="font-semibold"
+        isLoading={saving}
+        isDisabled={saveDisabled || loading}
+        onPress={handleSave}
+      >
+        Save Return Rate
+      </Button>
+    </div>
+  );
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        {topContent}
+        <div className="space-y-6 max-w-2xl">
+          <Skeleton className="h-16 rounded-lg" />
+          <Skeleton className="h-20 rounded-lg" />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <Card className="max-w-2xl border border-default-200/70 bg-content1/60 backdrop-blur">
-      <CardBody className="space-y-6">
-        <div className="flex items-start gap-3">
-          <Icon
-            icon="solar:refresh-circle-bold-duotone"
-            className="text-primary"
-            width={28}
-          />
-          <div className="space-y-1">
-            <h2 className="text-xl font-semibold text-default-900">RTO & Return Rate Override</h2>
-            <p className="text-sm text-default-600">
-              Use this percentage to estimate revenue lost to undetected returns/RTO. Leave the
-              field empty to disable the manual adjustment.
-            </p>
-          </div>
+    <div className="space-y-4">
+      {topContent}
+      <div className="space-y-6 max-w-2xl">
+        <div>
+          <p className="text-sm text-default-600">
+            Use this percentage to estimate revenue lost to undetected returns/RTO. Leave the
+            field empty to disable the manual adjustment.
+          </p>
         </div>
 
         <div className="grid gap-4 sm:max-w-md">
           <Input
-            label="Manual return rate"
+            label="Average monthly return/RTO rate"
             labelPlacement="outside"
             placeholder="e.g. 5"
-            description="Only set this if Shopify doesn’t capture returns/RTO automatically."
+            description="Only set this if Shopify doesn't capture returns/RTO automatically."
             type="number"
             inputMode="decimal"
             min={0}
             max={100}
             step="0.1"
+            size="lg"
             endContent={<span className="text-default-400 text-base font-medium">%</span>}
             value={rateInput}
             isInvalid={hasInvalidInput}
             errorMessage={hasInvalidInput ? "Enter a percentage between 0 and 100" : undefined}
             onValueChange={(value) => setRateInput(sanitizePercentage(value))}
           />
-          {manualReturnRate && (
-            <div className="text-sm text-default-500">
-              {manualReturnRate.isActive ? (
-                <span>
-                  Active at <span className="font-medium">{manualReturnRate.ratePercent}%</span>
-                </span>
-              ) : (
-                <span>Manual override is currently disabled.</span>
-              )}
-              {lastUpdatedLabel ? (
-                <span className="ml-2 text-default-400">(Updated {lastUpdatedLabel})</span>
-              ) : null}
-            </div>
-          )}
-        </div>
-
-        <div className="flex items-center gap-3">
-          <Button
-            color="primary"
-            className="font-semibold"
-            isLoading={saving}
-            isDisabled={saveDisabled}
-            onPress={handleSave}
-          >
-            Save Return Rate
-          </Button>
           <span className="text-xs text-default-400">
             Leave empty and save to clear the manual override.
           </span>
         </div>
-      </CardBody>
-    </Card>
+      </div>
+    </div>
   );
 }

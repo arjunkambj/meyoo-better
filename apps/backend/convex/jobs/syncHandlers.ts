@@ -300,6 +300,20 @@ export const handleShopifyOrdersBatch = internalAction({
   }),
   handler: async (ctx, args) => {
     const start = Date.now();
+    let analyticsEligibility: boolean | undefined;
+
+    const ensureAnalyticsEligibility = async () => {
+      if (analyticsEligibility === undefined) {
+        analyticsEligibility = await ctx.runQuery(
+          internal.integrations.shopify.getInitialSyncStatusInternal,
+          {
+            organizationId: args.organizationId,
+          },
+        );
+      }
+
+      return analyticsEligibility;
+    };
 
     try {
       if (args.orders.length > 0) {
@@ -307,6 +321,7 @@ export const handleShopifyOrdersBatch = internalAction({
           organizationId: args.organizationId,
           storeId: args.storeId,
           orders: args.orders as any,
+          shouldScheduleAnalytics: await ensureAnalyticsEligibility(),
         });
       }
 
@@ -316,6 +331,7 @@ export const handleShopifyOrdersBatch = internalAction({
           {
             organizationId: args.organizationId,
             transactions: args.transactions as any,
+            shouldScheduleAnalytics: await ensureAnalyticsEligibility(),
           },
         );
       }
@@ -324,6 +340,7 @@ export const handleShopifyOrdersBatch = internalAction({
         await ctx.runMutation(internal.integrations.shopify.storeRefundsInternal, {
           organizationId: args.organizationId,
           refunds: args.refunds as any,
+          shouldScheduleAnalytics: await ensureAnalyticsEligibility(),
         });
       }
 

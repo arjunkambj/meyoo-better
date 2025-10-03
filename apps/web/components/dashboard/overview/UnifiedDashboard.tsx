@@ -3,7 +3,7 @@
 import { Spacer } from "@heroui/react";
 import { useAtomValue } from "jotai";
 import React, { useCallback, useMemo, useState } from "react";
-import { useAnalyticsDateRange, useDashboardOverview } from "@/hooks";
+import { useAnalyticsDateRange, useDashboardOverview, useUser } from "@/hooks";
 import { devToolsVisibleAtom } from "@/store/atoms";
 import type { ChannelRevenueBreakdown } from "@repo/types";
 
@@ -56,6 +56,8 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
     updateRange: updateOverviewRange,
   } = useAnalyticsDateRange('dashboard-overview', { defaultPreset: 'today' });
   const devToolsVisible = useAtomValue(devToolsVisibleAtom);
+  const { role } = useUser();
+  const canViewDevTools = role === 'StoreOwner';
 
   const {
     isLoading,
@@ -306,7 +308,7 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
       />
 
       {/* Developer Tools - conditionally rendered based on settings */}
-      {devToolsVisible && (
+      {devToolsVisible && canViewDevTools && (
         <div className="mt-8">
           <DevTools />
         </div>

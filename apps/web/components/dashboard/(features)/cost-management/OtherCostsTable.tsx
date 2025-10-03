@@ -366,7 +366,7 @@ export default function OtherCostsTable() {
             <Button
               isIconOnly
               size="sm"
-              variant="light"
+              variant="flat"
               onPress={() => handleEdit(item)}
             >
               <Icon icon="solar:pen-linear" width={16} />
@@ -375,10 +375,10 @@ export default function OtherCostsTable() {
               isIconOnly
               color="danger"
               size="sm"
-              variant="light"
+              variant="flat"
               onPress={() => handleDeleteClick(item._id as string)}
             >
-              <Icon icon="solar:trash-bin-trash-linear" width={16} />
+              <Icon icon="solar:trash-bin-trash-bold-duotone" width={16} />
             </Button>
           </div>
         );

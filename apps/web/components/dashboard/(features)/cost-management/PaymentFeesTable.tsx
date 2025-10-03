@@ -133,12 +133,12 @@ export default function PaymentFeesTable() {
             <Button
               isIconOnly
               size="sm"
-              variant="light"
+              variant="flat"
               onPress={() => handleEdit(item)}
             >
               <Icon icon="solar:pen-linear" width={16} />
             </Button>
-            
+
           </div>
         );
 

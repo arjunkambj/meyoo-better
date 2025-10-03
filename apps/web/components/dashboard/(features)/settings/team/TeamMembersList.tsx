@@ -4,7 +4,7 @@ import {
   Avatar,
   Button,
   Chip,
-  Spinner,
+  Skeleton,
   Table,
   TableBody,
   TableCell,
@@ -39,6 +39,7 @@ export default function TeamMembersList() {
   const tableClassNames = useMemo(
     () => ({
       wrapper: "shadow-none border-0",
+      th: "dark:bg-background",
     }),
     [],
   );
@@ -71,9 +72,42 @@ export default function TeamMembersList() {
 
   if (isLoading) {
     return (
-      <div className="flex justify-center py-12">
-        <Spinner size="lg" />
-      </div>
+      <Table aria-label="Team members table" classNames={tableClassNames}>
+        <TableHeader>
+          <TableColumn>MEMBER</TableColumn>
+          <TableColumn>ROLE</TableColumn>
+          <TableColumn>STATUS</TableColumn>
+          <TableColumn>JOINED</TableColumn>
+          <TableColumn>{canManageTeam ? "ACTIONS" : ""}</TableColumn>
+        </TableHeader>
+        <TableBody>
+          {Array.from({ length: 3 }).map((_, index) => (
+            <TableRow key={index}>
+              <TableCell>
+                <div className="flex items-center gap-3">
+                  <Skeleton className="h-8 w-8 rounded-full" />
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-32 rounded-lg" />
+                    <Skeleton className="h-3 w-40 rounded-lg" />
+                  </div>
+                </div>
+              </TableCell>
+              <TableCell>
+                <Skeleton className="h-6 w-16 rounded-full" />
+              </TableCell>
+              <TableCell>
+                <Skeleton className="h-6 w-20 rounded-full" />
+              </TableCell>
+              <TableCell>
+                <Skeleton className="h-4 w-24 rounded-lg" />
+              </TableCell>
+              <TableCell>
+                <Skeleton className="h-8 w-20 rounded-lg" />
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     );
   }
 

@@ -1700,6 +1700,20 @@ export const incremental = internalAction({
         cursor = response.data?.orders?.pageInfo?.endCursor || null;
       }
 
+      let analyticsEligibility: boolean | undefined;
+      const ensureAnalyticsEligibility = async () => {
+        if (analyticsEligibility === undefined) {
+          analyticsEligibility = await ctx.runQuery(
+            internal.integrations.shopify.getInitialSyncStatusInternal,
+            {
+              organizationId: args.organizationId,
+            },
+          );
+        }
+
+        return analyticsEligibility;
+      };
+
       if (orders.length > 0) {
         await ctx.runMutation(
           internal.integrations.shopify.storeOrdersInternal,
@@ -1707,6 +1721,7 @@ export const incremental = internalAction({
             organizationId: args.organizationId,
             storeId,
             orders,
+            shouldScheduleAnalytics: await ensureAnalyticsEligibility(),
           },
         );
       }
@@ -1717,6 +1732,7 @@ export const incremental = internalAction({
           {
             organizationId: args.organizationId,
             transactions,
+            shouldScheduleAnalytics: await ensureAnalyticsEligibility(),
           },
         );
       }
@@ -1727,6 +1743,7 @@ export const incremental = internalAction({
           {
             organizationId: args.organizationId,
             refunds,
+            shouldScheduleAnalytics: await ensureAnalyticsEligibility(),
           },
         );
       }

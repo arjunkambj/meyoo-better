@@ -12,14 +12,12 @@ import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
 import { Logo } from "@/components/shared/Logo";
 
 const navItems = [
-  { name: "Pricing", href: "#pricing" },
-  { name: "FAQ", href: "#faq" },
+  { name: "Pricing", href: "/pricing" },
   { name: "Contact", href: "/contact" },
 ];
 
 export default function CenteredNavbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [activeSection, setActiveSection] = useState("");
   const [hasScrolled, setHasScrolled] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [currentPath, setCurrentPath] = useState("");
@@ -41,18 +39,6 @@ export default function CenteredNavbar() {
       if (!ticking) {
         window.requestAnimationFrame(() => {
           setHasScrolled(window.scrollY > 10);
-
-          const sections = navItems.map((item) => item.href.substring(1));
-          const currentSection = sections.find((section) => {
-            const element = document.getElementById(section);
-            if (element) {
-              const rect = element.getBoundingClientRect();
-              return rect.top <= 100 && rect.bottom >= 100;
-            }
-            return false;
-          });
-
-          setActiveSection(currentSection || "");
           ticking = false;
         });
         ticking = true;
@@ -81,14 +67,6 @@ export default function CenteredNavbar() {
       document.body.style.overflow = original || "";
     };
   }, [isClient, isMenuOpen]);
-
-  const scrollToSection = (href: string) => {
-    const element = document.querySelector(href);
-
-    if (element) {
-      element.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  };
 
   return (
     <div className="fixed w-full top-2 z-50 px-2 sm:px-4 md:px-6 py-1">
@@ -123,24 +101,16 @@ export default function CenteredNavbar() {
                 <NavbarItem key={item.name}>
                   <Button
                     className={`relative px-3 py-2 transition-all bg-transparent hover:bg-transparent duration-300 font-medium text-sm group h-auto min-w-0 ${
-                      activeSection === item.href.substring(1) ||
-                      (item.href === "/contact" && currentPath === "/contact")
+                      currentPath === item.href
                         ? "text-primary"
                         : "text-muted-foreground hover:text-primary"
                     }`}
-                    onPress={() => {
-                      if (item.href.startsWith("/")) {
-                        router.push(item.href);
-                      } else {
-                        scrollToSection(item.href);
-                      }
-                    }}
+                    onPress={() => router.push(item.href)}
                   >
                     {item.name}
                     <span
                       className={`absolute bottom-0 left-0 w-full h-0.5 bg-primary/60 rounded-full transition-transform duration-300 origin-left ${
-                        activeSection === item.href.substring(1) ||
-                        (item.href === "/contact" && currentPath === "/contact")
+                        currentPath === item.href
                           ? "scale-x-100"
                           : "scale-x-0 group-hover:scale-x-100"
                       }`}
@@ -235,11 +205,7 @@ export default function CenteredNavbar() {
                         variant="light"
                         className="text-lg sm:text-xl font-medium text-muted-foreground hover:text-primary transition-colors duration-300 text-left justify-start p-0 h-auto min-w-0"
                         onPress={() => {
-                          if (item.href.startsWith("/")) {
-                            router.push(item.href);
-                          } else {
-                            scrollToSection(item.href);
-                          }
+                          router.push(item.href);
                           setIsMenuOpen(false);
                         }}
                       >

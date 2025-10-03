@@ -21,52 +21,52 @@ const contactInfo = [
 
 export default function ContactPage() {
   return (
-    <div className={`min-h-screen ${designSystem.background.gradient} pt-28`}>
+    <div className={`min-h-screen ${designSystem.background.gradient} pt-24 pb-20`}>
       {/* Hero Section */}
-      <section className={`relative ${designSystem.spacing.section} px-4`}>
+      <section className={`relative ${designSystem.spacing.section} px-4 pb-8`}>
         <div className="max-w-4xl mx-auto text-center">
-          <div className={designSystem.typography.sectionChip}>
+          <div className={`${designSystem.typography.sectionChip} mb-6`}>
             <span className="text-sm uppercase tracking-[0.15em] font-medium text-primary/70">
               Contact Us
             </span>
           </div>
-          <h1 className={`${designSystem.typography.sectionTitle} mb-6`}>
+          <h1 className={`${designSystem.typography.sectionTitle} mb-8`}>
             Contact
           </h1>
-          <p className={designSystem.typography.sectionSubtitle}>
+          <p className={`${designSystem.typography.sectionSubtitle} max-w-2xl mx-auto`}>
             Questions about profit tracking? Let us know.
           </p>
         </div>
       </section>
 
       {/* Contact Options */}
-      <section className="py-12 px-4">
+      <section className="py-16 px-4">
         <div className="max-w-6xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
             {contactInfo.map((item) => (
               <Card
                 key={item.title}
                 className={`${designSystem.card.base} rounded-3xl p-1.5 transition-all duration-300 hover:scale-[1.02]`}
               >
-                <CardBody className="p-6">
-                  <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                <CardBody className="p-8">
+                  <div className="flex items-start gap-6">
+                    <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
                       <Icon
                         className="text-primary"
                         icon={item.icon}
-                        width={24}
+                        width={28}
                       />
                     </div>
                     <div className="flex-1">
-                      <h3 className="text-lg font-semibold mb-1 text-foreground">
+                      <h3 className="text-xl font-semibold mb-2 text-foreground">
                         {item.title}
                       </h3>
-                      <p className="text-muted-foreground text-sm mb-3 leading-relaxed">
+                      <p className="text-muted-foreground text-base mb-4 leading-relaxed">
                         {item.description}
                       </p>
                       {item.link && (
                         <Link
-                          className="text-primary text-sm font-medium hover:underline inline-flex items-center gap-1"
+                          className="text-primary text-sm font-medium hover:underline inline-flex items-center gap-1.5"
                           href={item.link}
                         >
                           Contact via {item.title}

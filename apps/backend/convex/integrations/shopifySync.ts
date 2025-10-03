@@ -985,7 +985,6 @@ export const initial = internalAction({
                                 location?:
                                   | {
                                       id?: string | null;
-                                      name?: string | null;
                                     }
                                   | null;
                               };

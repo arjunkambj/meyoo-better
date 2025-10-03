@@ -83,7 +83,7 @@ export default function ApiKeyManagement() {
             Generate New Key
           </Button>
         </CardHeader>
-        <CardBody className="px-5 py-5">
+        <CardBody className="px-5 shadow-none py-5">
           {isLoading ? (
             <div className="space-y-3">
               <Skeleton className="h-12 w-full rounded-lg" />

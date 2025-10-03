@@ -119,7 +119,7 @@ export default function ApiKeyTable({
   }
 
   return (
-    <Table aria-label="API keys table">
+    <Table className="shadow-non" aria-label="API keys table">
       <TableHeader columns={columns}>
         {(column) => <TableColumn key={column.key}>{column.label}</TableColumn>}
       </TableHeader>

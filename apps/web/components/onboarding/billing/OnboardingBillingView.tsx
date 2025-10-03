@@ -43,9 +43,9 @@ export default function OnboardingBillingView() {
 
   // Live onboarding status (Convex query) to auto-redirect when state updates via webhook/verify
   const onboardingStatus = useQuery(api.core.onboarding.getOnboardingStatus);
+  const hasShopifySubscription =
+    onboardingStatus?.hasShopifySubscription ?? false;
 
-  // No default plan; if none selected, treat as no active plan
-  const _currentPlan = currentPlan ?? null;
   const [selectedFrequency, setSelectedFrequency] = useState<Frequency>(
     (frequencies[0] as Frequency) ?? (frequencies[0] as Frequency)
   );
@@ -146,10 +146,11 @@ export default function OnboardingBillingView() {
   // Show all plans including free for explicit selection
   const availablePlans = tiers;
   // Determine active plan tier key for highlighting
+  const activePlan = hasShopifySubscription ? currentPlan : null;
   const activeTierKey = useMemo(() => {
-    const tier = getTierKeyFromPlanName(currentPlan ?? null);
+    const tier = getTierKeyFromPlanName(activePlan ?? null);
     return tier ?? "";
-  }, [currentPlan]);
+  }, [activePlan]);
   // Avoid duplicate client-side redirects; trust server redirect.
 
   return (
@@ -202,7 +203,9 @@ export default function OnboardingBillingView() {
                   : isLoadingTier
                     ? "Processing..."
                     : tier.key === TiersEnum.Free
-                      ? "Continue with Free"
+                      ? hasShopifySubscription
+                        ? "Continue with Free"
+                        : "Select Free Plan"
                       : `Select ${tier.title}`,
                 color: isActive
                   ? "success"
@@ -243,7 +246,7 @@ export default function OnboardingBillingView() {
               growth: "Growth Plan",
               business: "Business Plan",
             };
-            const label = currentPlan
+            const label = hasShopifySubscription && currentPlan
               ? map[String(currentPlan)] || String(currentPlan)
               : null;
             return `Current Plan: ${label ?? "Not selected"}`;

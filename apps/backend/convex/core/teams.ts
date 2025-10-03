@@ -35,6 +35,10 @@ export const getTeamStats = query({
       .withIndex("by_org", (q) => q.eq("organizationId", orgId))
       .collect();
 
+    const visibleMemberships = memberships.filter(
+      (membership) => membership.status !== "removed",
+    );
+
     // Get pending invitations
     const allInvitations = await ctx.db
       .query("invites")
@@ -49,8 +53,8 @@ export const getTeamStats = query({
     );
 
     return {
-      totalMembers: memberships.length,
-      activeMembers: memberships.filter((m) => m.status === "active").length,
+      totalMembers: visibleMemberships.length,
+      activeMembers: visibleMemberships.filter((m) => m.status === "active").length,
       pendingInvites: invitations.length,
     };
   },
@@ -95,10 +99,10 @@ export const getTeamMembers = query({
     // Actions (invite/remove) are controlled separately by role checks
 
     const orgId = user.organizationId as Id<"organizations">;
-    const memberships = await ctx.db
+    const memberships = (await ctx.db
       .query("memberships")
       .withIndex("by_org", (q) => q.eq("organizationId", orgId))
-      .collect();
+      .collect()).filter((membership) => membership.status !== "removed");
 
     const users = await Promise.all(memberships.map((m) => ctx.db.get(m.userId)));
 
@@ -272,6 +276,7 @@ export const inviteTeamMember = mutation({
           // Safe to move the user to inviter's organization
           await ctx.db.patch(existingUser._id, {
             organizationId: inviter.organizationId,
+            role: "StoreTeam",
             isOnboarded: true,
             status: "invited",
             updatedAt: Date.now(),
@@ -306,6 +311,7 @@ export const inviteTeamMember = mutation({
       // User exists but not in any organization - add them to this org
       await ctx.db.patch(existingUser._id, {
         organizationId: inviter.organizationId,
+        role: "StoreTeam",
         isOnboarded: true, // Skip onboarding for invited users
         status: "invited",
         updatedAt: Date.now(),
@@ -332,6 +338,7 @@ export const inviteTeamMember = mutation({
       email: targetEmail,
       name: targetEmail.split("@")[0], // Use email prefix as default name
       organizationId: inviter.organizationId,
+      role: "StoreTeam",
       status: "invited", // Mark as invited, not yet active
       isOnboarded: true, // Skip onboarding for invited users
       loginCount: 0,
@@ -415,13 +422,21 @@ export const removeTeamMember = mutation({
       throw new Error("Cannot remove yourself");
     }
 
-    // Mark membership removed; keep user account intact
-    if (memberMembership) {
+    const now = Date.now();
+
+    // Mark membership removed before resetting the user's workspace context
+    if (memberMembership && memberMembership.status !== "removed") {
       await ctx.db.patch(memberMembership._id, {
         status: "removed",
-        updatedAt: Date.now(),
+        updatedAt: now,
       });
     }
+
+    // Move removed member into a fresh personal organization so they can re-onboard elsewhere
+    await createNewUserData(ctx as unknown as MutationCtx, memberToRemove._id, {
+      name: memberToRemove.name || null,
+      email: memberToRemove.email || null,
+    });
 
     return {
       success: true,
@@ -444,6 +459,23 @@ export const leaveOrganization = mutation({
     // Owners cannot leave their own organization via this endpoint
     if (user.role === "StoreOwner") {
       throw new Error("Store owners cannot leave their own organization");
+    }
+
+    const membership = await ctx.db
+      .query("memberships")
+      .withIndex("by_org_user", (q) =>
+        q
+          .eq("organizationId", user.organizationId as Id<"organizations">)
+          .eq("userId", user._id),
+      )
+      .first();
+    const now = Date.now();
+
+    if (membership && membership.status !== "removed") {
+      await ctx.db.patch(membership._id, {
+        status: "removed",
+        updatedAt: now,
+      });
     }
 
     await createNewUserData(ctx as unknown as MutationCtx, user._id, {

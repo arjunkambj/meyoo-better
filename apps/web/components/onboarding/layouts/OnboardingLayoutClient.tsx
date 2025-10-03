@@ -21,6 +21,7 @@ import {
 import { navigationPendingAtom, setNavigationPendingAtom } from "@/store/onboarding";
 import { OnboardingSkeleton } from "./OnboardingSkeleton";
 import { Logo } from "@/components/shared/Logo";
+import UserProfile from "@/components/shared/UserProfile";
 import MinimalProgressBar from "../MinimalProgressBar";
 
 // Hook for batched onboarding data with Jotai integration
@@ -150,12 +151,14 @@ export const OnboardingLayoutClient = memo(function OnboardingLayoutClient({
           />
           {/* Logo and step indicator */}
           <div className="px-4 sm:px-6 py-4">
-            <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
               <Logo size="sm" />
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center justify-end gap-3">
                 <span className="text-xs font-medium text-default-500">
                   Step {currentStep} of {TOTAL_STEPS}
                 </span>
+                <div aria-hidden className="hidden sm:block h-6 w-px bg-default-200" />
+                <UserProfile showNavigationLinks={false} />
               </div>
             </div>
           </div>

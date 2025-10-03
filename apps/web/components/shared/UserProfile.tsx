@@ -16,7 +16,11 @@ import Link from "next/link";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useUserContext } from "@/contexts/UserContext";
 
-const UserProfile = React.memo(() => {
+type UserProfileProps = {
+  showNavigationLinks?: boolean;
+};
+
+const UserProfile = React.memo(({ showNavigationLinks = true }: UserProfileProps) => {
   const { user } = useUserContext();
   const { signOut } = useAuthActions();
   const { theme, setTheme } = useTheme();
@@ -136,49 +140,53 @@ const UserProfile = React.memo(() => {
               />
             }
             endContent={
-              mounted && (
-                <Switch
-                  size="sm"
-                  isSelected={theme === "dark"}
-                  onValueChange={handleThemeChange}
-                  aria-label="Toggle theme"
-                  classNames={{
-                    wrapper: "group-data-[selected=true]:bg-primary",
-                  }}
-                  thumbIcon={({ isSelected }) =>
-                    isSelected ? (
-                      <Icon icon="solar:moon-bold" width={12} />
-                    ) : (
-                      <Icon icon="solar:sun-bold" width={12} />
-                    )
-                  }
-                />
-              )
+              mounted
+                ? (
+                    <Switch
+                      size="sm"
+                      isSelected={theme === "dark"}
+                      onValueChange={handleThemeChange}
+                      aria-label="Toggle theme"
+                      classNames={{
+                        wrapper: "group-data-[selected=true]:bg-primary",
+                      }}
+                      thumbIcon={({ isSelected }) =>
+                        isSelected ? (
+                          <Icon icon="solar:moon-bold" width={12} />
+                        ) : (
+                          <Icon icon="solar:sun-bold" width={12} />
+                        )
+                      }
+                    />
+                  )
+                : undefined
             }
             isReadOnly
           >
             <span className="text-small font-medium">Appearance</span>
           </DropdownItem>
         </DropdownSection>
-        <DropdownSection showDivider>
-          {navigationItems.map((item) => (
-            <DropdownItem
-              key={item.key}
-              as={Link}
-              className="data-[hover=true]:bg-default-100 py-2"
-              href={item.href}
-              startContent={
-                <Icon
-                  icon={item.icon}
-                  width={20}
-                  className="text-default-500"
-                />
-              }
-            >
-              <span className="text-small font-medium">{item.label}</span>
-            </DropdownItem>
-          ))}
-        </DropdownSection>
+        {showNavigationLinks ? (
+          <DropdownSection showDivider>
+            {navigationItems.map((item) => (
+              <DropdownItem
+                key={item.key}
+                as={Link}
+                className="data-[hover=true]:bg-default-100 py-2"
+                href={item.href}
+                startContent={
+                  <Icon
+                    icon={item.icon}
+                    width={20}
+                    className="text-default-500"
+                  />
+                }
+              >
+                <span className="text-small font-medium">{item.label}</span>
+              </DropdownItem>
+            ))}
+          </DropdownSection>
+        ) : null}
         <DropdownSection>
           <DropdownItem
             key="logout"
@@ -196,7 +204,15 @@ const UserProfile = React.memo(() => {
         </DropdownSection>
       </DropdownMenu>
     ),
-    [userData, navigationItems, handleLogout, theme, mounted, handleThemeChange]
+    [
+      userData,
+      navigationItems,
+      handleLogout,
+      theme,
+      mounted,
+      handleThemeChange,
+      showNavigationLinks,
+    ]
   );
 
   return (

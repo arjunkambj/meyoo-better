@@ -402,7 +402,7 @@ export const shopifyInventory = defineTable({
   organizationId: v.id("organizations"),
   variantId: v.id("shopifyProductVariants"),
 
-  // Location (ID only, name requires read_locations scope)
+  // Location identifiers (name requires read_locations scope, which we don't request)
   locationId: v.string(),
 
   // Quantities

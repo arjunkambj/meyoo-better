@@ -573,7 +573,6 @@ export class ShopifyGraphQLClient {
               committed?: number | null;
               location?: {
                 id?: string | null;
-                name?: string | null;
               } | null;
             };
           }>;
@@ -1483,7 +1482,6 @@ export class ShopifyGraphQLClient {
               committed?: number | null;
               location?: {
                 id?: string | null;
-                name?: string | null;
               } | null;
             };
           }>;

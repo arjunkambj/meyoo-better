@@ -15,6 +15,7 @@ import {
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import {
+  useCallback,
   useEffect,
   useMemo,
   useState,
@@ -141,7 +142,62 @@ export default function ProductCostTable() {
 
   // Row-level save removed; use bulk save instead
 
-  const handleSaveAll = async () => {
+  const handleApplyCogs = useCallback(() => {
+    if (!variants.length || !bulkPct) return;
+    const pct = Number(bulkPct);
+    setEdits((prev) => {
+      const next = { ...prev } as Record<string, RowEdit>;
+      variants.forEach((v) => {
+        const id = String(v._id);
+        const original = (
+          prev[id]?.cogs ??
+          v.cogsPerUnit ??
+          ""
+        ).toString();
+        const originalVal = Number(original || 0);
+        if (!isFinite(originalVal) || originalVal === 0) {
+          const price = Number(v.price ?? 0) || 0;
+          const computed = (price * pct) / 100;
+          const fixed = isFinite(computed)
+            ? computed.toFixed(2)
+            : "0.00";
+          next[id] = { ...(next[id] || {}), cogs: fixed };
+        }
+      });
+      return next;
+    });
+  }, [variants, bulkPct]);
+
+  const handleApplyTax = useCallback(() => {
+    if (!variants.length || !bulkPct) return;
+    const pct = Number(bulkPct);
+    setEdits((prev) => {
+      const next = { ...prev } as Record<string, RowEdit>;
+      variants.forEach((v) => {
+        const id = String(v._id);
+        next[id] = { ...(next[id] || {}), tax: String(pct) };
+      });
+      return next;
+    });
+  }, [variants, bulkPct]);
+
+  const handleApplyHandling = useCallback(() => {
+    if (!variants.length || !bulkPct) return;
+    const pct = Number(bulkPct);
+    setEdits((prev) => {
+      const next = { ...prev } as Record<string, RowEdit>;
+      variants.forEach((v) => {
+        const id = String(v._id);
+        const price = Number(v.price ?? 0) || 0;
+        const computed = (price * pct) / 100;
+        const fixed = isFinite(computed) ? computed.toFixed(2) : "0.00";
+        next[id] = { ...(next[id] || {}), handling: fixed };
+      });
+      return next;
+    });
+  }, [variants, bulkPct]);
+
+  const handleSaveAll = useCallback(async () => {
     const variantIds = Object.keys(edits);
     if (variantIds.length === 0) return;
     setSavingAll(true);
@@ -172,106 +228,60 @@ export default function ProductCostTable() {
     } finally {
       setSavingAll(false);
     }
-  };
+  }, [edits, saveAll]);
 
-  const topContent = (
-    <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-      <div>
-        <h2 className="text-xl font-semibold">Product Costs</h2>
+  const topContent = useMemo(
+    () => (
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h2 className="text-xl font-semibold">Product Costs</h2>
+        </div>
+        <div className="flex-1" />
+        <div className="flex flex-wrap items-center gap-2">
+          <Input
+            size="md"
+            className="w-36"
+            classNames={{
+              inputWrapper: DATA_TABLE_INPUT_WRAPPER_CLASS,
+              input: DATA_TABLE_INPUT_CLASS,
+            }}
+            type="number"
+            placeholder="10"
+            endContent={<span className="text-default-500">%</span>}
+            value={bulkPct}
+            onValueChange={setBulkPct}
+          />
+          <Button
+            variant="flat"
+            color="primary"
+            isDisabled={!bulkPct || isNaN(Number(bulkPct))}
+            onPress={handleApplyCogs}
+          >
+            Apply COGS
+          </Button>
+          <Button
+            variant="flat"
+            color="primary"
+            isDisabled={!bulkPct || isNaN(Number(bulkPct))}
+            onPress={handleApplyTax}
+          >
+            Apply Tax
+          </Button>
+          <Button
+            variant="flat"
+            color="primary"
+            isDisabled={!bulkPct || isNaN(Number(bulkPct))}
+            onPress={handleApplyHandling}
+          >
+            Apply Handling
+          </Button>
+          <Button color="primary" isLoading={savingAll} onPress={handleSaveAll}>
+            Save All Changes
+          </Button>
+        </div>
       </div>
-      <div className="flex-1" />
-      <div className="flex flex-wrap items-center gap-2">
-        <Input
-          size="md"
-          className="w-36"
-          classNames={{
-            inputWrapper: DATA_TABLE_INPUT_WRAPPER_CLASS,
-            input: DATA_TABLE_INPUT_CLASS,
-          }}
-          type="number"
-          placeholder="10"
-          endContent={<span className="text-default-500">%</span>}
-          value={bulkPct}
-          onValueChange={setBulkPct}
-        />
-        <Button
-          variant="flat"
-          color="primary"
-          isDisabled={!bulkPct || isNaN(Number(bulkPct))}
-          onPress={() => {
-            if (!variants.length || !bulkPct) return;
-            const pct = Number(bulkPct);
-            setEdits((prev) => {
-              const next = { ...prev } as Record<string, RowEdit>;
-              variants.forEach((v) => {
-                const id = String(v._id);
-                const original = (
-                  prev[id]?.cogs ??
-                  v.cogsPerUnit ??
-                  ""
-                ).toString();
-                const originalVal = Number(original || 0);
-                if (!isFinite(originalVal) || originalVal === 0) {
-                  const price = Number(v.price ?? 0) || 0;
-                  const computed = (price * pct) / 100;
-                  const fixed = isFinite(computed)
-                    ? computed.toFixed(2)
-                    : "0.00";
-                  next[id] = { ...(next[id] || {}), cogs: fixed };
-                }
-              });
-              return next;
-            });
-          }}
-        >
-          Apply COGS
-        </Button>
-        <Button
-          variant="flat"
-          color="primary"
-          isDisabled={!bulkPct || isNaN(Number(bulkPct))}
-          onPress={() => {
-            if (!variants.length || !bulkPct) return;
-            const pct = Number(bulkPct);
-            setEdits((prev) => {
-              const next = { ...prev } as Record<string, RowEdit>;
-              variants.forEach((v) => {
-                const id = String(v._id);
-                next[id] = { ...(next[id] || {}), tax: String(pct) };
-              });
-              return next;
-            });
-          }}
-        >
-          Apply Tax
-        </Button>
-        <Button
-          variant="flat"
-          color="primary"
-          isDisabled={!bulkPct || isNaN(Number(bulkPct))}
-          onPress={() => {
-            if (!variants.length || !bulkPct) return;
-            const pct = Number(bulkPct);
-            setEdits((prev) => {
-              const next = { ...prev } as Record<string, RowEdit>;
-              variants.forEach((v) => {
-                const id = String(v._id);
-                const price = Number(v.price ?? 0) || 0;
-                const computed = (price * pct) / 100;
-                const fixed = isFinite(computed) ? computed.toFixed(2) : "0.00";
-                next[id] = { ...(next[id] || {}), handling: fixed };
-              });
-              return next;
-            });
-          }}
-        >
-          Apply Handling
-        </Button>
-        <Button color="primary" isLoading={savingAll} onPress={handleSaveAll}>
-          Save All Changes
-        </Button>
-      </div>
-    </div>
+    ),
+    [bulkPct, savingAll, handleApplyCogs, handleApplyTax, handleApplyHandling, handleSaveAll]
   );
 
   const paginationContent =

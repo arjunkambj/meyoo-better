@@ -23,12 +23,14 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ComponentProps,
   type ReactElement,
 } from "react";
 import type { RowElement } from "@react-types/table";
 import { useRouter } from "next/navigation";
+import { useVirtualizer } from "@tanstack/react-virtual";
 
 import {
   useShopifyProductVariantsPaginated,
@@ -77,6 +79,18 @@ type VariantRow = {
   handlingPerUnit?: number;
 };
 
+type VariantGroup = {
+  key: string;
+  productName: string;
+  productImage?: string;
+  productStatus?: string;
+  items: VariantRow[];
+};
+
+type VirtualRow =
+  | { type: "group"; group: VariantGroup; stripe: boolean }
+  | { type: "variant"; variant: VariantRow; stripe: boolean };
+
 export default function VariantCostsClient({
   hideNavigation = false,
   hideHandling = false,
@@ -96,7 +110,7 @@ export default function VariantCostsClient({
   const user = useCurrentUser();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const pageSize = 200;
+  const pageSize = 1000;
   const [bulkValue, setBulkValue] = useState<string>("10");
   const [bulkType, setBulkType] = useState<"percent" | "flat">("percent");
   const { data, totalPages, currentPage, loading } = useShopifyProductVariantsPaginated(
@@ -244,16 +258,7 @@ export default function VariantCostsClient({
   // Group variants by product (best-effort using productName + image)
   const grouped = useMemo(() => {
     const list = (data || []) as VariantRow[];
-    const map = new Map<
-      string,
-      {
-        key: string;
-        productName: string;
-        productImage?: string;
-        productStatus?: string;
-        items: VariantRow[];
-      }
-    >();
+    const map = new Map<string, VariantGroup>();
     for (const v of list) {
       const productName = v.productName || "Product";
       const productImage = v.productImage || v.imageUrl || v.image || "";
@@ -271,6 +276,33 @@ export default function VariantCostsClient({
     }
     return Array.from(map.values());
   }, [data]);
+
+  // Flatten groups and variants into virtual rows
+  const virtualRows = useMemo<VirtualRow[]>(() => {
+    const rows: VirtualRow[] = [];
+    grouped.forEach((grp, grpIndex) => {
+      const stripe = grpIndex % 2 === 1;
+      rows.push({ type: "group", group: grp, stripe });
+      if (expandedGroups.has(grp.key)) {
+        grp.items.forEach((variant) => {
+          rows.push({ type: "variant", variant, stripe });
+        });
+      }
+    });
+    return rows;
+  }, [grouped, expandedGroups]);
+
+  // Set up virtualizer (prepared for future virtualization implementation)
+  const _parentRef = useRef<HTMLDivElement>(null);
+  const _rowVirtualizer = useVirtualizer({
+    count: virtualRows.length,
+    getScrollElement: () => _parentRef.current,
+    estimateSize: (index) => {
+      const row = virtualRows[index];
+      return row?.type === "group" ? 60 : 70;
+    },
+    overscan: 10,
+  });
 
   const handleSaveRow = useCallback(
     async (variantId: string) => {

@@ -882,8 +882,9 @@ export const METRICS: Record<string, MetricDefinition> = {
   rtoRevenueLost: {
     id: "rtoRevenueLost",
     label: "RTO Revenue Lost",
-    icon: "solar:trend-down-bold-duotone",
-    category: "operationalEfficiency",
+    icon: "solar:rewind-back-bold-duotone",
+    iconColor: "text-default-500",
+    category: "coreKPIs",
     format: "currency",
     prefix: "$",
     description: "Estimated revenue loss from manual return/RTO override",

@@ -1170,7 +1170,7 @@ export const getProductVariantsPaginated = query({
 
     const orgId = user.organizationId;
     const page = args.page || 1;
-    const pageSize = Math.min(args.pageSize || 20, 100); // Cap at 100 for safety
+    const pageSize = Math.min(args.pageSize || 20, 1000); // Allow larger page sizes for bulk editing
 
     // Build query with organization filter
     const variantsQuery = ctx.db

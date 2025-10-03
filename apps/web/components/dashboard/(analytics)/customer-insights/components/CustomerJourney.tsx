@@ -87,7 +87,7 @@ export const CustomerJourney = memo(function CustomerJourney({
                       <div className="h-px bg-default-100 w-full" />
                     </div>
                   )}
-                  <div className="relative z-10 rounded-xl border border-default-100/70 bg-background border-default-50 p-4">
+                  <div className="relative z-10 rounded-xl border border-default-100/70 bg-background p-4">
                     <div className="flex flex-col items-center text-center space-y-3">
                       <div
                         className={`flex h-10 w-10 items-center justify-center rounded-xl ${stage.bgColor}`}

@@ -46,12 +46,12 @@ crons.interval(
 
 // NOTE: Global onboarding monitoring disabled - now using per-org self-scheduling
 // Monitoring is automatically started when completeOnboarding() is called
-// and will reschedule itself every 5 seconds until analytics are calculated
+// and will reschedule itself every 10 seconds until analytics are calculated
 // See completeOnboarding() in core/onboarding.ts for implementation
 //
 // crons.interval(
 //   "monitor onboarding sync completion",
-//   { seconds: 5 },
+//   { seconds: 10 },
 //   internal.core.onboarding.monitorInitialSyncs,
 //   { limit: 25 },
 // );

@@ -969,7 +969,7 @@ export const completeOnboarding = mutation({
         `[ONBOARDING] Starting per-org monitoring for ${user.organizationId} - ${pendingPlatformsList.length} platform(s) syncing`,
       );
       await ctx.scheduler.runAfter(
-        5000, // Check in 5 seconds
+        10000, // Check in 10 seconds
         internal.core.onboarding.monitorInitialSyncs,
         { organizationId: user.organizationId as Id<"organizations"> },
       );
@@ -1520,9 +1520,9 @@ export const monitorInitialSyncs = internalMutation({
 
     // Self-scheduling: If monitoring a specific org and still pending, reschedule
     if (args.organizationId && pendingCount > 0) {
-      console.log(`[MONITOR_CRON] Org ${args.organizationId}: Still pending, rescheduling check in 5 seconds`);
+      console.log(`[MONITOR_CRON] Org ${args.organizationId}: Still pending, rescheduling check in 10 seconds`);
       await ctx.scheduler.runAfter(
-        5000, // 5 seconds
+        10000, // 10 seconds
         internal.core.onboarding.monitorInitialSyncs,
         { organizationId: args.organizationId },
       );

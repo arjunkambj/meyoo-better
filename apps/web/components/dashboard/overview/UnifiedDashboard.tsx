@@ -3,13 +3,19 @@
 import { Spacer } from "@heroui/react";
 import { useAtomValue } from "jotai";
 import React, { useCallback, useMemo, useState } from "react";
-import { useAnalyticsDateRange, useDashboardOverview, useUser } from "@/hooks";
+import {
+  useAnalyticsDateRange,
+  useDashboardOverview,
+  useInitialSyncStatus,
+  useUser,
+} from "@/hooks";
 import { devToolsVisibleAtom } from "@/store/atoms";
 import { DEFAULT_DASHBOARD_CONFIG, type ChannelRevenueBreakdown } from "@repo/types";
 
 import { CustomizationModalUnified } from "./CustomizationModalUnified";
 import { DashboardHeader } from "./components/DashboardHeader";
 import { MetricsContainer } from "./components/MetricsContainer";
+import { SyncStatusCard } from "./components/SyncStatusCard";
 import { WidgetsContainer } from "./components/WidgetsContainer";
 import { DevTools } from "./DevTools";
 
@@ -68,6 +74,12 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
     saveConfig,
     primaryCurrency,
   } = useDashboardOverview({ startDate: overviewRange.startDate, endDate: overviewRange.endDate });
+
+  const {
+    isLoading: isSyncStatusLoading,
+    shouldDisplay: shouldShowSyncCard,
+    data: syncCardData,
+  } = useInitialSyncStatus();
 
   // Note: Cost setup status is now tracked in onboarding table
   const showCostSetupWarning = false; // TODO: Get from onboarding status when needed
@@ -288,6 +300,10 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
       />
 
       {/* Data Status Chips removed */}
+
+      {shouldShowSyncCard && (
+        <SyncStatusCard isLoading={isSyncStatusLoading} data={syncCardData} />
+      )}
 
       {/* KPI Metrics */}
       <div className="mb-8">

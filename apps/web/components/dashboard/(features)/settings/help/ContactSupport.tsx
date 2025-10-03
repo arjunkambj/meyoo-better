@@ -132,8 +132,6 @@ export default function ContactSupport() {
 
   return (
     <div className="space-y-8">
-      <Divider className="bg-divider" />
-
       {/* Success Message */}
       {submitSuccess && (
         <div className="bg-success/10 border border-success/20 rounded-lg p-4 flex items-start gap-3">
@@ -175,7 +173,7 @@ export default function ContactSupport() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left: Support Form Card */}
         <Card className="rounded-2xl bg-background shadow-none lg:col-span-2">
-          <CardBody className="px-5 py-5">
+          <CardBody className="px-5">
             <form className="space-y-6" onSubmit={handleSubmit}>
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 <Input

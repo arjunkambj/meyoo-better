@@ -54,7 +54,6 @@ export default function LeaveOrganizationButton() {
     <>
       <Button
         color="danger"
-        variant="flat"
         startContent={<Icon icon="solar:logout-2-linear" width={18} />}
         onPress={() => setOpen(true)}
       >

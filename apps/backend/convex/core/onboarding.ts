@@ -977,6 +977,19 @@ export const completeOnboarding = mutation({
       console.log(`[ONBOARDING] All syncs already complete for ${user.organizationId}, no monitoring needed`);
     }
 
+    // Always kick off a monitoring pass immediately so analytics can trigger
+    try {
+      await ctx.runMutation(internal.core.onboarding.monitorInitialSyncs, {
+        organizationId: user.organizationId as Id<"organizations">,
+        limit: 1,
+      });
+    } catch (monitorError) {
+      console.warn(
+        `[ONBOARDING] monitorInitialSyncs immediate run failed for ${user.organizationId}`,
+        monitorError,
+      );
+    }
+
     // Update integration status snapshot (best-effort)
     try {
       await ctx.runMutation(internal.core.status.refreshIntegrationStatus, {
@@ -1249,6 +1262,25 @@ export const monitorInitialSyncs = internalMutation({
       processed += 1;
 
       try {
+        if (!onboarding.isCompleted) {
+          console.log(
+            `[MONITOR_CRON] Org ${orgId}: Onboarding not completed yet, skipping analytics trigger`,
+          );
+
+          const skipUpdate: Record<string, any> = {
+            lastMonitorCheckAt: now,
+            monitorCheckCount: checkCount,
+          };
+
+          if (!onboarding.analyticsCalculationStatus) {
+            skipUpdate.analyticsCalculationStatus = "not_started";
+          }
+
+          await ctx.db.patch(onboarding._id, skipUpdate as any);
+          skippedCount += 1;
+          continue;
+        }
+
         // Skip if analytics already calculated
         if (onboarding.analyticsCalculationStatus === "completed") {
           console.log(`[MONITOR_CRON] Org ${orgId}: SKIPPED - Analytics already completed`);
@@ -1269,8 +1301,9 @@ export const monitorInitialSyncs = internalMutation({
           await ctx.db.patch(onboarding._id, {
             lastMonitorCheckAt: now,
             monitorCheckCount: checkCount,
+            analyticsCalculationStatus: "not_started",
           });
-          pendingCount += 1;
+          skippedCount += 1;
           continue;
         }
 
@@ -2063,6 +2096,9 @@ export const connectShopifyStore = mutation({
         : DEV_FIRECRAWL_TEST_URL;
 
     const firecrawlStatus = onboarding.onboardingData?.firecrawlSeedingStatus;
+    const hasAttemptedFirecrawl = Boolean(
+      onboarding.onboardingData?.firecrawlLastAttemptAt,
+    );
     const hasSeededFirecrawl = Boolean(
       onboarding.onboardingData?.firecrawlSeededAt,
     );
@@ -2070,7 +2106,7 @@ export const connectShopifyStore = mutation({
       firecrawlStatus?.status === "scheduled" ||
       firecrawlStatus?.status === "in_progress";
 
-    if (!hasSeededFirecrawl && !firecrawlBusy && seedUrl) {
+    if (!hasSeededFirecrawl && !firecrawlBusy && !hasAttemptedFirecrawl && seedUrl) {
       try {
         await ctx.db.patch(onboarding._id, {
           onboardingData: {

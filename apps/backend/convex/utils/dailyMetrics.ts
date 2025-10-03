@@ -1613,10 +1613,6 @@ export async function loadCustomerOverviewFromDailyMetrics(
     return null;
   }
 
-  if (!fetched.hasFullCoverage) {
-    return null;
-  }
-
   const aggregates = mergeDailyMetrics(fetched.docs);
   const lastDoc = fetched.docs[fetched.docs.length - 1] ?? null;
   const totalCustomersSnapshot = lastDoc ? toNumber(lastDoc.totalCustomers) : 0;

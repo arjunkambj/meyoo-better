@@ -7,6 +7,7 @@ import KPI, { KPISkeleton } from "@/components/shared/cards/KPI";
 interface CustomerKPICardsProps {
   loading?: boolean;
   metrics?: {
+    totalCustomers: number;
     periodCustomerCount: number;
     prepaidRate: number;
     periodRepeatRate: number;
@@ -30,11 +31,11 @@ export const CustomerKPICards = memo(function CustomerKPICards({
     return [
       {
         title: "Total Customers",
-        value: formatInteger(metrics.periodCustomerCount),
+        value: formatInteger(metrics.totalCustomers),
         icon: "solar:users-group-rounded-bold-duotone",
         iconColor: "text-default-500",
         tooltip:
-          "Unique customers who placed an order within the selected date range.",
+          "Total unique customers captured in analytics for the selected period.",
       },
       {
         title: "Prepaid Rate",

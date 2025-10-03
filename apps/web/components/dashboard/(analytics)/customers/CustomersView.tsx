@@ -112,6 +112,7 @@ export const CustomersView = memo(function CustomersView() {
           metrics={
             overview
               ? {
+                  totalCustomers: overview.totalCustomers,
                   periodCustomerCount: overview.periodCustomerCount,
                   prepaidRate: overview.prepaidRate,
                   periodRepeatRate: overview.periodRepeatRate,

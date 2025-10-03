@@ -6,7 +6,7 @@ import Firecrawl, {
 import { action } from '../_generated/server';
 import { v } from 'convex/values';
 import { rag } from '../rag';
-import { internal, api } from '../_generated/api';
+import { internal } from '../_generated/api';
 import type { Id } from '../_generated/dataModel';
 import { resolveOrgIdForContext } from '../utils/org';
 import { requireEnv } from '../utils/env';
@@ -250,35 +250,6 @@ export const seedDocsFromFirecrawl = action({
     }
 
     const firecrawl = createFirecrawlClient();
-    const enqueueRetry = async (
-      delayMs: number,
-      reason: string,
-    ): Promise<void> => {
-      const nextAttempt = Date.now() + delayMs;
-      console.warn(
-        `Firecrawl rate limited for ${args.url}. Retrying at ${new Date(nextAttempt).toISOString()} (${reason}).`,
-      );
-
-      if (onboardingId) {
-        await ctx.runMutation(
-          internal.agent.firecrawl.markFirecrawlSeedingScheduled,
-          {
-            onboardingId,
-            retryAt: nextAttempt,
-          },
-        );
-      }
-
-      await ctx.scheduler.runAfter(delayMs, api.agent.firecrawlSeed.seedDocsFromFirecrawl, {
-        url: args.url,
-        includePaths: args.includePaths,
-        excludePaths: args.excludePaths,
-        maxPages: args.maxPages,
-        organizationId: args.organizationId ?? undefined,
-        shopDomain: args.shopDomain ?? undefined,
-        force: true,
-      });
-    };
     const initialLimit = args.maxPages ?? DEFAULT_MAX_PAGES;
     const fallbackLimits =
       args.maxPages === undefined ? FALLBACK_PAGE_LIMITS : [];
@@ -360,41 +331,25 @@ export const seedDocsFromFirecrawl = action({
 
           const status = (error as { status?: number }).status;
           if (status === 429) {
-            const resetTs = (() => {
+            const resetAtText = (() => {
               const details = (error as { details?: { resetAt?: string; error?: string } }).details;
               if (details?.resetAt) {
-                const parsed = Date.parse(details.resetAt);
-                if (!Number.isNaN(parsed)) {
-                  return parsed;
-                }
+                return details.resetAt;
               }
 
               const message = extractFirecrawlErrorMessage(error);
               const match = message.match(/resets at ([^.]+)/i);
-              if (match && match[1]) {
-                const parsed = Date.parse(match[1]);
-                if (!Number.isNaN(parsed)) {
-                  return parsed;
-                }
-              }
-              return undefined;
+              return match?.[1];
             })();
 
-            const delay = (() => {
-              if (resetTs) {
-                const ms = resetTs - Date.now();
-                if (ms > 0) {
-                  return Math.min(ms, 5 * 60 * 1000);
-                }
-              }
-              return 60 * 1000;
-            })();
+            const resetInfo = resetAtText ? ` (retry after ${resetAtText})` : '';
+            console.warn(
+              `Firecrawl rate limited for ${args.url}. Not retrying automatically.${resetInfo}`,
+            );
 
-            await enqueueRetry(delay, "429 rate limit");
-            return {
-              skipped: true,
-              reason: `Firecrawl rate limited. Retry scheduled in ${Math.round(delay / 1000)}s.`,
-            };
+            throw new Error(
+              `Firecrawl rate limited for ${args.url}. Try again later or rerun with force=true.`,
+            );
           }
 
           console.error('Firecrawl crawl failed:', error);
@@ -467,9 +422,10 @@ export const seedDocsFromFirecrawl = action({
     } catch (error) {
       if (onboardingId) {
         await ctx.runMutation(
-          internal.agent.firecrawl.clearFirecrawlSeedingStatus,
+          internal.agent.firecrawl.markFirecrawlSeedingFailed,
           {
             onboardingId,
+            errorMessage: extractFirecrawlErrorMessage(error),
           },
         );
       }

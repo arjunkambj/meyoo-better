@@ -3,7 +3,7 @@ import { v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
 import { action, query } from "../_generated/server";
 import { api } from "../_generated/api";
-import { validateDateRange } from "../utils/analyticsSource";
+import { validateDateRange, toTimestampRange } from "../utils/analyticsSource";
 import { getUserAndOrg } from "../utils/auth";
 import { loadCustomerOverviewFromDailyMetrics } from "../utils/dailyMetrics";
 import { dateRangeValidator, defaultDateRange } from "./analyticsShared";
@@ -34,29 +34,6 @@ const ZERO_CUSTOMER_OVERVIEW = {
     lifetimeValue: 0,
   },
 } as const;
-
-const EMPTY_GEOGRAPHIC = {
-  countries: [] as Array<{
-    country: string;
-    customers: number;
-    revenue: number;
-    orders: number;
-    avgOrderValue: number;
-    zipCodes: Array<{
-      zipCode: string;
-      city?: string;
-      customers: number;
-      revenue: number;
-    }>;
-  }>,
-  cities: [] as Array<{
-    city: string;
-    country: string;
-    customers: number;
-    revenue: number;
-  }>,
-  heatmapData: [] as Array<{ lat: number; lng: number; value: number }>,
-};
 
 const DEFAULT_JOURNEY_STAGES = [
   {
@@ -432,10 +409,130 @@ export const getCohortAnalysis = query({
       ),
     }),
   ),
-  handler: async (ctx, _args) => {
+  handler: async (ctx, args) => {
     const auth = await getUserAndOrg(ctx);
     if (!auth) return [];
-    return [];
+
+    const rangeInput = args.dateRange ?? defaultDateRange();
+    const range = validateDateRange(rangeInput);
+    const timestamps = toTimestampRange(range);
+
+    // Get all orders for this organization up to the end of the date range
+    const allOrders = await ctx.db
+      .query("shopifyOrders")
+      .withIndex("by_organization_and_created", (q) =>
+        q
+          .eq("organizationId", auth.orgId as Id<"organizations">)
+          .lte("shopifyCreatedAt", timestamps.end),
+      )
+      .filter((q) => q.neq(q.field("financialStatus"), "cancelled"))
+      .collect();
+
+    // Group orders by customer and find first purchase month
+    const customerCohorts = new Map<
+      string,
+      { cohortMonth: string; orders: Array<{ date: Date; amount: number }> }
+    >();
+
+    for (const order of allOrders) {
+      if (!order.customerId) continue;
+
+      const orderDate = new Date(order.shopifyCreatedAt);
+      const customerId = order.customerId;
+
+      if (!customerCohorts.has(customerId)) {
+        customerCohorts.set(customerId, {
+          cohortMonth: "",
+          orders: [],
+        });
+      }
+
+      const customerData = customerCohorts.get(customerId)!;
+      customerData.orders.push({
+        date: orderDate,
+        amount: order.totalPrice,
+      });
+    }
+
+    // Determine cohort month (first purchase) for each customer
+    for (const [_customerId, data] of customerCohorts.entries()) {
+      data.orders.sort((a, b) => a.date.getTime() - b.date.getTime());
+      const firstOrder = data.orders[0];
+      if (firstOrder) {
+        const cohortDate = firstOrder.date;
+        data.cohortMonth = `${cohortDate.getFullYear()}-${String(cohortDate.getMonth() + 1).padStart(2, "0")}`;
+      }
+    }
+
+    // Group by cohort
+    const cohorts = new Map<
+      string,
+      {
+        customers: Set<string>;
+        ordersByPeriod: Map<number, { customers: Set<string>; revenue: number }>;
+      }
+    >();
+
+    for (const [customerId, data] of customerCohorts.entries()) {
+      const cohortMonth = data.cohortMonth;
+      if (!cohortMonth) continue;
+
+      if (!cohorts.has(cohortMonth)) {
+        cohorts.set(cohortMonth, {
+          customers: new Set(),
+          ordersByPeriod: new Map(),
+        });
+      }
+
+      const cohort = cohorts.get(cohortMonth)!;
+      cohort.customers.add(customerId);
+
+      // Calculate period (months since cohort) for each order
+      const [cohortYear, cohortMonthNum] = cohortMonth.split("-").map(Number);
+      for (const order of data.orders) {
+        const orderYear = order.date.getFullYear();
+        const orderMonth = order.date.getMonth() + 1;
+
+        const period =
+          (orderYear - cohortYear!) * 12 + (orderMonth - cohortMonthNum!);
+
+        if (!cohort.ordersByPeriod.has(period)) {
+          cohort.ordersByPeriod.set(period, {
+            customers: new Set(),
+            revenue: 0,
+          });
+        }
+
+        const periodData = cohort.ordersByPeriod.get(period)!;
+        periodData.customers.add(customerId);
+        periodData.revenue += order.amount;
+      }
+    }
+
+    // Build cohort analysis result
+    const cohortResults = Array.from(cohorts.entries())
+      .map(([cohortMonth, cohortData]) => {
+        const cohortSize = cohortData.customers.size;
+        const periods = Array.from(cohortData.ordersByPeriod.entries())
+          .sort(([a], [b]) => a - b)
+          .slice(0, 12) // Limit to 12 periods
+          .map(([period, data]) => ({
+            period,
+            retained: data.customers.size,
+            percentage: cohortSize > 0 ? (data.customers.size / cohortSize) * 100 : 0,
+            revenue: data.revenue,
+          }));
+
+        return {
+          cohort: cohortMonth,
+          cohortSize,
+          periods,
+        };
+      })
+      .sort((a, b) => b.cohort.localeCompare(a.cohort)) // Most recent first
+      .slice(0, 12); // Last 12 cohorts
+
+    return cohortResults;
   },
 });
 
@@ -524,16 +621,175 @@ export const getCustomerList = query({
       };
     }
 
+    // Parse and validate date range
+    const rangeInput = args.dateRange ?? defaultDateRange();
+    const range = validateDateRange(rangeInput);
+    const timestamps = toTimestampRange(range);
+
+    // Get all orders within the date range for this organization
+    const ordersInRange = await ctx.db
+      .query("shopifyOrders")
+      .withIndex("by_organization_and_created", (q) =>
+        q
+          .eq("organizationId", auth.orgId as Id<"organizations">)
+          .gte("shopifyCreatedAt", timestamps.start)
+          .lte("shopifyCreatedAt", timestamps.end),
+      )
+      .filter((q) => q.neq(q.field("financialStatus"), "cancelled"))
+      .collect();
+
+    // Get unique customers who had orders in this period
+    const customerIdsInPeriod = new Set<string>();
+    for (const order of ordersInRange) {
+      if (order.customerId) {
+        customerIdsInPeriod.add(order.customerId);
+      }
+    }
+
+    // Get customer documents
+    const allCustomers = await ctx.db
+      .query("shopifyCustomers")
+      .withIndex("by_organization", (q) => q.eq("organizationId", auth.orgId as Id<"organizations">))
+      .collect();
+
+    // Filter to only customers with activity in the date range
+    let filteredCustomers = allCustomers.filter((c) => customerIdsInPeriod.has(c._id));
+
+    // Apply search term filter if provided
+    const searchTerm = args.searchTerm?.trim().toLowerCase();
+    if (searchTerm) {
+      filteredCustomers = filteredCustomers.filter((c) => {
+        const name = `${c.firstName || ""} ${c.lastName || ""}`.toLowerCase();
+        const email = (c.email || "").toLowerCase();
+        return name.includes(searchTerm) || email.includes(searchTerm);
+      });
+    }
+
+    // Build customer list with order aggregations
+    const customerDataPromises = filteredCustomers.map(async (customer) => {
+      // Get orders for this customer in the date range
+      const orders = ordersInRange.filter((o) => o.customerId === customer._id);
+
+      const lifetimeValue = orders.reduce((sum, order) => sum + order.totalPrice, 0);
+      const orderCount = orders.length;
+      const avgOrderValue = orderCount > 0 ? lifetimeValue / orderCount : 0;
+
+      // Get first and last order dates from the filtered orders
+      const orderDates = orders
+        .map((o) => o.shopifyCreatedAt)
+        .sort((a, b) => a - b);
+      const firstOrderTimestamp = orderDates[0];
+      const lastOrderTimestamp = orderDates[orderDates.length - 1];
+
+      const firstOrderDate = firstOrderTimestamp
+        ? new Date(firstOrderTimestamp).toISOString()
+        : new Date(timestamps.start).toISOString();
+      const lastOrderDate = lastOrderTimestamp
+        ? new Date(lastOrderTimestamp).toISOString()
+        : new Date(timestamps.start).toISOString();
+
+      // Determine segment based on LTV and order count
+      let segment = "new";
+      if (orderCount === 0) {
+        segment = "prospect";
+      } else if (orderCount === 1) {
+        segment = "new";
+      } else if (orderCount >= 2 && lifetimeValue < 500) {
+        segment = "regular";
+      } else if (orderCount >= 2 && lifetimeValue >= 500 && lifetimeValue < 1000) {
+        segment = "vip";
+      } else if (lifetimeValue >= 1000) {
+        segment = "champion";
+      }
+
+      // Determine status
+      const daysSinceLastOrder = lastOrderTimestamp
+        ? Math.max(0, (timestamps.end - lastOrderTimestamp) / (1000 * 60 * 60 * 24))
+        : 0;
+      let status = "active";
+      if (orderCount === 0) {
+        status = "prospect";
+      } else if (daysSinceLastOrder > 180) {
+        status = "churned";
+      } else if (daysSinceLastOrder > 90) {
+        status = "at-risk";
+      }
+
+      const name = `${customer.firstName || ""} ${customer.lastName || ""}`.trim() || "Anonymous";
+
+      return {
+        id: customer._id,
+        name,
+        email: customer.email || "",
+        avatar: undefined,
+        status,
+        lifetimeValue,
+        orders: orderCount,
+        avgOrderValue,
+        lastOrderDate,
+        firstOrderDate,
+        segment,
+        city: customer.defaultAddress?.city,
+        country: customer.defaultAddress?.country,
+      };
+    });
+
+    const customerData = await Promise.all(customerDataPromises);
+
+    // Filter by segment if provided
+    let finalData = customerData;
+    if (args.segment && args.segment !== "all") {
+      finalData = customerData.filter((c) => c.segment === args.segment);
+    }
+
+    // Sort data
+    const sortBy = args.sortBy || "lastOrderDate";
+    const sortOrder = args.sortOrder || "desc";
+    finalData.sort((a, b) => {
+      let aVal: number | string = 0;
+      let bVal: number | string = 0;
+
+      switch (sortBy) {
+        case "lifetimeValue":
+          aVal = a.lifetimeValue;
+          bVal = b.lifetimeValue;
+          break;
+        case "orders":
+          aVal = a.orders;
+          bVal = b.orders;
+          break;
+        case "name":
+          aVal = a.name;
+          bVal = b.name;
+          break;
+        default:
+          aVal = new Date(a.lastOrderDate).getTime();
+          bVal = new Date(b.lastOrderDate).getTime();
+      }
+
+      if (typeof aVal === "string" && typeof bVal === "string") {
+        return sortOrder === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+      }
+      return sortOrder === "asc" ? (aVal as number) - (bVal as number) : (bVal as number) - (aVal as number);
+    });
+
+    // Paginate
+    const total = finalData.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const startIdx = (page - 1) * pageSize;
+    const endIdx = startIdx + pageSize;
+    const paginatedData = finalData.slice(startIdx, endIdx);
+
     return {
-      page: [],
-      continueCursor: END_CURSOR,
-      isDone: true,
-      data: [],
+      page: paginatedData,
+      continueCursor: page >= totalPages ? END_CURSOR : `page_${page + 1}`,
+      isDone: page >= totalPages,
+      data: paginatedData,
       pagination: {
         page,
         pageSize,
-        total: 0,
-        totalPages: 0,
+        total,
+        totalPages,
       },
     };
   },
@@ -580,7 +836,7 @@ export const getGeographicDistribution = query({
     dateRange: v.optional(dateRangeValidator),
   },
   returns: geographicValidator,
-  handler: async (ctx, _args) => {
+  handler: async (ctx, args) => {
     const auth = await getUserAndOrg(ctx);
     if (!auth) {
       return {
@@ -590,7 +846,140 @@ export const getGeographicDistribution = query({
       };
     }
 
-    return { ...EMPTY_GEOGRAPHIC };
+    const rangeInput = args.dateRange ?? defaultDateRange();
+    const range = validateDateRange(rangeInput);
+    const timestamps = toTimestampRange(range);
+
+    // Get orders in the date range
+    const orders = await ctx.db
+      .query("shopifyOrders")
+      .withIndex("by_organization_and_created", (q) =>
+        q
+          .eq("organizationId", auth.orgId as Id<"organizations">)
+          .gte("shopifyCreatedAt", timestamps.start)
+          .lte("shopifyCreatedAt", timestamps.end),
+      )
+      .filter((q) => q.neq(q.field("financialStatus"), "cancelled"))
+      .collect();
+
+    // Get unique customer IDs from orders
+    const customerIds = new Set<string>();
+    for (const order of orders) {
+      if (order.customerId) {
+        customerIds.add(order.customerId);
+      }
+    }
+
+    // Get customer documents
+    const customers = await ctx.db
+      .query("shopifyCustomers")
+      .withIndex("by_organization", (q) => q.eq("organizationId", auth.orgId as Id<"organizations">))
+      .collect();
+
+    // Build geographic aggregations
+    const countryMap = new Map<
+      string,
+      {
+        customers: Set<string>;
+        revenue: number;
+        orders: number;
+        cities: Map<string, { customers: Set<string>; revenue: number }>;
+        zipCodes: Map<string, { customers: Set<string>; revenue: number; city?: string }>;
+      }
+    >();
+
+    for (const customer of customers) {
+      if (!customerIds.has(customer._id)) continue;
+      if (!customer.defaultAddress?.country) continue;
+
+      const country = customer.defaultAddress.country;
+      const city = customer.defaultAddress.city;
+      const zip = customer.defaultAddress.zip;
+
+      if (!countryMap.has(country)) {
+        countryMap.set(country, {
+          customers: new Set(),
+          revenue: 0,
+          orders: 0,
+          cities: new Map(),
+          zipCodes: new Map(),
+        });
+      }
+
+      const countryData = countryMap.get(country)!;
+      countryData.customers.add(customer._id);
+
+      // Add city data
+      if (city) {
+        if (!countryData.cities.has(city)) {
+          countryData.cities.set(city, { customers: new Set(), revenue: 0 });
+        }
+        countryData.cities.get(city)!.customers.add(customer._id);
+      }
+
+      // Add zip data
+      if (zip) {
+        if (!countryData.zipCodes.has(zip)) {
+          countryData.zipCodes.set(zip, { customers: new Set(), revenue: 0, city });
+        }
+        countryData.zipCodes.get(zip)!.customers.add(customer._id);
+      }
+    }
+
+    // Aggregate revenue from orders
+    for (const order of orders) {
+      if (!order.customerId) continue;
+      if (!order.shippingAddress?.country) continue;
+
+      const country = order.shippingAddress.country;
+      if (countryMap.has(country)) {
+        const countryData = countryMap.get(country)!;
+        countryData.revenue += order.totalPrice;
+        countryData.orders += 1;
+
+        // Add to city revenue
+        const city = order.shippingAddress.city;
+        if (city && countryData.cities.has(city)) {
+          countryData.cities.get(city)!.revenue += order.totalPrice;
+        }
+
+        // Add to zip revenue
+        const zip = order.shippingAddress.zip;
+        if (zip && countryData.zipCodes.has(zip)) {
+          countryData.zipCodes.get(zip)!.revenue += order.totalPrice;
+        }
+      }
+    }
+
+    // Build result arrays
+    const countries = Array.from(countryMap.entries()).map(([country, data]) => ({
+      country,
+      customers: data.customers.size,
+      revenue: data.revenue,
+      orders: data.orders,
+      avgOrderValue: data.orders > 0 ? data.revenue / data.orders : 0,
+      zipCodes: Array.from(data.zipCodes.entries()).map(([zipCode, zipData]) => ({
+        zipCode,
+        city: zipData.city,
+        customers: zipData.customers.size,
+        revenue: zipData.revenue,
+      })),
+    }));
+
+    const cities = Array.from(countryMap.entries()).flatMap(([country, data]) =>
+      Array.from(data.cities.entries()).map(([city, cityData]) => ({
+        city,
+        country,
+        customers: cityData.customers.size,
+        revenue: cityData.revenue,
+      })),
+    );
+
+    return {
+      countries,
+      cities,
+      heatmapData: [], // TODO: Implement heatmap coordinates
+    };
   },
 });
 
@@ -602,11 +991,85 @@ export const getCustomerJourney = query({
     dateRange: v.optional(dateRangeValidator),
   },
   returns: v.array(journeyStageValidator),
-  handler: async (ctx, _args) => {
+  handler: async (ctx, args) => {
     const auth = await getUserAndOrg(ctx);
     if (!auth) return DEFAULT_JOURNEY_STAGES;
 
-    return DEFAULT_JOURNEY_STAGES;
+    const rangeInput = args.dateRange ?? defaultDateRange();
+    const range = validateDateRange(rangeInput);
+
+    // Load customer overview from daily metrics to get aggregated data
+    const dailyOverview = await loadCustomerOverviewFromDailyMetrics(
+      ctx,
+      auth.orgId as Id<"organizations">,
+      range,
+    );
+
+    if (!dailyOverview?.metrics) {
+      return DEFAULT_JOURNEY_STAGES;
+    }
+
+    const metrics = dailyOverview.metrics;
+    const totalCustomers = metrics.totalCustomers || 0;
+    const activeCustomers = metrics.activeCustomers || 0;
+    const newCustomers = metrics.newCustomers || 0;
+    const returningCustomers = metrics.returningCustomers || 0;
+
+    // Calculate journey stages based on metrics
+    const awarenessCustomers = totalCustomers;
+    const considerationCustomers = activeCustomers; // Customers who purchased
+    const purchaseCustomers = newCustomers + returningCustomers;
+    const retentionCustomers = returningCustomers;
+
+    // Calculate conversion rates
+    const awarenessToConsideration = awarenessCustomers > 0
+      ? (considerationCustomers / awarenessCustomers) * 100
+      : 0;
+    const considerationToPurchase = considerationCustomers > 0
+      ? (purchaseCustomers / considerationCustomers) * 100
+      : 0;
+    const purchaseToRetention = purchaseCustomers > 0
+      ? (retentionCustomers / purchaseCustomers) * 100
+      : 0;
+
+    return [
+      {
+        stage: "Awareness",
+        customers: awarenessCustomers,
+        percentage: 100,
+        avgDays: 0,
+        conversionRate: awarenessToConsideration,
+        icon: "solar:eye-bold-duotone",
+        color: "primary",
+      },
+      {
+        stage: "Consideration",
+        customers: considerationCustomers,
+        percentage: awarenessCustomers > 0 ? (considerationCustomers / awarenessCustomers) * 100 : 0,
+        avgDays: 0,
+        conversionRate: considerationToPurchase,
+        icon: "solar:cart-bold-duotone",
+        color: "warning",
+      },
+      {
+        stage: "Purchase",
+        customers: purchaseCustomers,
+        percentage: awarenessCustomers > 0 ? (purchaseCustomers / awarenessCustomers) * 100 : 0,
+        avgDays: 0,
+        conversionRate: purchaseToRetention,
+        icon: "solar:bag-bold-duotone",
+        color: "success",
+      },
+      {
+        stage: "Retention",
+        customers: retentionCustomers,
+        percentage: awarenessCustomers > 0 ? (retentionCustomers / awarenessCustomers) * 100 : 0,
+        avgDays: 0,
+        conversionRate: 0,
+        icon: "solar:refresh-circle-bold-duotone",
+        color: "info",
+      },
+    ];
   },
 });
 

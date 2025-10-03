@@ -1809,6 +1809,7 @@ export const storeProductsInternal = internalMutation({
     organizationId: v.id("organizations"),
     // Prefer passing storeId when available to avoid race conditions
     storeId: v.optional(v.id("shopifyStores")),
+    syncSessionId: v.optional(v.id("syncSessions")),
     products: v.array(v.any()),
   },
   returns: v.null(),
@@ -1835,8 +1836,51 @@ export const storeProductsInternal = internalMutation({
         .first();
     }
 
-    if (!store) {
-      throw new Error("No active Shopify store found");
+    if (!store || store.isActive === false) {
+      logger.warn("Skipping Shopify product sync because store is inactive", {
+        organizationId: String(args.organizationId),
+        storeId: args.storeId,
+      });
+
+      if (args.syncSessionId) {
+        try {
+          await ctx.runMutation(internal.jobs.helpers.patchSyncSessionMetadata, {
+            sessionId: args.syncSessionId,
+            metadata: {
+              stageStatus: { products: "failed" },
+              lastBatchError: "Shopify store inactive or uninstalled",
+              failureReason: "shopify_store_inactive",
+              partialSync: true,
+            } as any,
+          });
+
+          await ctx.runMutation(internal.jobs.helpers.updateSyncSession, {
+            sessionId: args.syncSessionId,
+            status: "failed",
+            error: "Shopify store inactive or uninstalled",
+            completedAt: Date.now(),
+          });
+        } catch (metadataError) {
+          logger.warn(
+            "Failed to mark sync session as failed after Shopify store uninstall",
+            metadataError,
+          );
+        }
+      }
+
+      try {
+        await ctx.runMutation(internal.core.onboarding.monitorInitialSyncs, {
+          organizationId: args.organizationId,
+          limit: 1,
+        });
+      } catch (monitorError) {
+        logger.warn(
+          "monitorInitialSyncs failed after detecting inactive Shopify store",
+          monitorError,
+        );
+      }
+
+      return null;
     }
 
     // Step 1: Bulk fetch existing products

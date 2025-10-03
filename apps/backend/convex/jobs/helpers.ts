@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 
+import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { internalMutation } from "../_generated/server";
 
@@ -225,22 +226,118 @@ export const initializeSyncSessionBatches = internalMutation({
     const session = await ctx.db.get(args.sessionId);
     if (!session) return;
 
-    const metadata = {
-      ...(session.metadata || {}),
-      totalBatches: args.totalBatches,
-      completedBatches: 0,
-      baselineRecords:
-        args.metrics?.baselineRecords ?? args.initialRecordsProcessed,
-      ordersQueued: args.metrics?.ordersQueued,
-      productsProcessed: args.metrics?.productsProcessed,
-      customersProcessed: args.metrics?.customersProcessed,
-      ordersProcessed: 0,
-    } as Record<string, any>;
+    const now = Date.now();
+    const existingMetadata = (session.metadata || {}) as Record<string, any>;
 
-    await ctx.db.patch(args.sessionId, {
-      metadata,
-      recordsProcessed: args.initialRecordsProcessed,
-    });
+    const previousCompleted =
+      typeof existingMetadata.completedBatches === "number"
+        ? existingMetadata.completedBatches
+        : 0;
+    const previousOrdersProcessed =
+      typeof existingMetadata.ordersProcessed === "number"
+        ? existingMetadata.ordersProcessed
+        : 0;
+
+    const baselineRecords =
+      (typeof existingMetadata.baselineRecords === "number"
+        ? existingMetadata.baselineRecords
+        : undefined) ??
+      args.metrics?.baselineRecords ??
+      args.initialRecordsProcessed;
+
+    const nextTotalBatches = args.totalBatches;
+    const nextCompletedBatches =
+      nextTotalBatches > 0
+        ? Math.min(nextTotalBatches, previousCompleted)
+        : previousCompleted;
+
+    const existingSyncedEntities = Array.isArray(
+      existingMetadata.syncedEntities,
+    )
+      ? (existingMetadata.syncedEntities as string[])
+      : [];
+
+    const nextMetadata: Record<string, any> = {
+      ...existingMetadata,
+      totalBatches: nextTotalBatches,
+      completedBatches: nextCompletedBatches,
+      baselineRecords,
+      ordersQueued:
+        args.metrics?.ordersQueued ?? existingMetadata.ordersQueued,
+      productsProcessed:
+        args.metrics?.productsProcessed ?? existingMetadata.productsProcessed,
+      customersProcessed:
+        args.metrics?.customersProcessed ??
+        existingMetadata.customersProcessed,
+      ordersProcessed: previousOrdersProcessed,
+      lastActivityAt: now,
+      progressUpdatedAt: now,
+    };
+
+    const nextRecordsProcessed = Math.max(
+      session.recordsProcessed ?? 0,
+      args.initialRecordsProcessed,
+    );
+
+    const shouldFinalize =
+      nextTotalBatches === 0 ||
+      (nextTotalBatches > 0 && nextCompletedBatches >= nextTotalBatches);
+
+    if (shouldFinalize) {
+      const stageStatus = (nextMetadata.stageStatus || {}) as Record<
+        string,
+        string
+      >;
+      nextMetadata.stageStatus = {
+        ...stageStatus,
+        orders: "completed",
+      };
+
+      const synced = new Set(existingSyncedEntities);
+      synced.add("orders");
+      nextMetadata.syncedEntities = Array.from(synced);
+      if (nextTotalBatches > 0) {
+        nextMetadata.completedBatches = nextTotalBatches;
+      }
+    }
+
+    const patch: Record<string, any> = {
+      metadata: nextMetadata,
+      recordsProcessed: nextRecordsProcessed,
+    };
+
+    const shouldMarkCompleted =
+      shouldFinalize && session.status !== "completed";
+
+    if (shouldMarkCompleted) {
+      const completedAt = session.completedAt ?? now;
+      patch.status = "completed";
+      patch.completedAt = completedAt;
+      if (session.startedAt) {
+        patch.duration = Math.max(0, completedAt - session.startedAt);
+      }
+    }
+
+    await ctx.db.patch(args.sessionId, patch);
+
+    if (shouldMarkCompleted) {
+      await ctx.runMutation(internal.engine.syncJobs.onInitialSyncComplete, {
+        workId: `initializeSyncSessionBatches:${String(args.sessionId)}`,
+        context: {
+          organizationId: session.organizationId as Id<"organizations">,
+          platform: session.platform,
+          sessionId: args.sessionId,
+        },
+        result: {
+          recordsProcessed: nextRecordsProcessed,
+        },
+      });
+
+      await ctx.runMutation(internal.core.onboarding.monitorInitialSyncs, {
+        organizationId: session.organizationId as Id<"organizations">,
+        limit: 1,
+      });
+    }
   },
 });
 
@@ -258,6 +355,7 @@ export const incrementSyncSessionProgress = internalMutation({
     if (!session) return null;
 
     const metadata = (session.metadata || {}) as Record<string, any>;
+    const now = Date.now();
     const totalBatches = metadata.totalBatches ?? 0;
     const previousCompleted = metadata.completedBatches ?? 0;
     const nextCompletedRaw = previousCompleted + args.batchesCompletedDelta;
@@ -285,6 +383,8 @@ export const incrementSyncSessionProgress = internalMutation({
         completedBatches: nextCompleted,
         baselineRecords,
         ordersProcessed: nextOrdersProcessed,
+        lastActivityAt: now,
+        progressUpdatedAt: now,
       } as Record<string, any>,
       recordsProcessed: nextRecordsProcessed,
     });

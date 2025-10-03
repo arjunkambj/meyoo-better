@@ -10,6 +10,7 @@ export interface CustomerMetrics {
   totalCustomers: number;
   newCustomers: number;
   returningCustomers: number;
+  periodCustomerCount: number;
   avgLTV: number;
   avgCAC: number;
   ltvCacRatio: number;
@@ -66,10 +67,11 @@ export const CustomerOverviewCards = memo(function CustomerOverviewCards({
         ? [
             {
               title: "Total Customers",
-              value: formatNumber(metrics.totalCustomers),
+              value: formatNumber(metrics.periodCustomerCount),
               change: formatChange(metrics.changes.totalCustomers),
               icon: "solar:users-group-rounded-bold-duotone",
               iconColor: "text-default-500",
+              tooltip: "Unique customers who placed an order in the selected period.",
             },
             {
               title: "New Customers",
@@ -112,15 +114,16 @@ export const CustomerOverviewCards = memo(function CustomerOverviewCards({
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       {cards.map((card) => (
         <KPI
-          key={card.title}
-          change={card.change.text.replace("%", "")}
-          changeType={card.change.type}
-          icon={card.icon}
-          iconColor={card.iconColor}
-          subtitle={card.subtitle}
-          title={card.title}
-          value={card.value}
-        />
+         key={card.title}
+         change={card.change.text.replace("%", "")}
+         changeType={card.change.type}
+         icon={card.icon}
+         iconColor={card.iconColor}
+          tooltip={card.tooltip}
+         subtitle={card.subtitle}
+         title={card.title}
+         value={card.value}
+       />
       ))}
     </div>
   );

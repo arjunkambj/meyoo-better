@@ -193,10 +193,18 @@ export function useCustomerAnalytics(dateRange?: {
 
   const actionArgs = useMemo(() => {
     const rangeStrings = toUtcRangeStrings(effectiveDateRange, timezone);
+    const normalizedRange = {
+      startDate: effectiveDateRange.startDate,
+      endDate: effectiveDateRange.endDate,
+      startDateTimeUtc: rangeStrings.startDateTimeUtc,
+      endDateTimeUtc: rangeStrings.endDateTimeUtc,
+      endDateTimeUtcExclusive: rangeStrings.endDateTimeUtcExclusive,
+      dayCount: rangeStrings.dayCount,
+    } as const;
     const trimmedSearch = searchTerm.trim();
 
     return {
-      dateRange: rangeStrings,
+      dateRange: normalizedRange,
       page,
       pageSize: DEFAULT_PAGE_SIZE,
       searchTerm: trimmedSearch.length > 0 ? trimmedSearch : undefined,
@@ -215,10 +223,7 @@ export function useCustomerAnalytics(dateRange?: {
     setIsLoadingAnalytics(true);
 
     fetchAnalytics({
-      dateRange: {
-        startDate: actionArgs.dateRange.startDate,
-        endDate: actionArgs.dateRange.endDate,
-      },
+      dateRange: actionArgs.dateRange,
       page: actionArgs.page,
       pageSize: actionArgs.pageSize,
       searchTerm: actionArgs.searchTerm,

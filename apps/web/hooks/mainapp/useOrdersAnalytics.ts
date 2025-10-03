@@ -85,13 +85,26 @@ export function useOrdersAnalytics(params: UseOrdersAnalyticsParams = {}) {
     return toUtcRangeStrings(effectiveRange, timezone);
   }, [effectiveRange, timezone]);
 
+  const normalizedRange = useMemo(() => {
+    if (!rangeStrings) return null;
+
+    return {
+      startDate: effectiveRange.startDate,
+      endDate: effectiveRange.endDate,
+      startDateTimeUtc: rangeStrings.startDateTimeUtc,
+      endDateTimeUtc: rangeStrings.endDateTimeUtc,
+      endDateTimeUtcExclusive: rangeStrings.endDateTimeUtcExclusive,
+      dayCount: rangeStrings.dayCount,
+    } as const;
+  }, [effectiveRange.endDate, effectiveRange.startDate, rangeStrings]);
+
   // Use consolidated action for overview and fulfillment metrics
   const [metricsData, setMetricsData] = useState<any>(null);
   const [isLoadingMetrics, setIsLoadingMetrics] = useState(true);
   const fetchMetrics = useAction(api.web.orders.getOrdersMetrics);
 
   useEffect(() => {
-    if (!rangeStrings) {
+    if (!normalizedRange) {
       setIsLoadingMetrics(false);
       return;
     }
@@ -100,7 +113,7 @@ export function useOrdersAnalytics(params: UseOrdersAnalyticsParams = {}) {
     setIsLoadingMetrics(true);
 
     fetchMetrics({
-      dateRange: rangeStrings,
+      dateRange: normalizedRange,
     })
       .then((result) => {
         if (!cancelled) {
@@ -118,22 +131,40 @@ export function useOrdersAnalytics(params: UseOrdersAnalyticsParams = {}) {
     return () => {
       cancelled = true;
     };
-  }, [fetchMetrics, rangeStrings?.startDate, rangeStrings?.endDate]);
+  }, [
+    fetchMetrics,
+    normalizedRange?.startDate,
+    normalizedRange?.endDate,
+    normalizedRange?.startDateTimeUtc,
+    normalizedRange?.endDateTimeUtcExclusive,
+  ]);
 
   const overview: OrdersOverviewMetrics | null = metricsData?.overview?.metrics ?? null;
 
   const cursorKey = useMemo(() => {
-    if (!rangeStrings) return null;
+    if (!normalizedRange) return null;
     return JSON.stringify({
-      start: rangeStrings.startDate,
-      end: rangeStrings.endDate,
+      start: normalizedRange.startDate,
+      end: normalizedRange.endDate,
+      startUtc: normalizedRange.startDateTimeUtc,
+      endUtc: normalizedRange.endDateTimeUtcExclusive,
       status: status ?? null,
       search: normalizedSearch ?? null,
       sortBy: sortBy ?? null,
       sortOrder,
       pageSize,
     });
-  }, [rangeStrings?.startDate, rangeStrings?.endDate, status, normalizedSearch, sortBy, sortOrder, pageSize]);
+  }, [
+    normalizedRange?.startDate,
+    normalizedRange?.endDate,
+    normalizedRange?.startDateTimeUtc,
+    normalizedRange?.endDateTimeUtcExclusive,
+    status,
+    normalizedSearch,
+    sortBy,
+    sortOrder,
+    pageSize,
+  ]);
 
   const cursorMapRef = useRef<Record<number, string | null>>({ 1: null });
   const lastCursorKeyRef = useRef<string | null>(null);
@@ -179,9 +210,9 @@ export function useOrdersAnalytics(params: UseOrdersAnalyticsParams = {}) {
   }, [effectivePage, cursorRevision]);
 
   const ordersQueryArgs = useMemo(() => {
-    if (!rangeStrings || waitingForCursor) return "skip" as const;
+    if (!normalizedRange || waitingForCursor) return "skip" as const;
     return {
-      dateRange: rangeStrings,
+      dateRange: normalizedRange,
       status,
       searchTerm: normalizedSearch,
       sortBy,
@@ -191,7 +222,7 @@ export function useOrdersAnalytics(params: UseOrdersAnalyticsParams = {}) {
         numItems: pageSize,
       },
     };
-  }, [rangeStrings, status, normalizedSearch, sortBy, sortOrder, currentCursor, pageSize, waitingForCursor]);
+  }, [normalizedRange, status, normalizedSearch, sortBy, sortOrder, currentCursor, pageSize, waitingForCursor]);
 
   const ordersPageSnapshot = useQuery(
     (api.web.orders as Record<string, any>).getOrdersTablePage,
@@ -199,7 +230,7 @@ export function useOrdersAnalytics(params: UseOrdersAnalyticsParams = {}) {
   ) as OrdersPageSnapshot | undefined;
 
   useEffect(() => {
-    if (!rangeStrings) {
+    if (!normalizedRange) {
       return;
     }
 
@@ -226,16 +257,16 @@ export function useOrdersAnalytics(params: UseOrdersAnalyticsParams = {}) {
     if (prefetchPage !== null) {
       setPrefetchPage(null);
     }
-  }, [effectivePage, rangeStrings, cursorRevision, prefetchPage]);
+  }, [effectivePage, normalizedRange, cursorRevision, prefetchPage]);
 
   const prefetchQueryArgs = useMemo(() => {
-    if (!rangeStrings || prefetchPage === null) return "skip" as const;
+    if (!normalizedRange || prefetchPage === null) return "skip" as const;
     if (!(prefetchPage in cursorMapRef.current)) return "skip" as const;
     const cursor = cursorMapRef.current[prefetchPage];
     if (prefetchPage > 1 && cursor === null) return "skip" as const;
 
     return {
-      dateRange: rangeStrings,
+      dateRange: normalizedRange,
       status,
       searchTerm: normalizedSearch,
       sortBy,
@@ -245,7 +276,7 @@ export function useOrdersAnalytics(params: UseOrdersAnalyticsParams = {}) {
         numItems: pageSize,
       },
     };
-  }, [rangeStrings, status, normalizedSearch, sortBy, sortOrder, prefetchPage, pageSize, cursorRevision]);
+  }, [normalizedRange, status, normalizedSearch, sortBy, sortOrder, prefetchPage, pageSize, cursorRevision]);
 
   const prefetchSnapshot = useQuery(
     (api.web.orders as Record<string, any>).getOrdersTablePage,

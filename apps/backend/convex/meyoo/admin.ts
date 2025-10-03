@@ -1372,6 +1372,123 @@ export const resetMetaData = action({
 });
 
 /**
+ * Reconcile sync session metadata with actual database state
+ * Use when batch jobs executed but didn't update progress tracking
+ */
+export const reconcileSyncSession = mutation({
+  args: {
+    organizationId: v.id("organizations"),
+  },
+  returns: v.object({
+    success: v.boolean(),
+    sessionId: v.id("syncSessions"),
+    before: v.object({
+      status: v.string(),
+      completedBatches: v.number(),
+      totalBatches: v.number(),
+      ordersProcessed: v.number(),
+    }),
+    after: v.object({
+      status: v.string(),
+      completedBatches: v.number(),
+      totalBatches: v.number(),
+      ordersProcessed: v.number(),
+    }),
+  }),
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const user = await ctx.db.get(userId);
+    if (!user || !isAdmin(user)) {
+      throw new Error("Not authorized");
+    }
+
+    // Find the latest initial sync session
+    const sessions = await ctx.db
+      .query("syncSessions")
+      .withIndex("by_org_platform_and_date", (q) =>
+        q.eq("organizationId", args.organizationId).eq("platform", "shopify"),
+      )
+      .order("desc")
+      .take(20);
+
+    const session = sessions.find(
+      (s) => s.type === "initial" || (s.metadata as any)?.isInitialSync === true,
+    );
+
+    if (!session) {
+      throw new Error("No initial sync session found");
+    }
+
+    // Count actual records
+    const orders = await ctx.db
+      .query("shopifyOrders")
+      .withIndex("by_organization", (q) => q.eq("organizationId", args.organizationId))
+      .collect();
+
+    const products = await ctx.db
+      .query("shopifyProducts")
+      .withIndex("by_organization", (q) => q.eq("organizationId", args.organizationId))
+      .collect();
+
+    const customers = await ctx.db
+      .query("shopifyCustomers")
+      .withIndex("by_organization", (q) => q.eq("organizationId", args.organizationId))
+      .collect();
+
+    const metadata = (session.metadata || {}) as any;
+    const totalBatches = metadata.totalBatches || 0;
+
+    // Capture before state
+    const before = {
+      status: session.status,
+      completedBatches: metadata.completedBatches || 0,
+      totalBatches,
+      ordersProcessed: metadata.ordersProcessed || 0,
+    };
+
+    // Update to match reality
+    await ctx.db.patch(session._id, {
+      status: "completed",
+      recordsProcessed: products.length + customers.length + orders.length,
+      completedAt: Date.now(),
+      metadata: {
+        ...metadata,
+        completedBatches: totalBatches,
+        ordersProcessed: orders.length,
+        productsProcessed: products.length,
+        customersProcessed: customers.length,
+        stageStatus: {
+          products: "completed",
+          inventory: "completed",
+          customers: "completed",
+          orders: "completed",
+        },
+        syncedEntities: ["products", "inventory", "customers", "orders"],
+      } as any,
+    });
+
+    console.log(
+      `[ADMIN_RECONCILE] Reconciled sync session ${session._id} for org ${args.organizationId}`,
+      { before, actualOrders: orders.length, actualProducts: products.length, actualCustomers: customers.length },
+    );
+
+    return {
+      success: true,
+      sessionId: session._id,
+      before,
+      after: {
+        status: "completed",
+        completedBatches: totalBatches,
+        totalBatches,
+        ordersProcessed: orders.length,
+      },
+    };
+  },
+});
+
+/**
  * Recalculate analytics aggregates for an organization.
  * Rebuilds daily metric snapshots for the requested lookback period using the new dailyMetrics table.
  */

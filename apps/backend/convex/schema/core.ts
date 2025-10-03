@@ -329,6 +329,8 @@ export const syncSessions = defineTable({
       ordersQueued: v.optional(v.number()),
       productsProcessed: v.optional(v.number()),
       customersProcessed: v.optional(v.number()),
+      lastActivityAt: v.optional(v.number()),
+      progressUpdatedAt: v.optional(v.number()),
       stageStatus: v.optional(
         v.object({
           products: v.optional(syncStageState),
@@ -405,9 +407,12 @@ export const onboarding = defineTable({
           status: v.union(
             v.literal("scheduled"),
             v.literal("in_progress"),
+            v.literal("completed"),
+            v.literal("failed"),
           ),
           startedAt: v.number(),
           retryAt: v.optional(v.number()),
+          errorMessage: v.optional(v.string()),
         }),
       ),
       firecrawlLastAttemptAt: v.optional(v.number()),

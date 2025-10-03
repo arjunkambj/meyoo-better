@@ -18,7 +18,12 @@ import {
 } from "../utils/analyticsSource";
 import { getUserAndOrg } from "../utils/auth";
 import { computeOrdersAnalytics } from "../utils/analyticsAggregations";
-import type { AnalyticsOrder, OrdersAnalyticsResult } from "@repo/types";
+import type {
+  AnalyticsOrder,
+  OrdersAnalyticsResult,
+  OrdersFulfillmentMetrics,
+  OrdersOverviewMetrics,
+} from "@repo/types";
 import { loadAnalyticsWithChunks } from "../utils/analyticsLoader";
 import { loadOverviewFromDailyMetrics } from "../utils/dailyMetrics";
 
@@ -142,6 +147,28 @@ function decodeOrdersCursor(cursor: string | null): OrdersCursorState | null {
   }
 }
 
+const ZERO_ORDERS_OVERVIEW: OrdersOverviewMetrics = {
+  totalOrders: 0,
+  cancelledOrders: 0,
+  totalRevenue: 0,
+  totalCosts: 0,
+  netProfit: 0,
+  totalTax: 0,
+  avgOrderValue: 0,
+  customerAcquisitionCost: 0,
+  grossMargin: 0,
+  fulfillmentRate: 0,
+  changes: {
+    totalOrders: 0,
+    revenue: 0,
+    netProfit: 0,
+    avgOrderValue: 0,
+    cac: 0,
+    margin: 0,
+    fulfillmentRate: 0,
+  },
+};
+
 const ordersOverviewValidator = v.object({
   totalOrders: v.number(),
   cancelledOrders: v.optional(v.number()),
@@ -174,6 +201,17 @@ const fulfillmentMetricsValidator = v.object({
   avgFulfillmentCost: v.optional(v.number()),
   totalOrders: v.optional(v.number()),
 });
+
+const ZERO_FULFILLMENT_METRICS: OrdersFulfillmentMetrics = {
+  avgProcessingTime: 0,
+  avgShippingTime: 0,
+  avgDeliveryTime: 0,
+  onTimeDeliveryRate: 0,
+  fulfillmentAccuracy: 0,
+  returnRate: 0,
+  avgFulfillmentCost: 0,
+  totalOrders: 0,
+};
 
 const analyticsOrderValidator = v.object({
   id: v.string(),
@@ -275,70 +313,21 @@ export const getOrdersOverviewMetrics = query({
       range,
     );
 
-    if (dailyOverview?.ordersOverview) {
-      return {
-        metrics: dailyOverview.ordersOverview,
-        meta: {
-          strategy: "dailyMetrics",
-          hasFullCoverage: dailyOverview.hasFullCoverage,
-          sourceMeta: dailyOverview.meta,
-        },
-      };
+    const metrics = dailyOverview?.ordersOverview ?? ZERO_ORDERS_OVERVIEW;
+    const meta: Record<string, unknown> = {
+      strategy: "dailyMetrics",
+      status: dailyOverview ? "ready" : "pending",
+      hasFullCoverage: dailyOverview?.hasFullCoverage ?? false,
+    };
+
+    if (dailyOverview) {
+      meta.sourceMeta = dailyOverview.meta;
     }
 
-    try {
-      const analyticsResponse = await loadAnalytics(
-        ctx,
-        auth.orgId as Id<"organizations">,
-        range,
-        { datasets: ORDER_ANALYTICS_DATASETS },
-      );
-      const result = computeOrdersAnalytics(analyticsResponse);
-
-      if (!result.overview) {
-        return null;
-      }
-
-      return {
-        metrics: result.overview,
-        meta: {
-          strategy: "analytics",
-          datasets: ORDER_ANALYTICS_DATASETS,
-          ...(analyticsResponse.meta ? { analyticsMeta: analyticsResponse.meta } : {}),
-        },
-      };
-    } catch (error) {
-      const meta: Record<string, unknown> = {
-        strategy: "analytics",
-        datasets: ORDER_ANALYTICS_DATASETS,
-      };
-      if (error instanceof Error) {
-        meta.error = error.message;
-      }
-      return {
-        metrics: dailyOverview?.ordersOverview ?? {
-          totalOrders: 0,
-          totalRevenue: 0,
-          totalCosts: 0,
-          netProfit: 0,
-          totalTax: 0,
-          avgOrderValue: 0,
-          customerAcquisitionCost: 0,
-          grossMargin: 0,
-          fulfillmentRate: 0,
-          changes: {
-            totalOrders: 0,
-            revenue: 0,
-            netProfit: 0,
-            avgOrderValue: 0,
-            cac: 0,
-            margin: 0,
-            fulfillmentRate: 0,
-          },
-        },
-        meta,
-      };
-    }
+    return {
+      metrics,
+      meta,
+    };
   },
 });
 
@@ -568,20 +557,34 @@ export const getFulfillmentMetrics = query({
     const auth = await getUserAndOrg(ctx);
     if (!auth) return null;
 
-    try {
-      const range = validateDateRange(args.dateRange);
-      const analyticsResponse = await loadAnalytics(
-        ctx,
-        auth.orgId as Id<"organizations">,
-        range,
-        { datasets: ORDER_ANALYTICS_DATASETS },
-      );
-      const result = computeOrdersAnalytics(analyticsResponse);
-      return result.fulfillment ?? null;
-    } catch (error) {
-      console.error("Failed to compute fulfillment metrics", error);
-      return null;
+    const range = validateDateRange(args.dateRange);
+    const dailyOverview = await loadOverviewFromDailyMetrics(
+      ctx,
+      auth.orgId as Id<"organizations">,
+      range,
+    );
+
+    if (!dailyOverview) {
+      return ZERO_FULFILLMENT_METRICS;
     }
+
+    const aggregates = dailyOverview.aggregates;
+    const totalOrders = dailyOverview.ordersOverview?.totalOrders ?? aggregates.orders ?? 0;
+    const fulfillmentRate = dailyOverview.ordersOverview?.fulfillmentRate ?? 0;
+    const returnRate = aggregates.orders > 0 ? (aggregates.returnedOrders / aggregates.orders) * 100 : 0;
+    const totalFulfillmentCost = aggregates.shippingCosts + aggregates.handlingFees;
+    const avgFulfillmentCost = aggregates.orders > 0 ? totalFulfillmentCost / aggregates.orders : 0;
+
+    return {
+      avgProcessingTime: 0,
+      avgShippingTime: 0,
+      avgDeliveryTime: 0,
+      onTimeDeliveryRate: fulfillmentRate,
+      fulfillmentAccuracy: fulfillmentRate,
+      returnRate,
+      avgFulfillmentCost,
+      totalOrders,
+    } satisfies OrdersFulfillmentMetrics;
   },
 });
 

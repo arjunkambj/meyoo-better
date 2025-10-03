@@ -1,17 +1,118 @@
 import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
-import type { Doc, Id } from "../_generated/dataModel";
+import type { Id } from "../_generated/dataModel";
 import { action, query } from "../_generated/server";
-import type { QueryCtx } from "../_generated/server";
 import { api } from "../_generated/api";
 import { validateDateRange } from "../utils/analyticsSource";
 import { getUserAndOrg } from "../utils/auth";
 import { loadCustomerOverviewFromDailyMetrics } from "../utils/dailyMetrics";
-import { dateRangeValidator } from "./analyticsShared";
+import { dateRangeValidator, defaultDateRange } from "./analyticsShared";
 
 const MAX_CUSTOMER_PAGE_SIZE = 100;
-const MAX_CURSOR_CARRY = 100;
+const DEFAULT_CUSTOMER_PAGE_SIZE = 50;
 const END_CURSOR = "__END__";
+
+const ZERO_CUSTOMER_OVERVIEW = {
+  totalCustomers: 0,
+  newCustomers: 0,
+  returningCustomers: 0,
+  activeCustomers: 0,
+  churnedCustomers: 0,
+  avgLifetimeValue: 0,
+  avgOrderValue: 0,
+  avgOrdersPerCustomer: 0,
+  customerAcquisitionCost: 0,
+  churnRate: 0,
+  repeatPurchaseRate: 0,
+  periodCustomerCount: 0,
+  prepaidRate: 0,
+  periodRepeatRate: 0,
+  abandonedCartCustomers: 0,
+  changes: {
+    totalCustomers: 0,
+    newCustomers: 0,
+    lifetimeValue: 0,
+  },
+} as const;
+
+const EMPTY_GEOGRAPHIC = {
+  countries: [] as Array<{
+    country: string;
+    customers: number;
+    revenue: number;
+    orders: number;
+    avgOrderValue: number;
+    zipCodes: Array<{
+      zipCode: string;
+      city?: string;
+      customers: number;
+      revenue: number;
+    }>;
+  }>,
+  cities: [] as Array<{
+    city: string;
+    country: string;
+    customers: number;
+    revenue: number;
+  }>,
+  heatmapData: [] as Array<{ lat: number; lng: number; value: number }>,
+};
+
+const DEFAULT_JOURNEY_STAGES = [
+  {
+    stage: "Awareness",
+    customers: 0,
+    percentage: 0,
+    avgDays: 0,
+    conversionRate: 0,
+    icon: "solar:eye-bold-duotone",
+    color: "primary",
+  },
+  {
+    stage: "Interest",
+    customers: 0,
+    percentage: 0,
+    avgDays: 0,
+    conversionRate: 0,
+    icon: "solar:heart-bold-duotone",
+    color: "secondary",
+  },
+  {
+    stage: "Consideration",
+    customers: 0,
+    percentage: 0,
+    avgDays: 0,
+    conversionRate: 0,
+    icon: "solar:cart-bold-duotone",
+    color: "warning",
+  },
+  {
+    stage: "Purchase",
+    customers: 0,
+    percentage: 0,
+    avgDays: 0,
+    conversionRate: 0,
+    icon: "solar:bag-bold-duotone",
+    color: "success",
+  },
+  {
+    stage: "Retention",
+    customers: 0,
+    percentage: 0,
+    avgDays: 0,
+    conversionRate: 0,
+    icon: "solar:refresh-circle-bold-duotone",
+    color: "info",
+  },
+] satisfies Array<{
+  stage: string;
+  customers: number;
+  percentage: number;
+  avgDays: number;
+  conversionRate: number;
+  icon: string;
+  color: string;
+}>;
 
 const customerListEntryValidator = v.object({
   id: v.string(),
@@ -268,394 +369,22 @@ export const getCustomerOverview = query({
   handler: async (ctx, args) => {
     const auth = await getUserAndOrg(ctx);
     if (!auth) return null;
-    const orgId = auth.orgId as Id<"organizations">;
-    const range = args.dateRange ? validateDateRange(args.dateRange) : null;
 
-    if (range) {
-      const dailyOverview = await loadCustomerOverviewFromDailyMetrics(ctx, orgId, range);
-      if (dailyOverview) {
-        return dailyOverview.metrics;
-      }
-    }
-
-    const periodRange = normalizeDateRange(args.dateRange ?? undefined);
-    const hasPeriod = periodRange !== undefined;
-
-    // Get all customers for the organization
-    const customers = await ctx.db
-      .query("shopifyCustomers")
-      .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
-      .collect();
-
-    // Get orders based on date range
-    let orders: Doc<"shopifyOrders">[] = [];
-    let filteredOrders: Doc<"shopifyOrders">[] = [];
-
-    if (periodRange) {
-      filteredOrders = await ctx.db
-        .query("shopifyOrders")
-        .withIndex("by_organization_and_created", (q) =>
-          q
-            .eq("organizationId", orgId)
-            .gte("shopifyCreatedAt", periodRange.start)
-            .lte("shopifyCreatedAt", periodRange.end),
-        )
-        .collect();
-
-      // Also get all orders for lifetime calculations
-      orders = await ctx.db
-        .query("shopifyOrders")
-        .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
-        .collect();
-    } else {
-      // Get all orders for the organization
-      orders = await ctx.db
-        .query("shopifyOrders")
-        .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
-        .collect();
-
-      filteredOrders = orders;
-    }
-
-    // Group orders by customer
-    const customerOrdersMap = new Map<string, typeof orders>();
-
-    for (const order of orders) {
-      if (order.customerId) {
-        if (!customerOrdersMap.has(order.customerId)) {
-          customerOrdersMap.set(order.customerId, []);
-        }
-        customerOrdersMap.get(order.customerId)?.push(order);
-      }
-    }
-
-    // Calculate metrics from actual data
-    const filteredOrderIds = new Set(filteredOrders.map((o) => o._id));
-
-    const customerMetrics = customers.map((customer) => {
-      const customerOrders = customerOrdersMap.get(customer._id) || [];
-      const ordersInPeriod = customerOrders.filter((o) =>
-        filteredOrderIds.has(o._id),
-      );
-
-      const lifetimeValue = customerOrders.reduce(
-        (sum, o) => sum + (o.totalPrice || 0),
-        0,
-      );
-      const lifetimeOrders = customerOrders.length;
-      const avgOrderValue =
-        lifetimeOrders > 0 ? lifetimeValue / lifetimeOrders : 0;
-
-      // Get first and last order dates
-      const sortedOrders = [...customerOrders].sort(
-        (a, b) => a.shopifyCreatedAt - b.shopifyCreatedAt,
-      );
-      const firstOrderTimestamp =
-        sortedOrders.length > 0 ? sortedOrders[0]!.shopifyCreatedAt : null;
-      const lastOrderTimestamp =
-        sortedOrders.length > 0
-          ? sortedOrders[sortedOrders.length - 1]!.shopifyCreatedAt
-          : null;
-
-      const periodSortedOrders = ordersInPeriod
-        .slice()
-        .sort((a, b) => a.shopifyCreatedAt - b.shopifyCreatedAt);
-      const periodFirstOrderTimestamp =
-        periodSortedOrders.length > 0
-          ? periodSortedOrders[0]!.shopifyCreatedAt
-          : null;
-      const periodLastOrderTimestamp =
-        periodSortedOrders.length > 0
-          ? periodSortedOrders[periodSortedOrders.length - 1]!.shopifyCreatedAt
-          : null;
-
-      return {
-        ...customer,
-        lifetimeValue,
-        lifetimeOrders,
-        avgOrderValue,
-        firstOrderDate: firstOrderTimestamp
-          ? new Date(firstOrderTimestamp).toISOString().split("T")[0]
-          : "",
-        lastOrderDate: lastOrderTimestamp
-          ? new Date(lastOrderTimestamp).toISOString().split("T")[0]
-          : "",
-        firstOrderTimestamp,
-        lastOrderTimestamp,
-        periodFirstOrderTimestamp,
-        periodLastOrderTimestamp,
-        ordersInPeriod: ordersInPeriod.length,
-        revenueInPeriod: ordersInPeriod.reduce(
-          (sum, o) => sum + (o.totalPrice || 0),
-          0,
-        ),
-      };
-    });
-
-    const customersWithOrders = customerMetrics.filter(
-      (c) => c.lifetimeOrders > 0,
+    const rangeInput = args.dateRange ?? defaultDateRange();
+    const range = validateDateRange(rangeInput);
+    const dailyOverview = await loadCustomerOverviewFromDailyMetrics(
+      ctx,
+      auth.orgId as Id<"organizations">,
+      range,
     );
 
-    const customersWithOrdersInPeriod = hasPeriod
-      ? customerMetrics.filter((c) => c.ordersInPeriod > 0)
-      : customersWithOrders;
-
-    const relevantCustomers = hasPeriod
-      ? customersWithOrdersInPeriod
-      : customersWithOrders;
-
-    const totalCustomersAllTime = customersWithOrders.length;
-
-    const lifetimeNewCustomers = customersWithOrders.filter(
-      (c) => c.lifetimeOrders === 1,
-    ).length;
-    const lifetimeReturningCustomers = customersWithOrders.filter(
-      (c) => c.lifetimeOrders > 1,
-    ).length;
-
-    const newCustomersInPeriod =
-      hasPeriod && periodRange
-        ? customersWithOrdersInPeriod.filter((c) => {
-            const firstOrderTimestamp = c.firstOrderTimestamp;
-            return (
-              firstOrderTimestamp != null &&
-              isTimestampInRange(firstOrderTimestamp, periodRange)
-            );
-          }).length
-        : lifetimeNewCustomers;
-
-    const returningCustomersInPeriod = hasPeriod
-      ? Math.max(customersWithOrdersInPeriod.length - newCustomersInPeriod, 0)
-      : lifetimeReturningCustomers;
-
-    const newCustomersMetric = hasPeriod
-      ? newCustomersInPeriod
-      : lifetimeNewCustomers;
-
-    const returningCustomersMetric = hasPeriod
-      ? returningCustomersInPeriod
-      : lifetimeReturningCustomers;
-
-    const referenceEnd = hasPeriod && periodRange ? periodRange.end : Date.now();
-    const activeThreshold =
-      referenceEnd - 30 * 24 * 60 * 60 * 1000; // 30 days before end
-    const churnThreshold =
-      referenceEnd - 90 * 24 * 60 * 60 * 1000; // 90 days before end
-
-    const activeCustomers = relevantCustomers.filter((c) => {
-      const lastOrderTimestamp = hasPeriod
-        ? c.periodLastOrderTimestamp ?? c.lastOrderTimestamp
-        : c.lastOrderTimestamp;
-
-      return (
-        lastOrderTimestamp != null &&
-        lastOrderTimestamp >= activeThreshold &&
-        lastOrderTimestamp <= referenceEnd
-      );
-    }).length;
-
-    const churnedCustomers = relevantCustomers.filter((c) => {
-      const lastOrderTimestamp = hasPeriod
-        ? c.periodLastOrderTimestamp ?? c.lastOrderTimestamp
-        : c.lastOrderTimestamp;
-
-      return lastOrderTimestamp != null && lastOrderTimestamp < churnThreshold;
-    }).length;
-
-    const totalValue = relevantCustomers.reduce(
-      (sum, c) =>
-        sum + (hasPeriod ? c.revenueInPeriod || 0 : c.lifetimeValue || 0),
-      0,
-    );
-    const totalOrders = relevantCustomers.reduce(
-      (sum, c) =>
-        sum + (hasPeriod ? c.ordersInPeriod || 0 : c.lifetimeOrders || 0),
-      0,
-    );
-
-    const avgLifetimeValue =
-      relevantCustomers.length > 0
-        ? totalValue / relevantCustomers.length
-        : 0;
-    const avgOrderValue =
-      totalOrders > 0 ? totalValue / totalOrders : 0;
-    const avgOrdersPerCustomer =
-      relevantCustomers.length > 0
-        ? totalOrders / relevantCustomers.length
-        : 0;
-
-    // Calculate Customer Acquisition Cost (simplified for now)
-    // In production, this would come from ad spend / new customers
-    const avgCAC = avgLifetimeValue * 0.3; // Assume 30% of LTV as CAC
-
-    // Calculate rates
-    const churnRate =
-      relevantCustomers.length > 0
-        ? (churnedCustomers / relevantCustomers.length) * 100
-        : 0;
-
-    const repeatPurchaseRate =
-      relevantCustomers.length > 0
-        ? ((hasPeriod
-            ? returningCustomersInPeriod
-            : lifetimeReturningCustomers) /
-            relevantCustomers.length) *
-          100
-        : 0;
-
-    const repeatCustomersInPeriod = hasPeriod
-      ? customersWithOrdersInPeriod.filter((c) => c.ordersInPeriod >= 2)
-      : customersWithOrders.filter((c) => c.lifetimeOrders >= 2);
-
-    const periodCustomerCount = customersWithOrdersInPeriod.length;
-
-    const abandonedCartCustomers = hasPeriod
-      ? customerMetrics.filter((c) => {
-          if (c.ordersInPeriod > 0) {
-            return false;
-          }
-
-          const lastOrderTimestamp =
-            c.periodLastOrderTimestamp ?? c.lastOrderTimestamp;
-
-          if (lastOrderTimestamp == null) {
-            return true;
-          }
-
-          return periodRange != null && lastOrderTimestamp < periodRange.start;
-        }).length
-      : customers.length - customersWithOrders.length;
-
-    const prepaidOrdersCount = filteredOrders.filter((order) => {
-      const status = order.financialStatus?.toLowerCase();
-
-      return status === "paid" || status === "partially_paid";
-    }).length;
-
-    const prepaidRate =
-      filteredOrders.length > 0
-        ? (prepaidOrdersCount / filteredOrders.length) * 100
-        : 0;
-
-    const periodRepeatRate =
-      periodCustomerCount > 0
-        ? (repeatCustomersInPeriod.length / periodCustomerCount) * 100
-        : 0;
-
-    // Calculate changes from previous period
-    const changes = {
-      totalCustomers: 0,
-      newCustomers: 0,
-      lifetimeValue: 0,
-    };
-
-    if (periodRange) {
-      const currentStart = periodRange.start;
-      const currentEnd = periodRange.end;
-      const periodLength = currentEnd - currentStart + 1;
-      const previousStart = currentStart - periodLength;
-      const previousEnd = currentEnd - periodLength;
-
-      const previousOrders = await ctx.db
-        .query("shopifyOrders")
-        .withIndex("by_organization_and_created", (q) =>
-          q
-            .eq("organizationId", orgId)
-            .gte("shopifyCreatedAt", previousStart)
-            .lte("shopifyCreatedAt", previousEnd),
-        )
-        .collect();
-
-      const previousCustomerIds = new Set(
-        previousOrders
-          .map((o) => o.customerId)
-          .filter((id): id is Id<"shopifyCustomers"> => id != null),
-      );
-
-      const prevCustomersWithOrders = previousCustomerIds.size;
-
-      const prevNewCustomers = Array.from(previousCustomerIds).reduce(
-        (count, customerId) => {
-          const ordersForCustomer = customerOrdersMap.get(customerId) ?? [];
-          const firstOrder = ordersForCustomer.reduce<number | null>(
-            (acc, order) =>
-              acc == null || order.shopifyCreatedAt < acc
-                ? order.shopifyCreatedAt
-                : acc,
-            null,
-          );
-
-          if (
-            firstOrder != null &&
-            firstOrder >= previousStart &&
-            firstOrder <= previousEnd
-          ) {
-            return count + 1;
-          }
-
-          return count;
-        },
-        0,
-      );
-
-      const previousRevenueTotal = previousOrders.reduce(
-        (sum, order) => sum + (order.totalPrice || 0),
-        0,
-      );
-
-      const prevAvgLTV =
-        prevCustomersWithOrders > 0
-          ? previousRevenueTotal / prevCustomersWithOrders
-          : 0;
-
-      const prevTotalCustomersAllTime = customersWithOrders.filter((c) => {
-        const firstOrderTimestamp = c.firstOrderTimestamp;
-
-        return (
-          firstOrderTimestamp != null &&
-          firstOrderTimestamp <= previousEnd
-        );
-      }).length;
-
-      changes.totalCustomers =
-        prevTotalCustomersAllTime > 0
-          ? ((totalCustomersAllTime - prevTotalCustomersAllTime) /
-              prevTotalCustomersAllTime) *
-            100
-          : 0;
-
-      changes.newCustomers =
-        prevNewCustomers > 0
-          ? ((newCustomersInPeriod - prevNewCustomers) / prevNewCustomers) * 100
-          : 0;
-
-      changes.lifetimeValue =
-        prevAvgLTV > 0
-          ? ((avgLifetimeValue - prevAvgLTV) / prevAvgLTV) * 100
-          : 0;
+    if (!dailyOverview) {
+      return { ...ZERO_CUSTOMER_OVERVIEW };
     }
 
-    return {
-      totalCustomers: totalCustomersAllTime,
-      newCustomers: newCustomersMetric,
-      returningCustomers: returningCustomersMetric,
-      activeCustomers,
-      churnedCustomers,
-      avgLifetimeValue,
-      avgOrderValue,
-      avgOrdersPerCustomer,
-      customerAcquisitionCost: avgCAC,
-      churnRate,
-      repeatPurchaseRate,
-      periodCustomerCount,
-      prepaidRate,
-      periodRepeatRate,
-      abandonedCartCustomers,
-      changes,
-    };
+    return dailyOverview.metrics ?? { ...ZERO_CUSTOMER_OVERVIEW };
   },
 });
-
 /**
  * Get RFM (Recency, Frequency, Monetary) segments
  */
@@ -678,204 +407,9 @@ export const getRFMSegments = query({
   handler: async (ctx, _args) => {
     const auth = await getUserAndOrg(ctx);
     if (!auth) return [];
-
-    // Get all customers and their orders
-    const customers = await ctx.db
-      .query("shopifyCustomers")
-      .withIndex("by_organization", (q) => q.eq("organizationId", auth.orgId as Id<"organizations">))
-      .collect();
-
-    const orders = await ctx.db
-      .query("shopifyOrders")
-      .withIndex("by_organization", (q) => q.eq("organizationId", auth.orgId as Id<"organizations">))
-      .collect();
-
-    // Group orders by customer
-    const customerOrdersMap = new Map<string, typeof orders>();
-
-    for (const order of orders) {
-      if (order.customerId) {
-        if (!customerOrdersMap.has(order.customerId)) {
-          customerOrdersMap.set(order.customerId, []);
-        }
-        customerOrdersMap.get(order.customerId)?.push(order);
-      }
-    }
-
-    // Calculate RFM scores for each customer with orders
-    const now = Date.now();
-    const scoredCustomers = customers
-      .filter((c) => customerOrdersMap.has(c._id))
-      .map((customer) => {
-        const customerOrders = customerOrdersMap.get(customer._id) || [];
-
-        // Sort orders by date
-        const sortedOrders = [...customerOrders].sort(
-          (a, b) => a.shopifyCreatedAt - b.shopifyCreatedAt,
-        );
-
-        const lastOrder = sortedOrders[sortedOrders.length - 1];
-        const lifetimeValue = customerOrders.reduce(
-          (sum, o) => sum + (o.totalPrice || 0),
-          0,
-        );
-        const lifetimeOrders = customerOrders.length;
-
-        // Recency score (days since last order)
-        const daysSinceLastOrder = Math.floor(
-          (now - (lastOrder?.shopifyCreatedAt ?? now)) / (1000 * 60 * 60 * 24),
-        );
-        const recencyScore =
-          daysSinceLastOrder <= 30
-            ? 5
-            : daysSinceLastOrder <= 60
-              ? 4
-              : daysSinceLastOrder <= 90
-                ? 3
-                : daysSinceLastOrder <= 180
-                  ? 2
-                  : 1;
-
-        // Frequency score (number of orders)
-        const frequencyScore =
-          lifetimeOrders >= 10
-            ? 5
-            : lifetimeOrders >= 5
-              ? 4
-              : lifetimeOrders >= 3
-                ? 3
-                : lifetimeOrders >= 2
-                  ? 2
-                  : 1;
-
-        // Monetary score (lifetime value)
-        const monetaryScore =
-          lifetimeValue >= 5000
-            ? 5
-            : lifetimeValue >= 2000
-              ? 4
-              : lifetimeValue >= 1000
-                ? 3
-                : lifetimeValue >= 500
-                  ? 2
-                  : 1;
-
-        return {
-          ...customer,
-          lifetimeValue,
-          lifetimeOrders,
-          recencyScore,
-          frequencyScore,
-          monetaryScore,
-          rfmScore: recencyScore + frequencyScore + monetaryScore,
-        };
-      });
-
-    // Segment customers based on RFM scores
-    const segments = [
-      {
-        name: "Champions",
-        filter: (c: {
-          recencyScore: number;
-          frequencyScore: number;
-          monetaryScore: number;
-        }) =>
-          c.recencyScore >= 4 && c.frequencyScore >= 4 && c.monetaryScore >= 4,
-        description: "Bought recently, buy often, spend the most",
-        recommendation: "Reward them. Can be early adopters for new products",
-        color: "success",
-        icon: "solar:crown-bold-duotone",
-      },
-      {
-        name: "Loyal Customers",
-        filter: (c: {
-          recencyScore: number;
-          frequencyScore: number;
-          monetaryScore: number;
-        }) => c.frequencyScore >= 3 && c.monetaryScore >= 3,
-        description: "Spend good money. Responsive to promotions",
-        recommendation: "Upsell higher value products. Ask for reviews",
-        color: "primary",
-        icon: "solar:heart-bold-duotone",
-      },
-      {
-        name: "Potential Loyalists",
-        filter: (c: {
-          recencyScore: number;
-          frequencyScore: number;
-          monetaryScore: number;
-        }) => c.recencyScore >= 3 && c.frequencyScore >= 2,
-        description:
-          "Recent customers, spent good amount, bought more than once",
-        recommendation: "Offer membership/loyalty program, recommend products",
-        color: "secondary",
-        icon: "solar:star-bold-duotone",
-      },
-      {
-        name: "New Customers",
-        filter: (c: {
-          recencyScore: number;
-          frequencyScore: number;
-          monetaryScore: number;
-        }) => c.recencyScore >= 4 && c.frequencyScore === 1,
-        description: "Bought recently, but only once",
-        recommendation: "Provide onboarding support, give them early success",
-        color: "info",
-        icon: "solar:user-bold-duotone",
-      },
-      {
-        name: "At Risk",
-        filter: (c: {
-          recencyScore: number;
-          frequencyScore: number;
-          monetaryScore: number;
-        }) => c.recencyScore <= 2 && c.frequencyScore >= 3,
-        description: "Spent big money, but long time ago",
-        recommendation: "Send personalized emails to reconnect, offer renewals",
-        color: "warning",
-        icon: "solar:danger-triangle-bold-duotone",
-      },
-      {
-        name: "Can't Lose Them",
-        filter: (c: {
-          recencyScore: number;
-          frequencyScore: number;
-          monetaryScore: number;
-        }) => c.recencyScore <= 2 && c.monetaryScore >= 4,
-        description: "Made big purchases and often, but long time ago",
-        recommendation: "Win them back via renewals or newer products",
-        color: "danger",
-        icon: "solar:close-circle-bold-duotone",
-      },
-    ];
-
-    // Calculate segment metrics
-    const totalCustomers = scoredCustomers.length;
-    const segmentData = segments.map((segment) => {
-      const segmentCustomers = scoredCustomers.filter(segment.filter);
-      const count = segmentCustomers.length;
-      const avgLTV =
-        count > 0
-          ? segmentCustomers.reduce((sum, c) => sum + c.lifetimeValue, 0) /
-            count
-          : 0;
-
-      return {
-        name: segment.name,
-        count,
-        percentage: totalCustomers > 0 ? (count / totalCustomers) * 100 : 0,
-        avgLTV,
-        description: segment.description,
-        recommendation: segment.recommendation,
-        color: segment.color,
-        icon: segment.icon,
-      };
-    });
-
-    return segmentData.filter((s) => s.count > 0);
+    return [];
   },
 });
-
 /**
  * Get cohort analysis data
  */
@@ -898,157 +432,10 @@ export const getCohortAnalysis = query({
       ),
     }),
   ),
-  handler: async (ctx, args) => {
+  handler: async (ctx, _args) => {
     const auth = await getUserAndOrg(ctx);
     if (!auth) return [];
-
-    const organizationId = auth.orgId as Id<"organizations">;
-
-    // Load orders scoped to the requested window (default: all time)
-    let orders: Doc<"shopifyOrders">[];
-
-    if (args.dateRange) {
-      const startTime = new Date(args.dateRange.startDate).getTime();
-      const endTime =
-        new Date(args.dateRange.endDate).getTime() + 24 * 60 * 60 * 1000 - 1;
-
-      orders = await ctx.db
-        .query("shopifyOrders")
-        .withIndex("by_organization_and_created", (q) =>
-          q
-            .eq("organizationId", organizationId)
-            .gte("shopifyCreatedAt", startTime)
-            .lte("shopifyCreatedAt", endTime),
-        )
-        .collect();
-    } else {
-      orders = await ctx.db
-        .query("shopifyOrders")
-        .withIndex("by_organization", (q) =>
-          q.eq("organizationId", organizationId),
-        )
-        .collect();
-    }
-
-    if (orders.length === 0) {
-      return [];
-    }
-
-    // Get customers linked to the organization
-    const customers = await ctx.db
-      .query("shopifyCustomers")
-      .withIndex("by_organization", (q) => q.eq("organizationId", organizationId))
-      .collect();
-
-    // Group orders by customer
-    const customerOrdersMap = new Map<string, typeof orders>();
-
-    for (const order of orders) {
-      if (order.customerId) {
-        if (!customerOrdersMap.has(order.customerId)) {
-          customerOrdersMap.set(order.customerId, []);
-        }
-        customerOrdersMap.get(order.customerId)?.push(order);
-      }
-    }
-
-    // Group customers by acquisition month (first order month)
-    interface CohortCustomer extends Doc<"shopifyCustomers"> {
-      orders: Doc<"shopifyOrders">[];
-      firstOrderDate: string;
-      ordersCount: number;
-    }
-    const cohortMap = new Map<string, CohortCustomer[]>();
-
-    customers.forEach((customer) => {
-      const customerOrders = customerOrdersMap.get(customer._id);
-
-      if (!customerOrders || customerOrders.length === 0) return;
-
-      // Sort orders within the selected period to find the first occurrence
-      const sortedOrders = [...customerOrders].sort(
-        (a, b) => a.shopifyCreatedAt - b.shopifyCreatedAt,
-      );
-      const firstOrder = sortedOrders[0]!;
-      const cohortMonth = new Date(firstOrder.shopifyCreatedAt)
-        .toISOString()
-        .substring(0, 7); // YYYY-MM
-
-      if (!cohortMap.has(cohortMonth)) {
-        cohortMap.set(cohortMonth, []);
-      }
-      const cohortCustomer: CohortCustomer = {
-        ...customer,
-        orders: customerOrders,
-        firstOrderDate: new Date(firstOrder.shopifyCreatedAt).toISOString(),
-        ordersCount: customerOrders.length,
-      };
-      cohortMap.get(cohortMonth)?.push(cohortCustomer);
-    });
-
-    // Calculate retention for each cohort
-    const cohortData = Array.from(cohortMap.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .slice(-6) // Last 6 cohorts
-      .map(([cohort, cohortCustomers]) => {
-        const cohortSize = cohortCustomers.length;
-        const cohortDate = new Date(`${cohort}-01`);
-
-        // Calculate retention for each period
-        const periods = [];
-
-        for (let period = 0; period < 6; period++) {
-          const periodDate = new Date(cohortDate);
-
-          periodDate.setMonth(periodDate.getMonth() + period);
-          const periodStart = periodDate.getTime();
-          const periodEnd = new Date(periodDate);
-
-          periodEnd.setMonth(periodEnd.getMonth() + 1);
-
-          // Count customers who made purchases in this period
-          const retained = cohortCustomers.filter((c) => {
-            // Check if customer has any order in this period
-            return c.orders.some(
-              (order: Doc<"shopifyOrders">) =>
-                order.shopifyCreatedAt >= periodStart &&
-                order.shopifyCreatedAt < periodEnd.getTime(),
-            );
-          }).length;
-
-          // Calculate revenue for this period from actual orders
-          const revenue = cohortCustomers.reduce((sum, c) => {
-            const periodRevenue = c.orders
-              .filter(
-                (order: Doc<"shopifyOrders">) =>
-                  order.shopifyCreatedAt >= periodStart &&
-                  order.shopifyCreatedAt < periodEnd.getTime(),
-              )
-              .reduce(
-                (orderSum: number, order: Doc<"shopifyOrders">) =>
-                  orderSum + (order.totalPrice || 0),
-                0,
-              );
-
-            return sum + periodRevenue;
-          }, 0);
-
-          periods.push({
-            period,
-            retained,
-            percentage: cohortSize > 0 ? (retained / cohortSize) * 100 : 0,
-            revenue,
-          });
-        }
-
-        return {
-          cohort,
-          cohortSize,
-          periods,
-        };
-      });
-
-    return cohortData;
+    return [];
   },
 });
 
@@ -1116,6 +503,12 @@ export const getCustomerList = query({
   }),
   handler: async (ctx, args) => {
     const auth = await getUserAndOrg(ctx);
+    const pageSize = Math.max(
+      1,
+      Math.min(args.pageSize ?? DEFAULT_CUSTOMER_PAGE_SIZE, MAX_CUSTOMER_PAGE_SIZE),
+    );
+    const page = Math.max(1, Math.floor(args.page ?? 1));
+
     if (!auth) {
       return {
         page: [],
@@ -1123,591 +516,28 @@ export const getCustomerList = query({
         isDone: true,
         data: [],
         pagination: {
-          page: 1,
-          pageSize: 0,
+          page,
+          pageSize,
           total: 0,
           totalPages: 0,
         },
       };
     }
 
-    const orgId = auth.orgId as Id<"organizations">;
-    const dateRange = normalizeDateRange(args.dateRange ?? undefined);
-    const isLegacyRequest = !args.paginationOpts;
-    const legacyPage = Math.max(1, Math.floor(args.page ?? 1));
-    const requestedItems = args.paginationOpts?.numItems ?? args.pageSize ?? 50;
-    const pageSize = Math.max(
-      1,
-      Math.min(requestedItems, MAX_CUSTOMER_PAGE_SIZE),
-    );
-    const targetOffset = isLegacyRequest ? (legacyPage - 1) * pageSize : 0;
-    const cursorState = decodeCustomerCursor(args.paginationOpts?.cursor ?? null);
-    const sortByField = args.sortBy;
-    const sortOrder = args.sortOrder ?? "desc";
-
-    const searchTerm =
-      args.searchTerm && args.searchTerm.trim().length > 0
-        ? args.searchTerm.trim().toLowerCase()
-        : undefined;
-
-    if (isLegacyRequest) {
-      return handleLegacyCustomerList(ctx, {
-        orgId,
-        dateRange,
-        page: legacyPage,
-        pageSize,
-        searchTerm,
-        segment: args.segment,
-        sortBy: sortByField,
-        sortOrder,
-      });
-    }
-
-    const results: {
-      id: string;
-      name: string;
-      email: string;
-      avatar: string | undefined;
-      status: string;
-      lifetimeValue: number;
-      orders: number;
-      avgOrderValue: number;
-      lastOrderDate: string;
-      firstOrderDate: string;
-      segment: string;
-      city?: string;
-      country?: string;
-    }[] = [];
-
-    let nextCarry: string[] = [];
-    let nextDbCursor: string | null = cursorState.dbCursor ?? null;
-    let skipped = 0;
-
-    const addCustomer = async (
-      customer: Doc<"shopifyCustomers">,
-    ): Promise<void> => {
-      if (results.length >= pageSize) {
-        return;
-      }
-
-      if (customer.organizationId !== orgId) {
-        return;
-      }
-
-      if (searchTerm) {
-        const fullName = `${customer.firstName ?? ""} ${
-          customer.lastName ?? ""
-        }`
-          .trim()
-          .toLowerCase();
-        const email = (customer.email ?? "").toLowerCase();
-
-        if (
-          !fullName.includes(searchTerm) &&
-          !email.includes(searchTerm)
-        ) {
-          return;
-        }
-      }
-
-      const orders = await ctx.db
-        .query("shopifyOrders")
-        .withIndex("by_customer", (q) =>
-          q.eq("customerId", customer._id as Id<"shopifyCustomers">),
-        )
-        .collect();
-
-      const sortedOrders = orders
-        .slice()
-        .sort((a, b) => a.shopifyCreatedAt - b.shopifyCreatedAt);
-
-      const ordersInRange = dateRange
-        ? sortedOrders.filter((order) =>
-            isTimestampInRange(order.shopifyCreatedAt, dateRange),
-          )
-        : sortedOrders;
-
-      if (dateRange && ordersInRange.length === 0) {
-        return;
-      }
-
-      const metricsOrders = ordersInRange;
-      const totalValue = metricsOrders.reduce(
-        (sum, order) => sum + (order.totalPrice ?? 0),
-        0,
-      );
-      const orderCount = metricsOrders.length;
-      const avgOrderValue =
-        orderCount > 0 ? totalValue / orderCount : 0;
-
-      const firstOrder = metricsOrders[0];
-      const lastOrder = metricsOrders[orderCount - 1];
-
-      const lifetimeOrders = sortedOrders.length;
-      const lifetimeLastOrder =
-        sortedOrders[sortedOrders.length - 1] ?? null;
-
-      const segment = determineSegment(
-        lifetimeOrders,
-        lifetimeLastOrder
-          ? new Date(lifetimeLastOrder.shopifyCreatedAt)
-          : null,
-      );
-
-      if (args.segment && args.segment !== segment) {
-        return;
-      }
-
-      if (skipped < targetOffset) {
-        skipped += 1;
-        return;
-      }
-
-      const status = lifetimeOrders > 0 ? "converted" : "abandoned_cart";
-
-      results.push({
-        id: customer._id,
-        name:
-          `${customer.firstName ?? ""} ${customer.lastName ?? ""}`.trim() ||
-          "Unknown",
-        email: customer.email ?? "",
-        avatar: undefined,
-        status,
-        lifetimeValue: totalValue,
-        orders: orderCount,
-        avgOrderValue,
-        lastOrderDate: lastOrder
-          ? new Date(lastOrder.shopifyCreatedAt)
-              .toISOString()
-              .substring(0, 10)
-          : "",
-        firstOrderDate: firstOrder
-          ? new Date(firstOrder.shopifyCreatedAt)
-              .toISOString()
-              .substring(0, 10)
-          : "",
-        segment,
-        city: customer.defaultAddress?.city,
-        country: customer.defaultAddress?.country,
-      });
-    };
-
-    if (cursorState.carryIds.length > 0) {
-      for (let index = 0; index < cursorState.carryIds.length; index += 1) {
-        if (results.length >= pageSize) {
-          nextCarry = cursorState.carryIds.slice(index);
-          break;
-        }
-
-        const carryId = cursorState.carryIds[index]!;
-        const customerDoc = await ctx.db.get(
-          carryId as Id<"shopifyCustomers">,
-        );
-
-        if (!customerDoc) {
-          continue;
-        }
-
-        await addCustomer(customerDoc);
-      }
-
-      if (results.length >= pageSize || nextCarry.length > 0) {
-        const continueCursor = encodeCustomerCursor({
-          dbCursor: cursorState.dbCursor ?? null,
-          carryIds: nextCarry,
-        });
-
-        if (sortByField) {
-          const direction = sortOrder === "asc" ? 1 : -1;
-          results.sort((a, b) => {
-            const aVal = a[sortByField as keyof typeof a];
-            const bVal = b[sortByField as keyof typeof b];
-
-            if (aVal === undefined || bVal === undefined) {
-              return 0;
-            }
-
-            if (aVal === bVal) return 0;
-            return aVal > bVal ? direction : -direction;
-          });
-        }
-
-        const legacyData =
-          isLegacyRequest
-            ? results.map((customer) => ({
-                id: customer.id,
-                name: customer.name,
-                email: customer.email,
-                avatar: customer.avatar,
-                status: customer.status,
-                lifetimeValue: customer.lifetimeValue,
-                orders: customer.orders,
-                avgOrderValue: customer.avgOrderValue,
-                lastOrderDate: customer.lastOrderDate,
-                firstOrderDate: customer.firstOrderDate,
-                segment: customer.segment,
-                city: customer.city,
-                country: customer.country,
-              }))
-            : undefined;
-
-        const legacyPagination = isLegacyRequest
-          ? {
-              page: legacyPage,
-              pageSize,
-              total:
-                targetOffset +
-                results.length +
-                (continueCursor === END_CURSOR ? 0 : pageSize),
-              totalPages:
-                results.length === 0
-                  ? legacyPage
-                  : Math.max(
-                      legacyPage,
-                      Math.ceil(
-                        (targetOffset + results.length +
-                          (continueCursor === END_CURSOR ? 0 : pageSize)) /
-                          pageSize,
-                      ),
-                    ),
-            }
-          : undefined;
-
-        return {
-          page: results,
-          continueCursor,
-          isDone: continueCursor === END_CURSOR,
-          data: legacyData,
-          pagination: legacyPagination,
-        };
-      }
-    }
-
-    const paginated = await ctx.db
-      .query("shopifyCustomers")
-      .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
-      .order("desc")
-      .paginate({
-        cursor: cursorState.dbCursor ?? null,
-        numItems: Math.min(pageSize, MAX_CUSTOMER_PAGE_SIZE),
-      });
-
-    nextDbCursor = paginated.isDone ? null : paginated.continueCursor;
-
-    for (let i = 0; i < paginated.page.length; i += 1) {
-      if (results.length >= pageSize) {
-        nextCarry = paginated.page.slice(i).map((customer) => customer._id);
-        break;
-      }
-
-      const customerDoc = paginated.page[i]!;
-
-      await addCustomer(customerDoc);
-    }
-
-    const continueCursor = encodeCustomerCursor({
-      dbCursor: nextDbCursor,
-      carryIds: nextCarry,
-    });
-
-    if (sortByField) {
-      const direction = sortOrder === "asc" ? 1 : -1;
-      results.sort((a, b) => {
-        const aVal = a[sortByField as keyof typeof a];
-        const bVal = b[sortByField as keyof typeof b];
-
-        if (aVal === undefined || bVal === undefined) {
-          return 0;
-        }
-
-        if (aVal === bVal) return 0;
-        return aVal > bVal ? direction : -direction;
-      });
-    }
-
-    const legacyData =
-      isLegacyRequest
-        ? results.map((customer) => ({
-            id: customer.id,
-            name: customer.name,
-            email: customer.email,
-            avatar: customer.avatar,
-            status: customer.status,
-            lifetimeValue: customer.lifetimeValue,
-            orders: customer.orders,
-            avgOrderValue: customer.avgOrderValue,
-            lastOrderDate: customer.lastOrderDate,
-            firstOrderDate: customer.firstOrderDate,
-            segment: customer.segment,
-            city: customer.city,
-            country: customer.country,
-          }))
-        : undefined;
-
-    const legacyPagination = isLegacyRequest
-      ? {
-          page: legacyPage,
-          pageSize,
-          total:
-            targetOffset +
-            results.length +
-            (continueCursor === END_CURSOR ? 0 : pageSize),
-          totalPages:
-            results.length === 0
-              ? legacyPage
-              : Math.max(
-                  legacyPage,
-                  Math.ceil(
-                    (targetOffset + results.length +
-                      (continueCursor === END_CURSOR ? 0 : pageSize)) /
-                      pageSize,
-                  ),
-                ),
-        }
-      : undefined;
-
     return {
-      page: results,
-      continueCursor,
-      isDone: continueCursor === END_CURSOR,
-      data: legacyData,
-      pagination: legacyPagination,
+      page: [],
+      continueCursor: END_CURSOR,
+      isDone: true,
+      data: [],
+      pagination: {
+        page,
+        pageSize,
+        total: 0,
+        totalPages: 0,
+      },
     };
   },
 });
-
-interface LegacyCustomerListArgs {
-  orgId: Id<"organizations">;
-  dateRange?: TimestampRange;
-  page: number;
-  pageSize: number;
-  searchTerm?: string;
-  segment?: string;
-  sortBy?: string;
-  sortOrder: "asc" | "desc";
-}
-
-async function handleLegacyCustomerList(
-  ctx: QueryCtx,
-  {
-    orgId,
-    dateRange,
-    page,
-    pageSize,
-    searchTerm,
-    segment,
-    sortBy,
-    sortOrder,
-  }: LegacyCustomerListArgs,
-) {
-  const customers = await ctx.db
-    .query("shopifyCustomers")
-    .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
-    .collect();
-
-  const orders = await ctx.db
-    .query("shopifyOrders")
-    .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
-    .collect();
-
-  const customerOrdersMap = new Map<string, typeof orders>();
-
-  for (const order of orders) {
-    if (!order.customerId) continue;
-    if (!customerOrdersMap.has(order.customerId)) {
-      customerOrdersMap.set(order.customerId, []);
-    }
-    customerOrdersMap.get(order.customerId)!.push(order);
-  }
-
-  const mergedData = customers.map((customer) => {
-    const customerOrders = customerOrdersMap.get(customer._id) ?? [];
-
-    const lifetimeValue = customerOrders.reduce(
-      (sum, o) => sum + (o.totalPrice || 0),
-      0,
-    );
-    const lifetimeOrders = customerOrders.length;
-    const avgOrderValue = lifetimeOrders > 0 ? lifetimeValue / lifetimeOrders : 0;
-
-    const sortedOrders = [...customerOrders].sort(
-      (a, b) => a.shopifyCreatedAt - b.shopifyCreatedAt,
-    );
-    const firstOrder = sortedOrders[0];
-    const lastOrder = sortedOrders[sortedOrders.length - 1];
-
-    const ordersInRange = dateRange
-      ? customerOrders.filter((order) =>
-          isTimestampInRange(order.shopifyCreatedAt, dateRange),
-        )
-      : customerOrders;
-
-    const segmentValue = determineSegment(
-      lifetimeOrders,
-      lastOrder ? new Date(lastOrder.shopifyCreatedAt) : null,
-    );
-
-    return {
-      id: customer._id,
-      name: `${customer.firstName ?? ""} ${customer.lastName ?? ""}`.trim() ||
-        "Unknown",
-      email: customer.email ?? "",
-      avatar: undefined,
-      status: lifetimeOrders > 0 ? "converted" : "abandoned_cart",
-      lifetimeValue,
-      orders: ordersInRange.length,
-      avgOrderValue,
-      lastOrderDate: lastOrder
-        ? new Date(lastOrder.shopifyCreatedAt).toISOString().substring(0, 10)
-        : "",
-      firstOrderDate: firstOrder
-        ? new Date(firstOrder.shopifyCreatedAt).toISOString().substring(0, 10)
-        : "",
-      segment: segmentValue,
-      city: customer.defaultAddress?.city,
-      country: customer.defaultAddress?.country,
-    };
-  });
-
-  let filteredData = mergedData;
-
-  if (dateRange) {
-    filteredData = filteredData.filter((c) => c.orders > 0);
-  }
-
-  if (searchTerm) {
-    filteredData = filteredData.filter((c) => {
-      const name = c.name.toLowerCase();
-      const email = c.email.toLowerCase();
-      return name.includes(searchTerm) || email.includes(searchTerm);
-    });
-  }
-
-  if (segment) {
-    filteredData = filteredData.filter((c) => c.segment === segment);
-  }
-
-  if (sortBy) {
-    const direction = sortOrder === "asc" ? 1 : -1;
-    filteredData = [...filteredData].sort((a, b) => {
-      const aVal = a[sortBy as keyof typeof a];
-      const bVal = b[sortBy as keyof typeof b];
-
-      if (aVal === undefined || bVal === undefined) return 0;
-      if (aVal === bVal) return 0;
-      return aVal > bVal ? direction : -direction;
-    });
-  }
-
-  const total = filteredData.length;
-  const totalPages = total > 0 ? Math.ceil(total / pageSize) : 0;
-  const safePage = totalPages > 0 ? Math.min(page, totalPages) : 1;
-  const startIndex = (safePage - 1) * pageSize;
-  const paginatedData = filteredData.slice(startIndex, startIndex + pageSize);
-
-  return {
-    page: paginatedData,
-    continueCursor: END_CURSOR,
-    isDone: true,
-    data: paginatedData,
-    pagination: {
-      page: safePage,
-      pageSize,
-      total,
-      totalPages,
-    },
-  };
-}
-
-// Customer pagination helpers
-type CustomerCursorState = {
-  dbCursor: string | null;
-  carryIds: string[];
-};
-
-type TimestampRange = {
-  start: number;
-  end: number;
-};
-
-function normalizeDateRange(
-  range?: { startDate: string; endDate: string },
-): TimestampRange | undefined {
-  if (!range) return undefined;
-
-  const start = new Date(range.startDate).getTime();
-  const endExclusive = new Date(range.endDate).getTime() + 24 * 60 * 60 * 1000;
-
-  if (Number.isNaN(start) || Number.isNaN(endExclusive)) {
-    return undefined;
-  }
-
-  return {
-    start,
-    end: endExclusive - 1,
-  };
-}
-
-function isTimestampInRange(timestamp: number, range: TimestampRange): boolean {
-  return timestamp >= range.start && timestamp <= range.end;
-}
-
-function decodeCustomerCursor(cursor: string | null): CustomerCursorState {
-  if (!cursor || cursor === END_CURSOR) {
-    return { dbCursor: null, carryIds: [] };
-  }
-
-  try {
-    const parsed = JSON.parse(cursor) as Partial<CustomerCursorState>;
-
-    if (
-      parsed &&
-      (typeof parsed.dbCursor === "string" || parsed.dbCursor === null) &&
-      Array.isArray(parsed.carryIds)
-    ) {
-      const carry = parsed.carryIds
-        .filter((id): id is string => typeof id === "string" && id.length > 0)
-        .slice(0, MAX_CURSOR_CARRY);
-
-      return {
-        dbCursor: parsed.dbCursor ?? null,
-        carryIds: carry,
-      };
-    }
-  } catch (_error) {
-    // Fallback to treat the cursor as a raw Convex cursor
-  }
-
-  return { dbCursor: cursor, carryIds: [] };
-}
-
-function encodeCustomerCursor(state: CustomerCursorState): string {
-  const carry = state.carryIds
-    .filter((id) => typeof id === "string" && id.length > 0)
-    .slice(0, MAX_CURSOR_CARRY);
-  const dbCursor = typeof state.dbCursor === "string" ? state.dbCursor : null;
-
-  if (dbCursor === null && carry.length === 0) {
-    return END_CURSOR;
-  }
-
-  return JSON.stringify({
-    dbCursor,
-    carryIds: carry,
-  });
-}
-
-// Helper function to determine customer segment
-function determineSegment(
-  lifetimeOrders: number,
-  _lastOrder: Date | null,
-): string {
-  // Simple segmentation: new (1 order) or repeated (2+ orders)
-  if (lifetimeOrders === 0) return "new"; // No orders yet
-  if (lifetimeOrders === 1) return "new";
-
-  return "repeated";
-}
 
 /**
  * Get customer segments for dashboard widget
@@ -1716,102 +546,28 @@ export const getCustomerSegments = query({
   args: {
     dateRange: v.optional(dateRangeValidator),
   },
-  returns: v.union(
-    v.null(),
-    v.object({
-      totalCustomers: v.number(),
-      returningCustomers: v.number(),
-      vipCustomers: v.number(),
-      atRiskCustomers: v.number(),
-    }),
-  ),
+  returns: v.object({
+    totalCustomers: v.number(),
+    returningCustomers: v.number(),
+    vipCustomers: v.number(),
+    atRiskCustomers: v.number(),
+  }),
   handler: async (ctx, _args) => {
     const auth = await getUserAndOrg(ctx);
-    if (!auth) return null;
-
-    // Get all customers for the organization
-    const customers = await ctx.db
-      .query("shopifyCustomers")
-      .withIndex("by_organization", (q) => q.eq("organizationId", auth.orgId as Id<"organizations">))
-      .collect();
-
-    // Get all orders to calculate segments
-    const orders = await ctx.db
-      .query("shopifyOrders")
-      .withIndex("by_organization", (q) => q.eq("organizationId", auth.orgId as Id<"organizations">))
-      .collect();
-
-    // Date range filtering is not used in this function
-
-    // Group orders by customer
-    const customerOrdersMap = new Map<string, typeof orders>();
-
-    for (const order of orders) {
-      if (order.customerId) {
-        if (!customerOrdersMap.has(order.customerId)) {
-          customerOrdersMap.set(order.customerId, []);
-        }
-        customerOrdersMap.get(order.customerId)?.push(order);
-      }
-    }
-
-    // Calculate segments based on actual customer behavior
-    let totalCustomers = 0;
-    let returningCustomers = 0;
-    let vipCustomers = 0;
-    let atRiskCustomers = 0;
-
-    const now = Date.now();
-
-    for (const customer of customers) {
-      const customerOrders = customerOrdersMap.get(customer._id) || [];
-
-      // Skip customers with no orders
-      if (customerOrders.length === 0) continue;
-
-      totalCustomers++;
-
-      // Calculate metrics for segmentation
-      const lifetimeValue = customerOrders.reduce(
-        (sum, o) => sum + (o.totalPrice || 0),
-        0,
-      );
-      const lifetimeOrders = customerOrders.length;
-
-      // Get last order date
-      const sortedOrders = [...customerOrders].sort(
-        (a, b) => a.shopifyCreatedAt - b.shopifyCreatedAt,
-      );
-      const lastOrder = sortedOrders[sortedOrders.length - 1];
-      const daysSinceLastOrder = Math.floor(
-        (now - (lastOrder?.shopifyCreatedAt ?? now)) / (1000 * 60 * 60 * 24),
-      );
-
-      // Returning customers (2+ orders)
-      if (lifetimeOrders >= 2) {
-        returningCustomers++;
-      }
-
-      // VIP customers: High value (top 20% by value) OR frequent buyers (5+ orders and active)
-      // For simplicity, we'll use: 5+ orders OR $2000+ lifetime value AND active in last 60 days
-      if (
-        (lifetimeOrders >= 5 || lifetimeValue >= 2000) &&
-        daysSinceLastOrder <= 60
-      ) {
-        vipCustomers++;
-      }
-
-      // At Risk customers: Previously active but no purchase in 90+ days
-      if (lifetimeOrders >= 2 && daysSinceLastOrder > 90) {
-        atRiskCustomers++;
-      }
+    if (!auth) {
+      return {
+        totalCustomers: 0,
+        returningCustomers: 0,
+        vipCustomers: 0,
+        atRiskCustomers: 0,
+      };
     }
 
     return {
-      totalCustomers,
-      returningCustomers,
-      vipCustomers,
-      atRiskCustomers,
+      totalCustomers: 0,
+      returningCustomers: 0,
+      vipCustomers: 0,
+      atRiskCustomers: 0,
     };
   },
 });
@@ -1823,231 +579,18 @@ export const getGeographicDistribution = query({
   args: {
     dateRange: v.optional(dateRangeValidator),
   },
-  returns: v.object({
-    countries: v.array(
-      v.object({
-        country: v.string(),
-        customers: v.number(),
-        revenue: v.number(),
-        orders: v.number(),
-        avgOrderValue: v.number(),
-        zipCodes: v.array(
-          v.object({
-            zipCode: v.string(),
-            city: v.optional(v.string()),
-            customers: v.number(),
-            revenue: v.number(),
-          }),
-        ),
-      }),
-    ),
-    cities: v.array(
-      v.object({
-        city: v.string(),
-        country: v.string(),
-        customers: v.number(),
-        revenue: v.number(),
-      }),
-    ),
-    heatmapData: v.array(
-      v.object({
-        lat: v.number(),
-        lng: v.number(),
-        value: v.number(),
-      }),
-    ),
-  }),
-  handler: async (ctx, args) => {
+  returns: geographicValidator,
+  handler: async (ctx, _args) => {
     const auth = await getUserAndOrg(ctx);
-    if (!auth)
-      return { countries: [], cities: [], heatmapData: [] };
-
-    const organizationId = auth.orgId as Id<"organizations">;
-
-    // Get customers with addresses
-    const customers = await ctx.db
-      .query("shopifyCustomers")
-      .withIndex("by_organization", (q) => q.eq("organizationId", organizationId))
-      .collect();
-
-    // Get orders scoped to the requested range (default: all time)
-    let orders: Doc<"shopifyOrders">[];
-
-    if (args.dateRange) {
-      const startTime = new Date(args.dateRange.startDate).getTime();
-      const endTime =
-        new Date(args.dateRange.endDate).getTime() + 24 * 60 * 60 * 1000 - 1;
-
-      orders = await ctx.db
-        .query("shopifyOrders")
-        .withIndex("by_organization_and_created", (q) =>
-          q
-            .eq("organizationId", organizationId)
-            .gte("shopifyCreatedAt", startTime)
-            .lte("shopifyCreatedAt", endTime),
-        )
-        .collect();
-    } else {
-      orders = await ctx.db
-        .query("shopifyOrders")
-        .withIndex("by_organization", (q) =>
-          q.eq("organizationId", organizationId),
-        )
-        .collect();
-    }
-
-    if (orders.length === 0) {
-      return { countries: [], cities: [], heatmapData: [] };
-    }
-
-    // Group orders by customer
-    const customerOrdersMap = new Map<string, typeof orders>();
-
-    for (const order of orders) {
-      if (order.customerId) {
-        if (!customerOrdersMap.has(order.customerId)) {
-          customerOrdersMap.set(order.customerId, []);
-        }
-        customerOrdersMap.get(order.customerId)?.push(order);
-      }
-    }
-
-    if (customerOrdersMap.size === 0) {
-      return { countries: [], cities: [], heatmapData: [] };
-    }
-
-    // Group by country
-    const countryMap = new Map<
-      string,
-      {
-        country: string;
-        customers: number;
-        revenue: number;
-        orders: number;
-      }
-    >();
-    const cityMap = new Map<
-      string,
-      {
-        city: string;
-        country: string;
-        customers: number;
-        revenue: number;
-      }
-    >();
-    const countryZipCodeMap = new Map<
-      string,
-      Map<
-        string,
-        {
-          zipCode: string;
-          city?: string;
-          customers: number;
-          revenue: number;
-        }
-      >
-    >();
-
-    customers.forEach((customer) => {
-      const customerOrders = customerOrdersMap.get(customer._id);
-      if (!customerOrders || customerOrders.length === 0) return;
-
-      const country = customer.defaultAddress?.country || "Unknown";
-      const city = customer.defaultAddress?.city || "Unknown";
-      const zip = customer.defaultAddress?.zip?.trim();
-
-      // Calculate metrics from orders within the selected window
-      const periodRevenue = customerOrders.reduce(
-        (sum, o) => sum + (o.totalPrice || 0),
-        0,
-      );
-      const periodOrders = customerOrders.length;
-
-      // Country aggregation
-      if (!countryMap.has(country)) {
-        countryMap.set(country, {
-          country,
-          customers: 0,
-          revenue: 0,
-          orders: 0,
-        });
-      }
-      const countryData = countryMap.get(country);
-      if (countryData) {
-        countryData.customers++;
-        countryData.revenue += periodRevenue;
-        countryData.orders += periodOrders;
-      }
-
-      // City aggregation
-      const cityKey = `${city}, ${country}`;
-
-      if (!cityMap.has(cityKey)) {
-        cityMap.set(cityKey, {
-          city,
-          country,
-          customers: 0,
-          revenue: 0,
-        });
-      }
-      const cityData = cityMap.get(cityKey);
-      if (cityData) {
-        cityData.customers++;
-        cityData.revenue += periodRevenue;
-      }
-
-      if (zip) {
-        if (!countryZipCodeMap.has(country)) {
-          countryZipCodeMap.set(country, new Map());
-        }
-
-        const countryZipMap = countryZipCodeMap.get(country);
-        if (countryZipMap) {
-          if (!countryZipMap.has(zip)) {
-            countryZipMap.set(zip, {
-              zipCode: zip,
-              city: customer.defaultAddress?.city || undefined,
-              customers: 0,
-              revenue: 0,
-            });
-          }
-
-          const zipData = countryZipMap.get(zip);
-          if (zipData) {
-            zipData.customers += 1;
-            zipData.revenue += periodRevenue;
-
-            if (!zipData.city && customer.defaultAddress?.city) {
-              zipData.city = customer.defaultAddress.city;
-            }
-          }
-        }
-      }
-    });
-
-    // Convert to arrays and calculate averages
-    const countries = Array.from(countryMap.values()).map((c) => {
-      const zipCodes = Array.from(countryZipCodeMap.get(c.country)?.values() ?? [])
-        .sort((a, b) => b.revenue - a.revenue);
-
+    if (!auth) {
       return {
-        ...c,
-        avgOrderValue: c.orders > 0 ? c.revenue / c.orders : 0,
-        zipCodes,
+        countries: [],
+        cities: [],
+        heatmapData: [],
       };
-    });
+    }
 
-    const cities = Array.from(cityMap.values())
-      .sort((a, b) => b.revenue - a.revenue)
-      .slice(0, 10); // Top 10 cities
-
-    const heatmapData: Array<{ lat: number; lng: number; value: number }> = [];
-
-    return {
-      countries: countries.sort((a, b) => b.revenue - a.revenue),
-      cities,
-      heatmapData,
-    };
+    return { ...EMPTY_GEOGRAPHIC };
   },
 });
 
@@ -2058,153 +601,12 @@ export const getCustomerJourney = query({
   args: {
     dateRange: v.optional(dateRangeValidator),
   },
-  returns: v.array(
-    v.object({
-      stage: v.string(),
-      customers: v.number(),
-      percentage: v.number(),
-      avgDays: v.number(),
-      conversionRate: v.number(),
-      icon: v.string(),
-      color: v.string(),
-    }),
-  ),
+  returns: v.array(journeyStageValidator),
   handler: async (ctx, _args) => {
     const auth = await getUserAndOrg(ctx);
-    if (!auth) return [];
+    if (!auth) return DEFAULT_JOURNEY_STAGES;
 
-    // Get all customers and orders to track journey stages
-    const customers = await ctx.db
-      .query("shopifyCustomers")
-      .withIndex("by_organization", (q) => q.eq("organizationId", auth.orgId as Id<"organizations">))
-      .collect();
-
-    const orders = await ctx.db
-      .query("shopifyOrders")
-      .withIndex("by_organization", (q) => q.eq("organizationId", auth.orgId as Id<"organizations">))
-      .collect();
-
-    // Group orders by customer
-    const customerOrdersMap = new Map<string, typeof orders>();
-
-    for (const order of orders) {
-      if (order.customerId) {
-        if (!customerOrdersMap.has(order.customerId)) {
-          customerOrdersMap.set(order.customerId, []);
-        }
-        customerOrdersMap.get(order.customerId)?.push(order);
-      }
-    }
-
-    // Count customers at each stage based on their order history
-    const customersWithOrders = customers.filter((c) =>
-      customerOrdersMap.has(c._id),
-    );
-    const totalCustomers = customersWithOrders.length;
-
-    // Calculate actual journey stages based on customer order history
-
-    const repeatCustomers = customersWithOrders.filter((c) => {
-      const orders = customerOrdersMap.get(c._id) || [];
-
-      return orders.length > 1;
-    }).length;
-
-    const loyalCustomers = customersWithOrders.filter((c) => {
-      const orders = customerOrdersMap.get(c._id) || [];
-
-      return orders.length >= 5;
-    }).length;
-
-    // Calculate average days between stages
-    const avgDaysToFirstPurchase = 7; // Default estimate
-    const avgDaysBetweenPurchases =
-      customersWithOrders.reduce((sum, c) => {
-        const custOrders = customerOrdersMap.get(c._id) || [];
-
-        if (custOrders.length < 2) return sum;
-
-        const sortedOrders = [...custOrders].sort(
-          (a, b) => a.shopifyCreatedAt - b.shopifyCreatedAt,
-        );
-        const daysBetween =
-          (sortedOrders[sortedOrders.length - 1]?.shopifyCreatedAt ?? 0 -
-            (sortedOrders[0]?.shopifyCreatedAt ?? 0)) /
-          (1000 * 60 * 60 * 24 * (custOrders.length - 1));
-
-        return sum + daysBetween;
-      }, 0) / Math.max(repeatCustomers, 1);
-
-    // Estimate total visitors (typically 2-3% conversion rate)
-    const estimatedVisitors = Math.round(totalCustomers / 0.025);
-    const estimatedInterested = Math.round(totalCustomers / 0.04);
-
-    const stages = [
-      {
-        stage: "Awareness",
-        customers: estimatedVisitors,
-        percentage: 100,
-        avgDays: 0,
-        conversionRate: Math.round(
-          (estimatedInterested / estimatedVisitors) * 100,
-        ),
-        icon: "solar:eye-bold-duotone",
-        color: "primary",
-      },
-      {
-        stage: "Interest",
-        customers: estimatedInterested,
-        percentage: Math.round((estimatedInterested / estimatedVisitors) * 100),
-        avgDays: 2,
-        conversionRate: Math.round(
-          (totalCustomers / estimatedInterested) * 100,
-        ),
-        icon: "solar:heart-bold-duotone",
-        color: "secondary",
-      },
-      {
-        stage: "Consideration",
-        customers: Math.round(totalCustomers * 1.2), // Some consider but don't buy
-        percentage: Math.round(
-          ((totalCustomers * 1.2) / estimatedVisitors) * 100,
-        ),
-        avgDays: 5,
-        conversionRate: Math.round(
-          (totalCustomers / (totalCustomers * 1.2)) * 100,
-        ),
-        icon: "solar:cart-bold-duotone",
-        color: "warning",
-      },
-      {
-        stage: "Purchase",
-        customers: totalCustomers,
-        percentage: Math.round((totalCustomers / estimatedVisitors) * 100),
-        avgDays: avgDaysToFirstPurchase,
-        conversionRate: Math.round((repeatCustomers / totalCustomers) * 100),
-        icon: "solar:bag-bold-duotone",
-        color: "success",
-      },
-      {
-        stage: "Retention",
-        customers: repeatCustomers,
-        percentage: Math.round((repeatCustomers / estimatedVisitors) * 100),
-        avgDays: Math.round(avgDaysBetweenPurchases),
-        conversionRate: Math.round(
-          (loyalCustomers / Math.max(repeatCustomers, 1)) * 100,
-        ),
-        icon: "solar:refresh-circle-bold-duotone",
-        color: "info",
-      },
-    ];
-
-    // Recalculate percentages based on first stage
-    const firstStageCustomers = stages[0]?.customers ?? 1;
-
-    return stages.map((stage) => ({
-      ...stage,
-      customers: Math.round(stage.customers),
-      percentage: Math.round((stage.customers / firstStageCustomers) * 100),
-    }));
+    return DEFAULT_JOURNEY_STAGES;
   },
 });
 

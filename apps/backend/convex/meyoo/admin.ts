@@ -1487,6 +1487,32 @@ export const recalculateAnalytics = action({
     const duration = Date.now() - startedAt;
     const jobCount = jobIds.length;
 
+    // Mark analytics as completed in onboarding so cron stops checking this org
+    try {
+      const onboardingRecord = await ctx.runQuery(
+        internal.core.onboarding.getOnboardingByOrganization,
+        { organizationId },
+      );
+
+      if (onboardingRecord) {
+        await ctx.runMutation(internal.core.onboarding.markAnalyticsCompleted, {
+          onboardingId: onboardingRecord._id,
+          triggeredBy: "manual_devtools",
+          jobCount,
+        });
+
+        console.log(
+          `[DEV_TOOLS] Marked analytics as completed for org ${organizationId} - cron will stop monitoring`,
+        );
+      }
+    } catch (error) {
+      // Non-critical - log and continue
+      console.warn(
+        `[DEV_TOOLS] Failed to mark analytics completed for org ${organizationId}:`,
+        error,
+      );
+    }
+
     return {
       success: true,
       processed: filteredDates.length,

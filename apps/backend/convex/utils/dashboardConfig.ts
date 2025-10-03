@@ -15,24 +15,40 @@ type LegacyConfig =
 
 type StoredConfig = DashboardDoc["config"] | LegacyConfig;
 
+const sanitizeStringList = (value: unknown, fallback: string[]): string[] => {
+  if (!Array.isArray(value)) {
+    return fallback;
+  }
+
+  const filtered = value.filter((item): item is string => typeof item === "string" && item.length > 0);
+
+  if (filtered.length === 0) {
+    return fallback;
+  }
+
+  return filtered;
+};
+
 export const normalizeDashboardConfig = (config: StoredConfig): DashboardConfig => {
   if (!config) {
     return DEFAULT_DASHBOARD_CONFIG;
   }
 
-  if ("zone1" in config || "zone2" in config) {
+  if (
+    typeof config === "object" &&
+    config !== null &&
+    ("zone1" in config || "zone2" in config)
+  ) {
     const legacy = config as LegacyConfig;
     return {
-      kpis: Array.isArray(legacy?.zone1) ? legacy.zone1 : DEFAULT_DASHBOARD_CONFIG.kpis,
-      widgets: Array.isArray(legacy?.zone2) ? legacy.zone2 : DEFAULT_DASHBOARD_CONFIG.widgets,
+      kpis: sanitizeStringList(legacy?.zone1, DEFAULT_DASHBOARD_CONFIG.kpis),
+      widgets: sanitizeStringList(legacy?.zone2, DEFAULT_DASHBOARD_CONFIG.widgets),
     };
   }
 
   const modern = config as DashboardConfig;
-  const kpis = Array.isArray(modern?.kpis) ? modern.kpis : DEFAULT_DASHBOARD_CONFIG.kpis;
-  const widgets = Array.isArray(modern?.widgets)
-    ? modern.widgets
-    : DEFAULT_DASHBOARD_CONFIG.widgets;
+  const kpis = sanitizeStringList(modern?.kpis, DEFAULT_DASHBOARD_CONFIG.kpis);
+  const widgets = sanitizeStringList(modern?.widgets, DEFAULT_DASHBOARD_CONFIG.widgets);
 
   return { kpis, widgets };
 };

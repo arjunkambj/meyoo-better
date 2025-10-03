@@ -160,11 +160,6 @@ export const getOverviewData = query({
     const range = args.startDate && args.endDate
       ? validateDateRange({ startDate: args.startDate, endDate: args.endDate })
       : defaultDateRange(parseTimeRange(args.timeRange));
-    const dailyOverview = await loadOverviewFromDailyMetrics(
-      ctx,
-      auth.orgId as Id<"organizations">,
-      range,
-    );
 
     const dashboardConfig = await resolveDashboardConfig(
       ctx,
@@ -174,134 +169,79 @@ export const getOverviewData = query({
     const integrationStatus = await computeIntegrationStatus(ctx, auth.orgId);
     const primaryCurrency = auth.user.primaryCurrency ?? "USD";
 
-    if (dailyOverview) {
-      const basePayload: OverviewPayload = {
-        dateRange: range,
-        organizationId: auth.orgId,
-        overview: dailyOverview.overview,
-        platformMetrics: dailyOverview.platformMetrics,
-        channelRevenue: null,
-        primaryCurrency,
-        dashboardConfig,
-        integrationStatus,
-        meta: {
-          strategy: "dailyMetrics",
-          ...dailyOverview.meta,
-        },
-      } satisfies OverviewPayload;
+    // ONLY read from dailyMetrics (aggregated data) - no raw order reads
+    const dailyOverview = await loadOverviewFromDailyMetrics(
+      ctx,
+      auth.orgId as Id<"organizations">,
+      range,
+    );
 
-      const supplementalDatasets = dailyOverview.hasFullCoverage
-        ? (["orders"] as const) // orders are required to populate channel revenue
-        : (["orders", "metaInsights", "analytics"] as const);
-      try {
-        const analyticsResponse = await loadAnalytics(
-          ctx,
-          auth.orgId as Id<"organizations">,
-          range,
-          {
-            datasets: supplementalDatasets,
-          },
-        );
-
-        const channelRevenue = computeChannelRevenue(analyticsResponse);
-
-        const platformMetrics = dailyOverview.hasFullCoverage
-          ? basePayload.platformMetrics
-          : computePlatformMetrics(analyticsResponse);
-
-        const enhancedMeta: Record<string, unknown> = {
-          strategy: "dailyMetrics",
-          ...dailyOverview.meta,
-          supplemental: {
-            datasets: supplementalDatasets,
-          },
-        };
-
-        if (analyticsResponse.meta) {
-          enhancedMeta.analyticsMeta = analyticsResponse.meta;
-        }
-
-        return {
-          ...basePayload,
-          platformMetrics,
-          channelRevenue,
-          meta: enhancedMeta,
-        } satisfies OverviewPayload;
-      } catch (error) {
-        const errorMeta: Record<string, unknown> = {
-          datasets: supplementalDatasets,
-        };
-
-        if (error instanceof Error) {
-          errorMeta.error = error.message;
-          if (isTooManyReadsError(error)) {
-            errorMeta.fallback = "too_many_reads";
-          }
-        }
-
-        const fallbackMeta = isTooManyReadsError(error)
-          ? { needsActionLoad: true, reason: "too_many_reads" }
-          : undefined;
-
-        return {
-          ...basePayload,
-          meta: {
-            strategy: "dailyMetrics",
-            ...dailyOverview.meta,
-            supplemental: errorMeta,
-            ...(fallbackMeta ?? {}),
-          },
-        } satisfies OverviewPayload;
-      }
-    }
-
-    let analyticsResponse: AnalyticsResponse | null = null;
-    let fallbackMeta: Record<string, unknown> | undefined;
-
-    try {
-      analyticsResponse = await loadDashboardAnalytics(
-        ctx,
-        auth.orgId as Id<"organizations">,
-        range,
-      );
-    } catch (error) {
-      if (isTooManyReadsError(error)) {
-        fallbackMeta = { needsActionLoad: true, reason: "too_many_reads" };
-      } else {
-        throw error;
-      }
-    }
-
-    if (!analyticsResponse) {
+    if (!dailyOverview) {
+      // Metrics not yet calculated - return calculating state
       return {
         dateRange: range,
         organizationId: auth.orgId,
         overview: null,
         platformMetrics: null,
         channelRevenue: null,
-        primaryCurrency: auth.user.primaryCurrency ?? "USD",
+        primaryCurrency,
         dashboardConfig,
         integrationStatus,
         meta: {
-          ...(fallbackMeta ?? {}),
+          strategy: "dailyMetrics",
+          status: "calculating",
+          message: "Metrics are being calculated. This usually takes 10-30 seconds after sync completion.",
         },
       } satisfies OverviewPayload;
     }
 
-    const overview = computeOverviewMetrics(analyticsResponse);
-    const platformMetrics = computePlatformMetrics(analyticsResponse);
-    const channelRevenue = computeChannelRevenue(analyticsResponse);
-    return {
-      dateRange: analyticsResponse.dateRange,
-      organizationId: analyticsResponse.organizationId,
-      overview,
-      platformMetrics,
-      channelRevenue,
-      primaryCurrency: auth.user.primaryCurrency ?? "USD",
+    // Metrics available from dailyMetrics table
+    const basePayload: OverviewPayload = {
+      dateRange: range,
+      organizationId: auth.orgId,
+      overview: dailyOverview.overview,
+      platformMetrics: dailyOverview.platformMetrics,
+      channelRevenue: null,
+      primaryCurrency,
       dashboardConfig,
       integrationStatus,
-      meta: analyticsResponse.meta,
+      meta: {
+        strategy: "dailyMetrics",
+        ...dailyOverview.meta,
+      },
     } satisfies OverviewPayload;
+
+    // Try to load minimal supplemental data for channel revenue
+    // Using small dataset to avoid large reads
+    const supplementalDatasets = ["orders"] as const;
+    try {
+      const analyticsResponse = await loadAnalytics(
+        ctx,
+        auth.orgId as Id<"organizations">,
+        range,
+        {
+          datasets: supplementalDatasets,
+        },
+      );
+
+      const channelRevenue = computeChannelRevenue(analyticsResponse);
+
+      return {
+        ...basePayload,
+        channelRevenue,
+        meta: {
+          strategy: "dailyMetrics",
+          ...dailyOverview.meta,
+          supplemental: {
+            datasets: supplementalDatasets,
+          },
+        },
+      } satisfies OverviewPayload;
+    } catch (error) {
+      // If supplemental load fails, return base metrics without channel revenue
+      console.warn("[DASHBOARD] Failed to load supplemental channel revenue data", error);
+      return basePayload;
+    }
   },
 });
 

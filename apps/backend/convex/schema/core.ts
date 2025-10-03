@@ -337,6 +337,10 @@ export const syncSessions = defineTable({
           orders: v.optional(syncStageState),
         }),
       ),
+      // Error tracking for stuck/failed sessions
+      failureReason: v.optional(v.string()),
+      partialSync: v.optional(v.boolean()),
+      lastBatchError: v.optional(v.string()),
     }),
   ),
 })
@@ -403,6 +407,7 @@ export const onboarding = defineTable({
             v.literal("in_progress"),
           ),
           startedAt: v.number(),
+          retryAt: v.optional(v.number()),
         }),
       ),
       firecrawlLastAttemptAt: v.optional(v.number()),
@@ -410,8 +415,25 @@ export const onboarding = defineTable({
       syncCheckAttempts: v.optional(v.number()),
       lastSyncCheckAt: v.optional(v.number()),
       analyticsTriggeredAt: v.optional(v.number()),
+      manuallyTriggered: v.optional(v.boolean()),
+      triggeredBy: v.optional(v.string()),
+      manualJobCount: v.optional(v.number()),
     }),
   ),
+
+  // Analytics calculation monitoring
+  // Tracks the state of daily metrics calculation to avoid redundant cron checks
+  analyticsCalculationStatus: v.optional(
+    v.union(
+      v.literal("not_started"),
+      v.literal("pending"),
+      v.literal("calculating"),
+      v.literal("completed"),
+      v.literal("failed"),
+    ),
+  ),
+  lastMonitorCheckAt: v.optional(v.number()),
+  monitorCheckCount: v.optional(v.number()),
 
   // Timestamps
   createdAt: v.optional(v.number()),
@@ -421,7 +443,8 @@ export const onboarding = defineTable({
   .index("by_organization", ["organizationId"])
   .index("by_user_organization", ["userId", "organizationId"])
   .index("by_completed", ["isCompleted"])
-  .index("by_step", ["onboardingStep"]);
+  .index("by_step", ["onboardingStep"])
+  .index("by_analytics_status", ["analyticsCalculationStatus"]);
 
 export const billing = defineTable({
   organizationId: v.id("organizations"),

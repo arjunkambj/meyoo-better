@@ -197,37 +197,17 @@ export const getAnalytics = query({
       granularity,
     );
 
-    if (dailyMetrics.meta.hasData) {
-      const dailyMeta: DailyPnLMeta = dailyMetrics.meta;
-      return {
-        dateRange: range,
-        organizationId: auth.orgId as string,
-        result: dailyMetrics.result,
-        meta: {
-          strategy: "dailyMetrics",
-          ...dailyMeta,
-        },
-      } satisfies {
-        dateRange: { startDate: string; endDate: string };
-        organizationId: string;
-        result: PnLAnalyticsResult;
-        meta: Record<string, unknown>;
-      };
-    }
-
-    const analytics = await loadAnalytics(ctx, organizationId, range, {
-      datasets: ["orders", "metaInsights", "globalCosts"],
-    });
-    const result = computePnLAnalytics(analytics, granularity);
+    const meta: Record<string, unknown> = {
+      strategy: "dailyMetrics",
+      status: dailyMetrics.meta.hasData ? "ready" : "pending",
+      ...dailyMetrics.meta,
+    };
 
     return {
       dateRange: range,
       organizationId: auth.orgId as string,
-      result,
-      meta: {
-        strategy: "analytics",
-        ...(analytics.meta ?? {}),
-      },
+      result: dailyMetrics.result,
+      meta,
     } satisfies {
       dateRange: { startDate: string; endDate: string };
       organizationId: string;

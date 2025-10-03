@@ -128,7 +128,7 @@ type DailyMetricDoc = Doc<"dailyMetrics">;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-type AggregatedDailyMetrics = {
+export type AggregatedDailyMetrics = {
   revenue: number;
   grossSales: number;
   discounts: number;
@@ -1371,6 +1371,7 @@ export type DailyMetricsOverview = {
   overview: OverviewComputation;
   platformMetrics: PlatformMetrics;
   ordersOverview: OrdersOverviewMetrics;
+  aggregates: AggregatedDailyMetrics;
   meta: Record<string, unknown>;
   hasFullCoverage: boolean;
 };
@@ -1500,6 +1501,7 @@ export async function loadOverviewFromDailyMetrics(
     overview,
     platformMetrics,
     ordersOverview,
+    aggregates: aggregatesAdjusted,
     meta,
     hasFullCoverage: fetched.hasFullCoverage,
   };

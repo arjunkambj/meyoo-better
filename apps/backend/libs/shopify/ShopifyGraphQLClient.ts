@@ -1449,6 +1449,7 @@ export class ShopifyGraphQLClient {
       return { data: { nodes: [] } };
     }
 
+    // Using current Shopify API - quantities field instead of deprecated fields
     const query = `
       query GetInventoryLevels($ids: [ID!]!) {
         nodes(ids: $ids) {
@@ -1457,9 +1458,10 @@ export class ShopifyGraphQLClient {
             inventoryLevels(first: 10) {
               edges {
                 node {
-                  availableQuantity: available
-                  incomingQuantity: incoming
-                  reservedQuantity: committed
+                  quantities(names: ["available", "incoming", "committed"]) {
+                    name
+                    quantity
+                  }
                   location {
                     id
                   }
@@ -1471,15 +1473,17 @@ export class ShopifyGraphQLClient {
       }
     `;
 
-    return this.makeRequest<{
+    // Transform the new API response to match expected format
+    const response = await this.makeRequest<{
       nodes: Array<{
         id: string;
         inventoryLevels: {
           edges: Array<{
             node: {
-              availableQuantity?: number | null;
-              incomingQuantity?: number | null;
-              reservedQuantity?: number | null;
+              quantities: Array<{
+                name: string;
+                quantity: number;
+              }>;
               location?: {
                 id?: string | null;
               } | null;
@@ -1488,6 +1492,27 @@ export class ShopifyGraphQLClient {
         };
       }>;
     }>(query, { ids: inventoryItemIds });
+
+    // Transform response to maintain backward compatibility
+    if (response.data?.nodes) {
+      for (const node of response.data.nodes) {
+        if (node.inventoryLevels?.edges) {
+          for (const edge of node.inventoryLevels.edges) {
+            const quantities = edge.node.quantities || [];
+            const available = quantities.find((q) => q.name === "available")?.quantity ?? null;
+            const incoming = quantities.find((q) => q.name === "incoming")?.quantity ?? null;
+            const committed = quantities.find((q) => q.name === "committed")?.quantity ?? null;
+
+            // Add backward-compatible fields
+            (edge.node as any).availableQuantity = available;
+            (edge.node as any).incomingQuantity = incoming;
+            (edge.node as any).reservedQuantity = committed;
+          }
+        }
+      }
+    }
+
+    return response as any; // Cast to maintain interface compatibility
   }
 
   /**

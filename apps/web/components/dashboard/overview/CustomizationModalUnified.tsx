@@ -17,6 +17,7 @@ import { SelectedItemsList } from "./components/customization/SelectedItemsList"
 import { VirtualizedItemSelector } from "./components/customization/VirtualizedItemSelector";
 import { METRICS, METRIC_CATEGORIES } from "./metrics/registry";
 import { getAllWidgets } from "./widgets/registry";
+import { DEFAULT_DASHBOARD_CONFIG } from "@repo/types";
 
 // Memoized components for better performance
 const MemoizedVirtualizedItemSelector = React.memo(VirtualizedItemSelector);
@@ -219,8 +220,8 @@ export function CustomizationModalUnified({
                   startContent={<Icon icon="solar:eraser-linear" width={14} />}
                   onPress={() =>
                     activeTab === "kpi"
-                      ? setSelectedKpis([])
-                      : setSelectedWidgets([])
+                      ? setSelectedKpis([...DEFAULT_DASHBOARD_CONFIG.kpis])
+                      : setSelectedWidgets([...DEFAULT_DASHBOARD_CONFIG.widgets])
                   }
                 >
                   Clear

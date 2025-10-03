@@ -70,6 +70,7 @@ export const markFirecrawlSeedingScheduled = internalMutation({
         ...(existing.onboardingData || {}),
         firecrawlSeedingStatus: {
           status: "scheduled",
+          startedAt: Date.now(),
           retryAt,
         },
       },

@@ -418,22 +418,42 @@ export const handleShopifyOrdersBatch = internalAction({
         duration: Date.now() - start,
       };
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error(`[BATCH] Batch ${args.batchNumber} failed for org ${args.organizationId}:`, errorMessage);
+
       if (args.syncSessionId) {
-        await ctx.runMutation(internal.jobs.helpers.patchSyncSessionMetadata, {
-          sessionId: args.syncSessionId,
-          metadata: {
-            stageStatus: { orders: "failed" },
+        // Still increment progress even on failure so session can eventually complete
+        // This prevents one failed batch from blocking the entire sync
+        const progress = await ctx.runMutation(
+          internal.jobs.helpers.incrementSyncSessionProgress,
+          {
+            sessionId: args.syncSessionId,
+            batchesCompletedDelta: 1, // Count as "completed" (even if failed)
+            recordsProcessedDelta: 0,  // Don't count records since they failed
           },
-        });
-        await ctx.runMutation(internal.jobs.helpers.updateSyncSession, {
-          sessionId: args.syncSessionId,
-          status: "failed",
-          error: error instanceof Error ? error.message : String(error),
-          completedAt: Date.now(),
-        });
+        );
+
+        console.error(`[BATCH] Updated progress despite failure: ${progress?.completedBatches}/${progress?.totalBatches} batches`);
+
+        // If this was the last batch, mark stage as failed
+        if (progress && progress.completedBatches >= progress.totalBatches) {
+          await ctx.runMutation(internal.jobs.helpers.patchSyncSessionMetadata, {
+            sessionId: args.syncSessionId,
+            metadata: {
+              stageStatus: { orders: "failed" },
+              lastBatchError: errorMessage,
+            } as any,
+          });
+          await ctx.runMutation(internal.jobs.helpers.updateSyncSession, {
+            sessionId: args.syncSessionId,
+            status: "failed",
+            error: errorMessage,
+            completedAt: Date.now(),
+          });
+        }
       }
 
-      throw error;
+      throw error; // Let workpool retry
     }
   },
 });

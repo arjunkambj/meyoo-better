@@ -13,6 +13,8 @@ ALways USE CONTEXT& to Fetch docs
   - `app.use(resend)`
 - In Convex actions, never use `ctx.db` directly — use `ctx.runQuery`/`ctx.runMutation` to access the database.
 
+if other agent is working on something or thing get checks what you stop not reset that
+
 ## Project Structure & Module Organization
 
 - Monorepo managed by Turbo and Bun.

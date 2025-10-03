@@ -5,7 +5,7 @@ import { useAtomValue } from "jotai";
 import React, { useCallback, useMemo, useState } from "react";
 import { useAnalyticsDateRange, useDashboardOverview, useUser } from "@/hooks";
 import { devToolsVisibleAtom } from "@/store/atoms";
-import type { ChannelRevenueBreakdown } from "@repo/types";
+import { DEFAULT_DASHBOARD_CONFIG, type ChannelRevenueBreakdown } from "@repo/types";
 
 import { CustomizationModalUnified } from "./CustomizationModalUnified";
 import { DashboardHeader } from "./components/DashboardHeader";
@@ -229,9 +229,12 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
 
   const handleCustomizationApply = useCallback(
     async (kpiItems: string[], widgetItems: string[]) => {
+      const nextKpis = kpiItems.length > 0 ? kpiItems : [...DEFAULT_DASHBOARD_CONFIG.kpis];
+      const nextWidgets = widgetItems.length > 0 ? widgetItems : [...DEFAULT_DASHBOARD_CONFIG.widgets];
+
       await saveConfig({
-        kpis: kpiItems,
-        widgets: widgetItems,
+        kpis: nextKpis,
+        widgets: nextWidgets,
       });
       setIsCustomizing(false);
     },

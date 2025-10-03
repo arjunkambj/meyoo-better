@@ -1167,6 +1167,7 @@ export const initial = internalAction({
                 ? [...fulfillmentsBatch]
                 : undefined;
 
+            const batchNum = batchesScheduled + 1;
             const jobId = await createJob(
               ctx,
               "sync:shopifyOrdersBatch",
@@ -1175,7 +1176,7 @@ export const initial = internalAction({
                 organizationId: args.organizationId as Id<"organizations">,
                 storeId,
                 syncSessionId: args.syncSessionId,
-                batchNumber: batchesScheduled + 1,
+                batchNumber: batchNum,
                 cursor: cursor ?? undefined,
                 orders: ordersPayload,
                 transactions: transactionsPayload,
@@ -1183,6 +1184,13 @@ export const initial = internalAction({
                 fulfillments: fulfillmentsPayload,
               },
             );
+
+            logger.info(`Created order batch job ${batchNum}`, {
+              jobId,
+              batchNumber: batchNum,
+              ordersCount: ordersPayload?.length || 0,
+              transactionsCount: transactionsPayload?.length || 0,
+            });
 
             if (args.syncSessionId) {
               await ctx.runMutation(

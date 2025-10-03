@@ -57,7 +57,12 @@ export function useCost(
   const { timezone } = useOrganizationTimeZone();
   const normalizedRange = useMemo(() => {
     if (!dateRange) return undefined;
-    return toUtcRangeStrings(dateRange, timezone);
+    const utcRange = toUtcRangeStrings(dateRange, timezone);
+    return {
+      ...utcRange,
+      startDate: dateRange.startDate,
+      endDate: dateRange.endDate,
+    } as const;
   }, [dateRange?.endDate, dateRange?.startDate, timezone]);
 
   const queryArgs = useMemo(

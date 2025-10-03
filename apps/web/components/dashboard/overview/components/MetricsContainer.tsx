@@ -22,16 +22,16 @@ interface MetricsContainerProps {
 
 // Default KPI metrics if none are selected
 const DEFAULT_METRICS = [
-  "netProfit",
   "revenue",
-  "netProfitMargin",
+  "netProfit",
   "orders",
-  "avgOrderValue",
-  "blendedRoas", // ROAS
   "blendedMarketingCost",
-  "customCosts",
+  "blendedRoas", // ROAS
+  "netProfitMargin",
   "marketingPercentageOfNet",
   "rtoRevenueLost",
+  "operatingMargin",
+  "avgOrderValue",
 ];
 
 export function MetricsContainer({

@@ -9,16 +9,16 @@ export const METRIC_CATEGORIES: Record<string, MetricCategory> = {
     icon: "solar:chart-2-bold-duotone",
     metrics: [
       // kpi.md — Home Dashboard (10)
-      "netProfit",              // Net Profit
       "revenue",               // Revenue (Net)
-      "netProfitMargin",       // Profit Margin %
+      "netProfit",             // Net Profit
       "orders",                // Orders
-      "avgOrderValue",         // AOV
-      "blendedRoas",           // ROAS (Revenue ÷ Total Ad Spend)
       "blendedMarketingCost",  // Total Ad Spend
-      "customCosts",           // Operating Costs
+      "blendedRoas",           // ROAS (Revenue ÷ Total Ad Spend)
+      "netProfitMargin",       // Profit Margin %
       "marketingPercentageOfNet", // Marketing % of Revenue
       "rtoRevenueLost",        // Estimated revenue lost to returns/RTO overrides
+      "operatingMargin",       // Operating Margin %
+      "avgOrderValue",         // AOV
     ],
   },
   revenue: {

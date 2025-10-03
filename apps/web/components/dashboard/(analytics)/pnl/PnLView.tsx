@@ -15,7 +15,7 @@ export const PnLView = memo(function PnLView() {
     calendarRange: pnlCalendarRange,
     preset: pnlPreset,
     updateRange: updatePnlRange,
-  } = useAnalyticsDateRange('dashboard-pnl', { defaultPreset: 'last_7_days' });
+  } = useAnalyticsDateRange('dashboard-pnl', { defaultPreset: 'today' });
 
   const {
     metricsData,
@@ -35,7 +35,7 @@ export const PnLView = memo(function PnLView() {
           <GlobalDateRangePicker
             value={pnlCalendarRange}
             preset={pnlPreset}
-            defaultPreset="last_7_days"
+            defaultPreset="today"
             onAnalyticsChange={updatePnlRange}
           />
         }

@@ -34,11 +34,20 @@ export function usePnLAnalytics(params?: UsePnLAnalyticsParams) {
 
   const utcDateRange = useMemo(() => {
     if (!canRunQueries) return undefined;
-    return dateRangeToUtcWithShopPreference(
-      { startDate, endDate },
+    const baseRange = { startDate, endDate } as const;
+    const utcRange = dateRangeToUtcWithShopPreference(
+      baseRange,
       offsetMinutes,
       timezone,
     );
+
+    return {
+      ...utcRange,
+      // Preserve the original shop-local date keys so daily metrics queries
+      // align with how snapshots are stored (by local YYYY-MM-DD).
+      startDate,
+      endDate,
+    };
   }, [canRunQueries, startDate, endDate, offsetMinutes, timezone]);
 
   const args = useMemo(() => {

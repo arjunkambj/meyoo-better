@@ -11,11 +11,7 @@ import {
 } from "./analyticsShared";
 import { validateDateRange } from "../utils/analyticsSource";
 import { getUserAndOrg } from "../utils/auth";
-import { computePnLAnalytics } from "../utils/analyticsAggregations";
-import {
-  loadPnLAnalyticsFromDailyMetrics,
-  type DailyPnLMeta,
-} from "../utils/dailyMetrics";
+import { loadPnLAnalyticsFromDailyMetrics } from "../utils/dailyMetrics";
 import type { PnLAnalyticsResult, PnLGranularity } from "@repo/types";
 
 const responseOrNull = v.union(v.null(), responseValidator);
@@ -25,13 +21,13 @@ type DateRangeArg = { startDate: string; endDate: string };
 type QueryHandler = (
   ctx: QueryCtx,
   orgId: Id<"organizations">,
-  range: DateRangeArg,
+  range: DateRangeArg
 ) => Promise<AnalyticsResponse>;
 
 async function handleQuery(
   ctx: QueryCtx,
   dateRange: DateRangeArg,
-  handler?: QueryHandler,
+  handler?: QueryHandler
 ) {
   const auth = await getUserAndOrg(ctx);
   if (!auth) return null;
@@ -105,7 +101,7 @@ export const getComparison = query({
     v.object({
       current: responseValidator,
       previous: v.optional(responseValidator),
-    }),
+    })
   ),
   handler: async (ctx, args) => {
     const auth = await getUserAndOrg(ctx);
@@ -115,7 +111,7 @@ export const getComparison = query({
     const current = await loadAnalytics(
       ctx,
       orgId,
-      validateDateRange(args.currentRange),
+      validateDateRange(args.currentRange)
     );
 
     if (!args.previousRange) {
@@ -125,7 +121,7 @@ export const getComparison = query({
     const previous = await loadAnalytics(
       ctx,
       orgId,
-      validateDateRange(args.previousRange),
+      validateDateRange(args.previousRange)
     );
 
     return { current, previous };
@@ -157,7 +153,7 @@ export const getTableData = query({
   args: {
     dateRange: dateRangeValidator,
     granularity: v.optional(
-      v.union(v.literal("daily"), v.literal("weekly"), v.literal("monthly")),
+      v.union(v.literal("daily"), v.literal("weekly"), v.literal("monthly"))
     ),
   },
   returns: responseOrNull,
@@ -170,7 +166,7 @@ export const getAnalytics = query({
   args: {
     dateRange: dateRangeValidator,
     granularity: v.optional(
-      v.union(v.literal("daily"), v.literal("weekly"), v.literal("monthly")),
+      v.union(v.literal("daily"), v.literal("weekly"), v.literal("monthly"))
     ),
   },
   returns: v.union(
@@ -180,7 +176,7 @@ export const getAnalytics = query({
       organizationId: v.string(),
       result: v.optional(v.any()),
       meta: v.optional(v.any()),
-    }),
+    })
   ),
   handler: async (ctx, args) => {
     const auth = await getUserAndOrg(ctx);
@@ -194,7 +190,7 @@ export const getAnalytics = query({
       ctx,
       organizationId,
       range,
-      granularity,
+      granularity
     );
 
     const meta: Record<string, unknown> = {

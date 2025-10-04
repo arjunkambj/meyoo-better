@@ -442,15 +442,16 @@ export async function createNewUserData(
     updatedAt: now,
     config: {
       kpis: [
-        "netProfit",
         "revenue",
-        "netProfitMargin",
+        "netProfit",
         "orders",
-        "avgOrderValue",
-        "blendedRoas",
         "blendedMarketingCost",
-        "repeatCustomerRate",
-        "moMRevenueGrowth",
+        "blendedRoas",
+        "netProfitMargin",
+        "marketingPercentageOfNet",
+        "rtoRevenueLost",
+        "operatingMargin",
+        "avgOrderValue",
       ],
       widgets: [
         "adSpendSummary",

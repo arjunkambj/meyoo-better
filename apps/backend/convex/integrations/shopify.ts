@@ -483,16 +483,16 @@ export const deleteDashboardsBatch = internalMutation({
           updatedAt: Date.now(),
           config: {
             kpis: [
-              "netProfit",
               "revenue",
-              "netProfitMargin",
+              "netProfit",
               "orders",
-              "avgOrderValue",
-              "blendedRoas",
               "blendedMarketingCost",
-              "shopifyConversionRate",
-              "repeatCustomerRate",
-              "moMRevenueGrowth",
+              "blendedRoas",
+              "netProfitMargin",
+              "marketingPercentageOfNet",
+              "rtoRevenueLost",
+              "operatingMargin",
+              "avgOrderValue",
             ],
             widgets: [
               "adSpendSummary",

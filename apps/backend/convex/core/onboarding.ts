@@ -607,6 +607,13 @@ export const joinDemoOrganization = mutation({
       };
     }
 
+    const demoOrgCurrency = await ctx.runQuery(
+      api.core.currency.getPrimaryCurrencyForOrg,
+      { orgId: demoOrgId },
+    );
+    const resolvedCurrency =
+      demoOrgCurrency ?? user.primaryCurrency ?? "USD";
+
     const now = Date.now();
 
     const existingMembership = await ctx.db
@@ -630,6 +637,7 @@ export const joinDemoOrganization = mutation({
       isOnboarded: true,
       lastLoginAt: now,
       updatedAt: now,
+      primaryCurrency: resolvedCurrency,
     });
 
     await ensureActiveMembership(ctx, demoOrgId, user._id, "StoreTeam", {

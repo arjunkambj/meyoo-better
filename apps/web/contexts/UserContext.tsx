@@ -2,6 +2,8 @@
 
 import React, { createContext, useContext, type ReactNode } from "react";
 import { useQuery } from "convex-helpers/react/cache/hooks";
+import type { GenericId as Id } from "convex/values";
+
 import { api } from "@/libs/convexApi";
 import type { Doc } from "@/types/convex";
 
@@ -43,6 +45,12 @@ const OnboardingContext = createContext<OnboardingContextValue | undefined>(
 
 export function UserProvider({ children }: { children: ReactNode }) {
   const user = useQuery(api.core.users.getCurrentUser);
+  const orgCurrency = useQuery(
+    api.core.currency.getPrimaryCurrencyForOrg,
+    user?.organizationId
+      ? { orgId: user.organizationId as Id<"organizations"> }
+      : "skip",
+  );
   const onboarding = useQuery(
     api.core.onboarding.getOnboardingStatus,
     user ? {} : "skip"
@@ -59,7 +67,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     isAuthenticated: !!user,
     role: user?.role,
     organizationId: user?.organizationId,
-    primaryCurrency: user?.primaryCurrency || "USD",
+    primaryCurrency: orgCurrency ?? user?.primaryCurrency ?? "USD",
   };
 
   const onboardingContextValue: OnboardingContextValue = {

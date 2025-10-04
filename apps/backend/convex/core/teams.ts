@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import { api } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { mutation, query } from "../_generated/server";
@@ -203,7 +204,14 @@ export const inviteTeamMember = mutation({
     message: v.string(),
     userId: v.optional(v.id("users")),
   }),
-  handler: async (ctx, args) => {
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{
+    success: boolean;
+    message: string;
+    userId?: Id<"users">;
+  }> => {
     const { user: inviter } = await requireUserAndOrg(ctx);
 
     if (!inviter) {
@@ -230,6 +238,14 @@ export const inviteTeamMember = mutation({
     if (!inviter.organizationId) {
       throw new Error("Organization not found");
     }
+
+    const orgId = inviter.organizationId as Id<"organizations">;
+    const orgPrimaryCurrency: string | null = await ctx.runQuery(
+      api.core.currency.getPrimaryCurrencyForOrg,
+      { orgId },
+    );
+    const resolvedCurrency: string =
+      orgPrimaryCurrency ?? inviter.primaryCurrency ?? "USD";
 
     // Normalize email for consistent storage and lookups
     const targetEmail = normalizeEmail(args.email);
@@ -274,24 +290,24 @@ export const inviteTeamMember = mutation({
           }
 
           // Safe to move the user to inviter's organization
+          const now = Date.now();
           await ctx.db.patch(existingUser._id, {
             organizationId: inviter.organizationId,
             role: "StoreTeam",
             isOnboarded: true,
             status: "invited",
-            updatedAt: Date.now(),
+            updatedAt: now,
+            primaryCurrency: resolvedCurrency,
           });
           const existingMembership = await ctx.db
             .query("memberships")
             .withIndex("by_org_user", (q) =>
               q
-                .eq("organizationId", inviter.organizationId as Id<"organizations">)
+                .eq("organizationId", orgId)
                 .eq("userId", existingUser._id),
             )
             .first();
 
-          const now = Date.now();
-          const orgId = inviter.organizationId as Id<"organizations">;
           await ensureActiveMembership(ctx, orgId, existingUser._id, args.role, {
             seatType: existingMembership?.seatType ?? "free",
             hasAiAddOn: existingMembership?.hasAiAddOn ?? false,
@@ -309,15 +325,15 @@ export const inviteTeamMember = mutation({
       }
 
       // User exists but not in any organization - add them to this org
+      const now = Date.now();
       await ctx.db.patch(existingUser._id, {
         organizationId: inviter.organizationId,
         role: "StoreTeam",
         isOnboarded: true, // Skip onboarding for invited users
         status: "invited",
-        updatedAt: Date.now(),
+        updatedAt: now,
+        primaryCurrency: resolvedCurrency,
       });
-      const now = Date.now();
-      const orgId = inviter.organizationId as Id<"organizations">;
       await ensureActiveMembership(ctx, orgId, existingUser._id, args.role, {
         seatType: "free",
         hasAiAddOn: false,
@@ -334,7 +350,7 @@ export const inviteTeamMember = mutation({
 
     // Create new user for the invited member
     const now = Date.now();
-    const newUserId = await ctx.db.insert("users", {
+    const newUserId: Id<"users"> = await ctx.db.insert("users", {
       email: targetEmail,
       name: targetEmail.split("@")[0], // Use email prefix as default name
       organizationId: inviter.organizationId,
@@ -344,11 +360,9 @@ export const inviteTeamMember = mutation({
       loginCount: 0,
       createdAt: now,
       updatedAt: now,
-
-      primaryCurrency: inviter.primaryCurrency || "USD",
+      primaryCurrency: resolvedCurrency,
     });
 
-    const orgId = inviter.organizationId as Id<"organizations">;
     await ensureActiveMembership(ctx, orgId, newUserId, args.role, {
       seatType: "free",
       hasAiAddOn: false,

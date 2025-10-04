@@ -53,7 +53,6 @@ const buildExpectedPeriods = (
   if (granularity === "daily") {
     const cursor = new Date(end);
     for (let index = 0; index < 7; index += 1) {
-      if (cursor < start) break;
       const iso = formatISODate(cursor);
       definitions.push({ key: iso, label: iso, date: iso });
       cursor.setUTCDate(cursor.getUTCDate() - 1);
@@ -66,12 +65,11 @@ const buildExpectedPeriods = (
     }
 
     for (let index = 0; index < 6; index += 1) {
-      if (cursor < start) break;
       const weekStart = new Date(cursor);
       const weekEnd = new Date(cursor);
       weekEnd.setUTCDate(weekEnd.getUTCDate() + 6);
       const startIso = formatISODate(weekStart);
-      const endIso = formatISODate(weekEnd);
+      const endIso = index === 0 ? formatISODate(end) : formatISODate(weekEnd);
       definitions.push({
         key: startIso,
         label: `${startIso} – ${endIso}`,
@@ -82,13 +80,13 @@ const buildExpectedPeriods = (
   } else {
     const cursor = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), 1));
 
-    for (let index = 0; index < 2; index += 1) {
-      if (cursor < start) break;
+    for (let index = 0; index < 3; index += 1) {
       const monthStartIso = formatISODate(cursor);
       const monthKey = monthStartIso.slice(0, 7);
+      const displayEnd = index === 0 ? formatISODate(end) : formatISODate(new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 0)));
       definitions.push({
         key: `${monthKey}-01`,
-        label: monthKey,
+        label: `${monthKey} – ${displayEnd}`,
         date: `${monthKey}-01`,
       });
       cursor.setUTCMonth(cursor.getUTCMonth() - 1);
@@ -289,9 +287,17 @@ export const PnLTable = React.memo(function PnLTable({
     const expectedDefinitions = buildExpectedPeriods(granularity, dateRange);
     const periodMap = new Map(regularPeriods.map((period) => [period.date, period]));
     const displayPeriods = expectedDefinitions.length
-      ? expectedDefinitions.map((definition) =>
-          periodMap.get(definition.key) ?? createPlaceholderPeriod(definition),
-        )
+      ? expectedDefinitions.map((definition) => {
+          const matched = periodMap.get(definition.key);
+          if (matched) {
+            return {
+              ...matched,
+              label: definition.label,
+              date: definition.date,
+            } satisfies PnLTablePeriod;
+          }
+          return createPlaceholderPeriod(definition);
+        })
       : regularPeriods;
 
     const formatPeriodLabel = (period: PnLTablePeriod) => {

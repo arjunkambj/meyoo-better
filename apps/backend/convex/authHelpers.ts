@@ -1,3 +1,4 @@
+import { api } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 
@@ -200,6 +201,15 @@ export async function handleInvitedUser(
   }
 
   // Patch the authenticated user to active, preserving org/role
+  let resolvedCurrency: string | undefined;
+  if (invitedUser.organizationId) {
+    const orgCurrency = await ctx.runQuery(
+      api.core.currency.getPrimaryCurrencyForOrg,
+      { orgId: invitedUser.organizationId as Id<"organizations"> },
+    );
+    resolvedCurrency = orgCurrency ?? invitedUser.primaryCurrency ?? undefined;
+  }
+
   await ctx.db.patch(authUserId, {
     organizationId: invitedUser.organizationId,
     role: invitedUser.role, // Preserve assigned role
@@ -210,7 +220,7 @@ export async function handleInvitedUser(
     // Preserve original createdAt if present, otherwise keep as-is
     ...(invitedUser.createdAt ? { createdAt: invitedUser.createdAt } : {}),
     updatedAt: Date.now(),
-    primaryCurrency: invitedUser.primaryCurrency || "USD",
+    primaryCurrency: resolvedCurrency ?? invitedUser.primaryCurrency ?? "USD",
   });
 
   // Ensure an onboarding record exists for this user/org
@@ -305,6 +315,17 @@ export async function handleExistingUser(
     });
   }
 
+  let resolvedCurrency = existingUser.primaryCurrency ?? "USD";
+  if (organizationId) {
+    const orgCurrency = await ctx.runQuery(
+      api.core.currency.getPrimaryCurrencyForOrg,
+      { orgId: organizationId as Id<"organizations"> },
+    );
+    if (orgCurrency) {
+      resolvedCurrency = orgCurrency;
+    }
+  }
+
   // Copy data from existing user
   await ctx.db.patch(authUserId, {
     organizationId: organizationId,
@@ -316,7 +337,7 @@ export async function handleExistingUser(
     lastLoginAt: Date.now(),
     createdAt: existingUser.createdAt || Date.now(),
     updatedAt: Date.now(),
-    primaryCurrency: existingUser.primaryCurrency || "USD",
+    primaryCurrency: resolvedCurrency,
   });
 
   // Transfer onboarding record

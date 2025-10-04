@@ -16,6 +16,12 @@ import type { GenericId as Id } from "convex/values";
  */
 export function useUser() {
   const user = useQuery(api.core.users.getCurrentUser);
+  const orgCurrency = useQuery(
+    api.core.currency.getPrimaryCurrencyForOrg,
+    user?.organizationId
+      ? { orgId: user.organizationId as Id<"organizations"> }
+      : "skip",
+  );
   const updateBusinessProfileMutation = useMutation(
     api.core.users.updateBusinessProfile,
   );
@@ -61,7 +67,7 @@ export function useUser() {
     organizationId: user?.organizationId,
     hasShopifyConnection: onboarding?.connections?.shopify || false,
     hasMetaConnection: onboarding?.connections?.meta || false,
-    primaryCurrency: user?.primaryCurrency || "USD",
+    primaryCurrency: orgCurrency ?? user?.primaryCurrency ?? "USD",
     isLoading: loading,
     updateProfile,
     updateBusinessProfile,

@@ -70,7 +70,7 @@ export const OrdersTable = React.memo(function OrdersTable({
               {item.tags && item.tags.length > 0 ? (
                 <div className="mt-2 flex flex-wrap gap-1">
                   {item.tags.map((tag) => (
-                    <Chip key={tag} color="secondary" size="sm" variant="flat">
+                    <Chip key={tag} color="default" size="sm">
                       {tag}
                     </Chip>
                   ))}
@@ -155,7 +155,10 @@ export const OrdersTable = React.memo(function OrdersTable({
           page={pagination.page}
           siblings={1}
           size="sm"
-          total={Math.max(1, Math.ceil(pagination.total / Math.max(1, pagination.pageSize)))}
+          total={Math.max(
+            1,
+            Math.ceil(pagination.total / Math.max(1, pagination.pageSize))
+          )}
           onChange={(newPage) => {
             pagination.setPage(newPage);
           }}

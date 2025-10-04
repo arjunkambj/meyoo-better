@@ -1,17 +1,29 @@
-import { v } from 'convex/values';
-import type { Id } from '../_generated/dataModel';
-import { query } from '../_generated/server';
+import { v } from "convex/values";
+import type { Id } from "../_generated/dataModel";
+import { query } from "../_generated/server";
 
-// Returns the primary currency code for an organization, or null if not set
+// Returns the primary currency code for an organization, preferring active stores
 export const getPrimaryCurrencyForOrg = query({
-  args: { orgId: v.id('organizations') },
+  args: { orgId: v.id("organizations") },
   returns: v.union(v.string(), v.null()),
   handler: async (ctx, args): Promise<string | null> => {
-    const store = await ctx.db
-      .query('shopifyStores')
-      .withIndex('by_organization', (q) => q.eq('organizationId', args.orgId as Id<'organizations'>))
+    const orgId = args.orgId as Id<"organizations">;
+
+    const activeStore = await ctx.db
+      .query("shopifyStores")
+      .withIndex("by_organization_and_active", (q) =>
+        q.eq("organizationId", orgId).eq("isActive", true),
+      )
       .first();
-    return (store?.primaryCurrency as string | undefined) ?? null;
+    if (activeStore?.primaryCurrency) {
+      return activeStore.primaryCurrency as string;
+    }
+
+    const fallbackStore = await ctx.db
+      .query("shopifyStores")
+      .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
+      .first();
+
+    return (fallbackStore?.primaryCurrency as string | undefined) ?? null;
   },
 });
-

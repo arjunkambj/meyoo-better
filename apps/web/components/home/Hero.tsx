@@ -21,7 +21,7 @@ const d2cBrands = [
 const Hero = () => {
   return (
     <section
-      className={`relative w-full min-h-[calc(90vh)] flex items-center justify-center overflow-hidden pt-24 sm:pt-28 md:pt-24 md:mt-8 ${designSystem.background.gradient} pb-12 sm:pb-16 lg:pb-20 2xl:pb-24`}
+      className={`relative w-full min-h-[calc(90vh)] flex items-center justify-center overflow-hidden mt-16 ${designSystem.background.gradient} pb-12 sm:pb-16 lg:pb-20 2xl:pb-24`}
     >
       <div className={`${designSystem.spacing.container} relative z-10`}>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 sm:gap-12 lg:gap-12 items-center">
@@ -39,8 +39,9 @@ const Hero = () => {
 
             {/* Professional info */}
             <p className="text-sm sm:text-base lg:text-lg text-muted-foreground leading-relaxed text-left max-w-xl mb-2">
-              Meyoo connects Shopify, ad platforms, and costs to show real profit
-              by product and channel—so D2C brands can make smarter decisions fast.
+              Meyoo connects Shopify, ad platforms, and costs to show real
+              profit by product and channel—so D2C brands can make smarter
+              decisions fast.
             </p>
 
             {/* CTA Buttons */}
@@ -58,7 +59,7 @@ const Hero = () => {
               <Button
                 as={Link}
                 href="#pricing"
-                variant="bordered"
+                variant="flat"
                 size="lg"
                 className="w-full sm:w-auto h-11 sm:h-12 transition-all duration-200 hover:scale-105 active:scale-100 text-sm sm:text-base"
               >
@@ -69,8 +70,14 @@ const Hero = () => {
             {/* Money Back Guarantee */}
             <div className="mt-6 sm:mt-8">
               <div className="inline-flex items-center gap-2 sm:gap-2.5 text-xs sm:text-sm text-default-600">
-                <Icon icon="solar:shield-check-bold" width={16} className="text-success sm:w-[18px]" />
-                <span className="font-medium">14-day free trial · Cancel anytime</span>
+                <Icon
+                  icon="solar:shield-check-bold"
+                  width={16}
+                  className="text-success sm:w-[18px]"
+                />
+                <span className="font-medium">
+                  14-day free trial · Cancel anytime
+                </span>
               </div>
             </div>
           </div>
@@ -101,10 +108,7 @@ const Hero = () => {
           </motion.div>
         </div>
 
-        <div className="mt-16 sm:mt-20 lg:mt-24">
-          <p className="text-center text-xs sm:text-sm font-medium text-muted-foreground uppercase tracking-wider mb-6 sm:mb-8 px-2">
-            Trusted by leading D2C brands
-          </p>
+        <div className="mt-16 sm:mt-20 lg:mt-18">
           <div className="mx-auto w-full max-w-7xl px-2 sm:px-4">
             <div className="grid grid-cols-3 sm:flex sm:flex-nowrap items-center justify-between gap-4 sm:gap-6 lg:gap-10 text-default-400">
               {d2cBrands.map((brand) => (

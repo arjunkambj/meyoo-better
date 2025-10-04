@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
 
 import { Logo } from "@/components/shared/Logo";
+import { designSystem } from "@/libs/design-system";
 
 const navItems = [
   { name: "Pricing", href: "/pricing" },
@@ -69,16 +70,19 @@ export default function CenteredNavbar() {
   }, [isClient, isMenuOpen]);
 
   return (
-    <div className="fixed w-full top-2 z-50 px-2 sm:px-4 md:px-6 py-1">
-      <div className="max-w-7xl mx-auto">
+    <div className="sticky top-0 bg-background z-50 w-full py-1">
+      <div
+        className={`${designSystem.spacing.container} flex w-full`}
+      >
         <Navbar
+          isBlurred={false}
+          maxWidth="full"
           className={`
-            ${hasScrolled ? "bg-background/90 backdrop-blur-md" : "bg-background/70 backdrop-blur-sm"}
-            rounded-2xl border border-default-200/50 transition-all duration-300
+                       w-full rounded-2xl bg-transparent transition-all duration-300
           `}
           classNames={{
-            base: "px-3 sm:px-4 md:px-6 py-2.5 sm:py-3 md:py-3.5 rounded-2xl",
-            wrapper: "px-0 max-w-none gap-2 sm:gap-4",
+            base: "px-2 sm:px-4 md:px-6 py-2.5 sm:py-3 md:py-3.5 rounded-2xl w-full",
+            wrapper: "px-0 w-full gap-2 sm:gap-4",
           }}
           height="auto"
         >
@@ -122,7 +126,10 @@ export default function CenteredNavbar() {
           </NavbarContent>
 
           {/* Right side - CTA */}
-          <NavbarContent className="hidden md:flex  shrink-0" justify="end">
+          <NavbarContent
+            className="hidden md:flex shrink-0 flex-grow-0"
+            justify="end"
+          >
             <NavbarItem>
               <Unauthenticated>
                 <Button
@@ -154,7 +161,10 @@ export default function CenteredNavbar() {
           </NavbarContent>
 
           {/* Mobile Menu Toggle */}
-          <NavbarContent className="md:hidden shrink-0 flex-grow-0" justify="end">
+          <NavbarContent
+            className="md:hidden shrink-0 flex-grow-0"
+            justify="end"
+          >
             <NavbarItem>
               <Button
                 isIconOnly
@@ -184,7 +194,7 @@ export default function CenteredNavbar() {
               <ModalBody>
                 <div className="flex flex-col h-full min-h-[calc(100vh-2rem)]">
                   {/* Mobile Header */}
-                  <div className="flex items-center justify-between pb-4 sm:pb-6 border-b border-default-200/50">
+                  <div className="flex items-center justify-between pb-4 sm:pb-6">
                     <Logo />
                     <Button
                       isIconOnly

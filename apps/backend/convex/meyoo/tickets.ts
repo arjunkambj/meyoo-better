@@ -1,7 +1,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { mutation, query } from "../_generated/server";
-import type { Doc } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 
 // Meyoo/Admin-side ticket management
 
@@ -25,12 +25,24 @@ export const updateTicketStatus = mutation({
     const ticket = await ctx.db.get(args.ticketId);
     if (!ticket) throw new Error("Ticket not found");
 
+    const membership = user.organizationId
+      ? await ctx.db
+          .query("memberships")
+          .withIndex("by_org_user", (q) =>
+            q
+              .eq("organizationId", user.organizationId as Id<"organizations">)
+              .eq("userId", user._id),
+          )
+          .first()
+      : null;
+
     // Only admins can change status; owners can close their own tickets via user API
+    const globalRole = user.globalRole;
     const isAdmin =
-      user.role === "MeyooFounder" ||
-      user.role === "MeyooAdmin" ||
-      user.role === "MeyooTeam" ||
-      user.role === "StoreOwner"; // keep StoreOwner elevated
+      globalRole === "MeyooFounder" ||
+      globalRole === "MeyooAdmin" ||
+      globalRole === "MeyooTeam" ||
+      membership?.role === "StoreOwner";
 
     if (!isAdmin) throw new Error("No permission to update ticket status");
 
@@ -89,12 +101,24 @@ export const getAllTickets = query({
     if (!userId) return [];
     const user = await ctx.db.get(userId);
 
+    const membership = user?.organizationId
+      ? await ctx.db
+          .query("memberships")
+          .withIndex("by_org_user", (q) =>
+            q
+              .eq("organizationId", user.organizationId as Id<"organizations">)
+              .eq("userId", user._id),
+          )
+          .first()
+      : null;
+
+    const globalRole = user?.globalRole;
     const isMeyooOrAdmin =
       !!user &&
-      (user.role === "MeyooFounder" ||
-        user.role === "MeyooAdmin" ||
-        user.role === "MeyooTeam" ||
-        user.role === "StoreOwner");
+      (globalRole === "MeyooFounder" ||
+        globalRole === "MeyooAdmin" ||
+        globalRole === "MeyooTeam" ||
+        membership?.role === "StoreOwner");
     if (!isMeyooOrAdmin) return [];
 
     // Use index for efficient ordering by creation time

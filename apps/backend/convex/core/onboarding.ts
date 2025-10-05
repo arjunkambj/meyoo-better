@@ -612,9 +612,16 @@ export const joinDemoOrganization = mutation({
       { orgId: demoOrgId },
     );
     const resolvedCurrency =
-      demoOrgCurrency ?? user.primaryCurrency ?? "USD";
+      demoOrgCurrency ?? demoOrg.primaryCurrency ?? "USD";
 
     const now = Date.now();
+
+    if (resolvedCurrency !== demoOrg.primaryCurrency) {
+      await ctx.db.patch(demoOrgId, {
+        primaryCurrency: resolvedCurrency,
+        updatedAt: now,
+      });
+    }
 
     const existingMembership = await ctx.db
       .query("memberships")
@@ -632,12 +639,10 @@ export const joinDemoOrganization = mutation({
 
     await ctx.db.patch(user._id, {
       organizationId: demoOrgId,
-      role: "StoreTeam",
       status: "active",
       isOnboarded: true,
       lastLoginAt: now,
       updatedAt: now,
-      primaryCurrency: resolvedCurrency,
     });
 
     await ensureActiveMembership(ctx, demoOrgId, user._id, "StoreTeam", {
@@ -1973,6 +1978,17 @@ export const connectShopifyStore = mutation({
       });
     }
 
+    if (user.organizationId) {
+      const orgId = user.organizationId as Id<"organizations">;
+      const orgDoc = await ctx.db.get(orgId);
+      if (!orgDoc || orgDoc.primaryCurrency !== currency) {
+        await ctx.db.patch(orgId, {
+          primaryCurrency: currency,
+          updatedAt: Date.now(),
+        });
+      }
+    }
+
     // Initialize trial for store organizations if needed
     const billingRecord = await ctx.db
       .query("billing")
@@ -2071,25 +2087,6 @@ export const connectShopifyStore = mutation({
     };
 
     await ctx.db.patch(onboarding._id, onboardingUpdates);
-
-    // Update user's primary currency from Shopify store
-    interface UserUpdateData {
-      updatedAt: number;
-      primaryCurrency?: string;
-    }
-
-    const userUpdates: UserUpdateData = {
-      updatedAt: Date.now(),
-    };
-
-    if (args.shopData?.currency) {
-      userUpdates.primaryCurrency = args.shopData.currency;
-      console.log(
-        `[ONBOARDING] Setting user ${user.email} primary currency to ${args.shopData.currency} from Shopify store`,
-      );
-    }
-
-    await ctx.db.patch(user._id, userUpdates);
 
     console.log(
       `[ONBOARDING] Successfully connected Shopify store for ${user.email}. Sync will be triggered by callback.`,

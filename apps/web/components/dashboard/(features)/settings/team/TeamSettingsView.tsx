@@ -9,9 +9,9 @@ import LeaveOrganizationButton from "./LeaveOrganizationButton";
 import TeamMembersList from "./TeamMembersList";
 
 export default function TeamSettingsView() {
-  const { role } = useUser();
+  const { membershipRole } = useUser();
   const { teamStats, isLoading } = useTeamStats();
-  const canManageTeam = role === "StoreOwner";
+  const canManageTeam = membershipRole === "StoreOwner";
 
   // Loading state for stats
   const StatsLoader = () => (

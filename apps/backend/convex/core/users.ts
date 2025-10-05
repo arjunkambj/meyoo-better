@@ -6,7 +6,7 @@ import {
 } from "@convex-dev/auth/server";
 import { ConvexError, v } from "convex/values";
 import { api, internal } from "../_generated/api";
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import { action, internalQuery, mutation, query } from "../_generated/server";
 import { getUserAndOrg, requireUserAndOrg } from "../utils/auth";
 
@@ -26,10 +26,8 @@ const _userValidator = v.object({
   isAnonymous: v.optional(v.boolean()),
   organizationId: v.optional(v.string()),
   organizationName: v.optional(v.string()),
-  role: v.optional(
+  globalRole: v.optional(
     v.union(
-      v.literal("StoreOwner"),
-      v.literal("StoreTeam"),
       v.literal("MeyooFounder"),
       v.literal("MeyooAdmin"),
       v.literal("MeyooTeam"),
@@ -63,7 +61,6 @@ const _userValidator = v.object({
   hasGoogleConnection: v.optional(v.boolean()),
   isInitialSyncComplete: v.optional(v.boolean()),
   // Legacy cost setup flags removed; onboarding table tracks step 5/6 now
-  primaryCurrency: v.optional(v.string()),
   status: v.optional(
     v.union(
       v.literal("active"),
@@ -311,10 +308,10 @@ export const inviteTeamMember = mutation({
     message: v.string(),
   }),
   handler: async (ctx, args) => {
-    const { user } = await requireUserAndOrg(ctx);
+    const { membership } = await requireUserAndOrg(ctx);
 
     // Check if user has permission to invite
-    if (user.role !== "StoreOwner") {
+    if (membership?.role !== "StoreOwner") {
       throw new Error("Insufficient permissions to invite team members");
     }
 
@@ -336,13 +333,15 @@ export const updateOrganizationName = mutation({
   },
   returns: v.object({ success: v.boolean() }),
   handler: async (ctx, args) => {
-    const { user } = await requireUserAndOrg(ctx);
+    const { user, membership } = await requireUserAndOrg(ctx);
 
     // Check permissions - only StoreOwner can update organization name
+    const isStoreOwner = membership?.role === "StoreOwner";
+    const globalRole = user.globalRole;
     if (
-      user.role !== "StoreOwner" &&
-      user.role !== "MeyooFounder" &&
-      user.role !== "MeyooAdmin"
+      !isStoreOwner &&
+      globalRole !== "MeyooFounder" &&
+      globalRole !== "MeyooAdmin"
     ) {
       throw new Error("Insufficient permissions to update organization name");
     }
@@ -428,24 +427,23 @@ export const getById = internalQuery({
  * Check if user has permission for action
  */
 export function hasPermission(
-  user: { role: string },
+  storeRole: Doc<"memberships">["role"] | null | undefined,
+  globalRole: Doc<"users">["globalRole"] | null | undefined,
   action: "view" | "edit" | "delete" | "admin",
 ): boolean {
-  switch (user.role) {
-    case "StoreOwner":
-    case "MeyooAdmin":
-    case "MeyooFounder":
-      return true; // Full access
-
-    case "StoreTeam":
-      return action === "view" || action === "edit";
-
-    case "MeyooTeam":
-      return action === "view" || action === "edit";
-
-    default:
-      return false;
+  if (storeRole === "StoreOwner") {
+    return true;
   }
+
+  if (globalRole === "MeyooFounder" || globalRole === "MeyooAdmin") {
+    return true;
+  }
+
+  if (storeRole === "StoreTeam" || globalRole === "MeyooTeam") {
+    return action === "view" || action === "edit";
+  }
+
+  return false;
 }
 
 /**

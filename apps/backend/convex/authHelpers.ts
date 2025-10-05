@@ -1,4 +1,3 @@
-import { api } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 
@@ -13,9 +12,10 @@ type EnsureMembershipOptions = {
 };
 
 function resolveMembershipRole(
-  role: Doc<"users">["role"] | null | undefined,
+  membership: Doc<"memberships"> | null | undefined,
+  fallback: MembershipRole = "StoreTeam",
 ): MembershipRole {
-  return role === "StoreOwner" ? "StoreOwner" : "StoreTeam";
+  return membership?.role ?? fallback;
 }
 
 export async function ensureActiveMembership(
@@ -189,6 +189,7 @@ export async function handleInvitedUser(
   // we should directly activate this account rather than trying to merge
   // and delete a placeholder user.
   const isSameUser = invitedUser._id === authUserId;
+  const now = Date.now();
 
   // Check if invited user has store connection
   const hasStoreConnection = await ctx.db
@@ -200,27 +201,36 @@ export async function handleInvitedUser(
     return false;
   }
 
-  // Patch the authenticated user to active, preserving org/role
-  let resolvedCurrency: string | undefined;
+  // Patch the authenticated user to active, preserving org linkage
   if (invitedUser.organizationId) {
-    const orgCurrency = await ctx.runQuery(
-      api.core.currency.getPrimaryCurrencyForOrg,
-      { orgId: invitedUser.organizationId as Id<"organizations"> },
-    );
-    resolvedCurrency = orgCurrency ?? invitedUser.primaryCurrency ?? undefined;
+    const orgId = invitedUser.organizationId as Id<"organizations">;
+    const orgDoc = await ctx.db.get(orgId);
+    let orgCurrency = orgDoc?.primaryCurrency;
+    if (!orgCurrency) {
+      const store = await ctx.db
+        .query("shopifyStores")
+        .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
+        .first();
+      orgCurrency = store?.primaryCurrency ?? undefined;
+    }
+
+    if (orgCurrency && orgCurrency !== orgDoc?.primaryCurrency) {
+      await ctx.db.patch(orgId, {
+        primaryCurrency: orgCurrency,
+        updatedAt: now,
+      });
+    }
   }
 
   await ctx.db.patch(authUserId, {
     organizationId: invitedUser.organizationId,
-    role: invitedUser.role, // Preserve assigned role
     status: "active",
     isOnboarded: true,
     loginCount: (invitedUser.loginCount || 0) + 1,
-    lastLoginAt: Date.now(),
+    lastLoginAt: now,
     // Preserve original createdAt if present, otherwise keep as-is
     ...(invitedUser.createdAt ? { createdAt: invitedUser.createdAt } : {}),
-    updatedAt: Date.now(),
-    primaryCurrency: resolvedCurrency ?? invitedUser.primaryCurrency ?? "USD",
+    updatedAt: now,
   });
 
   // Ensure an onboarding record exists for this user/org
@@ -252,7 +262,14 @@ export async function handleInvitedUser(
     }
 
     const orgId = invitedUser.organizationId as Id<"organizations">;
-    const membershipRole = resolveMembershipRole(invitedUser.role);
+    const existingMembership = await ctx.db
+      .query("memberships")
+      .withIndex("by_org_user", (q) =>
+        q.eq("organizationId", orgId).eq("userId", invitedUser._id),
+      )
+      .first();
+
+    const membershipRole = resolveMembershipRole(existingMembership, "StoreTeam");
     const transferred = await transferMembership(
       ctx,
       orgId,
@@ -262,10 +279,10 @@ export async function handleInvitedUser(
     );
 
     await ensureActiveMembership(ctx, orgId, authUserId, membershipRole, {
-      seatType: transferred?.seatType,
-      hasAiAddOn: transferred?.hasAiAddOn,
-      assignedAt: transferred?.assignedAt,
-      assignedBy: transferred?.assignedBy,
+      seatType: transferred?.seatType ?? existingMembership?.seatType,
+      hasAiAddOn: transferred?.hasAiAddOn ?? existingMembership?.hasAiAddOn,
+      assignedAt: transferred?.assignedAt ?? existingMembership?.assignedAt,
+      assignedBy: transferred?.assignedBy ?? existingMembership?.assignedBy,
     });
   }
 
@@ -315,21 +332,27 @@ export async function handleExistingUser(
     });
   }
 
-  let resolvedCurrency = existingUser.primaryCurrency ?? "USD";
+  let resolvedCurrency = "USD";
+  let orgDoc: Doc<"organizations"> | null = null;
   if (organizationId) {
-    const orgCurrency = await ctx.runQuery(
-      api.core.currency.getPrimaryCurrencyForOrg,
-      { orgId: organizationId as Id<"organizations"> },
-    );
-    if (orgCurrency) {
-      resolvedCurrency = orgCurrency;
+    const orgId = organizationId as Id<"organizations">;
+    orgDoc = await ctx.db.get(orgId);
+    if (orgDoc?.primaryCurrency) {
+      resolvedCurrency = orgDoc.primaryCurrency;
+    } else {
+      const orgStore = await ctx.db
+        .query("shopifyStores")
+        .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
+        .first();
+      if (orgStore?.primaryCurrency) {
+        resolvedCurrency = orgStore.primaryCurrency;
+      }
     }
   }
 
   // Copy data from existing user
   await ctx.db.patch(authUserId, {
     organizationId: organizationId,
-    role: existingUser.role || "StoreOwner",
     status: "active",
     isOnboarded:
       existingUser.isOnboarded || existingOnboarding?.isCompleted || false,
@@ -337,7 +360,6 @@ export async function handleExistingUser(
     lastLoginAt: Date.now(),
     createdAt: existingUser.createdAt || Date.now(),
     updatedAt: Date.now(),
-    primaryCurrency: resolvedCurrency,
   });
 
   // Transfer onboarding record
@@ -355,7 +377,17 @@ export async function handleExistingUser(
   // Update organization owner
   if (organizationId) {
     const orgId = organizationId as Id<"organizations">;
-    const membershipRole = resolveMembershipRole(existingUser.role);
+    const existingMembership = await ctx.db
+      .query("memberships")
+      .withIndex("by_org_user", (q) =>
+        q.eq("organizationId", orgId).eq("userId", existingUser._id),
+      )
+      .first();
+
+    const membershipRole = resolveMembershipRole(
+      existingMembership,
+      "StoreOwner",
+    );
     const transferred = await transferMembership(
       ctx,
       orgId,
@@ -365,20 +397,20 @@ export async function handleExistingUser(
     );
 
     await ensureActiveMembership(ctx, orgId, authUserId, membershipRole, {
-      seatType: transferred?.seatType,
-      hasAiAddOn: transferred?.hasAiAddOn,
-      assignedAt: transferred?.assignedAt,
-      assignedBy: transferred?.assignedBy,
+      seatType: transferred?.seatType ?? existingMembership?.seatType,
+      hasAiAddOn: transferred?.hasAiAddOn ?? existingMembership?.hasAiAddOn,
+      assignedAt: transferred?.assignedAt ?? existingMembership?.assignedAt,
+      assignedBy: transferred?.assignedBy ?? existingMembership?.assignedBy,
     });
 
-    const org = await ctx.db.get(orgId);
-
-    if (org) {
-      await ctx.db.patch(org._id, {
-        ownerId: authUserId,
-        updatedAt: Date.now(),
-      });
+    const orgPatch: Partial<Doc<"organizations">> = {
+      ownerId: authUserId,
+      updatedAt: Date.now(),
+    };
+    if (resolvedCurrency && resolvedCurrency !== orgDoc?.primaryCurrency) {
+      orgPatch.primaryCurrency = resolvedCurrency;
     }
+    await ctx.db.patch(orgId, orgPatch);
   }
 
   // Delete old user record
@@ -407,6 +439,7 @@ export async function createNewUserData(
     requiresUpgrade: false,
     locale: "en-US",
     timezone: "America/New_York",
+    primaryCurrency: "USD",
     createdAt: now,
     updatedAt: now,
   });
@@ -414,14 +447,12 @@ export async function createNewUserData(
   // Update user with organization
   await ctx.db.patch(userId, {
     organizationId: orgId,
-    role: "StoreOwner",
     status: "active",
     isOnboarded: false,
     loginCount: 1,
     lastLoginAt: now,
     createdAt: now,
     updatedAt: now,
-    primaryCurrency: "USD",
   });
 
   await ensureActiveMembership(ctx, orgId, userId, "StoreOwner", {
@@ -498,11 +529,21 @@ export async function updateLoginTracking(
   });
 
   if (user.organizationId) {
+    const orgId = user.organizationId as Id<"organizations">;
+    const membership = await ctx.db
+      .query("memberships")
+      .withIndex("by_org_user", (q) =>
+        q.eq("organizationId", orgId).eq("userId", userId),
+      )
+      .first();
+    const orgDoc = await ctx.db.get(orgId);
+    const fallbackRole: MembershipRole =
+      orgDoc?.ownerId === userId ? "StoreOwner" : "StoreTeam";
     await ensureActiveMembership(
       ctx,
-      user.organizationId as Id<"organizations">,
+      orgId,
       userId,
-      resolveMembershipRole(user.role),
+      resolveMembershipRole(membership, fallbackRole),
       {
         assignedBy: userId,
       },

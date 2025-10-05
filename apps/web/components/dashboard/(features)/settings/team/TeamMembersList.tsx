@@ -26,7 +26,7 @@ import { formatDate } from "@/libs/utils/format";
 // Use inferred return type from Convex API; no local TeamMember type
 
 export default function TeamMembersList() {
-  const { role: currentUserRole } = useUser();
+  const { membershipRole: currentUserRole } = useUser();
   const { teamMembers, canManageTeam, isLoading } =
     useTeamMembersWithManagement();
   const [removingUserId, setRemovingUserId] = useState<Id<"users"> | null>(

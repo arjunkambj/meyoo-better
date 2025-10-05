@@ -4,7 +4,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { action, mutation } from "./_generated/server";
 import { normalizeShopDomain } from "./utils/shop";
 import { verifyShopProvisionSignature } from "./utils/crypto";
-import { findExistingUser, normalizeEmail } from "./authHelpers";
+import { ensureActiveMembership, findExistingUser, normalizeEmail } from "./authHelpers";
 import { ensureShopifyOnboarding } from "./utils/onboarding";
 import { isIanaTimeZone } from "@repo/time";
 import { optionalEnv } from "./utils/env";
@@ -88,13 +88,11 @@ export const createOrAttachFromShopifyOAuth = mutation({
         const userId = await ctx.db.insert("users", {
           email: fallbackEmail.trim().toLowerCase(), // Always normalize when creating
           name,
-          role: "StoreOwner",
           status: "active",
           isOnboarded: false,
           loginCount: 0,
           lastLoginAt: now,
           createdAt: now,
-          primaryCurrency: args.shopData?.currency || "USD",
         });
         user = await ctx.db.get(userId);
       }
@@ -113,6 +111,7 @@ export const createOrAttachFromShopifyOAuth = mutation({
             isIanaTimeZone(args.shopData?.timezone)
               ? (args.shopData?.timezone as string)
               : undefined, // leave undefined if not a valid IANA zone
+          primaryCurrency: args.shopData?.currency || "USD",
           createdAt: now,
         });
         await ctx.db.patch(user._id, { organizationId });
@@ -141,10 +140,44 @@ export const createOrAttachFromShopifyOAuth = mutation({
     if (!user || !organizationId)
       throw new Error("Missing user or org context");
 
+    const orgId = organizationId as Id<"organizations">;
+    const currentOrg = await ctx.db.get(orgId);
+    const incomingCurrency =
+      args.shopData?.currency ||
+      existingStore?.primaryCurrency ||
+      currentOrg?.primaryCurrency ||
+      undefined;
+    const incomingTimezone = isIanaTimeZone(args.shopData?.timezone)
+      ? (args.shopData?.timezone as string)
+      : undefined;
+    const orgUpdates: Partial<Doc<"organizations">> = {};
+
+    if (incomingCurrency && incomingCurrency !== currentOrg?.primaryCurrency) {
+      orgUpdates.primaryCurrency = incomingCurrency;
+    }
+    if (incomingTimezone && incomingTimezone !== currentOrg?.timezone) {
+      orgUpdates.timezone = incomingTimezone;
+    }
+    if (Object.keys(orgUpdates).length > 0) {
+      orgUpdates.updatedAt = now;
+      await ctx.db.patch(orgId, orgUpdates);
+    }
+
+    await ensureActiveMembership(
+      ctx,
+      orgId,
+      user._id as Id<'users'>,
+      "StoreOwner",
+      {
+        assignedAt: now,
+        assignedBy: user._id as Id<'users'>,
+      },
+    );
+
     await ensureShopifyOnboarding(
       ctx,
       user._id as Id<'users'>,
-      organizationId as Id<'organizations'>,
+      orgId,
       now,
     );
 

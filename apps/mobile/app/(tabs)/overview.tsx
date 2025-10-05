@@ -5,11 +5,13 @@ import {
 } from "react-native-safe-area-context";
 import { ScrollView, Text, View, RefreshControl } from "react-native";
 
+import { useQuery } from "convex/react";
+
 import { KPICard, type KPICardProps } from "@/components/analytics/KPICard";
 import { DateRangePickerButton } from "@/components/shared/DateRangePicker";
 import { useOverviewAnalytics } from "@/hooks/useAnalytics";
-import { useUserDetails } from "@/hooks/useUserDetails";
 import { getCurrencySymbol } from "@/libs/format";
+import { api } from "@/libs/convexApi";
 
 interface CardConfig {
   title: KPICardProps["title"];
@@ -27,9 +29,9 @@ export default function OverviewTab() {
   const insets = useSafeAreaInsets();
 
   const { metrics, isLoading } = useOverviewAnalytics();
-  const { user } = useUserDetails();
+  const organization = useQuery(api.core.organizations.getCurrentOrganization);
 
-  const primaryCurrency = (user as any)?.currency || "USD";
+  const primaryCurrency = organization?.primaryCurrency ?? "USD";
   const currencySymbol = useMemo(
     () => getCurrencySymbol(primaryCurrency),
     [primaryCurrency]

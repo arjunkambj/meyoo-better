@@ -9,6 +9,11 @@ export const getPrimaryCurrencyForOrg = query({
   handler: async (ctx, args): Promise<string | null> => {
     const orgId = args.orgId as Id<"organizations">;
 
+    const organization = await ctx.db.get(orgId);
+    if (organization?.primaryCurrency) {
+      return organization.primaryCurrency as string;
+    }
+
     const activeStore = await ctx.db
       .query("shopifyStores")
       .withIndex("by_organization_and_active", (q) =>

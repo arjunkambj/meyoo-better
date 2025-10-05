@@ -10,6 +10,7 @@ import {
 } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { getUserAndOrg } from "../utils/auth";
+import { createNewUserData } from "../authHelpers";
 
 /**
  * Organization management
@@ -44,6 +45,7 @@ export const getCurrentOrganization = query({
       id: v.string(),
       name: v.string(),
       timezone: v.optional(v.string()),
+      primaryCurrency: v.optional(v.string()),
       createdAt: v.string(),
       plan: v.union(v.null(), v.string()),
       status: v.optional(v.string()),
@@ -84,6 +86,7 @@ export const getCurrentOrganization = query({
       id: organizationId,
       name: org?.name || "My Organization",
       timezone: org?.timezone,
+      primaryCurrency: org?.primaryCurrency,
       createdAt: createdAtStr,
       plan: billing?.shopifyBilling?.plan ?? null,
       status: user.status,
@@ -279,10 +282,12 @@ export const updateOrganization = mutation({
           .eq("userId", user._id),
       )
       .first();
-    if (
-      !acting ||
-      !["StoreOwner", "MeyooFounder", "MeyooAdmin"].includes(acting.role)
-    ) {
+    const globalRole = user.globalRole;
+    const canUpdate =
+      acting?.role === "StoreOwner" ||
+      globalRole === "MeyooFounder" ||
+      globalRole === "MeyooAdmin";
+    if (!canUpdate) {
       throw new Error("Insufficient permissions to update organization");
     }
 
@@ -350,7 +355,17 @@ export const updateBillingPlan = mutation({
     }
 
     // Check permissions - only owner can change billing
-    if (user.role !== "StoreOwner") {
+    const membership = user.organizationId
+      ? await ctx.db
+          .query("memberships")
+          .withIndex("by_org_user", (q) =>
+            q
+              .eq("organizationId", user.organizationId as Id<"organizations">)
+              .eq("userId", user._id),
+          )
+          .first()
+      : null;
+    if (membership?.role !== "StoreOwner") {
       throw new Error("Only store owner can change billing plan");
     }
 
@@ -420,12 +435,22 @@ export const removeTeamMember = mutation({
       throw new Error("User not found");
     }
 
-    // Check permissions
-    if (
-      currentUser.role !== "StoreOwner" &&
-      currentUser.role !== "MeyooFounder" &&
-      currentUser.role !== "MeyooAdmin"
-    ) {
+    const currentMembership = currentUser.organizationId
+      ? await ctx.db
+          .query("memberships")
+          .withIndex("by_org_user", (q) =>
+            q
+              .eq("organizationId", currentUser.organizationId as Id<"organizations">)
+              .eq("userId", currentUser._id),
+          )
+          .first()
+      : null;
+    const globalRole = currentUser.globalRole;
+    const canRemove =
+      currentMembership?.role === "StoreOwner" ||
+      globalRole === "MeyooFounder" ||
+      globalRole === "MeyooAdmin";
+    if (!canRemove) {
       throw new Error("Insufficient permissions to remove team members");
     }
 
@@ -435,28 +460,43 @@ export const removeTeamMember = mutation({
       throw new Error("User to remove not found");
     }
 
-    // Can't remove yourself
     if (userToRemove._id === currentUser._id) {
       throw new Error("Cannot remove yourself from the organization");
     }
 
-    // Can't remove the owner
-    if (userToRemove.role === "StoreOwner") {
-      throw new Error("Cannot remove the store owner");
-    }
-
-    // Check they're in the same organization
     if (userToRemove.organizationId !== currentUser.organizationId) {
       throw new Error("User is not in your organization");
     }
 
-    // Remove user from organization
-    await ctx.db.patch(userToRemove._id, {
-      organizationId: undefined,
-      role: undefined,
-      status: "inactive" as const,
-      appDeletedAt: Date.now(),
-      updatedAt: Date.now(),
+    const targetMembership = await ctx.db
+      .query("memberships")
+      .withIndex("by_org_user", (q) =>
+        q
+          .eq("organizationId", currentUser.organizationId as Id<"organizations">)
+          .eq("userId", userToRemove._id),
+      )
+      .first();
+
+    if (!targetMembership) {
+      throw new Error("Membership not found");
+    }
+
+    if (targetMembership.role === "StoreOwner") {
+      throw new Error("Cannot remove the store owner");
+    }
+
+    const now = Date.now();
+
+    if (targetMembership.status !== "removed") {
+      await ctx.db.patch(targetMembership._id, {
+        status: "removed",
+        updatedAt: now,
+      });
+    }
+
+    await createNewUserData(ctx, userToRemove._id as Id<"users">, {
+      name: userToRemove.name || null,
+      email: userToRemove.email || null,
     });
 
     return { success: true };

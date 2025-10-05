@@ -19,13 +19,12 @@ const CONVEX_CLOUD_URL = optionalEnv("CONVEX_CLOUD_URL");
 /**
  * Check if user is admin
  */
-function isAdmin(user: { role?: string }): boolean {
-  if (!user.role) return false;
-
+function isAdmin(user: { globalRole?: string | null }): boolean {
+  const role = user.globalRole;
   return (
-    user.role === "StoreOwner" ||
-    user.role === "MeyooFounder" ||
-    user.role === "MeyooTeam"
+    role === "MeyooFounder" ||
+    role === "MeyooAdmin" ||
+    role === "MeyooTeam"
   );
 }
 
@@ -779,7 +778,7 @@ export const getOrganizations = query({
       if (org) {
         org.memberCount++;
 
-        if (u.role === "StoreOwner") {
+        if (orgDetails?.ownerId === u._id) {
           org.owner = {
             id: u._id,
             name: u.name || "",

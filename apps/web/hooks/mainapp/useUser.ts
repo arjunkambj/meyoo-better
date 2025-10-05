@@ -3,7 +3,6 @@ import { useQuery } from "convex-helpers/react/cache/hooks";
 
 import { api } from "@/libs/convexApi";
 import { isIanaTimeZone } from "@repo/time";
-import type { GenericId as Id } from "convex/values";
 
 /**
  * User and Organization Management Hooks
@@ -16,12 +15,8 @@ import type { GenericId as Id } from "convex/values";
  */
 export function useUser() {
   const user = useQuery(api.core.users.getCurrentUser);
-  const orgCurrency = useQuery(
-    api.core.currency.getPrimaryCurrencyForOrg,
-    user?.organizationId
-      ? { orgId: user.organizationId as Id<"organizations"> }
-      : "skip",
-  );
+  const membership = useQuery(api.core.memberships.getCurrentMembership);
+  const organization = useQuery(api.core.organizations.getCurrentOrganization);
   const updateBusinessProfileMutation = useMutation(
     api.core.users.updateBusinessProfile,
   );
@@ -63,11 +58,13 @@ export function useUser() {
     loading,
     error,
     isAuthenticated: !!user,
-    role: user?.role,
+    role: membership?.role ?? null,
+    globalRole: user?.globalRole,
+    membershipRole: membership?.role ?? null,
     organizationId: user?.organizationId,
     hasShopifyConnection: onboarding?.connections?.shopify || false,
     hasMetaConnection: onboarding?.connections?.meta || false,
-    primaryCurrency: orgCurrency ?? user?.primaryCurrency ?? "USD",
+    primaryCurrency: organization?.primaryCurrency ?? "USD",
     isLoading: loading,
     updateProfile,
     updateBusinessProfile,

@@ -1,5 +1,4 @@
 import { v } from "convex/values";
-import { api } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { mutation, query } from "../_generated/server";
@@ -154,15 +153,16 @@ export const getInvitations = query({
   handler: async (ctx) => {
     const auth = await getUserAndOrg(ctx);
     if (!auth) return [];
-    const user = auth.user;
+    const { user, membership } = auth;
+    const globalRole = user.globalRole;
 
     // Only allow owners/admins to view invitations
-    if (
-      !user.role ||
-      !["StoreOwner", "MeyooFounder", "MeyooAdmin", "MeyooTeam"].includes(
-        user.role,
-      )
-    ) {
+    const canView =
+      membership?.role === "StoreOwner" ||
+      globalRole === "MeyooFounder" ||
+      globalRole === "MeyooAdmin" ||
+      globalRole === "MeyooTeam";
+    if (!canView) {
       return [];
     }
 
@@ -212,24 +212,14 @@ export const inviteTeamMember = mutation({
     message: string;
     userId?: Id<"users">;
   }> => {
-    const { user: inviter } = await requireUserAndOrg(ctx);
+    const { user: inviter, membership: inviterMembership } =
+      await requireUserAndOrg(ctx);
 
     if (!inviter) {
       throw new Error("User not found");
     }
 
-    // Only store owners via membership can invite new members
-    const inviterMembership = inviter.organizationId
-      ? await ctx.db
-          .query("memberships")
-          .withIndex("by_org_user", (q) =>
-            q
-              .eq("organizationId", inviter.organizationId as Id<"organizations">)
-              .eq("userId", inviter._id),
-          )
-          .first()
-      : null;
-    if (!inviterMembership || inviterMembership.role !== "StoreOwner") {
+    if (inviterMembership?.role !== "StoreOwner") {
       throw new Error(
         "Only store owners can invite team members",
       );
@@ -240,12 +230,6 @@ export const inviteTeamMember = mutation({
     }
 
     const orgId = inviter.organizationId as Id<"organizations">;
-    const orgPrimaryCurrency: string | null = await ctx.runQuery(
-      api.core.currency.getPrimaryCurrencyForOrg,
-      { orgId },
-    );
-    const resolvedCurrency: string =
-      orgPrimaryCurrency ?? inviter.primaryCurrency ?? "USD";
 
     // Normalize email for consistent storage and lookups
     const targetEmail = normalizeEmail(args.email);
@@ -293,11 +277,9 @@ export const inviteTeamMember = mutation({
           const now = Date.now();
           await ctx.db.patch(existingUser._id, {
             organizationId: inviter.organizationId,
-            role: "StoreTeam",
             isOnboarded: true,
             status: "invited",
             updatedAt: now,
-            primaryCurrency: resolvedCurrency,
           });
           const existingMembership = await ctx.db
             .query("memberships")
@@ -328,11 +310,9 @@ export const inviteTeamMember = mutation({
       const now = Date.now();
       await ctx.db.patch(existingUser._id, {
         organizationId: inviter.organizationId,
-        role: "StoreTeam",
         isOnboarded: true, // Skip onboarding for invited users
         status: "invited",
         updatedAt: now,
-        primaryCurrency: resolvedCurrency,
       });
       await ensureActiveMembership(ctx, orgId, existingUser._id, args.role, {
         seatType: "free",
@@ -354,13 +334,11 @@ export const inviteTeamMember = mutation({
       email: targetEmail,
       name: targetEmail.split("@")[0], // Use email prefix as default name
       organizationId: inviter.organizationId,
-      role: "StoreTeam",
       status: "invited", // Mark as invited, not yet active
       isOnboarded: true, // Skip onboarding for invited users
       loginCount: 0,
       createdAt: now,
       updatedAt: now,
-      primaryCurrency: resolvedCurrency,
     });
 
     await ensureActiveMembership(ctx, orgId, newUserId, args.role, {
@@ -392,18 +370,9 @@ export const removeTeamMember = mutation({
     message: v.string(),
   }),
   handler: async (ctx, args) => {
-    const { user } = await requireUserAndOrg(ctx);
+    const { user, membership } = await requireUserAndOrg(ctx);
 
-    // Only the StoreOwner can remove team members (via membership)
-    const m = await ctx.db
-      .query("memberships")
-      .withIndex("by_org_user", (q) =>
-        q
-          .eq("organizationId", user.organizationId as Id<"organizations">)
-          .eq("userId", user._id),
-      )
-      .first();
-    if (!m || m.role !== "StoreOwner") {
+    if (membership?.role !== "StoreOwner") {
       throw new Error("Only the store owner can remove team members");
     }
 
@@ -467,15 +436,15 @@ export const leaveOrganization = mutation({
   args: {},
   returns: v.object({ success: v.boolean(), message: v.string() }),
   handler: async (ctx) => {
-    const { user } = await requireUserAndOrg(ctx);
+    const { user, membership } = await requireUserAndOrg(ctx);
     if (!user?.organizationId) throw new Error("User has no organization");
 
     // Owners cannot leave their own organization via this endpoint
-    if (user.role === "StoreOwner") {
+    if (membership?.role === "StoreOwner") {
       throw new Error("Store owners cannot leave their own organization");
     }
 
-    const membership = await ctx.db
+    const existingMembership = await ctx.db
       .query("memberships")
       .withIndex("by_org_user", (q) =>
         q
@@ -485,8 +454,8 @@ export const leaveOrganization = mutation({
       .first();
     const now = Date.now();
 
-    if (membership && membership.status !== "removed") {
-      await ctx.db.patch(membership._id, {
+    if (existingMembership && existingMembership.status !== "removed") {
+      await ctx.db.patch(existingMembership._id, {
         status: "removed",
         updatedAt: now,
       });
@@ -513,10 +482,14 @@ export const updateMemberRole = mutation({
     success: v.boolean(),
   }),
   handler: async (ctx, args) => {
-    const { user } = await requireUserAndOrg(ctx);
+    const { user, membership } = await requireUserAndOrg(ctx);
 
     if (!user?.organizationId) {
       throw new Error("User or organization not found");
+    }
+
+    if (membership?.role !== "StoreOwner") {
+      throw new Error("Only the store owner can update member roles");
     }
 
     // Only allow owners/admins to update member roles (via membership)
@@ -583,22 +556,13 @@ export const cancelInvitation = mutation({
     success: v.boolean(),
   }),
   handler: async (ctx, args) => {
-    const { user } = await requireUserAndOrg(ctx);
+    const { user, membership } = await requireUserAndOrg(ctx);
 
     if (!user?.organizationId) {
       throw new Error("User or organization not found");
     }
 
-    // Only allow owners/admins to cancel invitations (via membership)
-    const acting = await ctx.db
-      .query("memberships")
-      .withIndex("by_org_user", (q) =>
-        q
-          .eq("organizationId", user.organizationId as Id<"organizations">)
-          .eq("userId", user._id),
-      )
-      .first();
-    if (!acting || acting.role !== "StoreOwner") {
+    if (membership?.role !== "StoreOwner") {
       throw new Error("Insufficient permissions to cancel invitations");
     }
 

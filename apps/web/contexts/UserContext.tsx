@@ -2,7 +2,6 @@
 
 import React, { createContext, useContext, type ReactNode } from "react";
 import { useQuery } from "convex-helpers/react/cache/hooks";
-import type { GenericId as Id } from "convex/values";
 
 import { api } from "@/libs/convexApi";
 import type { Doc } from "@/types/convex";
@@ -25,7 +24,8 @@ type UserContextValue = {
   loading: boolean;
   error: string | null;
   isAuthenticated: boolean;
-  role: Doc<"users">["role"];
+  globalRole: Doc<"users">["globalRole"];
+  membershipRole: Doc<"memberships">["role"] | null;
   organizationId: string | undefined;
   primaryCurrency: string;
 };
@@ -45,12 +45,8 @@ const OnboardingContext = createContext<OnboardingContextValue | undefined>(
 
 export function UserProvider({ children }: { children: ReactNode }) {
   const user = useQuery(api.core.users.getCurrentUser);
-  const orgCurrency = useQuery(
-    api.core.currency.getPrimaryCurrencyForOrg,
-    user?.organizationId
-      ? { orgId: user.organizationId as Id<"organizations"> }
-      : "skip",
-  );
+  const membership = useQuery(api.core.memberships.getCurrentMembership);
+  const organization = useQuery(api.core.organizations.getCurrentOrganization);
   const onboarding = useQuery(
     api.core.onboarding.getOnboardingStatus,
     user ? {} : "skip"
@@ -65,9 +61,10 @@ export function UserProvider({ children }: { children: ReactNode }) {
     loading: userLoading,
     error,
     isAuthenticated: !!user,
-    role: user?.role,
+    globalRole: user?.globalRole,
+    membershipRole: membership?.role ?? null,
     organizationId: user?.organizationId,
-    primaryCurrency: orgCurrency ?? user?.primaryCurrency ?? "USD",
+    primaryCurrency: organization?.primaryCurrency ?? "USD",
   };
 
   const onboardingContextValue: OnboardingContextValue = {

@@ -21,7 +21,7 @@ export interface User {
 
   // Settings
   timezone?: string;
-  primaryCurrency?: string;
+  globalRole?: "MeyooFounder" | "MeyooAdmin" | "MeyooTeam";
   locale?: string;
   emailNotifications?: boolean;
   marketingEmails?: boolean;

@@ -21,11 +21,9 @@ export const users = defineTable({
   // Organization - single organization for all users
   organizationId: v.optional(v.id("organizations")),
 
-  // Role - store and Meyoo team roles only
-  role: v.optional(
+  // Global platform roles (Meyoo staff only)
+  globalRole: v.optional(
     v.union(
-      v.literal("StoreOwner"), // Store owner
-      v.literal("StoreTeam"), // Store team member
       v.literal("MeyooFounder"), // Meyoo founder (full system access)
       v.literal("MeyooAdmin"), // Meyoo admin (system management)
       v.literal("MeyooTeam"), // Meyoo team member (limited system access)
@@ -34,9 +32,6 @@ export const users = defineTable({
 
   // Onboarding - simplified to single flag
   isOnboarded: v.optional(v.boolean()),
-
-  // Settings
-  primaryCurrency: v.optional(v.string()),
 
   // Status
   status: v.optional(
@@ -60,8 +55,7 @@ export const users = defineTable({
   .index("by_email_verification_time", ["emailVerificationTime"])
   .index("by_organization", ["organizationId"])
   .index("by_isOnboarded", ["isOnboarded"])
-  .index("by_role", ["role"])
-  .index("by_organization_and_role", ["organizationId", "role"])
+  .index("by_globalRole", ["globalRole"])
   .index("by_status", ["status"]);
 
 // Simplified organizations table - store-centric
@@ -73,6 +67,7 @@ export const organizations = defineTable({
   // Business info (common for both)
   locale: v.optional(v.string()),
   timezone: v.optional(v.string()),
+  primaryCurrency: v.optional(v.string()),
 
   // Quick status checks
   isPremium: v.optional(v.boolean()),

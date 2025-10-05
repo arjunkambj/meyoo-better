@@ -19,7 +19,7 @@ const navItems = [
 
 export default function CenteredNavbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [hasScrolled, setHasScrolled] = useState(false);
+  const [, setHasScrolled] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [currentPath, setCurrentPath] = useState("");
   const router = useRouter();

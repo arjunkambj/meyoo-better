@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
-import { mutation, query } from "../_generated/server";
+import { internalQuery, mutation, query } from "../_generated/server";
 import { getUserAndOrg, requireUserAndOrg } from "../utils/auth";
 
 export const getMemberships = query({
@@ -12,6 +12,37 @@ export const getMemberships = query({
       .query("memberships")
       .withIndex("by_org", (q) => q.eq("organizationId", auth.orgId as Id<"organizations">))
       .collect();
+  },
+});
+
+export const getCurrentMembership = query({
+  args: {},
+  handler: async (ctx) => {
+    const auth = await getUserAndOrg(ctx);
+    if (!auth) return null;
+    return await ctx.db
+      .query("memberships")
+      .withIndex("by_org_user", (q) =>
+        q
+          .eq("organizationId", auth.orgId as Id<"organizations">)
+          .eq("userId", auth.user._id),
+      )
+      .first();
+  },
+});
+
+export const getMembershipForUserInternal = internalQuery({
+  args: {
+    orgId: v.id("organizations"),
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("memberships")
+      .withIndex("by_org_user", (q) =>
+        q.eq("organizationId", args.orgId).eq("userId", args.userId),
+      )
+      .first();
   },
 });
 

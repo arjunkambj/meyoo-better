@@ -10,7 +10,7 @@ import { useUser } from "./useUser";
  * Provides organization data and methods for the current user
  */
 export function useOrganization() {
-  const { user } = useUser();
+  const { user, membershipRole } = useUser();
   const organization = useQuery(api.core.organizations.getCurrentOrganization);
   const updateOrganizationNameMutation = useMutation(
     api.core.users.updateOrganizationName,
@@ -40,7 +40,7 @@ export function useOrganization() {
   return {
     organizationId: user?.organizationId || null,
     organizationName: organization?.name || "Default Organization",
-    userRole: user?.role || null,
+    userRole: membershipRole,
     organization,
     loading,
     error,

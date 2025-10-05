@@ -215,7 +215,7 @@ export const getTicket = query({
       const user = auth.user;
       // Check if user owns the ticket or is admin
       const isOwner = ticket.userId === user._id || ticket.email === user.email;
-      const isAdmin = user.role === "StoreOwner";
+      const isAdmin = auth.membership?.role === "StoreOwner";
 
       if (!isOwner && !isAdmin) {
         return null; // No access
@@ -270,7 +270,7 @@ export const addTicketResponse = mutation({
     responseId: v.id("ticketResponses"),
   }),
   handler: async (ctx, args) => {
-    const { user } = await requireUserAndOrg(ctx);
+    const { user, membership } = await requireUserAndOrg(ctx);
 
     const ticket = await ctx.db.get(args.ticketId);
 
@@ -280,7 +280,7 @@ export const addTicketResponse = mutation({
 
     // Check if user can respond
     const isOwner = ticket.userId === user._id || ticket.email === user.email;
-    const isAdmin = user.role === "StoreOwner";
+    const isAdmin = membership?.role === "StoreOwner";
 
     if (!isOwner && !isAdmin) {
       throw new Error("No permission to respond to this ticket");
@@ -326,7 +326,7 @@ export const deleteTicket = mutation({
     success: v.boolean(),
   }),
   handler: async (ctx, args) => {
-    const { user } = await requireUserAndOrg(ctx);
+    const { user, membership } = await requireUserAndOrg(ctx);
 
     const ticket = await ctx.db.get(args.ticketId);
 
@@ -336,7 +336,7 @@ export const deleteTicket = mutation({
 
     // Check permissions - only ticket owner or admin can delete
     const isOwner = ticket.userId === user._id || ticket.email === user.email;
-    const isAdmin = user.role === "StoreOwner";
+    const isAdmin = membership?.role === "StoreOwner";
 
     if (!isOwner && !isAdmin) {
       throw new Error("No permission to delete this ticket");

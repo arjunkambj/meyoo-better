@@ -114,8 +114,8 @@ export const getAllRequests = query({
   handler: async (ctx, args) => {
     const auth = await getUserAndOrg(ctx);
     if (!auth) return [];
-    const user = auth.user;
-    if (user.role !== "StoreOwner") return [];
+    const { membership } = auth;
+    if (membership?.role !== "StoreOwner") return [];
 
     let requests = await ctx.db
       .query("integrationRequests")

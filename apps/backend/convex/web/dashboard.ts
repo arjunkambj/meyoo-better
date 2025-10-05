@@ -167,7 +167,8 @@ export const getOverviewData = query({
       auth.orgId,
     );
     const integrationStatus = await computeIntegrationStatus(ctx, auth.orgId);
-    const primaryCurrency = auth.user.primaryCurrency ?? "USD";
+    const orgDoc = await ctx.db.get(auth.orgId as Id<"organizations">);
+    const primaryCurrency = orgDoc?.primaryCurrency ?? "USD";
 
     // ONLY read from dailyMetrics (aggregated data) - no raw order reads
     const dailyOverview = await loadOverviewFromDailyMetrics(
@@ -332,7 +333,10 @@ const getOverviewDataActionDefinition = {
       overview,
       platformMetrics,
       channelRevenue,
-      primaryCurrency: auth.user.primaryCurrency ?? "USD",
+      primaryCurrency:
+        (await ctx.runQuery(api.core.currency.getPrimaryCurrencyForOrg, {
+          orgId: auth.orgId as Id<"organizations">,
+        })) ?? "USD",
       dashboardConfig: dashboardLayout ?? DEFAULT_DASHBOARD_CONFIG,
       integrationStatus,
       meta: {

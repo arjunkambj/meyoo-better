@@ -40,7 +40,7 @@ export const OrdersInsightsView = memo(function OrdersInsightsView() {
     cohorts,
     geographic,
     loadingStates: customerLoading,
-  } = useCustomerAnalytics(ordersInsightsRange);
+  } = useCustomerAnalytics({ dateRange: ordersInsightsRange });
 
   const handleAnalyticsRangeChange = useCallback(updateOrdersInsightsRange, [updateOrdersInsightsRange]);
 

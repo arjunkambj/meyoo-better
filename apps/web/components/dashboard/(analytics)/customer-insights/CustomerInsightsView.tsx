@@ -23,7 +23,7 @@ export const CustomerInsightsView = memo(function CustomerInsightsView() {
     isInitialLoading,
     loadingStates,
     exportData,
-  } = useCustomerAnalytics(customerInsightsRange);
+  } = useCustomerAnalytics({ dateRange: customerInsightsRange });
 
   // Fetch order metrics for cancel and return rates
   const { fulfillmentMetrics, orderOverview } = useOrdersAnalytics({

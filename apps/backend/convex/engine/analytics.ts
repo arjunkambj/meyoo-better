@@ -828,10 +828,9 @@ function buildDailyMetricsFromResponse(
 
   const newCustomers = toSafeNumber(summary?.newCustomers);
   const returningCustomers = toSafeNumber(summary?.returningCustomers);
-  const repeatCustomers = Array.from(ordersPerCustomer.values()).reduce(
-    (count, occurrences) => (occurrences > 1 ? count + 1 : count),
-    0,
-  );
+  // repeatCustomers should match the same calculation as returningCustomers
+  // (customers with lifetime order count > 1)
+  const repeatCustomers = returningCustomers;
 
   const returnedOrders = (() => {
     if (!refunds.length) return 0;

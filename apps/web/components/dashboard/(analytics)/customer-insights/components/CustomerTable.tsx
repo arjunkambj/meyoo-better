@@ -43,6 +43,9 @@ export interface Customer {
   segment: string;
   city?: string;
   country?: string;
+  periodOrders: number;
+  periodRevenue: number;
+  isReturning: boolean;
 }
 
 interface CustomerTableProps {
@@ -75,31 +78,14 @@ export const CustomerTable = React.memo(function CustomerTable({
   customers,
   pagination,
   loading,
-  statusFilter = "all",
+  statusFilter: _statusFilter = "all",
 }: CustomerTableProps) {
   const pageSize = pagination?.pageSize ?? 50;
   const { primaryCurrency } = useUser();
   const currencySymbol = getCurrencySymbol(primaryCurrency);
 
   // Filter customers based on search and status
-  const filteredCustomers = customers.filter((customer) => {
-    // Status filter
-    if (statusFilter && statusFilter !== "all") {
-      // Map the filter values to actual status values
-      const statusMap: Record<string, string> = {
-        converted: "converted",
-        abandoned_cart: "abandoned_cart",
-      };
-
-      const mappedStatus = statusMap[statusFilter];
-
-      if (mappedStatus && customer.status !== mappedStatus) {
-        return false;
-      }
-    }
-
-    return true;
-  });
+  const filteredCustomers = customers;
 
   const renderCell = useCallback(
     (item: Customer, columnKey: React.Key) => {
@@ -138,8 +124,12 @@ export const CustomerTable = React.memo(function CustomerTable({
                 {item.orders}
               </p>
               <p className="text-xs text-default-500">
-                AOV: {currencySymbol}
-                {item.avgOrderValue.toFixed(0)}
+                Lifetime AOV: {currencySymbol}
+                {Math.round(item.avgOrderValue)}
+              </p>
+              <p className="text-xs text-default-500">
+                {item.periodOrders} in range · {currencySymbol}
+                {formatNumber(item.periodRevenue)}
               </p>
             </div>
           );

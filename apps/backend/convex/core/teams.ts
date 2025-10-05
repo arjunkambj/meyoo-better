@@ -153,7 +153,7 @@ export const getInvitations = query({
   handler: async (ctx) => {
     const auth = await getUserAndOrg(ctx);
     if (!auth) return [];
-    const { membership } = auth;
+    const { user, membership } = auth;
 
     // Only allow owners to view invitations
     const canView = membership?.role === "StoreOwner";

@@ -164,10 +164,10 @@ export const getABCColor = (
 export const getSegmentStyle = (segment: string): string => {
   switch (segment.toLowerCase()) {
     case "new":
-      return "bg-info/10 text-info";
+      return "bg-default-200";
     case "repeated":
       return "bg-success text-white";
     default:
-      return "bg-default/10 text-default";
+      return "bg-default-200";
   }
 };

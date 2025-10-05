@@ -1,7 +1,5 @@
 # Repository Guidelines
 
-ALways USE CONTEXT& to Fetch docs
-
 ## Agent & Components Usage Rules
 
 - Always fetch latest Context7 docs before editing code that touches Convex Agent, Resend, or other Convex components (`/get-convex/agent`, `/get-convex/resend`, etc.).
@@ -12,8 +10,6 @@ ALways USE CONTEXT& to Fetch docs
   - `app.use(agent)`
   - `app.use(resend)`
 - In Convex actions, never use `ctx.db` directly — use `ctx.runQuery`/`ctx.runMutation` to access the database.
-
-if other agent is working on something or thing get checks what you stop not reset that
 
 ## Project Structure & Module Organization
 
@@ -118,26 +114,3 @@ if other agent is working on something or thing get checks what you stop not res
 
 - Store secrets only in per‑app `*.env.local` (never commit). Refer via `process.env` or Convex env.
 - Node ≥ 18 and Bun ≥ 1.2.18 required.
-
-## avaible heroui native componetns
-
-Accordion
-Avatar
-Button
-Card
-Checkbox
-Chip
-Dialog
-Divider
-Drop Shadow View
-Error View
-Form Field
-Radio
-Radio Group
-Scroll Shadow
-Skeleton
-Skeleton Group
-Spinner
-Surface
-Switch
-Text Field

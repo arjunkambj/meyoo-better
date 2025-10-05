@@ -363,14 +363,36 @@ function applyOperationalCostsToAggregates(
     rangeEndMs: normalizedEnd,
   };
 
-  const customCostsTotal = costs.reduce(
-    (total, cost) => total + computeOperationalCostAmount(cost, context),
-    0,
+  const totals = costs.reduce(
+    (acc, cost) => {
+      const amount = computeOperationalCostAmount(cost, context);
+      if (amount <= 0) {
+        return acc;
+      }
+
+      switch (cost.type) {
+        case 'shipping':
+          acc.shipping += amount;
+          break;
+        case 'payment':
+          acc.payment += amount;
+          break;
+        case 'operational':
+        default:
+          acc.operational += amount;
+          break;
+      }
+
+      return acc;
+    },
+    { shipping: 0, payment: 0, operational: 0 },
   );
 
   return {
     ...aggregates,
-    customCosts: customCostsTotal,
+    shippingCosts: aggregates.shippingCosts + totals.shipping,
+    transactionFees: aggregates.transactionFees + totals.payment,
+    customCosts: aggregates.customCosts + totals.operational,
   } satisfies AggregatedDailyMetrics;
 }
 
@@ -760,6 +782,11 @@ function buildOverviewFromAggregates(
   const prevNetProfit =
     prevRevenue - prevTotalCostsWithoutAds - prevMarketingCost - prevTotalReturnImpact;
 
+  const operatingCosts = totalCostsWithoutAds + totalReturnImpact;
+  const prevOperatingCosts = prevTotalCostsWithoutAds + prevTotalReturnImpact;
+  const operatingProfit = revenue - operatingCosts;
+  const prevOperatingProfit = prevRevenue - prevOperatingCosts;
+
   const grossProfit = revenue - cogs;
   const prevGrossProfit = prevRevenue - prevCogs;
 
@@ -774,6 +801,11 @@ function buildOverviewFromAggregates(
 
   const profitMargin = revenue > 0 ? (netProfit / revenue) * 100 : 0;
   const prevProfitMargin = prevRevenue > 0 ? (prevNetProfit / prevRevenue) * 100 : 0;
+
+  const operatingMargin = revenue > 0 ? (operatingProfit / revenue) * 100 : 0;
+  const prevOperatingMargin = prevRevenue > 0
+    ? (prevOperatingProfit / prevRevenue) * 100
+    : 0;
 
   const grossProfitMargin = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
   const prevGrossProfitMargin = prevRevenue > 0 ? (prevGrossProfit / prevRevenue) * 100 : 0;
@@ -892,8 +924,8 @@ function buildOverviewFromAggregates(
       contributionMarginPercentage,
       prevContributionMarginPercentage,
     ),
-    operatingMargin: profitMargin,
-    operatingMarginChange: percentageChange(profitMargin, prevProfitMargin),
+    operatingMargin,
+    operatingMarginChange: percentageChange(operatingMargin, prevOperatingMargin),
     blendedMarketingCost: marketingCost,
     blendedMarketingCostChange: percentageChange(marketingCost, prevMarketingCost),
     metaAdSpend: 0,

@@ -1610,7 +1610,7 @@ export const deleteAnalyticsMetrics = action({
     deleted: number;
     tables: Record<string, number>;
   }> => {
-    const { user, organizationId } = await ensureAdminAccess(
+    const { organizationId } = await ensureAdminAccess(
       ctx,
       args.organizationId,
     );

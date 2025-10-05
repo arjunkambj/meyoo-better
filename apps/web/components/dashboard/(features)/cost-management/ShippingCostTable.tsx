@@ -24,7 +24,8 @@ import { useState } from "react";
 import type { GenericId as Id } from "convex/values";
 import {
   useShippingCosts,
-  useCreateShippingCost as useUpsertShippingCost,
+  useCreateShippingCost,
+  useUpdateExpense,
 } from "@/hooks";
 import { useUserContext } from "@/contexts/UserContext";
 import { getCurrencySymbol } from "@/libs/utils/format";
@@ -65,7 +66,8 @@ export default function ShippingCostTable() {
   const { shippingCosts: allShippingCosts, loading } = useShippingCosts();
   const baseCosts = (allShippingCosts || []) as ShippingCostItem[];
   const shippingCosts: ShippingCostItem[] = baseCosts.slice(0, 1);
-  const upsertShippingCost = useUpsertShippingCost();
+  const createShippingCost = useCreateShippingCost();
+  const updateExpense = useUpdateExpense();
 
   const handleEdit = (item: ShippingCostItem) => {
     setFormData({
@@ -86,13 +88,32 @@ export default function ShippingCostTable() {
 
   const handleSave = async () => {
     try {
-      await upsertShippingCost({
-        name: formData.name || "Shipping",
-        value: formData.baseRate || 0,
-        calculation: "FIXED",
-      });
+      if (formData._id) {
+        // Update existing shipping cost
+        await updateExpense({
+          costId: formData._id,
+          name: formData.name || "Shipping",
+          value: formData.baseRate || 0,
+        });
+      } else {
+        // Create new shipping cost (or update first one if it exists)
+        const existingCost = baseCosts[0];
+        if (existingCost) {
+          await updateExpense({
+            costId: existingCost._id,
+            name: formData.name || "Shipping",
+            value: formData.baseRate || 0,
+          });
+        } else {
+          await createShippingCost({
+            name: formData.name || "Shipping",
+            value: formData.baseRate || 0,
+            calculation: "FIXED",
+          });
+        }
+      }
       addToast({
-        title: formData._id ? "Shipping rate updated" : "Shipping rate added",
+        title: formData._id ? "Shipping rate updated" : "Shipping rate set",
         color: "default",
         timeout: 3000,
       });

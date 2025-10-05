@@ -1,7 +1,7 @@
 "use client";
 
 import { Skeleton, Spacer } from "@heroui/react";
-import { lazy, memo, Suspense, useCallback, useMemo, useState } from "react";
+import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 
 import { AnalyticsHeader } from "@/components/shared/AnalyticsHeader";
 import GlobalDateRangePicker from "@/components/shared/GlobalDateRangePicker";
@@ -30,9 +30,21 @@ export const CustomersView = memo(function CustomersView() {
     preset: customersPreset,
     updateRange: updateCustomersRange,
   } = useAnalyticsDateRange('dashboard-customers', { defaultPreset: 'today' });
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "converted" | "abandoned_cart">("all");
+  const [currentPage, setCurrentPage] = useState(1);
 
-  const { overview, customers, loadingStates, exportData } = useCustomerAnalytics(customersRange);
+  const { overview, customers, loadingStates, exportData } = useCustomerAnalytics({
+    dateRange: customersRange,
+    status: statusFilter,
+    page: currentPage,
+  });
+
+  useEffect(() => {
+    const resolvedPage = customers?.pagination?.page;
+    if (typeof resolvedPage === "number" && resolvedPage !== currentPage) {
+      setCurrentPage(resolvedPage);
+    }
+  }, [customers?.pagination?.page, currentPage]);
 
   const filters = useMemo(
     () => [
@@ -53,11 +65,18 @@ export const CustomersView = memo(function CustomersView() {
     [statusFilter]
   );
 
-  const handleAnalyticsRangeChange = useCallback(updateCustomersRange, [updateCustomersRange]);
+  const handleAnalyticsRangeChange = useCallback(
+    (...args: Parameters<typeof updateCustomersRange>) => {
+      setCurrentPage(1);
+      return updateCustomersRange(...args);
+    },
+    [updateCustomersRange],
+  );
 
   const handleFilterChange = useCallback((key: string, value: unknown) => {
     if (key === "status") {
-      setStatusFilter((value as string) || "all");
+      setCurrentPage(1);
+      setStatusFilter((value as "all" | "converted" | "abandoned_cart") || "all");
     }
   }, []);
 
@@ -126,7 +145,14 @@ export const CustomersView = memo(function CustomersView() {
       <CustomerTable
         customers={customers?.data || []}
         loading={loadingStates.customers}
-        pagination={customers?.pagination}
+        pagination={
+          customers?.pagination
+            ? {
+                ...customers.pagination,
+                setPage: setCurrentPage,
+              }
+            : undefined
+        }
         statusFilter={statusFilter}
       />
     </div>

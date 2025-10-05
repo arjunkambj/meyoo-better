@@ -94,7 +94,6 @@ export const FULFILLMENT_STATUS_CONFIG: Record<string, StatusConfig> = {
   unfulfilled: {
     label: "Unfulfilled",
     type: "default",
-    icon: "solar:inbox-linear",
   },
   pending: {
     label: "Pending",
@@ -121,7 +120,7 @@ export const FULFILLMENT_STATUS_CONFIG: Record<string, StatusConfig> = {
     type: "warning",
     icon: "solar:archive-minimalistic-linear",
   },
-  fulfilled: { label: "Fulfilled", type: "success", icon: "solar:box-linear" },
+  fulfilled: { label: "Fulfilled", type: "success" },
   shipped: { label: "Shipped", type: "primary", icon: "solar:delivery-linear" },
   in_transit: {
     label: "In Transit",
@@ -256,17 +255,31 @@ export function StatusBadge({
   const normalizedStatus = status.toLowerCase().replace(/[^a-z0-9]/g, "_");
 
   // Try to find config from provided config or default configs
-  let statusConfig: StatusConfig | undefined = config?.[normalizedStatus];
+  let statusConfig: StatusConfig | undefined;
+  let isFulfillmentStatus = false;
 
-  // If not found in provided config, check default configs
-  if (!statusConfig) {
-    statusConfig =
-      ORDER_STATUS_CONFIG[normalizedStatus] ||
-      PAYMENT_STATUS_CONFIG[normalizedStatus] ||
-      FULFILLMENT_STATUS_CONFIG[normalizedStatus] ||
-      STOCK_STATUS_CONFIG[normalizedStatus] ||
-      PRODUCT_STATUS_CONFIG[normalizedStatus] ||
-      CUSTOMER_STATUS_CONFIG[normalizedStatus];
+  const configSources = [
+    { config, isFulfillment: config === FULFILLMENT_STATUS_CONFIG },
+    { config: ORDER_STATUS_CONFIG, isFulfillment: false },
+    { config: PAYMENT_STATUS_CONFIG, isFulfillment: false },
+    { config: FULFILLMENT_STATUS_CONFIG, isFulfillment: true },
+    { config: STOCK_STATUS_CONFIG, isFulfillment: false },
+    { config: PRODUCT_STATUS_CONFIG, isFulfillment: false },
+    { config: CUSTOMER_STATUS_CONFIG, isFulfillment: false },
+  ] as const;
+
+  for (const source of configSources) {
+    if (!source.config) {
+      continue;
+    }
+
+    const match = source.config[normalizedStatus];
+
+    if (match) {
+      statusConfig = match;
+      isFulfillmentStatus = source.isFulfillment;
+      break;
+    }
   }
 
   // Fallback to a generic config if status is not recognized
@@ -276,7 +289,17 @@ export function StatusBadge({
         status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, " "),
       type: "default",
     };
+    isFulfillmentStatus = false;
   }
+
+  const isFulfilledOrUnfulfilled =
+    isFulfillmentStatus &&
+    (normalizedStatus === "fulfilled" || normalizedStatus === "unfulfilled");
+
+  const shouldShowIcon =
+    showIcon &&
+    statusConfig.icon &&
+    !isFulfilledOrUnfulfilled;
 
   const getColor = (type: StatusType) => {
     switch (type) {
@@ -298,12 +321,16 @@ export function StatusBadge({
 
   return (
     <Chip
-      className={cn("capitalize", className)}
-      color={getColor(statusConfig.type)}
+      className={cn(
+        "capitalize",
+        isFulfilledOrUnfulfilled &&
+          "bg-default-200 text-default-700 dark:text-default-500",
+        className
+      )}
+      color={isFulfilledOrUnfulfilled ? "default" : getColor(statusConfig.type)}
       size={size}
       startContent={
-        showIcon &&
-        statusConfig.icon && (
+        shouldShowIcon && statusConfig.icon && (
           <Icon
             className={cn(
               size === "sm" && "w-3 h-3",

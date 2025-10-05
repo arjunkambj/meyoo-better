@@ -3,7 +3,7 @@ import { v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
 import { action, query } from "../_generated/server";
 import { api } from "../_generated/api";
-import { validateDateRange, toTimestampRange } from "../utils/analyticsSource";
+import { validateDateRange, toTimestampRange, type DateRange } from "../utils/analyticsSource";
 import { getUserAndOrg } from "../utils/auth";
 import { loadCustomerOverviewFromDailyMetrics } from "../utils/dailyMetrics";
 import { dateRangeValidator, defaultDateRange } from "./analyticsShared";
@@ -11,6 +11,59 @@ import { dateRangeValidator, defaultDateRange } from "./analyticsShared";
 const MAX_CUSTOMER_PAGE_SIZE = 100;
 const DEFAULT_CUSTOMER_PAGE_SIZE = 50;
 const END_CURSOR = "__END__";
+
+type DateRangeArg = DateRange;
+
+type CustomersCursorState = {
+  offset: number;
+  key: string;
+};
+
+function buildCustomersCursorKey(args: {
+  dateRange: DateRangeArg;
+  status?: string;
+  segment?: string;
+  searchTerm?: string;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+  pageSize: number;
+}): string {
+  return JSON.stringify({
+    dateRange: args.dateRange,
+    status: args.status ?? null,
+    segment: args.segment ?? null,
+    search: args.searchTerm ?? null,
+    sortBy: args.sortBy ?? null,
+    sortOrder: args.sortOrder ?? null,
+    pageSize: args.pageSize,
+  });
+}
+
+function encodeCustomersCursor(state: CustomersCursorState): string {
+  if (state.offset < 0) {
+    return END_CURSOR;
+  }
+  return JSON.stringify(state);
+}
+
+function decodeCustomersCursor(cursor: string | null): CustomersCursorState | null {
+  if (!cursor || cursor === END_CURSOR) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(cursor) as Partial<CustomersCursorState>;
+    const offset = typeof parsed.offset === "number" ? parsed.offset : 0;
+    const key = typeof parsed.key === "string" ? parsed.key : "";
+    return {
+      offset: Math.max(0, Math.floor(offset)),
+      key,
+    } satisfies CustomersCursorState;
+  } catch (error) {
+    console.warn("Failed to decode customers cursor", error);
+    return null;
+  }
+}
 
 const ZERO_CUSTOMER_OVERVIEW = {
   totalCustomers: 0,
@@ -105,6 +158,9 @@ const customerListEntryValidator = v.object({
   segment: v.string(),
   city: v.optional(v.string()),
   country: v.optional(v.string()),
+  periodOrders: v.optional(v.number()),
+  periodRevenue: v.optional(v.number()),
+  isReturning: v.optional(v.boolean()),
 });
 
 const customerListPaginationValidator = v.object({
@@ -118,6 +174,13 @@ const customerListResultValidator = v.object({
   data: v.array(customerListEntryValidator),
   pagination: customerListPaginationValidator,
   continueCursor: v.string(),
+  info: v.optional(
+    v.object({
+      pageSize: v.number(),
+      returned: v.number(),
+      hasMore: v.boolean(),
+    }),
+  ),
 });
 
 const cohortValidator = v.object({
@@ -226,6 +289,9 @@ type CustomerListEntry = {
   segment: string;
   city?: string;
   country?: string;
+  periodOrders: number;
+  periodRevenue: number;
+  isReturning: boolean;
 };
 
 type CustomerListPagination = {
@@ -549,6 +615,13 @@ export const getCustomerList = query({
     pageSize: v.optional(v.number()),
     sortBy: v.optional(v.string()),
     sortOrder: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
+    status: v.optional(
+      v.union(
+        v.literal("all"),
+        v.literal("converted"),
+        v.literal("abandoned_cart"),
+      ),
+    ),
   },
   returns: v.object({
     page: v.array(
@@ -566,6 +639,9 @@ export const getCustomerList = query({
         segment: v.string(),
         city: v.optional(v.string()),
         country: v.optional(v.string()),
+        periodOrders: v.number(),
+        periodRevenue: v.number(),
+        isReturning: v.boolean(),
       }),
     ),
     continueCursor: v.string(),
@@ -586,6 +662,9 @@ export const getCustomerList = query({
           segment: v.string(),
           city: v.optional(v.string()),
           country: v.optional(v.string()),
+          periodOrders: v.number(),
+          periodRevenue: v.number(),
+          isReturning: v.boolean(),
         }),
       ),
     ),
@@ -595,6 +674,13 @@ export const getCustomerList = query({
         pageSize: v.number(),
         total: v.number(),
         totalPages: v.number(),
+      }),
+    ),
+    info: v.optional(
+      v.object({
+        pageSize: v.number(),
+        returned: v.number(),
+        hasMore: v.boolean(),
       }),
     ),
   }),
@@ -625,7 +711,6 @@ export const getCustomerList = query({
     const rangeInput = args.dateRange ?? defaultDateRange();
     const range = validateDateRange(rangeInput);
     const timestamps = toTimestampRange(range);
-
     // Get all orders within the date range for this organization
     const ordersInRange = await ctx.db
       .query("shopifyOrders")
@@ -640,9 +725,18 @@ export const getCustomerList = query({
 
     // Get unique customers who had orders in this period
     const customerIdsInPeriod = new Set<string>();
+    const ordersByCustomer = new Map<string, typeof ordersInRange>();
     for (const order of ordersInRange) {
-      if (order.customerId) {
-        customerIdsInPeriod.add(order.customerId);
+      const customerId = order.customerId;
+      if (!customerId) {
+        continue;
+      }
+      customerIdsInPeriod.add(customerId);
+      const existingOrders = ordersByCustomer.get(customerId);
+      if (existingOrders) {
+        existingOrders.push(order);
+      } else {
+        ordersByCustomer.set(customerId, [order]);
       }
     }
 
@@ -652,8 +746,13 @@ export const getCustomerList = query({
       .withIndex("by_organization", (q) => q.eq("organizationId", auth.orgId as Id<"organizations">))
       .collect();
 
-    // Filter to only customers with activity in the date range
-    let filteredCustomers = allCustomers.filter((c) => customerIdsInPeriod.has(c._id));
+    const statusFilter = args.status ?? "all";
+
+    // Only constrain to in-period customers when the requested status demands it
+    let filteredCustomers = allCustomers;
+    if (statusFilter === "converted") {
+      filteredCustomers = filteredCustomers.filter((c) => customerIdsInPeriod.has(c._id));
+    }
 
     // Apply search term filter if provided
     const searchTerm = args.searchTerm?.trim().toLowerCase();
@@ -668,7 +767,7 @@ export const getCustomerList = query({
     // Build customer list with order aggregations
     const customerDataPromises = filteredCustomers.map(async (customer) => {
       // Get orders for this customer in the date range
-      const orders = ordersInRange.filter((o) => o.customerId === customer._id);
+      const orders = ordersByCustomer.get(customer._id) ?? [];
 
       const lifetimeValue = orders.reduce((sum, order) => sum + order.totalPrice, 0);
       const orderCount = orders.length;
@@ -702,27 +801,32 @@ export const getCustomerList = query({
         segment = "champion";
       }
 
-      // Determine status
+      // Determine status (currently unused, may be needed for future features)
       const daysSinceLastOrder = lastOrderTimestamp
         ? Math.max(0, (timestamps.end - lastOrderTimestamp) / (1000 * 60 * 60 * 24))
         : 0;
-      let status = "active";
+      let _status = "active";
       if (orderCount === 0) {
-        status = "prospect";
+        _status = "prospect";
       } else if (daysSinceLastOrder > 180) {
-        status = "churned";
+        _status = "churned";
       } else if (daysSinceLastOrder > 90) {
-        status = "at-risk";
+        _status = "at-risk";
       }
 
       const name = `${customer.firstName || ""} ${customer.lastName || ""}`.trim() || "Anonymous";
+
+      const periodRevenue = lifetimeValue;
+      const periodOrders = orderCount;
+      const isReturning = orderCount > 1;
+      const convertedStatus = periodOrders > 0 ? "converted" : "abandoned_cart";
 
       return {
         id: customer._id,
         name,
         email: customer.email || "",
         avatar: undefined,
-        status,
+        status: convertedStatus,
         lifetimeValue,
         orders: orderCount,
         avgOrderValue,
@@ -731,15 +835,23 @@ export const getCustomerList = query({
         segment,
         city: customer.defaultAddress?.city,
         country: customer.defaultAddress?.country,
-      };
+        periodOrders,
+        periodRevenue,
+        isReturning,
+      } satisfies CustomerListEntry;
     });
 
     const customerData = await Promise.all(customerDataPromises);
 
-    // Filter by segment if provided
     let finalData = customerData;
+    if (statusFilter === "converted") {
+      finalData = finalData.filter((c) => c.periodOrders > 0);
+    } else if (statusFilter === "abandoned_cart") {
+      finalData = finalData.filter((c) => c.periodOrders === 0);
+    }
+
     if (args.segment && args.segment !== "all") {
-      finalData = customerData.filter((c) => c.segment === args.segment);
+      finalData = finalData.filter((c) => c.segment === args.segment);
     }
 
     // Sort data
@@ -773,23 +885,66 @@ export const getCustomerList = query({
       return sortOrder === "asc" ? (aVal as number) - (bVal as number) : (bVal as number) - (aVal as number);
     });
 
-    // Paginate
+    const requestedItems = Math.max(
+      1,
+      Math.min(
+        args.paginationOpts?.numItems ??
+          Math.max(
+            1,
+            Math.min(args.pageSize ?? DEFAULT_CUSTOMER_PAGE_SIZE, MAX_CUSTOMER_PAGE_SIZE),
+          ),
+        MAX_CUSTOMER_PAGE_SIZE,
+      ),
+    );
+
+    const cursorKey = buildCustomersCursorKey({
+      dateRange: range,
+      status: args.status,
+      segment: args.segment,
+      searchTerm: args.searchTerm,
+      sortBy: args.sortBy,
+      sortOrder: args.sortOrder,
+      pageSize: requestedItems,
+    });
+
+    const decodedState = decodeCustomersCursor(args.paginationOpts?.cursor ?? null);
+    const initialState = decodedState && decodedState.key === cursorKey ? decodedState : null;
+
+    const fallbackPage = Math.max(1, Math.floor(args.page ?? 1));
+    let offset = initialState?.offset ?? (fallbackPage - 1) * requestedItems;
+    offset = Math.max(0, offset);
+
     const total = finalData.length;
-    const totalPages = Math.max(1, Math.ceil(total / pageSize));
-    const startIdx = (page - 1) * pageSize;
-    const endIdx = startIdx + pageSize;
-    const paginatedData = finalData.slice(startIdx, endIdx);
+    if (offset >= total) {
+      offset = Math.max(0, Math.floor((total - 1) / requestedItems) * requestedItems);
+    }
+
+    const endIdx = Math.min(total, offset + requestedItems);
+    const sliced = finalData.slice(offset, endIdx);
+    const nextOffset = offset + sliced.length;
+    const hasMore = nextOffset < total;
+    const continueCursor = hasMore
+      ? encodeCustomersCursor({ offset: nextOffset, key: cursorKey })
+      : END_CURSOR;
+
+    const pageNumber = total === 0 ? 1 : Math.floor(offset / requestedItems) + 1;
+    const totalPages = Math.max(1, Math.ceil(Math.max(1, total) / requestedItems));
 
     return {
-      page: paginatedData,
-      continueCursor: page >= totalPages ? END_CURSOR : `page_${page + 1}`,
-      isDone: page >= totalPages,
-      data: paginatedData,
+      page: sliced,
+      continueCursor,
+      isDone: !hasMore,
+      data: sliced,
       pagination: {
-        page,
-        pageSize,
+        page: Math.min(pageNumber, totalPages),
+        pageSize: requestedItems,
         total,
         totalPages,
+      },
+      info: {
+        pageSize: requestedItems,
+        returned: sliced.length,
+        hasMore,
       },
     };
   },
@@ -1082,6 +1237,13 @@ export const getAnalytics = action({
     segment: v.optional(v.string()),
     sortBy: v.optional(v.string()),
     sortOrder: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
+    status: v.optional(
+      v.union(
+        v.literal("all"),
+        v.literal("converted"),
+        v.literal("abandoned_cart"),
+      ),
+    ),
   },
   returns: v.union(
     v.null(),
@@ -1103,14 +1265,8 @@ export const getAnalytics = action({
     if (!auth) return null;
 
     const range = validateDateRange(args.dateRange);
-    const page = Math.max(1, Math.floor(args.page ?? 1));
-    const pageSize = Math.min(Math.max(args.pageSize ?? 50, 1), MAX_CUSTOMER_PAGE_SIZE);
-    const searchTerm = args.searchTerm?.trim() ? args.searchTerm.trim() : undefined;
-    const segment = args.segment?.trim() ? args.segment.trim() : undefined;
-    const sortBy = args.sortBy ?? undefined;
-    const sortOrder = args.sortOrder ?? "desc";
 
-    const [overview, cohorts, geographic, journey, customerList] = await Promise.all([
+    const [overview, cohorts, geographic, journey] = await Promise.all([
       ctx.runQuery(api.web.customers.getCustomerOverview, {
         dateRange: range,
       }),
@@ -1124,42 +1280,9 @@ export const getAnalytics = action({
       ctx.runQuery(api.web.customers.getCustomerJourney, {
         dateRange: range,
       }),
-      ctx.runQuery(api.web.customers.getCustomerList, {
-        dateRange: range,
-        page,
-        pageSize,
-        searchTerm,
-        segment,
-        sortBy,
-        sortOrder,
-      }),
     ]);
 
-    const listData = customerList?.data ?? customerList?.page ?? [];
-    const pagination = customerList?.pagination ?? {
-      page,
-      pageSize,
-      total:
-        customerList?.pagination?.total ??
-        Math.max((page - 1) * pageSize + listData.length, listData.length),
-      totalPages:
-        customerList?.pagination?.totalPages ??
-        Math.max(
-          1,
-          Math.ceil(
-            (customerList?.pagination?.total ?? Math.max((page - 1) * pageSize + listData.length, listData.length)) /
-              pageSize,
-          ),
-        ),
-    } satisfies CustomerListPagination;
-
-    const customerListPayload = customerList
-      ? {
-          data: listData as CustomerListEntry[],
-          pagination,
-          continueCursor: customerList.continueCursor ?? END_CURSOR,
-        }
-      : null;
+    const customerListPayload = null;
 
     return {
       dateRange: range,

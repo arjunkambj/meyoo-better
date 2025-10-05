@@ -1,3 +1,4 @@
+import { useQuery } from "convex-helpers/react/cache/hooks";
 import { useAction } from "convex/react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -47,13 +48,15 @@ interface Customer {
   segment: string;
   city?: string;
   country?: string;
+  periodOrders: number;
+  periodRevenue: number;
+  isReturning: boolean;
 }
 
 interface CustomersResult {
   data: Customer[];
   pagination: {
     page: number;
-    setPage: (page: number) => void;
     total: number;
     pageSize: number;
     hasMore: boolean;
@@ -62,6 +65,69 @@ interface CustomersResult {
 
 const END_CURSOR = "__END__";
 const DEFAULT_PAGE_SIZE = 50;
+
+interface CustomersPageSnapshot {
+  page: Customer[];
+  continueCursor: string;
+  isDone: boolean;
+  pagination?: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
+  info?: {
+    pageSize: number;
+    returned: number;
+    hasMore: boolean;
+  };
+}
+
+function buildCustomerCursorKey(args: {
+  dateRange: {
+    startDate: string;
+    endDate: string;
+    startDateTimeUtc: string;
+    endDateTimeUtcExclusive: string;
+    endDateTimeUtc: string;
+    dayCount: number;
+  };
+  status?: string;
+  segment?: string;
+  searchTerm?: string;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+  pageSize: number;
+}): string {
+  const { dateRange, status, segment, searchTerm, sortBy, sortOrder, pageSize } = args;
+  return JSON.stringify({
+    dateRange,
+    status: status ?? null,
+    segment: segment ?? null,
+    search: searchTerm ?? null,
+    sortBy: sortBy ?? null,
+    sortOrder: sortOrder ?? null,
+    pageSize,
+  });
+}
+
+function encodeCustomerCursor(state: { offset: number; key: string }): string {
+  return JSON.stringify(state);
+}
+
+export interface UseCustomerAnalyticsParams {
+  dateRange?: {
+    startDate: string;
+    endDate: string;
+  };
+  status?: "all" | "converted" | "abandoned_cart";
+  page?: number;
+  pageSize?: number;
+  searchTerm?: string;
+  segment?: string;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+}
 
 type BackendOverview = {
   totalCustomers: number;
@@ -167,80 +233,83 @@ const defaultRange = () => {
   };
 };
 
-export function useCustomerAnalytics(dateRange?: {
-  startDate: string;
-  endDate: string;
-}) {
+export function useCustomerAnalytics(params: UseCustomerAnalyticsParams = {}) {
   const { primaryCurrency } = useUser();
   const { timezone } = useOrganizationTimeZone();
   const { offsetMinutes } = useShopifyTime();
 
-  const [page, setPage] = useState(1);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedSegment, setSelectedSegment] = useState<string | undefined>();
+  const {
+    dateRange,
+    status = "all",
+    page = 1,
+    pageSize = DEFAULT_PAGE_SIZE,
+    searchTerm,
+    segment,
+    sortBy,
+    sortOrder = "desc",
+  } = params;
+
+  const requestedPage = Math.max(1, page);
+
+  const normalizedSearch = useMemo(() => {
+    if (!searchTerm) return undefined;
+    const trimmed = searchTerm.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  }, [searchTerm]);
+
+  const normalizedSegment = useMemo(() => {
+    if (!segment) return undefined;
+    const trimmed = segment.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  }, [segment]);
 
   const effectiveDateRange = useMemo(() => {
     if (dateRange) return dateRange;
     return defaultRange();
   }, [dateRange?.startDate, dateRange?.endDate]);
 
-  useEffect(() => {
-    setPage(1);
-  }, [
-    effectiveDateRange.startDate,
-    effectiveDateRange.endDate,
-    selectedSegment,
-    searchTerm,
-  ]);
-
-  const actionArgs = useMemo(() => {
-    const rangeStrings = dateRangeToUtcWithShopPreference(
+  const rangeStrings = useMemo(() => {
+    if (!effectiveDateRange) return null;
+    return dateRangeToUtcWithShopPreference(
       effectiveDateRange,
       typeof offsetMinutes === "number" ? offsetMinutes : undefined,
       timezone,
     );
-    const normalizedRange = {
-      startDate: effectiveDateRange.startDate,
-      endDate: effectiveDateRange.endDate,
-      startDateTimeUtc: rangeStrings.startDateTimeUtc,
-      endDateTimeUtc: rangeStrings.endDateTimeUtc,
-      endDateTimeUtcExclusive: rangeStrings.endDateTimeUtcExclusive,
-      dayCount: rangeStrings.dayCount,
-    } as const;
-    const trimmedSearch = searchTerm.trim();
+  }, [effectiveDateRange, offsetMinutes, timezone]);
+
+  const normalizedRange = useMemo(() => {
+    if (!rangeStrings) return null;
 
     return {
-      dateRange: normalizedRange,
-      page,
-      pageSize: DEFAULT_PAGE_SIZE,
-      searchTerm: trimmedSearch.length > 0 ? trimmedSearch : undefined,
-      segment: selectedSegment,
-    };
-  }, [
-    effectiveDateRange,
-    offsetMinutes,
-    page,
-    searchTerm,
-    selectedSegment,
-    timezone,
-  ]);
+      startDate: effectiveDateRange.startDate,
+      endDate: effectiveDateRange.endDate,
+      startDateTimeUtc:
+        rangeStrings.startDateTimeUtc ?? `${effectiveDateRange.startDate}T00:00:00.000Z`,
+      endDateTimeUtc:
+        rangeStrings.endDateTimeUtc ?? `${effectiveDateRange.endDate}T23:59:59.999Z`,
+      endDateTimeUtcExclusive:
+        rangeStrings.endDateTimeUtcExclusive ?? `${effectiveDateRange.endDate}T23:59:59.999Z`,
+      dayCount: rangeStrings.dayCount ?? 0,
+    } as const;
+  }, [effectiveDateRange.endDate, effectiveDateRange.startDate, rangeStrings]);
 
-  // Use consolidated action for better performance - batches all queries with Promise.all
+  // Use consolidated action for overview-related metrics
   const [analyticsData, setAnalyticsData] =
     useState<CustomerAnalyticsResponse | null>(null);
   const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(true);
   const fetchAnalytics = useAction(api.web.customers.getAnalytics);
 
   useEffect(() => {
+    if (!normalizedRange) {
+      setIsLoadingAnalytics(false);
+      return;
+    }
+
     let cancelled = false;
     setIsLoadingAnalytics(true);
 
     fetchAnalytics({
-      dateRange: actionArgs.dateRange,
-      page: actionArgs.page,
-      pageSize: actionArgs.pageSize,
-      searchTerm: actionArgs.searchTerm,
-      segment: actionArgs.segment,
+      dateRange: normalizedRange,
     })
       .then((result: CustomerAnalyticsResponse | null) => {
         if (!cancelled) {
@@ -260,17 +329,14 @@ export function useCustomerAnalytics(dateRange?: {
     };
   }, [
     fetchAnalytics,
-    actionArgs.dateRange.startDate,
-    actionArgs.dateRange.endDate,
-    actionArgs.page,
-    actionArgs.pageSize,
-    actionArgs.searchTerm,
-    actionArgs.segment,
+    normalizedRange?.startDate,
+    normalizedRange?.endDate,
+    normalizedRange?.startDateTimeUtc,
+    normalizedRange?.endDateTimeUtcExclusive,
   ]);
 
   const overviewQuery = analyticsData?.result?.overview;
   const cohortsQuery = analyticsData?.result?.cohorts;
-  const customerListQuery = analyticsData?.result?.customerList;
   const geographicQuery = analyticsData?.result?.geographic;
   const journeyQuery = analyticsData?.result?.journey;
 
@@ -318,35 +384,109 @@ export function useCustomerAnalytics(dateRange?: {
     }));
   }, [cohortsQuery]);
 
+  const cursorKey = useMemo(() => {
+    if (!normalizedRange) return null;
+    return buildCustomerCursorKey({
+      dateRange: normalizedRange,
+      status: status === "all" ? undefined : status,
+      segment: normalizedSegment,
+      searchTerm: normalizedSearch,
+      sortBy,
+      sortOrder,
+      pageSize,
+    });
+  }, [
+    normalizedRange?.startDate,
+    normalizedRange?.endDate,
+    normalizedRange?.startDateTimeUtc,
+    normalizedRange?.endDateTimeUtcExclusive,
+    normalizedRange?.endDateTimeUtc,
+    normalizedRange?.dayCount,
+    status,
+    normalizedSegment,
+    normalizedSearch,
+    sortBy,
+    sortOrder,
+    pageSize,
+  ]);
+
+  const cursorForPage = useMemo(() => {
+    if (!cursorKey || requestedPage <= 1) {
+      return null;
+    }
+    const offset = (requestedPage - 1) * pageSize;
+    return encodeCustomerCursor({ offset, key: cursorKey });
+  }, [cursorKey, requestedPage, pageSize]);
+
+  const customersQueryArgs = useMemo(() => {
+    if (!normalizedRange) return "skip" as const;
+    return {
+      dateRange: normalizedRange,
+      status: status === "all" ? undefined : status,
+      searchTerm: normalizedSearch,
+      segment: normalizedSegment,
+      sortBy,
+      sortOrder,
+      page: requestedPage,
+      pageSize,
+      paginationOpts: {
+        cursor: cursorForPage,
+        numItems: pageSize,
+      },
+    };
+  }, [
+    normalizedRange?.startDate,
+    normalizedRange?.endDate,
+    normalizedRange?.startDateTimeUtc,
+    normalizedRange?.endDateTimeUtcExclusive,
+    normalizedRange?.endDateTimeUtc,
+    normalizedRange?.dayCount,
+    status,
+    normalizedSearch,
+    normalizedSegment,
+    sortBy,
+    sortOrder,
+    requestedPage,
+    pageSize,
+    cursorForPage,
+  ]);
+
+  const customersPageSnapshot = useQuery(
+    (api.web.customers as Record<string, any>).getCustomerList,
+    customersQueryArgs,
+  ) as CustomersPageSnapshot | undefined;
+
+  const customersLoading =
+    customersQueryArgs !== "skip" && customersPageSnapshot === undefined;
+
   const customers: CustomersResult | undefined = useMemo(() => {
-    if (!customerListQuery) return undefined;
+    if (!customersPageSnapshot) return undefined;
 
-    const entries =
-      customerListQuery.data ?? customerListQuery.page ?? ([] as Customer[]);
-
-    const paginationSource = customerListQuery.pagination ?? {
-      page,
-      pageSize: DEFAULT_PAGE_SIZE,
-      total: entries.length,
+    const paginationSource = customersPageSnapshot.pagination ?? {
+      page: requestedPage,
+      pageSize,
+      total: customersPageSnapshot.page.length,
       totalPages: Math.max(
         1,
-        Math.ceil(Math.max(entries.length, 1) / DEFAULT_PAGE_SIZE),
+        Math.ceil(
+          Math.max(customersPageSnapshot.page.length, 1) / Math.max(pageSize, 1),
+        ),
       ),
     };
 
+    const hasMore = customersPageSnapshot.info?.hasMore ??
+      (customersPageSnapshot.continueCursor !== END_CURSOR && !customersPageSnapshot.isDone);
+
     return {
-      data: entries,
+      data: customersPageSnapshot.page,
       pagination: {
         page: paginationSource.page,
-        setPage,
         total: paginationSource.total,
         pageSize: paginationSource.pageSize,
-        hasMore:
-          !!customerListQuery.continueCursor &&
-          customerListQuery.continueCursor !== END_CURSOR,
+        hasMore,
       },
     };
-  }, [customerListQuery, page, setPage]);
+  }, [customersPageSnapshot, pageSize, requestedPage]);
 
   const geographicSource = geographicQuery ?? null;
 
@@ -466,10 +606,13 @@ export function useCustomerAnalytics(dateRange?: {
           Status: c.status,
           "Lifetime Value": formatCurrency(c.lifetimeValue, primaryCurrency),
           Orders: c.orders,
+          "Orders (Range)": c.periodOrders,
           "Avg Order Value": formatCurrency(c.avgOrderValue, primaryCurrency),
+          "Revenue (Range)": formatCurrency(c.periodRevenue, primaryCurrency),
           "Last Order": c.lastOrderDate,
           "First Order": c.firstOrderDate,
           Segment: c.segment,
+          Returning: c.isReturning ? "Yes" : "No",
           Location:
             c.city && c.country ? `${c.city}, ${c.country}` : "Unknown",
         })),
@@ -508,13 +651,15 @@ export function useCustomerAnalytics(dateRange?: {
   const loadingStates = {
     overview: isLoadingAnalytics || overviewQuery === undefined,
     cohorts: isLoadingAnalytics || cohortsQuery === undefined,
-    customers: isLoadingAnalytics || customerListQuery === undefined,
+    customers: customersLoading,
     geographic: isLoadingAnalytics || geographicQuery === undefined,
     journey: isLoadingAnalytics || journeyQuery === undefined,
   };
 
-  const isLoading = isLoadingAnalytics || Object.values(loadingStates).some(Boolean);
-  const isInitialLoading = isLoadingAnalytics;
+  const isLoading = isLoadingAnalytics || customersLoading;
+  const isInitialLoading =
+    (isLoadingAnalytics && !analyticsData) ||
+    (customersLoading && requestedPage === 1);
 
   return {
     overview,
@@ -526,7 +671,5 @@ export function useCustomerAnalytics(dateRange?: {
     isLoading,
     isInitialLoading,
     loadingStates,
-    setSearchTerm,
-    setSelectedSegment,
   };
 }

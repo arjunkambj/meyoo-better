@@ -1,3 +1,4 @@
+import { parseDate } from "@internationalized/date";
 import { v } from "convex/values";
 import type { Infer } from "convex/values";
 
@@ -21,6 +22,8 @@ import { computeOverviewMetrics, computePlatformMetrics } from "../utils/analyti
 import { msToDateString, normalizeDateString } from "../utils/date";
 import { loadAnalyticsWithChunks } from "../utils/analyticsLoader";
 import type { AnalyticsResponse } from "../web/analyticsShared";
+import { toUtcRangeForOffset } from "@repo/time";
+import { getShopUtcOffsetMinutes } from "../../libs/time/shopTime";
 
 const datasetCountValidator = v.object({
   orders: v.number(),
@@ -52,6 +55,45 @@ const DAILY_METRICS_DATASETS = [
   "metaInsights",
   "analytics",
 ] as const satisfies readonly AnalyticsSourceKey[];
+
+function buildDateRangeForLocalDay(
+  normalizedDate: string,
+  timezone: string | null | undefined,
+  fallbackOffsetMinutes: number,
+): DateRange {
+  if (timezone) {
+    try {
+      const startCalendar = parseDate(normalizedDate);
+      const startUtc = startCalendar.toDate(timezone);
+      const endExclusiveUtc = startCalendar.add({ days: 1 }).toDate(timezone);
+
+      return {
+        startDate: normalizedDate,
+        endDate: normalizedDate,
+        startDateTimeUtc: startUtc.toISOString(),
+        endDateTimeUtc: new Date(endExclusiveUtc.getTime() - 1).toISOString(),
+        endDateTimeUtcExclusive: endExclusiveUtc.toISOString(),
+        dayCount: 1,
+      } satisfies DateRange;
+    } catch (_error) {
+      // Fallback to offset-based calculation when timezone conversion fails
+    }
+  }
+
+  const fallbackRange = toUtcRangeForOffset(
+    { startDate: normalizedDate, endDate: normalizedDate },
+    fallbackOffsetMinutes,
+  );
+
+  return {
+    startDate: normalizedDate,
+    endDate: normalizedDate,
+    startDateTimeUtc: fallbackRange.startDateTimeUtc,
+    endDateTimeUtc: fallbackRange.endDateTimeUtc,
+    endDateTimeUtcExclusive: fallbackRange.endDateTimeUtcExclusive,
+    dayCount: fallbackRange.dayCount,
+  } satisfies DateRange;
+}
 
 function resolveDateRange(
   input?: {
@@ -133,11 +175,19 @@ export const calculateAnalytics = internalAction({
         organizationId: string;
         startDate: string;
         endDate: string;
+        startDateTimeUtc?: string;
+        endDateTimeUtc?: string;
+        endDateTimeUtcExclusive?: string;
         cursor?: string;
       } = {
         organizationId,
         startDate: range.startDate,
         endDate: range.endDate,
+        ...(range.startDateTimeUtc ? { startDateTimeUtc: range.startDateTimeUtc } : {}),
+        ...(range.endDateTimeUtc ? { endDateTimeUtc: range.endDateTimeUtc } : {}),
+        ...(range.endDateTimeUtcExclusive
+          ? { endDateTimeUtcExclusive: range.endDateTimeUtcExclusive }
+          : {}),
       };
 
       if (orderCursor) {
@@ -196,12 +246,20 @@ export const calculateAnalytics = internalAction({
           organizationId: string;
           startDate: string;
           endDate: string;
+          startDateTimeUtc?: string;
+          endDateTimeUtc?: string;
+          endDateTimeUtcExclusive?: string;
           dataset: "metaInsights" | "globalCosts" | "sessions" | "analytics";
           cursor?: string;
         } = {
           organizationId,
           startDate: range.startDate,
           endDate: range.endDate,
+          ...(range.startDateTimeUtc ? { startDateTimeUtc: range.startDateTimeUtc } : {}),
+          ...(range.endDateTimeUtc ? { endDateTimeUtc: range.endDateTimeUtc } : {}),
+          ...(range.endDateTimeUtcExclusive
+            ? { endDateTimeUtcExclusive: range.endDateTimeUtcExclusive }
+            : {}),
           dataset,
         };
 
@@ -260,6 +318,9 @@ export const gatherAnalyticsOrderChunk = internalQuery({
     organizationId: v.string(),
     startDate: v.string(),
     endDate: v.string(),
+    startDateTimeUtc: v.optional(v.string()),
+    endDateTimeUtc: v.optional(v.string()),
+    endDateTimeUtcExclusive: v.optional(v.string()),
     cursor: v.optional(v.string()),
     pageSize: v.optional(v.number()),
     datasets: v.optional(v.array(v.string())),
@@ -281,6 +342,9 @@ export const gatherAnalyticsOrderChunk = internalQuery({
     const range = validateDateRange({
       startDate: args.startDate,
       endDate: args.endDate,
+      startDateTimeUtc: args.startDateTimeUtc ?? undefined,
+      endDateTimeUtc: args.endDateTimeUtc ?? undefined,
+      endDateTimeUtcExclusive: args.endDateTimeUtcExclusive ?? undefined,
     });
 
     const organizationId = args.organizationId as Id<"organizations">;
@@ -313,6 +377,9 @@ export const gatherSupplementalAnalyticsChunk = internalQuery({
     organizationId: v.string(),
     startDate: v.string(),
     endDate: v.string(),
+    startDateTimeUtc: v.optional(v.string()),
+    endDateTimeUtc: v.optional(v.string()),
+    endDateTimeUtcExclusive: v.optional(v.string()),
     dataset: supplementalDatasetValidator,
     cursor: v.optional(v.string()),
     pageSize: v.optional(v.number()),
@@ -326,6 +393,9 @@ export const gatherSupplementalAnalyticsChunk = internalQuery({
     const range = validateDateRange({
       startDate: args.startDate,
       endDate: args.endDate,
+      startDateTimeUtc: args.startDateTimeUtc ?? undefined,
+      endDateTimeUtc: args.endDateTimeUtc ?? undefined,
+      endDateTimeUtcExclusive: args.endDateTimeUtcExclusive ?? undefined,
     });
 
     const organizationId = args.organizationId as Id<"organizations">;
@@ -392,18 +462,20 @@ export const getAvailableDateBounds = internalQuery({
     latest: v.optional(v.string()),
   }),
   handler: async (ctx, args) => {
+    const organization = await ctx.db.get(args.organizationId);
+    const dateOptions = organization?.timezone ? { timezone: organization.timezone } : undefined;
     const earliestCandidates: string[] = [];
     const latestCandidates: string[] = [];
 
     const addEarliestMs = (value: number | null | undefined) => {
-      const normalized = msToDateString(value ?? null);
+      const normalized = msToDateString(value ?? null, dateOptions);
       if (normalized) {
         earliestCandidates.push(normalized);
       }
     };
 
     const addLatestMs = (value: number | null | undefined) => {
-      const normalized = msToDateString(value ?? null);
+      const normalized = msToDateString(value ?? null, dateOptions);
       if (normalized) {
         latestCandidates.push(normalized);
       }
@@ -918,24 +990,56 @@ export const rebuildDailyMetrics = internalAction({
     let updated = 0;
     let skipped = 0;
 
+    let timezone: string | null = null;
+    try {
+      const timezoneResult = await ctx.runQuery(
+        internal.core.organizations.getOrganizationTimezoneInternal,
+        { organizationId: args.organizationId },
+      );
+      timezone = timezoneResult?.timezone ?? null;
+    } catch (error) {
+      console.warn("[Analytics] Failed to load organization timezone", {
+        organizationId: args.organizationId,
+        error,
+      });
+    }
+
+    let fallbackOffsetMinutes = 0;
+    if (!timezone) {
+      try {
+        const offset = await getShopUtcOffsetMinutes(ctx as any, String(args.organizationId));
+        fallbackOffsetMinutes = Number.isFinite(offset) ? offset : 0;
+      } catch (error) {
+        console.warn("[Analytics] Failed to resolve shop offset", {
+          organizationId: args.organizationId,
+          error,
+        });
+        fallbackOffsetMinutes = 0;
+      }
+    }
+
+    const organizationId = args.organizationId as Id<"organizations">;
+
     for (const date of uniqueDates) {
       processed += 1;
       try {
         const normalizedDate = normalizeDateString(date);
+        const dateRange = buildDateRangeForLocalDay(
+          normalizedDate,
+          timezone,
+          fallbackOffsetMinutes,
+        );
         const { data } = await loadAnalyticsWithChunks(
           ctx,
-          args.organizationId as Id<"organizations">,
-          {
-            startDate: normalizedDate,
-            endDate: normalizedDate,
-          },
+          organizationId,
+          dateRange,
           {
             datasets: DAILY_METRICS_DATASETS,
           },
         );
 
         const response: AnalyticsResponse = {
-          dateRange: { startDate: normalizedDate, endDate: normalizedDate },
+          dateRange,
           organizationId: args.organizationId,
           data,
         };

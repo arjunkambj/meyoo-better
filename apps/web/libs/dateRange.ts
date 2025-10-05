@@ -86,14 +86,18 @@ export function dateRangeToUtcWithShopPreference(
   offsetMinutes?: number,
   timeZone: string = 'UTC',
 ): RangeYYYYMMDD {
-  const tz = isIanaTimeZone(timeZone) ? timeZone : 'UTC';
   const r: RangeYYYYMMDD =
     'startDate' in range
       ? { startDate: range.startDate, endDate: range.endDate }
       : { startDate: range.start, endDate: range.end };
 
+  if (isIanaTimeZone(timeZone)) {
+    return toUtcRangeStrings(r, timeZone);
+  }
+
   if (typeof offsetMinutes === 'number') {
     return toUtcRangeForOffset(r, offsetMinutes);
   }
-  return toUtcRangeStrings(r, tz);
+
+  return toUtcRangeStrings(r, 'UTC');
 }

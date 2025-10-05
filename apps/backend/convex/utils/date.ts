@@ -1,4 +1,24 @@
-export function msToDateString(ms: number | null | undefined): string | null {
+export interface MsToDateOptions {
+  timezone?: string;
+  offsetMinutes?: number;
+}
+
+const ISO_DATE_FORMATTER = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "UTC",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+function formatDateWithOffset(date: Date, offsetMinutes: number): string {
+  const adjusted = new Date(date.getTime() + offsetMinutes * 60_000);
+  return ISO_DATE_FORMATTER.format(adjusted);
+}
+
+export function msToDateString(
+  ms: number | null | undefined,
+  options?: MsToDateOptions,
+): string | null {
   if (typeof ms !== "number" || !Number.isFinite(ms)) {
     return null;
   }
@@ -6,6 +26,24 @@ export function msToDateString(ms: number | null | undefined): string | null {
   const date = new Date(ms);
   if (Number.isNaN(date.getTime())) {
     return null;
+  }
+
+  if (options?.timezone) {
+    try {
+      const formatter = new Intl.DateTimeFormat("en-CA", {
+        timeZone: options.timezone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      });
+      return formatter.format(date);
+    } catch (_error) {
+      // Fallback to offset/UTC formatting when timezone is invalid
+    }
+  }
+
+  if (typeof options?.offsetMinutes === "number" && Number.isFinite(options.offsetMinutes)) {
+    return formatDateWithOffset(date, options.offsetMinutes);
   }
 
   return date.toISOString().slice(0, 10);

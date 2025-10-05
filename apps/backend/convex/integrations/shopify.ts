@@ -16,7 +16,7 @@ import {
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { createIntegration, type SyncResult } from "./_base";
 import { normalizeShopDomain } from "../utils/shop";
-import { msToDateString } from "../utils/date";
+import { msToDateString, type MsToDateOptions } from "../utils/date";
 import { createJob, PRIORITY } from "../engine/workpool";
 import { toStringArray } from "../utils/shopify";
 import { createNewUserData } from "../authHelpers";
@@ -2279,6 +2279,7 @@ export const storeOrdersInternal = internalMutation({
     }
 
     // Resolve the store to associate with these orders
+    const organizationId = args.organizationId as Id<"organizations">;
     let store: Doc<"shopifyStores"> | null = null;
 
     if (args.storeId) {
@@ -2301,6 +2302,11 @@ export const storeOrdersInternal = internalMutation({
     if (!store) {
       throw new Error("No active Shopify store found");
     }
+
+    const organization = await ctx.db.get(organizationId);
+    const dateFormattingOptions: MsToDateOptions | undefined = organization?.timezone
+      ? { timezone: organization.timezone }
+      : undefined;
 
     // Step 1: Collect all unique customers from orders
     const customerDataMap = new Map();
@@ -2422,7 +2428,7 @@ export const storeOrdersInternal = internalMutation({
         : undefined;
 
       const orderToStore = {
-        organizationId: args.organizationId as Id<"organizations">,
+        organizationId,
         storeId: store._id,
         shopifyId: orderData.shopifyId,
         orderNumber: orderData.orderNumber,
@@ -2609,7 +2615,7 @@ export const storeOrdersInternal = internalMutation({
 
     const affectedDates = new Set<string>();
     for (const order of args.orders) {
-      const date = msToDateString(order.shopifyCreatedAt);
+      const date = msToDateString(order.shopifyCreatedAt, dateFormattingOptions);
       if (date) {
         affectedDates.add(date);
       }
@@ -2618,10 +2624,7 @@ export const storeOrdersInternal = internalMutation({
     const canSchedule =
       args.shouldScheduleAnalytics !== undefined
         ? args.shouldScheduleAnalytics
-        : await hasCompletedInitialShopifySync(
-            ctx,
-            args.organizationId as Id<"organizations">,
-          );
+        : await hasCompletedInitialShopifySync(ctx, organizationId);
 
     if (canSchedule && affectedDates.size > 0) {
       const dates = Array.from(affectedDates);
@@ -2630,7 +2633,7 @@ export const storeOrdersInternal = internalMutation({
         "analytics:rebuildDaily",
         PRIORITY.LOW,
         {
-          organizationId: args.organizationId as Id<"organizations">,
+          organizationId,
           dates,
         },
         {
@@ -2923,6 +2926,11 @@ export const storeTransactionsInternal = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    const organizationId = args.organizationId as Id<"organizations">;
+    const organization = await ctx.db.get(organizationId);
+    const dateFormattingOptions: MsToDateOptions | undefined = organization?.timezone
+      ? { timezone: organization.timezone }
+      : undefined;
     const affectedDates = new Set<string>();
     const retryTransactions: Array<(typeof args.transactions)[number]> = [];
     for (const transaction of args.transactions) {
@@ -2953,7 +2961,7 @@ export const storeTransactionsInternal = internalMutation({
         .first();
 
       const transactionData = {
-        organizationId: args.organizationId as Id<"organizations">,
+        organizationId,
         orderId: order._id,
         shopifyId: transaction.shopifyId,
         shopifyOrderId: transaction.shopifyOrderId,
@@ -2973,7 +2981,7 @@ export const storeTransactionsInternal = internalMutation({
         await ctx.db.insert("shopifyTransactions", transactionData);
       }
 
-      const date = msToDateString(transaction.shopifyCreatedAt);
+      const date = msToDateString(transaction.shopifyCreatedAt, dateFormattingOptions);
       if (date) {
         affectedDates.add(date);
       }
@@ -3003,10 +3011,7 @@ export const storeTransactionsInternal = internalMutation({
     const canSchedule =
       args.shouldScheduleAnalytics !== undefined
         ? args.shouldScheduleAnalytics
-        : await hasCompletedInitialShopifySync(
-            ctx,
-            args.organizationId as Id<"organizations">,
-          );
+        : await hasCompletedInitialShopifySync(ctx, organizationId);
 
     if (canSchedule && affectedDates.size > 0) {
       const dates = Array.from(affectedDates);
@@ -3015,7 +3020,7 @@ export const storeTransactionsInternal = internalMutation({
         "analytics:rebuildDaily",
         PRIORITY.LOW,
         {
-          organizationId: args.organizationId as Id<"organizations">,
+          organizationId,
           dates,
         },
         {
@@ -3040,6 +3045,11 @@ export const storeRefundsInternal = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    const organizationId = args.organizationId as Id<"organizations">;
+    const organization = await ctx.db.get(organizationId);
+    const dateFormattingOptions: MsToDateOptions | undefined = organization?.timezone
+      ? { timezone: organization.timezone }
+      : undefined;
     const affectedDates = new Set<string>();
     const retryRefunds: Array<(typeof args.refunds)[number]> = [];
     for (const refund of args.refunds) {
@@ -3068,7 +3078,7 @@ export const storeRefundsInternal = internalMutation({
         .first();
 
       const refundData = {
-        organizationId: args.organizationId as Id<"organizations">,
+        organizationId,
         orderId: order._id,
         shopifyId: refund.shopifyId,
         shopifyOrderId: refund.shopifyOrderId,
@@ -3086,7 +3096,7 @@ export const storeRefundsInternal = internalMutation({
         await ctx.db.insert("shopifyRefunds", refundData);
       }
 
-      const date = msToDateString(refund.shopifyCreatedAt);
+      const date = msToDateString(refund.shopifyCreatedAt, dateFormattingOptions);
       if (date) {
         affectedDates.add(date);
       }
@@ -3116,10 +3126,7 @@ export const storeRefundsInternal = internalMutation({
     const canSchedule =
       args.shouldScheduleAnalytics !== undefined
         ? args.shouldScheduleAnalytics
-        : await hasCompletedInitialShopifySync(
-            ctx,
-            args.organizationId as Id<"organizations">,
-          );
+        : await hasCompletedInitialShopifySync(ctx, organizationId);
 
     if (canSchedule && affectedDates.size > 0) {
       const dates = Array.from(affectedDates);
@@ -3128,7 +3135,7 @@ export const storeRefundsInternal = internalMutation({
         "analytics:rebuildDaily",
         PRIORITY.LOW,
         {
-          organizationId: args.organizationId as Id<"organizations">,
+          organizationId,
           dates,
         },
         {

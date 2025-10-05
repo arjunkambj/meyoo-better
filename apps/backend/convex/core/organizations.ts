@@ -18,6 +18,21 @@ import { getUserAndOrg } from "../utils/auth";
 
 // ============ QUERIES ============
 
+export const getOrganizationTimezoneInternal = internalQuery({
+  args: {
+    organizationId: v.id("organizations"),
+  },
+  returns: v.object({
+    timezone: v.optional(v.string()),
+  }),
+  handler: async (ctx, args) => {
+    const organization = await ctx.db.get(args.organizationId);
+    return {
+      timezone: organization?.timezone,
+    };
+  },
+});
+
 /**
  * Get current user's organization
  */

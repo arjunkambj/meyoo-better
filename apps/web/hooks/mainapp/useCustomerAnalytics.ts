@@ -2,8 +2,9 @@ import { useAction } from "convex/react";
 import { useEffect, useMemo, useState } from "react";
 
 import { api } from "@/libs/convexApi";
-import { toUtcRangeStrings } from "@/libs/dateRange";
+import { dateRangeToUtcWithShopPreference } from "@/libs/dateRange";
 import { useOrganizationTimeZone, useUser } from "./useUser";
+import { useShopifyTime } from "./useShopifyTime";
 import type { JourneyStage } from "@/components/dashboard/(analytics)/customer-insights/components/CustomerJourney";
 import type { CohortData } from "@/components/dashboard/(analytics)/orders-insights/components/CohortAnalysis";
 import type { GeoData } from "@/components/dashboard/(analytics)/orders-insights/components/GeographicDistribution";
@@ -172,6 +173,7 @@ export function useCustomerAnalytics(dateRange?: {
 }) {
   const { primaryCurrency } = useUser();
   const { timezone } = useOrganizationTimeZone();
+  const { offsetMinutes } = useShopifyTime();
 
   const [page, setPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
@@ -192,7 +194,11 @@ export function useCustomerAnalytics(dateRange?: {
   ]);
 
   const actionArgs = useMemo(() => {
-    const rangeStrings = toUtcRangeStrings(effectiveDateRange, timezone);
+    const rangeStrings = dateRangeToUtcWithShopPreference(
+      effectiveDateRange,
+      typeof offsetMinutes === "number" ? offsetMinutes : undefined,
+      timezone,
+    );
     const normalizedRange = {
       startDate: effectiveDateRange.startDate,
       endDate: effectiveDateRange.endDate,
@@ -210,7 +216,14 @@ export function useCustomerAnalytics(dateRange?: {
       searchTerm: trimmedSearch.length > 0 ? trimmedSearch : undefined,
       segment: selectedSegment,
     };
-  }, [effectiveDateRange, timezone, page, searchTerm, selectedSegment]);
+  }, [
+    effectiveDateRange,
+    offsetMinutes,
+    page,
+    searchTerm,
+    selectedSegment,
+    timezone,
+  ]);
 
   // Use consolidated action for better performance - batches all queries with Promise.all
   const [analyticsData, setAnalyticsData] =

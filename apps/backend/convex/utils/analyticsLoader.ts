@@ -148,6 +148,11 @@ export async function loadAnalyticsWithChunks(
     organizationId: organizationId as string,
     startDate: range.startDate,
     endDate: range.endDate,
+    ...(range.startDateTimeUtc ? { startDateTimeUtc: range.startDateTimeUtc } : {}),
+    ...(range.endDateTimeUtc ? { endDateTimeUtc: range.endDateTimeUtc } : {}),
+    ...(range.endDateTimeUtcExclusive
+      ? { endDateTimeUtcExclusive: range.endDateTimeUtcExclusive }
+      : {}),
   } as const;
 
   const rangeStartMs = getRangeStartMs(range);

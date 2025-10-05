@@ -4,8 +4,9 @@ import { useAction } from "convex/react";
 import type { Product } from "@/components/dashboard/(analytics)/inventory/components/ProductsTable";
 
 import { api } from "@/libs/convexApi";
-import { toUtcRangeStrings } from "@/libs/dateRange";
+import { dateRangeToUtcWithShopPreference } from "@/libs/dateRange";
 import { useOrganizationTimeZone } from "./useUser";
+import { useShopifyTime } from "./useShopifyTime";
 
 // Local type definitions aligned with Convex returns
 export type StockMovementData = {
@@ -126,16 +127,21 @@ export function useInventoryAnalytics(
   } = params;
 
   const { timezone } = useOrganizationTimeZone();
+  const { offsetMinutes } = useShopifyTime();
 
   const normalizedDateRange = useMemo(() => {
     if (!dateRange) return undefined;
-    const utcRange = toUtcRangeStrings(dateRange, timezone);
+    const utcRange = dateRangeToUtcWithShopPreference(
+      dateRange,
+      typeof offsetMinutes === "number" ? offsetMinutes : undefined,
+      timezone,
+    );
     return {
       ...utcRange,
       startDate: dateRange.startDate,
       endDate: dateRange.endDate,
     } as const;
-  }, [dateRange?.endDate, dateRange?.startDate, timezone]);
+  }, [dateRange?.endDate, dateRange?.startDate, offsetMinutes, timezone]);
 
   // Use consolidated action for overview, alerts, topPerformers, and stockMovement
   const [metricsData, setMetricsData] = useState<any>(null);

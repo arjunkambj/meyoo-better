@@ -11,7 +11,7 @@ import {
 } from "../utils/shopify";
 import { optionalEnv, requireEnv } from "../utils/env";
 import type { Id } from "../_generated/dataModel";
-import { msToDateString } from "../utils/date";
+import { msToDateString, type MsToDateOptions } from "../utils/date";
 import { createJob, PRIORITY } from "../engine/workpool";
 import { hasCompletedInitialShopifySync } from "../integrations/shopify";
 
@@ -299,6 +299,22 @@ async function handleTopicInline(
 
   const storeId = store?._id as Id<"shopifyStores"> | undefined;
 
+  let cachedDateOptions: MsToDateOptions | null = null;
+  let dateOptionsResolved = false;
+  const resolveDateOptions = async (): Promise<MsToDateOptions | undefined> => {
+    if (!organizationId || dateOptionsResolved) {
+      return cachedDateOptions ?? undefined;
+    }
+
+    const result = await ctx.runQuery(
+      internal.core.organizations.getOrganizationTimezoneInternal,
+      { organizationId },
+    );
+    cachedDateOptions = result?.timezone ? { timezone: result.timezone } : null;
+    dateOptionsResolved = true;
+    return cachedDateOptions ?? undefined;
+  };
+
   // basic normalization helpers are in utils/shopify
 
   switch (topic) {
@@ -409,7 +425,10 @@ async function handleTopicInline(
         { organizationId, shopifyId },
       );
       // analytics recalculation handled client-side
-      const deletionDate = existingOrder ? msToDateString(existingOrder.shopifyCreatedAt) : null;
+      const dateOptions = await resolveDateOptions();
+      const deletionDate = existingOrder
+        ? msToDateString(existingOrder.shopifyCreatedAt, dateOptions)
+        : null;
       const canSchedule = await hasCompletedInitialShopifySync(ctx as any, organizationId);
       if (deletionDate && canSchedule) {
         await scheduleAnalyticsRebuild(
@@ -495,7 +514,8 @@ async function handleTopicInline(
         { organizationId, storeId, customer: payload },
       );
       const canSchedule = await hasCompletedInitialShopifySync(ctx as any, organizationId);
-      const today = msToDateString(Date.now());
+      const dateOptions = await resolveDateOptions();
+      const today = msToDateString(Date.now(), dateOptions);
       if (canSchedule && today) {
         await scheduleAnalyticsRebuild(
           ctx,
@@ -529,7 +549,8 @@ async function handleTopicInline(
         );
       }
       const canSchedule = await hasCompletedInitialShopifySync(ctx as any, organizationId);
-      const today = msToDateString(Date.now());
+      const dateOptions = await resolveDateOptions();
+      const today = msToDateString(Date.now(), dateOptions);
       if (canSchedule && today) {
         await scheduleAnalyticsRebuild(
           ctx,
@@ -558,7 +579,8 @@ async function handleTopicInline(
       );
       // analytics recalculation handled client-side
       const canSchedule = await hasCompletedInitialShopifySync(ctx as any, organizationId);
-      const today = msToDateString(Date.now());
+      const dateOptions = await resolveDateOptions();
+      const today = msToDateString(Date.now(), dateOptions);
       if (canSchedule && today) {
         await scheduleAnalyticsRebuild(
           ctx,
@@ -597,7 +619,8 @@ async function handleTopicInline(
       });
       // analytics recalculation handled client-side
       const canSchedule = await hasCompletedInitialShopifySync(ctx as any, organizationId);
-      const refundDate = msToDateString(refunds[0]?.shopifyCreatedAt);
+      const dateOptions = await resolveDateOptions();
+      const refundDate = msToDateString(refunds[0]?.shopifyCreatedAt, dateOptions);
       if (canSchedule && refundDate) {
         await scheduleAnalyticsRebuild(
           ctx,

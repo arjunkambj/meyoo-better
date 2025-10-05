@@ -132,7 +132,8 @@ function decodeOrdersCursor(cursor: string | null): OrdersCursorState | null {
     const carry = Array.isArray(parsed.carry)
       ? (parsed.carry as AnalyticsOrder[])
       : [];
-    const done = typeof parsed.done === "boolean" ? parsed.done : false;
+    const doneFlag = typeof parsed.done === "boolean" ? parsed.done : false;
+    const done = doneFlag || chunkCursor === null;
     const key = typeof parsed.key === "string" ? parsed.key : "";
 
     return {
@@ -439,22 +440,24 @@ export const getOrdersTablePage = query({
     const results: AnalyticsOrder[] = [];
     takeFromBuffer(results);
 
-    while (results.length < pageSize && !done) {
+    if (results.length < pageSize && !done) {
+      const fetchSize = Math.min(
+        MAX_ORDERS_PAGE_SIZE,
+        Math.max(pageSize * 3, DEFAULT_ORDERS_PAGE_SIZE),
+      );
+
       const chunk = await fetchAnalyticsOrderChunk(
         ctx,
         auth.orgId as Id<"organizations">,
         range,
         {
           cursor: chunkCursor ?? undefined,
-          pageSize: Math.max(pageSize, DEFAULT_ORDERS_PAGE_SIZE),
+          pageSize: fetchSize,
           datasets: ORDER_ANALYTICS_DATASETS,
         },
       );
 
       chunkCursor = chunk.cursor ?? null;
-      if (chunk.isDone && !chunkCursor) {
-        done = true;
-      }
 
       const chunkResponse: AnalyticsResponse = {
         dateRange: range,
@@ -483,7 +486,7 @@ export const getOrdersTablePage = query({
         sortBy: args.sortBy ?? undefined,
         sortOrder: args.sortOrder ?? undefined,
         page: 1,
-        pageSize: Math.max(chunk.data.orders.length, pageSize),
+        pageSize: fetchSize,
       });
 
       const chunkOrders = computed.orders?.data ?? [];
@@ -494,22 +497,8 @@ export const getOrdersTablePage = query({
 
       takeFromBuffer(results);
 
-      if (chunk.isDone && bufferMap.size === 0) {
-        done = true;
-      }
-
       if (chunk.isDone && !chunkCursor) {
         done = true;
-      }
-
-      if (chunk.isDone && results.length >= pageSize) {
-        break;
-      }
-
-      if (chunk.isDone && results.length < pageSize) {
-        // No more data available
-        done = true;
-        break;
       }
     }
 

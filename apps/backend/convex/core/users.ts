@@ -26,13 +26,6 @@ const _userValidator = v.object({
   isAnonymous: v.optional(v.boolean()),
   organizationId: v.optional(v.string()),
   organizationName: v.optional(v.string()),
-  globalRole: v.optional(
-    v.union(
-      v.literal("MeyooFounder"),
-      v.literal("MeyooAdmin"),
-      v.literal("MeyooTeam"),
-    ),
-  ),
   plan: v.optional(
     v.union(
       v.literal("free"),
@@ -337,12 +330,7 @@ export const updateOrganizationName = mutation({
 
     // Check permissions - only StoreOwner can update organization name
     const isStoreOwner = membership?.role === "StoreOwner";
-    const globalRole = user.globalRole;
-    if (
-      !isStoreOwner &&
-      globalRole !== "MeyooFounder" &&
-      globalRole !== "MeyooAdmin"
-    ) {
+    if (!isStoreOwner) {
       throw new Error("Insufficient permissions to update organization name");
     }
 
@@ -428,18 +416,13 @@ export const getById = internalQuery({
  */
 export function hasPermission(
   storeRole: Doc<"memberships">["role"] | null | undefined,
-  globalRole: Doc<"users">["globalRole"] | null | undefined,
   action: "view" | "edit" | "delete" | "admin",
 ): boolean {
   if (storeRole === "StoreOwner") {
     return true;
   }
 
-  if (globalRole === "MeyooFounder" || globalRole === "MeyooAdmin") {
-    return true;
-  }
-
-  if (storeRole === "StoreTeam" || globalRole === "MeyooTeam") {
+  if (storeRole === "StoreTeam") {
     return action === "view" || action === "edit";
   }
 

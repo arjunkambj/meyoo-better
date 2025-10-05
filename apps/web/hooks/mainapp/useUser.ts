@@ -59,7 +59,6 @@ export function useUser() {
     error,
     isAuthenticated: !!user,
     role: membership?.role ?? null,
-    globalRole: user?.globalRole,
     membershipRole: membership?.role ?? null,
     organizationId: user?.organizationId,
     hasShopifyConnection: onboarding?.connections?.shopify || false,

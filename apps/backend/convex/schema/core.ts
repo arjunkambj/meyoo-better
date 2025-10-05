@@ -21,15 +21,6 @@ export const users = defineTable({
   // Organization - single organization for all users
   organizationId: v.optional(v.id("organizations")),
 
-  // Global platform roles (Meyoo staff only)
-  globalRole: v.optional(
-    v.union(
-      v.literal("MeyooFounder"), // Meyoo founder (full system access)
-      v.literal("MeyooAdmin"), // Meyoo admin (system management)
-      v.literal("MeyooTeam"), // Meyoo team member (limited system access)
-    ),
-  ),
-
   // Onboarding - simplified to single flag
   isOnboarded: v.optional(v.boolean()),
 
@@ -55,7 +46,6 @@ export const users = defineTable({
   .index("by_email_verification_time", ["emailVerificationTime"])
   .index("by_organization", ["organizationId"])
   .index("by_isOnboarded", ["isOnboarded"])
-  .index("by_globalRole", ["globalRole"])
   .index("by_status", ["status"]);
 
 // Simplified organizations table - store-centric

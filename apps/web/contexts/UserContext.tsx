@@ -24,7 +24,6 @@ type UserContextValue = {
   loading: boolean;
   error: string | null;
   isAuthenticated: boolean;
-  globalRole: Doc<"users">["globalRole"];
   membershipRole: Doc<"memberships">["role"] | null;
   organizationId: string | undefined;
   primaryCurrency: string;
@@ -61,7 +60,6 @@ export function UserProvider({ children }: { children: ReactNode }) {
     loading: userLoading,
     error,
     isAuthenticated: !!user,
-    globalRole: user?.globalRole,
     membershipRole: membership?.role ?? null,
     organizationId: user?.organizationId,
     primaryCurrency: organization?.primaryCurrency ?? "USD",

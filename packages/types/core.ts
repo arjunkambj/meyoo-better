@@ -21,7 +21,6 @@ export interface User {
 
   // Settings
   timezone?: string;
-  globalRole?: "MeyooFounder" | "MeyooAdmin" | "MeyooTeam";
   locale?: string;
   emailNotifications?: boolean;
   marketingEmails?: boolean;

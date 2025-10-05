@@ -1,8 +1,8 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
-import type { Id } from "../_generated/dataModel";
-import type { MutationCtx } from "../_generated/server";
+import type { Doc, Id } from "../_generated/dataModel";
+import type { ActionCtx, MutationCtx, QueryCtx } from "../_generated/server";
 import { action, internalMutation, internalQuery, mutation, query } from "../_generated/server";
 import { createNewUserData } from "../authHelpers";
 import { createJob, PRIORITY } from "../engine/workpool";
@@ -16,16 +16,73 @@ const CONVEX_CLOUD_URL = optionalEnv("CONVEX_CLOUD_URL");
  * Administrative functions for system management
  */
 
-/**
- * Check if user is admin
- */
-function isAdmin(user: { globalRole?: string | null }): boolean {
-  const role = user.globalRole;
-  return (
-    role === "MeyooFounder" ||
-    role === "MeyooAdmin" ||
-    role === "MeyooTeam"
+type AnyCtx = QueryCtx | MutationCtx | ActionCtx;
+
+async function loadUser(ctx: AnyCtx, userId: Id<"users">) {
+  if ("db" in ctx) {
+    return await ctx.db.get(userId);
+  }
+
+  return await ctx.runQuery(internal.meyoo.admin.getUserById, { userId });
+}
+
+async function loadMembership(
+  ctx: AnyCtx,
+  organizationId: Id<"organizations">,
+  userId: Id<"users">,
+) {
+  if ("db" in ctx) {
+    return await ctx.db
+      .query("memberships")
+      .withIndex("by_org_user", (q) =>
+        q.eq("organizationId", organizationId).eq("userId", userId),
+      )
+      .first();
+  }
+
+  return await ctx.runQuery(
+    internal.core.memberships.getMembershipForUserInternal,
+    {
+      orgId: organizationId,
+      userId,
+    },
   );
+}
+
+function isAdminMembership(
+  membership: Doc<"memberships"> | null | undefined,
+) {
+  return membership?.role === "StoreOwner";
+}
+
+async function ensureAdminAccess(
+  ctx: AnyCtx,
+  organizationId?: Id<"organizations">,
+) {
+  const userId = await getAuthUserId(ctx);
+  if (!userId) {
+    throw new Error("Not authenticated");
+  }
+
+  const user = await loadUser(ctx, userId);
+  if (!user) {
+    throw new Error("User not found");
+  }
+
+  const targetOrgId =
+    organizationId ??
+    (user.organizationId ? (user.organizationId as Id<"organizations">) : null);
+
+  if (!targetOrgId) {
+    throw new Error("Admin access required");
+  }
+
+  const membership = await loadMembership(ctx, targetOrgId, user._id);
+  if (!membership || !isAdminMembership(membership)) {
+    throw new Error("Admin access required");
+  }
+
+  return { user, membership, organizationId: targetOrgId } as const;
 }
 
 const RESET_DEFAULT_BATCH_SIZE = 200;
@@ -44,19 +101,13 @@ export const populateMissingCostComponents = mutation({
     })),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Not authenticated");
+    await ensureAdminAccess(ctx, args.organizationId);
 
-    const user = await ctx.db.get(userId);
-    if (!user || !isAdmin(user)) {
-      throw new Error("Not authorized");
-  }
-
-  // Default values
-  const defaults = {
-    handlingPerUnit: args.defaults?.handlingPerUnit ?? 0,
-    taxPercent: args.defaults?.taxPercent ?? 0,
-  };
+    // Default values
+    const defaults = {
+      handlingPerUnit: args.defaults?.handlingPerUnit ?? 0,
+      taxPercent: args.defaults?.taxPercent ?? 0,
+    };
 
     // Get all variants for the organization
     const variants = await ctx.db
@@ -119,13 +170,7 @@ export const debugCostComponents = query({
     organizationId: v.id("organizations"),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Not authenticated");
-
-    const user = await ctx.db.get(userId);
-    if (!user || !isAdmin(user)) {
-      throw new Error("Not authorized");
-    }
+    await ensureAdminAccess(ctx, args.organizationId);
 
     // Get product cost components
     const costComponents = await ctx.db
@@ -658,13 +703,9 @@ export const getSystemStats = query({
     }),
   ),
   handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
-
-    if (!userId) return null;
-
-    const user = await ctx.db.get(userId);
-
-    if (!user || !isAdmin(user)) {
+    try {
+      await ensureAdminAccess(ctx);
+    } catch {
       return null;
     }
 
@@ -723,13 +764,9 @@ export const getOrganizations = query({
     }),
   ),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-
-    if (!userId) return [];
-
-    const user = await ctx.db.get(userId);
-
-    if (!user || !isAdmin(user)) {
+    try {
+      await ensureAdminAccess(ctx);
+    } catch {
       return [];
     }
 
@@ -850,13 +887,9 @@ export const getErrorLogs = query({
     }),
   ),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-
-    if (!userId) return [];
-
-    const user = await ctx.db.get(userId);
-
-    if (!user || !isAdmin(user)) {
+    try {
+      await ensureAdminAccess(ctx);
+    } catch {
       return [];
     }
 
@@ -916,17 +949,7 @@ export const updateOrganizationPlan = mutation({
     updatedCount: v.number(),
   }),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-
-    if (!userId) {
-      throw new Error("Not authenticated");
-    }
-
-    const user = await ctx.db.get(userId);
-
-    if (!user || !isAdmin(user)) {
-      throw new Error("Admin access required");
-    }
+    await ensureAdminAccess(ctx, args.organizationId);
 
     // Update billing record
     const billing = await ctx.db
@@ -979,18 +1002,8 @@ export const clearOrganizationCache = mutation({
     success: v.boolean(),
     clearedCount: v.number(),
   }),
-  handler: async (ctx, _args) => {
-    const userId = await getAuthUserId(ctx);
-
-    if (!userId) {
-      throw new Error("Not authenticated");
-    }
-
-    const user = await ctx.db.get(userId);
-
-    if (!user || !isAdmin(user)) {
-      throw new Error("Admin access required");
-    }
+  handler: async (ctx, args) => {
+    await ensureAdminAccess(ctx, args.organizationId);
 
     return {
       success: true,
@@ -1016,13 +1029,9 @@ export const getJobQueueStatus = query({
     }),
   ),
   handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
-
-    if (!userId) return null;
-
-    const user = await ctx.db.get(userId);
-
-    if (!user || !isAdmin(user)) {
+    try {
+      await ensureAdminAccess(ctx);
+    } catch {
       return null;
     }
 
@@ -1053,17 +1062,7 @@ export const clearAnalyticsCache = mutation({
     clearedCount: v.number(),
   }),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-
-    if (!userId) {
-      throw new Error("Not authenticated");
-    }
-
-    const user = await ctx.db.get(userId);
-
-    if (!user || !isAdmin(user)) {
-      throw new Error("Admin access required");
-    }
+    await ensureAdminAccess(ctx, args.organizationId);
 
     const clearedCount = 0;
     const cacheType = args.cacheType || "all";
@@ -1110,17 +1109,7 @@ export const resetTestData = mutation({
     }),
   }),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-
-    if (!userId) {
-      throw new Error("Not authenticated");
-    }
-
-    const user = await ctx.db.get(userId);
-
-    if (!user || !isAdmin(user)) {
-      throw new Error("Admin access required");
-    }
+    await ensureAdminAccess(ctx, args.organizationId);
 
     // Safety check - only allow for non-production environments
     if (CONVEX_CLOUD_URL?.includes("prod")) {
@@ -1255,19 +1244,7 @@ export const resetMetaData = action({
     }),
   }),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-
-    if (!userId) {
-      throw new Error("Not authenticated");
-    }
-
-    const user = await ctx.runQuery(internal.meyoo.admin.getUserById, {
-      userId,
-    });
-
-    if (!user || !isAdmin(user)) {
-      throw new Error("Admin access required");
-    }
+    await ensureAdminAccess(ctx, args.organizationId);
 
     if (CONVEX_CLOUD_URL?.includes("prod")) {
       throw new Error("Cannot reset data in production environment");
@@ -1395,13 +1372,7 @@ export const reconcileSyncSession = mutation({
     }),
   }),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Not authenticated");
-
-    const user = await ctx.db.get(userId);
-    if (!user || !isAdmin(user)) {
-      throw new Error("Not authorized");
-    }
+    await ensureAdminAccess(ctx, args.organizationId);
 
     // Find the latest initial sync session
     const sessions = await ctx.db
@@ -1510,27 +1481,10 @@ export const recalculateAnalytics = action({
     skipped: number;
     message: string;
   }> => {
-    const userId = await getAuthUserId(ctx);
-
-    if (!userId) {
-      throw new Error("Not authenticated");
-    }
-
-    const user = await ctx.runQuery(internal.meyoo.admin.getUserById, {
-      userId,
-    });
-
-    if (!user || !isAdmin(user)) {
-      throw new Error("Admin access required");
-    }
-
-    const organizationId = (args.organizationId ?? user.organizationId) as
-      | Id<"organizations">
-      | undefined;
-
-    if (!organizationId) {
-      throw new Error("No organization found for user");
-    }
+    const { user, organizationId } = await ensureAdminAccess(
+      ctx,
+      args.organizationId,
+    );
 
     const daysBack = Math.max(1, Math.floor(args.daysBack ?? 60));
     const dates = buildDateSpan(daysBack);
@@ -1587,7 +1541,7 @@ export const recalculateAnalytics = action({
         {
           context: {
             scope: "admin.recalculateAnalytics",
-            requestedBy: String(userId),
+            requestedBy: String(user._id),
             chunkSize: chunk.length,
             totalDates: filteredDates.length,
             requestedDates: dates.length,
@@ -1656,30 +1610,13 @@ export const deleteAnalyticsMetrics = action({
     deleted: number;
     tables: Record<string, number>;
   }> => {
-    const userId = await getAuthUserId(ctx);
-
-    if (!userId) {
-      throw new Error("Not authenticated");
-    }
-
-    const user = await ctx.runQuery(internal.meyoo.admin.getUserById, {
-      userId,
-    });
-
-    if (!user || !isAdmin(user)) {
-      throw new Error("Admin access required");
-    }
+    const { user, organizationId } = await ensureAdminAccess(
+      ctx,
+      args.organizationId,
+    );
 
     if (CONVEX_CLOUD_URL?.includes("prod")) {
       throw new Error("Cannot delete analytics data in production");
-    }
-
-    const organizationId = (args.organizationId ?? user.organizationId) as
-      | Id<"organizations">
-      | undefined;
-
-    if (!organizationId) {
-      throw new Error("No organization found for user");
     }
 
     const tablesToClear: OrgScopedTable[] = ["dailyMetrics"];
@@ -1747,19 +1684,7 @@ export const resetShopifyData = action({
     }),
   }),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-
-    if (!userId) {
-      throw new Error("Not authenticated");
-    }
-
-    const user = await ctx.runQuery(internal.meyoo.admin.getUserById, {
-      userId,
-    });
-
-    if (!user || !isAdmin(user)) {
-      throw new Error("Admin access required");
-    }
+    await ensureAdminAccess(ctx, args.organizationId);
 
     if (CONVEX_CLOUD_URL?.includes("prod")) {
       throw new Error("Cannot reset data in production environment");
@@ -1938,19 +1863,7 @@ export const resetEverything = action({
     usersUpdated: v.number(),
   }),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-
-    if (!userId) {
-      throw new Error("Not authenticated");
-    }
-
-    const user = await ctx.runQuery(internal.meyoo.admin.getUserById, {
-      userId,
-    });
-
-    if (!user || !isAdmin(user)) {
-      throw new Error("Admin access required");
-    }
+    await ensureAdminAccess(ctx, args.organizationId);
 
     if (CONVEX_CLOUD_URL?.includes("prod")) {
       throw new Error("Cannot reset data in production environment");

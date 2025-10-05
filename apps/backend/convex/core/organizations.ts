@@ -282,11 +282,7 @@ export const updateOrganization = mutation({
           .eq("userId", user._id),
       )
       .first();
-    const globalRole = user.globalRole;
-    const canUpdate =
-      acting?.role === "StoreOwner" ||
-      globalRole === "MeyooFounder" ||
-      globalRole === "MeyooAdmin";
+    const canUpdate = acting?.role === "StoreOwner";
     if (!canUpdate) {
       throw new Error("Insufficient permissions to update organization");
     }
@@ -445,11 +441,7 @@ export const removeTeamMember = mutation({
           )
           .first()
       : null;
-    const globalRole = currentUser.globalRole;
-    const canRemove =
-      currentMembership?.role === "StoreOwner" ||
-      globalRole === "MeyooFounder" ||
-      globalRole === "MeyooAdmin";
+    const canRemove = currentMembership?.role === "StoreOwner";
     if (!canRemove) {
       throw new Error("Insufficient permissions to remove team members");
     }

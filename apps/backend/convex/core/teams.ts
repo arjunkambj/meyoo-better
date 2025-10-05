@@ -153,15 +153,10 @@ export const getInvitations = query({
   handler: async (ctx) => {
     const auth = await getUserAndOrg(ctx);
     if (!auth) return [];
-    const { user, membership } = auth;
-    const globalRole = user.globalRole;
+    const { membership } = auth;
 
-    // Only allow owners/admins to view invitations
-    const canView =
-      membership?.role === "StoreOwner" ||
-      globalRole === "MeyooFounder" ||
-      globalRole === "MeyooAdmin" ||
-      globalRole === "MeyooTeam";
+    // Only allow owners to view invitations
+    const canView = membership?.role === "StoreOwner";
     if (!canView) {
       return [];
     }

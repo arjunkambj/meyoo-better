@@ -9,12 +9,10 @@ import { devToolsVisibleAtom } from "@/store/atoms";
 import ApiKeyManagement from "./ApiKeyManagement";
 
 export default function SecuritySettingsView() {
-  const { role, loading } = useUser();
+  const { membershipRole, loading } = useUser();
   const [devToolsVisible, setDevToolsVisible] = useAtom(devToolsVisibleAtom);
 
-  const canToggleDevTools = ['StoreOwner', 'MeyooFounder', 'MeyooTeam', 'MeyooAdmin'].includes(
-    role ?? '',
-  );
+  const canToggleDevTools = membershipRole === 'StoreOwner';
 
   return (
     <div className="space-y-6">

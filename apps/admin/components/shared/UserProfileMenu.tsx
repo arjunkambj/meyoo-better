@@ -26,7 +26,7 @@ interface UserProfileMenuProps {
 const mockUser = {
   name: "Admin User",
   email: "admin@meyoo.com",
-  role: "MeyooAdmin",
+  role: "StoreOwner",
   image: undefined,
 };
 

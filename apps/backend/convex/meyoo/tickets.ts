@@ -36,15 +36,10 @@ export const updateTicketStatus = mutation({
           .first()
       : null;
 
-    // Only admins can change status; owners can close their own tickets via user API
-    const globalRole = user.globalRole;
-    const isAdmin =
-      globalRole === "MeyooFounder" ||
-      globalRole === "MeyooAdmin" ||
-      globalRole === "MeyooTeam" ||
-      membership?.role === "StoreOwner";
+    // Only store owners can change status; owners can close their own tickets via user API
+    const canManage = membership?.role === "StoreOwner";
 
-    if (!isAdmin) throw new Error("No permission to update ticket status");
+    if (!canManage) throw new Error("No permission to update ticket status");
 
     const updateData: {
       status: "open" | "in_progress" | "resolved" | "closed";
@@ -112,14 +107,8 @@ export const getAllTickets = query({
           .first()
       : null;
 
-    const globalRole = user?.globalRole;
-    const isMeyooOrAdmin =
-      !!user &&
-      (globalRole === "MeyooFounder" ||
-        globalRole === "MeyooAdmin" ||
-        globalRole === "MeyooTeam" ||
-        membership?.role === "StoreOwner");
-    if (!isMeyooOrAdmin) return [];
+    const canViewTickets = membership?.role === "StoreOwner";
+    if (!user || !canViewTickets) return [];
 
     // Use index for efficient ordering by creation time
     let tickets: Doc<"tickets">[] = await ctx.db

@@ -142,6 +142,7 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
       orders: overviewMetrics?.orders?.value || 0,
       avgOrderValue: overviewMetrics?.avgOrderValue?.value || 0,
       blendedRoas: overviewMetrics?.blendedRoas?.value || 0,
+      prepaidRate: overviewMetrics?.prepaidRate?.value || 0,
 
       // Revenue & Margins
       grossSales: overviewMetrics?.revenue?.value ?? 0,
@@ -188,6 +189,8 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
       newCustomers: overviewMetrics?.newCustomers?.value || 0,
       returningCustomers: overviewMetrics?.returningCustomers?.value || 0,
       repeatCustomerRate: overviewMetrics?.repeatCustomerRate?.value || 0,
+      abandonedCustomers: overviewMetrics?.abandonedCustomers?.value || 0,
+      abandonedRate: overviewMetrics?.abandonedRate?.value || 0,
       customerAcquisitionCost:
         overviewMetrics?.customerAcquisitionCost?.value || 0,
       cacPercentageOfAOV: overviewMetrics?.cacPercentageOfAOV?.value || 0,
@@ -220,6 +223,8 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
       ncROAS: overviewMetrics?.ncROAS?.value || 0,
       repurchaseRate: overviewMetrics?.repeatCustomerRate?.value || 0,
       returnRate: overviewMetrics?.returnRate?.value || 0,
+      abandonedCustomers: overviewMetrics?.abandonedCustomers?.value || 0,
+      abandonedRate: overviewMetrics?.abandonedRate?.value || 0,
       adSpendPerOrder:
         overviewMetrics?.adSpendPerOrder?.value ??
         (overviewMetrics?.orders?.value &&

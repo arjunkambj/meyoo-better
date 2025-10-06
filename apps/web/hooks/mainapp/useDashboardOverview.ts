@@ -86,6 +86,8 @@ function buildOverviewMetrics(
     uniqueVisitors: extras?.uniqueVisitors ?? 0,
   } as const;
 
+  const metricMap = overview.metrics ?? {};
+
   return {
     revenue: {
       label: "Revenue",
@@ -129,6 +131,13 @@ function buildOverviewMetrics(
       value: summary.poas || 0,
       change: summary.poasChange || 0,
       decimal: 2,
+    },
+    prepaidRate: {
+      label: "Prepaid Rate",
+      value: metricMap.prepaidRate?.value ?? 0,
+      change: metricMap.prepaidRate?.change ?? 0,
+      suffix: "%",
+      decimal: 1,
     },
     ncROAS: {
       label: "ncROAS",
@@ -351,6 +360,18 @@ function buildOverviewMetrics(
           ? (summary.returningCustomers / summary.customers) * 100
           : 0),
       change: summary.repeatCustomerRateChange || 0,
+      suffix: "%",
+      decimal: 1,
+    },
+    abandonedCustomers: {
+      label: "Abandoned Customers",
+      value: summary.abandonedCustomers || 0,
+      change: summary.abandonedCustomersChange || 0,
+    },
+    abandonedRate: {
+      label: "Abandoned Customer Rate",
+      value: summary.abandonedRate || 0,
+      change: summary.abandonedRateChange || 0,
       suffix: "%",
       decimal: 1,
     },

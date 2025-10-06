@@ -116,8 +116,9 @@ interface CustomerSummaryWidgetProps {
   newCustomersChange?: number;
   repurchaseRate: number;
   repurchaseRateChange?: number;
-  returnRate: number;
-  returnRateChange?: number;
+  abandonedCustomers: number;
+  abandonedRate: number;
+  abandonedRateChange?: number;
   loading?: boolean;
 }
 
@@ -130,8 +131,9 @@ export function CustomerSummaryWidget({
   newCustomersChange,
   repurchaseRate,
   repurchaseRateChange,
-  returnRate,
-  returnRateChange,
+  abandonedCustomers,
+  abandonedRate,
+  abandonedRateChange,
   loading = false,
 }: CustomerSummaryWidgetProps) {
   if (loading) {
@@ -205,12 +207,11 @@ export function CustomerSummaryWidget({
         />
 
         <Metric
-          change={returnRateChange}
-          format="percentage"
-          label="Return Rate"
-          hint="Percentage of orders that were returned"
-          goodWhenLower
-          value={returnRate}
+          change={abandonedRateChange}
+          format="number"
+          label="Abandoned Customers"
+          hint={`Customers without an order in this period • Rate: ${abandonedRate.toFixed(1)}%`}
+          value={abandonedCustomers}
         />
       </div>
     </Card>

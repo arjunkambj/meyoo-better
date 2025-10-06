@@ -53,7 +53,7 @@ export const CustomerOverviewCards = memo(function CustomerOverviewCards({
         const isPositive = inverse ? safeValue <= 0 : safeValue >= 0;
 
         return {
-          text: `${safeValue >= 0 ? "+" : ""}${safeValue.toFixed(1)}%`,
+          text: `${safeValue >= 0 ? "+" : ""}${safeValue.toFixed(2)}%`,
           type: isPositive ? ("positive" as const) : ("negative" as const),
           trend: value >= 0 ? ("up" as const) : ("down" as const),
         };
@@ -67,11 +67,12 @@ export const CustomerOverviewCards = memo(function CustomerOverviewCards({
         ? [
             {
               title: "Total Customers",
-              value: formatNumber(metrics.periodCustomerCount),
+              value: formatNumber(metrics.totalCustomers),
               change: formatChange(metrics.changes.totalCustomers),
               icon: "solar:users-group-rounded-bold-duotone",
               iconColor: "text-default-500",
-              tooltip: "Unique customers who placed an order in the selected period.",
+              tooltip: "All customers in your store. Subtitle shows how many purchased in this range.",
+              subtitle: `Active in period: ${formatNumber(metrics.periodCustomerCount)}`,
             },
             {
               title: "New Customers",
@@ -95,7 +96,7 @@ export const CustomerOverviewCards = memo(function CustomerOverviewCards({
               iconColor: "text-default-500",
               subtitle: `CAC: ${formatCurrency(metrics.avgCAC)}`,
             },
-          ]
+          ].slice(0, 4)
         : [],
     [metrics, formatNumber, formatCurrency, formatChange],
   );

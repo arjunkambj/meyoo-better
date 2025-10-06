@@ -10,13 +10,14 @@ interface CustomerKPICardsProps {
     totalCustomers: number;
     periodCustomerCount: number;
     prepaidRate: number;
-    periodRepeatRate: number;
+    repeatRate: number;
     abandonedCartCustomers: number;
+    abandonedRate: number;
   };
 }
 
 const formatPercent = (value: number) =>
-  `${Number.isFinite(value) ? value.toFixed(1) : "0.0"}%`;
+  `${Number.isFinite(value) ? value.toFixed(2) : "0.00"}%`;
 
 const formatInteger = (value: number) =>
   new Intl.NumberFormat("en-US").format(Number.isFinite(value) ? value : 0);
@@ -46,19 +47,19 @@ export const CustomerKPICards = memo(function CustomerKPICards({
       },
       {
         title: "Repeat Rate",
-        value: formatPercent(metrics.periodRepeatRate),
+        value: formatPercent(metrics.repeatRate),
         icon: "solar:refresh-circle-bold-duotone",
         iconColor: "text-default-500",
         tooltip:
-          "Share of period customers who placed two or more orders in the selected window.",
+          "Share of customers who returned to buy again in the selected window.",
       },
       {
-        title: "Abandoned Carts",
-        value: formatInteger(metrics.abandonedCartCustomers),
+        title: "Abandoned Customers",
+        value: `${formatInteger(metrics.abandonedCartCustomers)} (${formatPercent(metrics.abandonedRate)})`,
         icon: "solar:cart-cross-bold-duotone",
         iconColor: "text-default-500",
         tooltip:
-          "Customers created in the selected date range who have not completed an order.",
+          "Customers created in this window who haven't completed an order yet.",
       },
     ];
   }, [metrics]);

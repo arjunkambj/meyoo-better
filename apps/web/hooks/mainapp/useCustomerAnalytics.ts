@@ -25,7 +25,7 @@ interface CustomerOverviewMetrics {
   repeatPurchaseRate: number;
   periodCustomerCount: number;
   prepaidRate: number;
-  periodRepeatRate: number;
+  abandonedRate: number;
   abandonedCartCustomers: number;
   changes: {
     totalCustomers: number;
@@ -142,7 +142,7 @@ type BackendOverview = {
   repeatPurchaseRate: number;
   periodCustomerCount: number;
   prepaidRate: number;
-  periodRepeatRate: number;
+  abandonedRate: number;
   abandonedCartCustomers: number;
   changes: {
     totalCustomers: number;
@@ -360,7 +360,10 @@ export function useCustomerAnalytics(params: UseCustomerAnalyticsParams = {}) {
       repeatPurchaseRate: overviewQuery.repeatPurchaseRate,
       periodCustomerCount: overviewQuery.periodCustomerCount,
       prepaidRate: overviewQuery.prepaidRate,
-      periodRepeatRate: overviewQuery.periodRepeatRate,
+      abandonedRate:
+        overviewQuery.periodCustomerCount > 0
+          ? (overviewQuery.abandonedCartCustomers / overviewQuery.periodCustomerCount) * 100
+          : 0,
       abandonedCartCustomers: overviewQuery.abandonedCartCustomers,
       changes: {
         totalCustomers: overviewQuery.changes.totalCustomers,
@@ -528,6 +531,7 @@ export function useCustomerAnalytics(params: UseCustomerAnalyticsParams = {}) {
       success: { bg: "bg-success/10", text: "text-success" },
       warning: { bg: "bg-warning/10", text: "text-warning" },
       danger: { bg: "bg-danger/10", text: "text-danger" },
+      info: { bg: "bg-info/10", text: "text-info" },
       default: { bg: "bg-default-100", text: "text-default-500" },
     };
 

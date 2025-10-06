@@ -7,17 +7,19 @@ import {
   formatCurrency,
   formatCurrencyCompact,
   formatNumber,
+  formatPercent,
 } from "@/libs/utils/format";
 
 interface MetricProps {
   label: string;
   value: number | string;
   change?: number;
-  format?: "currency" | "number";
+  format?: "currency" | "number" | "percent";
   currency?: string;
   isPrimary?: boolean;
   hint?: string;
   goodWhenLower?: boolean;
+  decimals?: number;
 }
 
 function Metric({
@@ -29,6 +31,7 @@ function Metric({
   isPrimary = false,
   hint,
   goodWhenLower = false,
+  decimals,
 }: MetricProps) {
   const formatValue = () => {
     if (typeof value === "string") return value;
@@ -39,7 +42,15 @@ function Metric({
           ? formatCurrencyCompact(value, currency)
           : formatCurrency(value, currency);
       }
+      case "percent":
+        return formatPercent(value, decimals ?? 1);
       default:
+        if (decimals !== undefined) {
+          return new Intl.NumberFormat("en-US", {
+            minimumFractionDigits: decimals,
+            maximumFractionDigits: decimals,
+          }).format(value);
+        }
         return formatNumber(value);
     }
   };
@@ -112,10 +123,10 @@ interface OrderSummaryWidgetProps {
   adSpendPerOrderChange?: number;
   avgOrderProfit: number;
   avgOrderProfitChange?: number;
-  avgOrderCost: number;
-  avgOrderCostChange?: number;
   prepaidRate?: number;
   prepaidRateChange?: number;
+  repeatRate?: number;
+  repeatRateChange?: number;
   currency?: string;
   loading?: boolean;
 }
@@ -127,10 +138,10 @@ export function OrderSummaryWidget({
   adSpendPerOrderChange,
   avgOrderProfit,
   avgOrderProfitChange,
-  avgOrderCost,
-  avgOrderCostChange,
   prepaidRate = 0,
   prepaidRateChange,
+  repeatRate = 0,
+  repeatRateChange,
   currency = "USD",
   loading = false,
 }: OrderSummaryWidgetProps) {
@@ -201,21 +212,18 @@ export function OrderSummaryWidget({
         />
 
         <Metric
-          change={avgOrderCostChange}
-          currency={currency}
-          format="currency"
-          label="Avg. Order Cost"
-          hint="Average cost per order including COGS"
-          goodWhenLower
-          value={avgOrderCost}
+          change={repeatRateChange}
+          format="percent"
+          label="Repeat Rate"
+          hint="Percentage of orders from returning customers"
+          value={repeatRate}
         />
 
         <Metric
           change={prepaidRateChange}
-          format="currency"
+          format="percent"
           label="Prepaid Rate"
-          hint="Average prepaid amount per order"
-          currency={currency}
+          hint="Share of orders paid in advance"
           value={prepaidRate}
         />
       </div>

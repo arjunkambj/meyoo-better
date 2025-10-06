@@ -131,12 +131,13 @@ export const CustomersView = memo(function CustomersView() {
           metrics={
             overview
               ? {
-                  totalCustomers: overview.totalCustomers,
-                  periodCustomerCount: overview.periodCustomerCount,
-                  prepaidRate: overview.prepaidRate,
-                  periodRepeatRate: overview.periodRepeatRate,
-                  abandonedCartCustomers: overview.abandonedCartCustomers,
-                }
+                totalCustomers: overview.totalCustomers,
+                periodCustomerCount: overview.periodCustomerCount,
+                prepaidRate: overview.prepaidRate,
+                repeatRate: overview.repeatPurchaseRate,
+                abandonedCartCustomers: overview.abandonedCartCustomers,
+                abandonedRate: overview.abandonedRate,
+              }
               : undefined
           }
         />

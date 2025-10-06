@@ -365,18 +365,24 @@ function computeOverviewBaseline(
 
   const uniqueCustomerIds = new Set<string>(ordersPerCustomer.keys());
 
-  let returningCustomers = 0;
   let newCustomers = 0;
+  let returningCustomers = 0;
+  let repeatCustomersInPeriod = 0;
   for (const customerId of uniqueCustomerIds) {
+    const periodOrders = ordersPerCustomer.get(customerId) ?? 0;
     const customer = customersById.get(customerId);
-    const fallbackCount = ordersPerCustomer.get(customerId) ?? 0;
-    const ordersCount = safeNumber(
-      customer?.ordersCount ?? customer?.orders_count ?? fallbackCount,
+    const lifetimeOrders = safeNumber(
+      customer?.ordersCount ?? customer?.orders_count ?? periodOrders,
     );
-    if (ordersCount > 1) {
-      returningCustomers += 1;
-    } else {
+
+    if (periodOrders > 1) {
+      repeatCustomersInPeriod += 1;
+    }
+
+    if (periodOrders > 0 && lifetimeOrders === periodOrders) {
       newCustomers += 1;
+    } else {
+      returningCustomers += 1;
     }
   }
 
@@ -527,11 +533,17 @@ function computeOverviewBaseline(
 
   const returnRate = activeOrderCount > 0 ? (refunds.length / activeOrderCount) * 100 : 0;
   const paidCustomersCount = uniqueCustomerIds.size;
-  const totalCustomersCount = customers.length > 0 ? customers.length : paidCustomersCount;
-  const repeatCustomerRate = paidCustomersCount > 0 ? (returningCustomers / paidCustomersCount) * 100 : 0;
+  const totalCustomersCount = paidCustomersCount;
+  const repeatCustomerRate = paidCustomersCount > 0
+    ? (repeatCustomersInPeriod / paidCustomersCount) * 100
+    : 0;
   const customerAcquisitionCost = newCustomers > 0 ? totalAdSpend / newCustomers : 0;
   const cacPercentageOfAOV = averageOrderValue > 0 ? (customerAcquisitionCost / averageOrderValue) * 100 : 0;
   const operatingCostPercentage = revenue > 0 ? (customCostTotal / revenue) * 100 : 0;
+  const abandonedCustomers = Math.max(totalCustomersCount - paidCustomersCount, 0);
+  const abandonedRate = totalCustomersCount > 0
+    ? (abandonedCustomers / totalCustomersCount) * 100
+    : 0;
 
   const summary: OverviewComputation["summary"] = {
     revenue,
@@ -634,6 +646,10 @@ function computeOverviewBaseline(
     customerAcquisitionCostChange: 0,
     cacPercentageOfAOV,
     cacPercentageOfAOVChange: 0,
+    abandonedCustomers,
+    abandonedCustomersChange: 0,
+    abandonedRate,
+    abandonedRateChange: 0,
     returnRate,
     returnRateChange: 0,
     moMRevenueGrowth: 0,

@@ -153,6 +153,10 @@ export interface OverviewSummary {
   customerAcquisitionCostChange: number;
   cacPercentageOfAOV: number;
   cacPercentageOfAOVChange: number;
+  abandonedCustomers: number;
+  abandonedCustomersChange: number;
+  abandonedRate: number;
+  abandonedRateChange: number;
   returnRate: number;
   returnRateChange: number;
   moMRevenueGrowth: number;

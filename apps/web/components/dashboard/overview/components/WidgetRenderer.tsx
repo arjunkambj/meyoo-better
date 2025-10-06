@@ -73,8 +73,11 @@ export function WidgetRenderer({
           newCustomersChange={overviewMetrics?.newCustomers?.change ?? 0}
           repurchaseRate={metricsData.repurchaseRate ?? 0}
           repurchaseRateChange={overviewMetrics?.repeatCustomerRate?.change ?? 0}
-          returnRate={metricsData.returnRate ?? 0}
-          returnRateChange={overviewMetrics?.returnRate?.change ?? 0}
+          abandonedCustomers={metricsData.abandonedCustomers ?? 0}
+          abandonedRate={metricsData.abandonedRate ?? 0}
+          abandonedRateChange={
+            overviewMetrics?.abandonedRate?.change ?? 0
+          }
         />
       );
     case "orderSummary":
@@ -84,14 +87,14 @@ export function WidgetRenderer({
           adSpendPerOrderChange={
             overviewMetrics?.adSpendPerOrder?.change ?? 0
           }
-          avgOrderCost={metricsData.avgOrderCost ?? 0}
-          avgOrderCostChange={overviewMetrics?.avgOrderCost?.change ?? 0}
           avgOrderProfit={metricsData.avgOrderProfit ?? 0}
           avgOrderProfitChange={overviewMetrics?.avgOrderProfit?.change ?? 0}
           avgOrderValue={metricsData.avgOrderValue ?? 0}
           avgOrderValueChange={overviewMetrics?.avgOrderValue?.change ?? 0}
           prepaidRate={metricsData.prepaidRate ?? 0}
-          prepaidRateChange={0}
+          prepaidRateChange={overviewMetrics?.prepaidRate?.change ?? 0}
+          repeatRate={metricsData.repeatCustomerRate ?? 0}
+          repeatRateChange={overviewMetrics?.repeatCustomerRate?.change ?? 0}
           currency={primaryCurrency}
           loading={isLoading}
         />

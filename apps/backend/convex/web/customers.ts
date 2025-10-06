@@ -79,8 +79,8 @@ const ZERO_CUSTOMER_OVERVIEW = {
   repeatPurchaseRate: 0,
   periodCustomerCount: 0,
   prepaidRate: 0,
-  periodRepeatRate: 0,
   abandonedCartCustomers: 0,
+  abandonedRate: 0,
   changes: {
     totalCustomers: 0,
     newCustomers: 0,
@@ -257,8 +257,8 @@ const overviewValidator = v.union(
     repeatPurchaseRate: v.number(),
     periodCustomerCount: v.number(),
     prepaidRate: v.number(),
-    periodRepeatRate: v.number(),
     abandonedCartCustomers: v.number(),
+    abandonedRate: v.number(),
     changes: v.object({
       totalCustomers: v.number(),
       newCustomers: v.number(),
@@ -316,8 +316,8 @@ type CustomerAnalyticsResult = {
     repeatPurchaseRate: number;
     periodCustomerCount: number;
     prepaidRate: number;
-    periodRepeatRate: number;
     abandonedCartCustomers: number;
+    abandonedRate: number;
     changes: {
       totalCustomers: number;
       newCustomers: number;
@@ -400,8 +400,8 @@ export const getCustomerOverview = query({
       repeatPurchaseRate: v.number(),
       periodCustomerCount: v.number(),
       prepaidRate: v.number(),
-      periodRepeatRate: v.number(),
       abandonedCartCustomers: v.number(),
+      abandonedRate: v.number(),
       changes: v.object({
         totalCustomers: v.number(),
         newCustomers: v.number(),
@@ -1165,26 +1165,37 @@ export const getCustomerJourney = query({
     }
 
     const metrics = dailyOverview.metrics;
-    const totalCustomers = metrics.totalCustomers || 0;
-    const activeCustomers = metrics.activeCustomers || 0;
-    const newCustomers = metrics.newCustomers || 0;
     const returningCustomers = metrics.returningCustomers || 0;
 
-    // Calculate journey stages based on metrics
-    const awarenessCustomers = totalCustomers;
-    const considerationCustomers = activeCustomers; // Customers who purchased
-    const purchaseCustomers = newCustomers + returningCustomers;
-    const retentionCustomers = returningCustomers;
+    const metaInsights = await ctx.db
+      .query("metaInsights")
+      .withIndex("by_org_date", (q) =>
+        q
+          .eq("organizationId", auth.orgId as Id<"organizations">)
+          .gte("date", range.startDate)
+          .lte("date", range.endDate),
+      )
+      .filter((q) => q.eq(q.field("entityType"), "account"))
+      .collect();
+
+    const awarenessCustomers = metaInsights.reduce((total, insight) => {
+      const clicks = typeof insight.clicks === "number" ? insight.clicks : 0;
+      return total + Math.max(clicks, 0);
+    }, 0);
+
+    const considerationCustomers = Math.max(metrics.abandonedCartCustomers || 0, 0);
+    const purchaseCustomers = Math.max(metrics.periodCustomerCount || 0, 0);
+    const retentionCustomers = Math.max(returningCustomers, 0);
 
     // Calculate conversion rates
     const awarenessToConsideration = awarenessCustomers > 0
-      ? (considerationCustomers / awarenessCustomers) * 100
+      ? Math.min(100, (considerationCustomers / awarenessCustomers) * 100)
       : 0;
     const considerationToPurchase = considerationCustomers > 0
-      ? (purchaseCustomers / considerationCustomers) * 100
+      ? Math.min(100, (purchaseCustomers / considerationCustomers) * 100)
       : 0;
     const purchaseToRetention = purchaseCustomers > 0
-      ? (retentionCustomers / purchaseCustomers) * 100
+      ? Math.min(100, (retentionCustomers / purchaseCustomers) * 100)
       : 0;
 
     return [
@@ -1200,7 +1211,9 @@ export const getCustomerJourney = query({
       {
         stage: "Consideration",
         customers: considerationCustomers,
-        percentage: awarenessCustomers > 0 ? (considerationCustomers / awarenessCustomers) * 100 : 0,
+        percentage: awarenessCustomers > 0
+          ? Math.min(100, (considerationCustomers / awarenessCustomers) * 100)
+          : 0,
         avgDays: 0,
         conversionRate: considerationToPurchase,
         icon: "solar:cart-bold-duotone",
@@ -1209,7 +1222,9 @@ export const getCustomerJourney = query({
       {
         stage: "Purchase",
         customers: purchaseCustomers,
-        percentage: awarenessCustomers > 0 ? (purchaseCustomers / awarenessCustomers) * 100 : 0,
+        percentage: awarenessCustomers > 0
+          ? Math.min(100, (purchaseCustomers / awarenessCustomers) * 100)
+          : 0,
         avgDays: 0,
         conversionRate: purchaseToRetention,
         icon: "solar:bag-bold-duotone",
@@ -1218,7 +1233,9 @@ export const getCustomerJourney = query({
       {
         stage: "Retention",
         customers: retentionCustomers,
-        percentage: awarenessCustomers > 0 ? (retentionCustomers / awarenessCustomers) * 100 : 0,
+        percentage: awarenessCustomers > 0
+          ? Math.min(100, (retentionCustomers / awarenessCustomers) * 100)
+          : 0,
         avgDays: 0,
         conversionRate: 0,
         icon: "solar:refresh-circle-bold-duotone",

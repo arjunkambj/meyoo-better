@@ -216,10 +216,10 @@ export function CustomizationModalUnified({
 
   return (
     <Modal isOpen={isOpen} scrollBehavior="inside" size="4xl" onClose={onClose}>
-      <ModalContent className="max-h-[85vh] rounded-2xl">
+      <ModalContent className="max-h-[85vh] rounded-2xl bg-background border border-default-100">
         {(onClose) => (
           <>
-            <ModalHeader className="pb-0 pt-5 bg-background flex-shrink-0 rounded-t-2xl">
+            <ModalHeader className="px-6 pt-6 pb-3 bg-background flex-shrink-0 rounded-t-2xl">
               <div className="w-full">
                 <div className="flex items-start justify-between mb-3">
                   <div>
@@ -238,7 +238,7 @@ export function CustomizationModalUnified({
                 </div>
               </div>
             </ModalHeader>
-            <ModalBody className="p-4 overflow-hidden flex flex-col bg-background gap-4">
+            <ModalBody className="px-6 pb-6 pt-4 overflow-hidden flex flex-col bg-background gap-6">
               {/* Tabs */}
               <Tabs
                 aria-label="Customization tabs"
@@ -250,14 +250,18 @@ export function CustomizationModalUnified({
                   });
                 }}
                 classNames={{
-                  tabList: "border border-default-100",
+                  tabList:
+                    "border border-default-100 rounded-xl p-1 bg-default-100",
+                  tab: "px-4 py-2 rounded-lg transition-colors data-[selected=true]:bg-background",
+                  tabContent:
+                    "text-default-600 group-data-[selected=true]:text-primary",
                 }}
               >
                 <Tab
                   key="kpi"
                   title={
                     <div className="flex items-center gap-1.5">
-                      <Icon icon="solar:chart-2-bold-duotone" width={14} />
+                      <Icon icon="solar:graph-bold-duotone" width={14} />
                       <span className="text-sm">KPI Cards</span>
                       <Chip className="h-5 text-xs" color="primary" size="sm">
                         {selectedKpis.length}
@@ -327,30 +331,32 @@ export function CustomizationModalUnified({
                 </Button>
               </div>
 
-              <div className="flex gap-4 pr-4 h-[450px]">
-                {/* Left: Items selection with 2 per row (70%) */}
-                <MemoizedVirtualizedItemSelector
-                  style={{ flex: "0 0 65%" }}
-                  items={displayItems}
-                  selectedIds={
-                    activeTab === "kpi" ? selectedKpis : selectedWidgets
-                  }
-                  onItemToggle={
-                    activeTab === "kpi" ? handleKPIToggle : handleWidgetToggle
-                  }
-                />
+              <div className="flex gap-4 h-[450px]">
+                <div className="flex-1 min-w-0">
+                  <MemoizedVirtualizedItemSelector
+                    style={{ width: "100%" }}
+                    items={displayItems}
+                    selectedIds={
+                      activeTab === "kpi" ? selectedKpis : selectedWidgets
+                    }
+                    onItemToggle={
+                      activeTab === "kpi" ? handleKPIToggle : handleWidgetToggle
+                    }
+                  />
+                </div>
 
-                {/* Right: Selected Items with Position Control (30%) */}
-                <MemoizedSelectedItemsList
-                  style={{ flex: "0 0 35%" }}
-                  items={activeTab === "kpi" ? selectedKpis : selectedWidgets}
-                  type={activeTab}
-                  onItemRemove={handleItemRemove}
-                  onItemsReorder={handleItemsReorder}
-                />
+                <div className="flex-1 min-w-0">
+                  <MemoizedSelectedItemsList
+                    style={{ width: "100%" }}
+                    items={activeTab === "kpi" ? selectedKpis : selectedWidgets}
+                    type={activeTab}
+                    onItemRemove={handleItemRemove}
+                    onItemsReorder={handleItemsReorder}
+                  />
+                </div>
               </div>
             </ModalBody>
-            <ModalFooter className="bg-background rounded-b-2xl">
+            <ModalFooter className="px-6 py-4 bg-background rounded-b-2xl">
               <Button variant="flat" onPress={onClose}>
                 Cancel
               </Button>

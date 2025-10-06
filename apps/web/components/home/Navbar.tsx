@@ -13,8 +13,9 @@ import { Logo } from "@/components/shared/Logo";
 import { designSystem } from "@/libs/design-system";
 
 const navItems = [
-  { name: "Pricing", href: "/pricing" },
+  { name: "About", href: "/about" },
   { name: "Contact", href: "/contact" },
+  { name: "Pricing", href: "/pricing" },
 ];
 
 export default function CenteredNavbar() {
@@ -71,9 +72,7 @@ export default function CenteredNavbar() {
 
   return (
     <div className="sticky top-0 bg-background z-50 w-full py-1">
-      <div
-        className={`${designSystem.spacing.container} flex w-full`}
-      >
+      <div className={`${designSystem.spacing.container} flex w-full`}>
         <Navbar
           isBlurred={false}
           maxWidth="full"
@@ -81,7 +80,7 @@ export default function CenteredNavbar() {
                        w-full rounded-2xl bg-transparent transition-all duration-300
           `}
           classNames={{
-            base: "px-2 sm:px-4 md:px-6 py-2.5 sm:py-3 md:py-3.5 rounded-2xl w-full",
+            base: "px-2 sm:px-4 md:px-6 py-2.5 sm:py-2.5 md:py-3 rounded-2xl w-full",
             wrapper: "px-0 w-full gap-2 sm:gap-4",
           }}
           height="auto"
@@ -125,7 +124,7 @@ export default function CenteredNavbar() {
             </div>
           </NavbarContent>
 
-          {/* Right side - CTA */}
+          {/* Right side - CTA (Meyoo) */}
           <NavbarContent
             className="hidden md:flex shrink-0 flex-grow-0"
             justify="end"

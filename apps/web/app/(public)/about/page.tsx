@@ -24,10 +24,7 @@ const values = [
 ];
 
 const milestones = [
-  { year: "2023", event: "Founded" },
-  { year: "2024", event: "50+ beta users" },
-  { year: "2024", event: "Seed funding" },
-  { year: "2025", event: "500+ stores" },
+  { year: "October 2025", event: "Public launch" },
 ];
 
 export default function AboutPage() {
@@ -45,7 +42,9 @@ export default function AboutPage() {
             Real Profit Intelligence
           </h1>
           <p className={designSystem.typography.sectionSubtitle}>
-            Helping e-commerce brands track what really matters.
+            Helping e‑commerce brands track what really matters.
+            <br />
+            <span className="text-primary font-medium">Launching October 2025</span>
           </p>
         </div>
       </section>
@@ -61,15 +60,15 @@ export default function AboutPage() {
                 <div className="space-y-4 text-muted-foreground leading-relaxed">
                   <p>
                     We spent years in spreadsheets trying to calculate real
-                    profits after ad spend, shipping, and fees.
+                    profit after ad spend, shipping, and fees.
                   </p>
                   <p>
-                    Revenue dashboards were everywhere. Profit intelligence was
-                    nowhere.
+                    Revenue dashboards are everywhere. True profit intelligence
+                    is missing.
                   </p>
                   <p>
-                    So we built Meyoo - the profit tracking platform we wished
-                    we had.
+                    We’re building Meyoo — the profit tracking platform we
+                    always wanted — and opening access in October 2025.
                   </p>
                 </div>
               </CardBody>
@@ -151,13 +150,13 @@ export default function AboutPage() {
             <Card className={`${designSystem.card.base} rounded-3xl p-1.5`}>
               <CardBody className="p-8">
                 <h3 className="text-2xl font-bold mb-3 text-foreground">
-                  Ready to track real profit?
+                  Be first to try Meyoo
                 </h3>
                 <p className="text-muted-foreground mb-6">
-                  Join 500+ stores using Meyoo.
+                  Launching October 2025 — join the waitlist and we’ll notify you when we open access.
                 </p>
-                <CTAButton endIcon="solar:arrow-right-bold" href="/auth">
-                  Get Started
+                <CTAButton endIcon="solar:arrow-right-bold" href="/signup">
+                  Join the waitlist
                 </CTAButton>
               </CardBody>
             </Card>

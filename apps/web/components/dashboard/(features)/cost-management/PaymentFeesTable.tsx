@@ -20,10 +20,7 @@ import {
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { useState } from "react";
-import {
-  useCreateTransactionFee,
-  useTransactionFees,
-} from "@/hooks";
+import { useCreateTransactionFee, useTransactionFees } from "@/hooks";
 import { TableSkeleton } from "@/components/shared/skeletons";
 import {
   DATA_TABLE_HEADER_CLASS,
@@ -53,13 +50,14 @@ const columns = [
 type PaymentFormData = Partial<TransactionCost>;
 
 export default function PaymentFeesTable() {
-  
   const [formData, setFormData] = useState<PaymentFormData>({});
   const { isOpen, onOpen, onOpenChange } = useDisclosure();
   // Delete disabled: single processing fee only
 
   const { fees: allTransactionCosts, loading } = useTransactionFees();
-  const transactionCosts = (allTransactionCosts as TransactionCost[] | undefined)?.slice(0, 1);
+  const transactionCosts = (
+    allTransactionCosts as TransactionCost[] | undefined
+  )?.slice(0, 1);
   const upsertTransactionCost = useCreateTransactionFee();
 
   const handleEdit = (item: TransactionCost) => {
@@ -118,14 +116,15 @@ export default function PaymentFeesTable() {
 
       case "fees": {
         const percentageFee =
-          item.calculation?.toLowerCase() === "percentage" ? item.value : undefined;
+          item.calculation?.toLowerCase() === "percentage"
+            ? item.value
+            : undefined;
         return (
           <span className="font-medium">
             {percentageFee != null ? `${percentageFee}%` : "-"}
           </span>
         );
       }
-
 
       case "actions":
         return (
@@ -138,7 +137,6 @@ export default function PaymentFeesTable() {
             >
               <Icon icon="solar:pen-linear" width={16} />
             </Button>
-
           </div>
         );
 
@@ -192,7 +190,9 @@ export default function PaymentFeesTable() {
             }}
           >
             <TableHeader columns={columns}>
-              {(column) => <TableColumn key={column.uid}>{column.name}</TableColumn>}
+              {(column) => (
+                <TableColumn key={column.uid}>{column.name}</TableColumn>
+              )}
             </TableHeader>
             <TableBody
               emptyContent={
@@ -217,7 +217,9 @@ export default function PaymentFeesTable() {
                   key={item._id}
                   className={DATA_TABLE_SIMPLE_ROW_STRIPE_CLASS}
                 >
-                  {(columnKey) => <TableCell>{renderCell(item, columnKey)}</TableCell>}
+                  {(columnKey) => (
+                    <TableCell>{renderCell(item, columnKey)}</TableCell>
+                  )}
                 </TableRow>
               )}
             </TableBody>
@@ -229,16 +231,15 @@ export default function PaymentFeesTable() {
         <ModalContent>
           {(onClose) => (
             <>
-              <ModalHeader>
+              <ModalHeader className="dark:bg-default-50">
                 {formData._id ? "Edit Payment Fee" : "Set Payment Fee"}
               </ModalHeader>
-              <ModalBody className="bg-default-50 gap-6">
+              <ModalBody className="dark:bg-default-50 gap-6">
                 <div className="grid grid-cols-2 gap-4">
                   <Input
                     isRequired
                     label="Provider Name"
                     labelPlacement="outside"
-                    size="sm"
                     value={formData.name || ""}
                     onValueChange={(value) =>
                       setFormData({ ...formData, name: value })
@@ -251,7 +252,9 @@ export default function PaymentFeesTable() {
                     labelPlacement="outside"
                     step="0.01"
                     type="number"
-                    value={formData.value != null ? formData.value.toString() : ""}
+                    value={
+                      formData.value != null ? formData.value.toString() : ""
+                    }
                     onValueChange={(value) =>
                       setFormData({
                         ...formData,
@@ -261,7 +264,7 @@ export default function PaymentFeesTable() {
                   />
                 </div>
               </ModalBody>
-              <ModalFooter>
+              <ModalFooter className="dark:bg-default-50">
                 <Button variant="flat" onPress={onClose}>
                   Cancel
                 </Button>

@@ -209,7 +209,9 @@ export default function ShippingCostTable() {
             }}
           >
             <TableHeader columns={columns}>
-              {(column) => <TableColumn key={column.uid}>{column.name}</TableColumn>}
+              {(column) => (
+                <TableColumn key={column.uid}>{column.name}</TableColumn>
+              )}
             </TableHeader>
             <TableBody
               emptyContent={
@@ -219,7 +221,9 @@ export default function ShippingCostTable() {
                     icon="solar:delivery-bold-duotone"
                     width={48}
                   />
-                  <p className="mb-2 text-default-500">No shipping rates added yet</p>
+                  <p className="mb-2 text-default-500">
+                    No shipping rates added yet
+                  </p>
                   <p className="text-small text-default-400">
                     Add shipping rates to track delivery expenses
                   </p>
@@ -232,7 +236,9 @@ export default function ShippingCostTable() {
                   key={item._id}
                   className={DATA_TABLE_SIMPLE_ROW_STRIPE_CLASS}
                 >
-                  {(columnKey) => <TableCell>{renderCell(item, columnKey)}</TableCell>}
+                  {(columnKey) => (
+                    <TableCell>{renderCell(item, columnKey)}</TableCell>
+                  )}
                 </TableRow>
               )}
             </TableBody>
@@ -244,16 +250,15 @@ export default function ShippingCostTable() {
         <ModalContent>
           {(onClose) => (
             <>
-              <ModalHeader>
+              <ModalHeader className="dark:bg-default-50 mb-3">
                 {formData._id ? "Edit Shipping Rate" : "Set Shipping Rate"}
               </ModalHeader>
-              <ModalBody className="bg-default-50 gap-6">
+              <ModalBody className="dark:bg-default-50 gap-6">
                 <div className="grid grid-cols-2 gap-4">
                   <Input
                     isRequired
                     label="Name"
                     labelPlacement="outside"
-                    size="sm"
                     value={formData.name || ""}
                     onValueChange={(value) =>
                       setFormData({ ...formData, name: value })
@@ -263,7 +268,6 @@ export default function ShippingCostTable() {
                     isRequired
                     label="Shipping Rate"
                     labelPlacement="outside"
-                    size="sm"
                     startContent={getCurrencySymbol(currency)}
                     type="number"
                     value={formData.baseRate?.toString() || ""}
@@ -276,7 +280,7 @@ export default function ShippingCostTable() {
                   />
                 </div>
               </ModalBody>
-              <ModalFooter>
+              <ModalFooter className="dark:bg-default-50">
                 <Button variant="flat" onPress={onClose}>
                   Cancel
                 </Button>

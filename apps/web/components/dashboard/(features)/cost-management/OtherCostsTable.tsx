@@ -44,7 +44,12 @@ import {
   DATA_TABLE_SIMPLE_ROW_STRIPE_CLASS,
   DATA_TABLE_TABLE_CLASS,
 } from "@/components/shared/table/DataTableCard";
-import { getLocalTimeZone, parseDate, today, type CalendarDate } from "@internationalized/date";
+import {
+  getLocalTimeZone,
+  parseDate,
+  today,
+  type CalendarDate,
+} from "@internationalized/date";
 
 const logger = createLogger("OtherCostsTable");
 
@@ -178,7 +183,6 @@ const formatEffectiveFromLabel = (value?: string): string => {
 };
 
 export default function OtherCostsTable() {
-  
   const [formData, setFormData] = useState<FormData>({
     name: "",
     amount: 0,
@@ -325,7 +329,7 @@ export default function OtherCostsTable() {
 
   const effectiveFromCalendarValue = useMemo(
     () => getEffectiveFromCalendarValue(formData.effectiveFrom),
-    [formData.effectiveFrom],
+    [formData.effectiveFrom]
   );
 
   const renderCell = (item: Cost, columnKey: React.Key) => {
@@ -355,8 +359,6 @@ export default function OtherCostsTable() {
           </Chip>
         );
       }
-
-      
 
       // status column removed
 
@@ -431,7 +433,9 @@ export default function OtherCostsTable() {
             }}
           >
             <TableHeader columns={columns}>
-              {(column) => <TableColumn key={column.uid}>{column.name}</TableColumn>}
+              {(column) => (
+                <TableColumn key={column.uid}>{column.name}</TableColumn>
+              )}
             </TableHeader>
             <TableBody
               emptyContent={
@@ -456,7 +460,9 @@ export default function OtherCostsTable() {
                   key={item._id as string}
                   className={DATA_TABLE_SIMPLE_ROW_STRIPE_CLASS}
                 >
-                  {(columnKey) => <TableCell>{renderCell(item, columnKey)}</TableCell>}
+                  {(columnKey) => (
+                    <TableCell>{renderCell(item, columnKey)}</TableCell>
+                  )}
                 </TableRow>
               )}
             </TableBody>
@@ -479,7 +485,7 @@ export default function OtherCostsTable() {
         <ModalContent>
           {(onClose) => (
             <>
-              <ModalHeader className="flex flex-col gap-1 border-b border-divider pb-3">
+              <ModalHeader className="flex flex-col dark:bg-default-50 gap-1 border-b border-divider pb-3">
                 <h2 className="text-lg font-semibold">
                   {formData._id ? "Edit Operating Cost" : "Add Operating Cost"}
                 </h2>
@@ -492,7 +498,6 @@ export default function OtherCostsTable() {
                   <Input
                     isRequired
                     label="Cost Name"
-                    size="sm"
                     labelPlacement="outside"
                     placeholder="e.g., Office Rent, Software Subscription"
                     value={formData.name || ""}
@@ -500,17 +505,12 @@ export default function OtherCostsTable() {
                       setFormData({ ...formData, name: value })
                     }
                   />
-
-                  
                 </div>
-
-                
 
                 {/* Amount + Frequency/Apply To aligned in one row */}
                 <div className="grid sm:grid-cols-2 gap-4">
                   <Input
                     isRequired
-                    size="sm"
                     label="Amount"
                     labelPlacement="outside"
                     startContent={getCurrencySymbol(currency)}
@@ -527,12 +527,14 @@ export default function OtherCostsTable() {
 
                   <Select
                     label="Frequency"
-                    size="sm"
                     labelPlacement="outside"
                     selectedKeys={[formData.frequency]}
                     onSelectionChange={(keys) => {
-                      if (keys === 'all') return;
-                      const [nextFrequency] = Array.from(keys) as (CostFrequency | undefined)[];
+                      if (keys === "all") return;
+                      const [nextFrequency] = Array.from(keys) as (
+                        | CostFrequency
+                        | undefined
+                      )[];
                       if (!nextFrequency) return;
                       setFormData((prev) => ({
                         ...prev,
@@ -559,7 +561,6 @@ export default function OtherCostsTable() {
                       <PopoverTrigger>
                         <Button
                           className="w-full justify-between text-left"
-                          size="sm"
                           variant="bordered"
                         >
                           <span className="flex items-center gap-2">
@@ -587,10 +588,9 @@ export default function OtherCostsTable() {
                       </PopoverContent>
                     </Popover>
                   </div>
-                  
                 </div>
               </ModalBody>
-              <ModalFooter>
+              <ModalFooter className="dark:bg-default-50">
                 <Button variant="flat" onPress={onClose}>
                   Cancel
                 </Button>

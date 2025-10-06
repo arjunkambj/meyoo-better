@@ -136,10 +136,7 @@ export const KPISkeleton = React.memo(function KPISkeleton({
               className={cn("h-3 rounded-md", KPI_CHANGE_PRIMARY_WIDTH[size])}
             />
             <Skeleton
-              className={cn(
-                "h-3 rounded-md",
-                KPI_CHANGE_SECONDARY_WIDTH[size]
-              )}
+              className={cn("h-3 rounded-md", KPI_CHANGE_SECONDARY_WIDTH[size])}
             />
           </div>
         )}
@@ -236,7 +233,7 @@ const KPI = React.memo(function KPI({
           </span>
           {icon && (
             <div className="shrink-0">
-              <Icon className={iconColor} icon={icon} width={22} />
+              <Icon className={iconColor} icon={icon} width={18} />
             </div>
           )}
         </div>
@@ -263,7 +260,9 @@ const KPI = React.memo(function KPI({
           <>
             <Divider className="mb-2 bg-default-200" />
             <div className="flex items-center justify-between">
-              <div className="text-xs font-medium text-default-500">vs last period</div>
+              <div className="text-xs font-medium text-default-500">
+                vs last period
+              </div>
               <div
                 className={cn(
                   "text-xs font-semibold",

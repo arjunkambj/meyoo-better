@@ -17,8 +17,6 @@ export const DEFAULT_DASHBOARD_CONFIG: DashboardConfig = {
     "avgOrderValue",
   ],
   widgets: [
-    "adSpendSummary",
-    "customerSummary",
-    "orderSummary",
+    "costBreakdown",
   ],
 };

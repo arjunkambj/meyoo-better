@@ -159,7 +159,7 @@ export function AdSpendSummaryWidget({
         <div className="flex items-center gap-2.5">
           <Icon
             icon="solar:chart-square-bold-duotone"
-            width={24}
+            width={20}
             className="text-default-500"
           />
           <h3 className="text-lg font-semibold text-default-900">

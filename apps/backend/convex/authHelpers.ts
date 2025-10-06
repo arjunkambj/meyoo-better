@@ -1,3 +1,4 @@
+import { DEFAULT_DASHBOARD_CONFIG } from "@repo/types";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 
@@ -493,23 +494,8 @@ export async function createNewUserData(
     createdBy: userId,
     updatedAt: now,
     config: {
-      kpis: [
-        "revenue",
-        "netProfit",
-        "orders",
-        "blendedMarketingCost",
-        "blendedRoas",
-        "netProfitMargin",
-        "marketingPercentageOfNet",
-        "rtoRevenueLost",
-        "operatingMargin",
-        "avgOrderValue",
-      ],
-      widgets: [
-        "adSpendSummary",
-        "customerSummary",
-        "orderSummary",
-      ],
+      kpis: [...DEFAULT_DASHBOARD_CONFIG.kpis],
+      widgets: [...DEFAULT_DASHBOARD_CONFIG.widgets],
     },
   });
 }

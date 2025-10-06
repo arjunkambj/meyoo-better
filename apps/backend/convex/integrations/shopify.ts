@@ -1,6 +1,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import type { GenericActionCtx } from "convex/server";
 import { v } from "convex/values";
+import { DEFAULT_DASHBOARD_CONFIG } from "@repo/types";
 import { ShopifyGraphQLClient } from "../../libs/shopify/ShopifyGraphQLClient";
 import { createSimpleLogger } from "../../libs/logging/simple";
 import { roundMoney } from "../../libs/utils/money";
@@ -482,23 +483,8 @@ export const deleteDashboardsBatch = internalMutation({
           createdBy: args.ownerId,
           updatedAt: Date.now(),
           config: {
-            kpis: [
-              "revenue",
-              "netProfit",
-              "orders",
-              "blendedMarketingCost",
-              "blendedRoas",
-              "netProfitMargin",
-              "marketingPercentageOfNet",
-              "rtoRevenueLost",
-              "operatingMargin",
-              "avgOrderValue",
-            ],
-            widgets: [
-              "adSpendSummary",
-              "customerSummary",
-              "orderSummary",
-            ],
+            kpis: [...DEFAULT_DASHBOARD_CONFIG.kpis],
+            widgets: [...DEFAULT_DASHBOARD_CONFIG.widgets],
           },
         });
       }

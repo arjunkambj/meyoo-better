@@ -12,7 +12,6 @@ type CostCategoryKey =
   | "adSpend"
   | "cogs"
   | "shipping"
-  | "transaction"
   | "custom"
   | "handling"
   | "operating"
@@ -23,42 +22,37 @@ const COST_STYLES: Record<
   { colorHex: string; iconBg: string; iconColor: string }
 > = {
   adSpend: {
-    colorHex: "#2563EB",
+    colorHex: "#3B82F6",
     iconBg: "bg-blue-500/10",
     iconColor: "text-blue-600",
   },
   cogs: {
-    colorHex: "#16A34A",
+    colorHex: "#10B981",
     iconBg: "bg-emerald-500/10",
     iconColor: "text-emerald-600",
   },
   shipping: {
-    colorHex: "#F97316",
+    colorHex: "#F59E0B",
     iconBg: "bg-orange-500/10",
     iconColor: "text-orange-500",
   },
-  transaction: {
-    colorHex: "#7C3AED",
-    iconBg: "bg-violet-500/10",
-    iconColor: "text-violet-600",
-  },
   custom: {
-    colorHex: "#DB2777",
+    colorHex: "#EC4899",
     iconBg: "bg-rose-500/10",
     iconColor: "text-rose-600",
   },
   handling: {
-    colorHex: "#0D9488",
+    colorHex: "#14B8A6",
     iconBg: "bg-teal-500/10",
     iconColor: "text-teal-600",
   },
   operating: {
-    colorHex: "#0EA5E9",
+    colorHex: "#8B5CF6",
     iconBg: "bg-sky-500/10",
     iconColor: "text-sky-600",
   },
   taxes: {
-    colorHex: "#DC2626",
+    colorHex: "#EF4444",
     iconBg: "bg-red-500/10",
     iconColor: "text-red-600",
   },
@@ -78,13 +72,24 @@ interface CostBreakdownWidgetProps {
   showCostSetupWarning?: boolean;
 }
 
+const normalizeCostValue = (value: number): number => {
+  const numeric =
+    typeof value === "number" && Number.isFinite(value) ? value : Number(value);
+
+  if (!Number.isFinite(numeric)) {
+    return 0;
+  }
+
+  return Math.abs(numeric);
+};
+
 export function CostBreakdownWidget({
-  cogs,
-  shippingCosts,
-  totalAdSpend,
-  transactionFees,
+  cogs = 0,
+  shippingCosts = 0,
+  totalAdSpend = 0,
+  transactionFees: _transactionFees,
   operatingCosts = 0,
-  handlingFees,
+  handlingFees = 0,
   taxes = 0,
   totalRevenue: _totalRevenue = 0,
   currency = "USD",
@@ -105,7 +110,7 @@ export function CostBreakdownWidget({
         key: "adSpend",
         label: "Ad Spend",
         value: totalAdSpend,
-        icon: "solar:ad-bold-duotone",
+        icon: "solar:graph-up-bold-duotone",
       },
       {
         key: "cogs",
@@ -120,14 +125,8 @@ export function CostBreakdownWidget({
         icon: "solar:delivery-bold-duotone",
       },
       {
-        key: "transaction",
-        label: "Transaction",
-        value: transactionFees,
-        icon: "solar:card-bold-duotone",
-      },
-      {
         key: "operating",
-        label: "Operating",
+        label: "Operating Costs",
         value: operatingCosts,
         icon: "solar:settings-bold-duotone",
       },
@@ -145,12 +144,17 @@ export function CostBreakdownWidget({
       },
     ];
 
-    const totalCosts = breakdownConfig.reduce(
+    const normalizedConfig = breakdownConfig.map((item) => ({
+      ...item,
+      value: normalizeCostValue(item.value),
+    }));
+
+    const totalCosts = normalizedConfig.reduce(
       (sum, item) => sum + item.value,
       0
     );
 
-    const pieData = breakdownConfig
+    const pieData = normalizedConfig
       .filter((item) => item.value > 0)
       .map((item) => ({
         name: item.label,
@@ -159,7 +163,7 @@ export function CostBreakdownWidget({
       }))
       .sort((a, b) => b.value - a.value);
 
-    const breakdown = breakdownConfig
+    const breakdown = normalizedConfig
       .map((item) => {
         const styles = COST_STYLES[item.key];
 
@@ -177,15 +181,7 @@ export function CostBreakdownWidget({
       chartData: pieData,
       costBreakdown: breakdown,
     };
-  }, [
-    cogs,
-    shippingCosts,
-    totalAdSpend,
-    transactionFees,
-    operatingCosts,
-    handlingFees,
-    taxes,
-  ]);
+  }, [cogs, shippingCosts, totalAdSpend, operatingCosts, handlingFees, taxes]);
 
   if (loading) {
     return (
@@ -207,10 +203,10 @@ export function CostBreakdownWidget({
           </div>
 
           {/* Main Content Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {/* Pie Chart Section - Left Side */}
-            <div className="lg:col-span-2 flex flex-col items-center justify-center h-full">
-              <div className="w-full h-full min-h-[240px] flex items-center justify-center">
+            <div className="lg:col-span-1 flex flex-col  h-full">
+              <div className="w-full h-full">
                 <div className="relative">
                   <div className="h-40 w-40 bg-default-200 rounded-full" />
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
@@ -222,13 +218,13 @@ export function CostBreakdownWidget({
             </div>
 
             {/* Cost Stats List - Right Side */}
-            <div className="lg:col-span-3 h-full">
-              {/* Cost Items List - Show all 8 categories */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 h-full content-start">
-                {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+            <div className="lg:col-span-2 h-full">
+              {/* Cost Items List - Show all 6 categories */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 h-full content-start">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
                   <div
                     key={i}
-                    className="bg-background border border-default-50 rounded-xl p-3"
+                    className="bg-background border border-default-100 rounded-xl p-3.5"
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5">
@@ -259,13 +255,13 @@ export function CostBreakdownWidget({
   }
 
   return (
-    <Card className="p-5 bg-default-100 dark:bg-content1 border border-default-50 rounded-2xl h-full">
+    <Card className="p-6 bg-default-100 dark:bg-content1 shadow-none border border-default-50 rounded-2xl h-full">
       {/* Header Section */}
       <div className="mb-4 pb-4 border-b border-divider flex flex-col sm:flex-row justify-between items-start sm:items-center">
         <div className="flex items-center gap-2.5">
           <Icon
             icon="solar:wallet-bold-duotone"
-            width={24}
+            width={20}
             className="text-default-500"
           />
           <h3 className="text-lg font-semibold text-default-900">
@@ -276,6 +272,7 @@ export function CostBreakdownWidget({
           <Button
             color="warning"
             size="sm"
+            className="px-3 py-1"
             startContent={<Icon icon="solar:settings-bold-duotone" />}
             variant="flat"
             onPress={() => router.push("/cost-management")}
@@ -286,22 +283,23 @@ export function CostBreakdownWidget({
       </div>
 
       {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Pie Chart Section - Left Side */}
-        <div className="lg:col-span-2 flex flex-col items-center justify-center h-full">
+        <div className="lg:col-span-1 flex flex-col items-center justify-center h-full">
           {chartData.length > 0 ? (
-            <div className="w-full h-full min-h-[280px] relative flex items-center justify-center">
+            <div className="w-full h-full min-h-[220px] relative flex items-center justify-center px-4">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={chartData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={64}
-                    outerRadius={100}
+                    innerRadius={70}
+                    outerRadius={105}
                     fill="#2563EB"
                     dataKey="value"
-                    strokeWidth={0}
+                    strokeWidth={3}
+                    stroke="hsl(var(--heroui-default-100))"
                   >
                     {chartData.map((entry) => (
                       <Cell key={`cell-${entry.name}`} fill={entry.fill} />
@@ -310,30 +308,34 @@ export function CostBreakdownWidget({
                 </PieChart>
               </ResponsiveContainer>
               {/* Center label */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <div className="text-xs font-semibold text-default-500 uppercase tracking-wider mb-1">
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none px-6">
+                <div className="text-[10px] font-bold text-default-400 uppercase tracking-wide mb-0.5">
                   Total Costs
                 </div>
-                <div className="text-2xl font-bold text-default-900">
+                <div className="font-bold text-default-900 break-all text-center leading-tight max-w-[120px]">
                   {(() => {
-                    const total = chartData.reduce((sum, item) => sum + item.value, 0);
-                    return Math.abs(total) >= 10000000
+                    const total = chartData.reduce(
+                      (sum, item) => sum + item.value,
+                      0
+                    );
+                    return Math.abs(total) >= 1000000
                       ? formatCurrencyCompact(total, currency)
                       : formatCurrency(total, currency);
                   })()}
                 </div>
-                <div className="text-xs text-default-400 mt-1">
-                  {chartData.length} {chartData.length === 1 ? 'category' : 'categories'}
+                <div className="text-[10px] text-default-400 mt-0.5">
+                  {chartData.length}{" "}
+                  {chartData.length === 1 ? "category" : "categories"}
                 </div>
               </div>
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center h-full min-h-[240px] text-center">
-              <div className="w-20 h-20 rounded-2xl bg-default-100 flex items-center justify-center mb-4">
+            <div className="flex flex-col items-center justify-center h-full min-h-[220px] text-center">
+              <div className="w-16 h-16 rounded-2xl bg-default-100 flex items-center justify-center mb-4">
                 <Icon
                   className="text-default-400"
                   icon="solar:pie-chart-3-bold-duotone"
-                  width={40}
+                  width={32}
                 />
               </div>
               <p className="text-sm font-semibold text-default-700 mb-1">
@@ -347,9 +349,9 @@ export function CostBreakdownWidget({
         </div>
 
         {/* Cost Stats List - Right Side */}
-        <div className="lg:col-span-3 h-full">
+        <div className="lg:col-span-2 h-full">
           {/* Cost Items List - Show all categories with improved UX */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 h-full content-start">
+          <div className="grid grid-cols-1 items-center justify-center sm:grid-cols-2 gap-2 h-full ">
             {costBreakdown.map((item) => (
               <div
                 key={item.key}
@@ -377,7 +379,10 @@ export function CostBreakdownWidget({
                           delay={200}
                         >
                           <span className="text-default-500 cursor-help hover:text-default-700 transition-colors">
-                            <Icon icon="solar:info-circle-bold-duotone" width={14} />
+                            <Icon
+                              icon="solar:info-circle-bold-duotone"
+                              width={14}
+                            />
                           </span>
                         </Tooltip>
                       </div>
@@ -414,12 +419,12 @@ export function CostBreakdownWidget({
                   </div>
                   <div className="text-right shrink-0">
                     <p
-                      className={`text-sm font-bold ${
+                      className={`text-xs font-bold ${
                         item.value > 0 ? "text-default-900" : "text-default-400"
                       }`}
                     >
                       {item.value > 0
-                        ? Math.abs(item.value) >= 10000000
+                        ? Math.abs(item.value) >= 1000000
                           ? formatCurrencyCompact(item.value, currency)
                           : formatCurrency(item.value, currency)
                         : "—"}

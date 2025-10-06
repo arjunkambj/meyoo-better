@@ -219,7 +219,7 @@ export function CustomizationModalUnified({
       <ModalContent className="max-h-[85vh] rounded-2xl">
         {(onClose) => (
           <>
-            <ModalHeader className="pb-3 pt-5 bg-background flex-shrink-0 rounded-t-2xl">
+            <ModalHeader className="pb-0 pt-5 bg-background flex-shrink-0 rounded-t-2xl">
               <div className="w-full">
                 <div className="flex items-start justify-between mb-3">
                   <div>
@@ -297,7 +297,7 @@ export function CustomizationModalUnified({
                   onClear={() => setSearchQuery("")}
                   classNames={{
                     input: "text-sm",
-                    inputWrapper: "h-9",
+                    inputWrapper: "h-8",
                   }}
                 />
                 <Button
@@ -318,7 +318,6 @@ export function CustomizationModalUnified({
                 </Button>
                 <Button
                   size="sm"
-                  variant="flat"
                   color="danger"
                   startContent={<Icon icon="solar:restart-linear" width={14} />}
                   onPress={handleResetToDefault}

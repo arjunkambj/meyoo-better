@@ -16,6 +16,7 @@ export interface JourneyStage {
   color: string;
   bgColor: string;
   textColor: string;
+  metaConversionRate?: number;
 }
 
 interface CustomerJourneyProps {
@@ -31,26 +32,43 @@ export const CustomerJourney = memo(function CustomerJourney({
 }: CustomerJourneyProps) {
   // D2C-friendly stage descriptions
   const stageDescriptions: Record<string, string> = {
-    Awareness:
-      "People who discovered your brand through ads, social media, or search",
-    Interest:
-      "Visitors actively browsing your products and spending time on your site",
+    Awareness: "Meta ad impressions introducing shoppers to your brand",
+    Interest: "Total clicks generated from paid campaigns",
     Consideration:
-      "Shoppers who added items to cart or wishlist, comparing options",
-    Purchase: "Customers who completed their first order with you",
-    Retention: "Happy customers who came back and bought again",
+      "Shoppers weighing a purchase (customers + active cart abandoners)",
+    Purchase: "Customers who completed an order",
+    Retention: "Returning customers who purchased again",
   };
 
   const journeyData = data ?? [];
   const hasJourneyData = journeyData.length > 0;
 
-  const firstStage = hasJourneyData ? journeyData[0] : undefined;
+  const awarenessStage = journeyData.find(
+    (stage) => stage.stage.toLowerCase() === "awareness",
+  );
+  const interestStage = journeyData.find(
+    (stage) => stage.stage.toLowerCase() === "interest",
+  );
   const purchaseStage = journeyData.find(
     (stage) => stage.stage.toLowerCase() === "purchase"
   );
   const retentionStage = journeyData.find(
     (stage) => stage.stage.toLowerCase() === "retention"
   );
+
+  const visitorCount = interestStage?.customers ?? awarenessStage?.customers ?? 0;
+  const safeVisitors = Number.isFinite(visitorCount) ? visitorCount : 0;
+  const metaConversionRateValue = Number.isFinite(
+    interestStage?.metaConversionRate ?? NaN,
+  )
+    ? (interestStage?.metaConversionRate ?? 0)
+    : 0;
+
+  const formatPercentValue = (value: number) =>
+    new Intl.NumberFormat("en-US", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }).format(value);
 
   const safeCancelRate = Number.isFinite(cancelRate) ? cancelRate : 0;
   const safeReturnRate = Number.isFinite(returnRate) ? returnRate : 0;
@@ -68,7 +86,7 @@ export const CustomerJourney = memo(function CustomerJourney({
         </div>
         <div className="text-sm bg-background border border-default-50 rounded-full px-4 py-2 text-default-600">
           <span className="font-medium">
-            {formatNumber(firstStage?.customers ?? 0)}
+            {formatNumber(safeVisitors)}
           </span>
           <span className="text-default-400 ml-1">visitors</span>
         </div>
@@ -118,7 +136,7 @@ export const CustomerJourney = memo(function CustomerJourney({
                           Conversion
                         </p>
                         <p className="text-sm font-medium text-default-700">
-                          {stage.conversionRate}%
+                          {formatPercentValue(stage.conversionRate)}%
                         </p>
                       </div>
                     </div>
@@ -141,13 +159,14 @@ export const CustomerJourney = memo(function CustomerJourney({
             </p>
             <p className="text-xl font-semibold text-default-900">
               {(() => {
-                const visitors = firstStage?.customers || 0;
                 const purchasers = purchaseStage?.customers || 0;
-                if (visitors <= 0 || purchasers <= 0) return "0.0%";
-                return `${((purchasers / visitors) * 100).toFixed(1)}%`;
+                if (safeVisitors <= 0 || purchasers <= 0) return "0.0%";
+                return `${((purchasers / safeVisitors) * 100).toFixed(1)}%`;
               })()}
             </p>
-            <p className="text-xs text-default-400 mt-1">Visitor to customer</p>
+            <p className="text-xs text-default-400 mt-1">
+              Visitor to customer · Meta conv {formatPercentValue(metaConversionRateValue)}%
+            </p>
           </div>
           <div className="rounded-xl p-4 border bg-background border-default-50">
             <p className="text-xs font-medium text-default-600 mb-2">

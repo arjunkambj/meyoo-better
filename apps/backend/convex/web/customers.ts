@@ -105,7 +105,7 @@ const DEFAULT_JOURNEY_STAGES = [
     avgDays: 0,
     conversionRate: 0,
     icon: "solar:heart-bold-duotone",
-    color: "secondary",
+    color: "interest",
   },
   {
     stage: "Consideration",
@@ -132,7 +132,7 @@ const DEFAULT_JOURNEY_STAGES = [
     avgDays: 0,
     conversionRate: 0,
     icon: "solar:refresh-circle-bold-duotone",
-    color: "info",
+    color: "retention",
   },
 ] satisfies Array<{
   stage: string;
@@ -239,6 +239,7 @@ const journeyStageValidator = v.object({
   conversionRate: v.number(),
   icon: v.string(),
   color: v.string(),
+  metaConversionRate: v.optional(v.number()),
 });
 
 const overviewValidator = v.union(
@@ -1178,42 +1179,92 @@ export const getCustomerJourney = query({
       .filter((q) => q.eq(q.field("entityType"), "account"))
       .collect();
 
-    const awarenessCustomers = metaInsights.reduce((total, insight) => {
-      const clicks = typeof insight.clicks === "number" ? insight.clicks : 0;
-      return total + Math.max(clicks, 0);
-    }, 0);
+    const metaTotals = metaInsights.reduce(
+      (totals, insight) => {
+        const impressions = typeof insight.impressions === "number" ? insight.impressions : 0;
+        const clicks = typeof insight.clicks === "number" ? insight.clicks : 0;
+        const conversions = typeof insight.conversions === "number" ? insight.conversions : 0;
+        return {
+          impressions: totals.impressions + Math.max(impressions, 0),
+          clicks: totals.clicks + Math.max(clicks, 0),
+          conversions: totals.conversions + Math.max(conversions, 0),
+        };
+      },
+      { impressions: 0, clicks: 0, conversions: 0 },
+    );
 
-    const considerationCustomers = Math.max(metrics.abandonedCartCustomers || 0, 0);
+    const roundPercent = (value: number) => {
+      if (!Number.isFinite(value)) {
+        return 0;
+      }
+      const clamped = Math.min(100, Math.max(0, value));
+      return Number.parseFloat(clamped.toFixed(2));
+    };
+
+    const awarenessCustomers = Math.max(metaTotals.impressions, 0);
+    const interestCustomers = Math.max(metaTotals.clicks, 0);
+    const metaConversionRate = interestCustomers > 0
+      ? roundPercent((metaTotals.conversions / interestCustomers) * 100)
+      : 0;
+
+    const considerationCustomers = Math.max(
+      (metrics.abandonedCartCustomers || 0) + (metrics.periodCustomerCount || 0),
+      0,
+    );
     const purchaseCustomers = Math.max(metrics.periodCustomerCount || 0, 0);
     const retentionCustomers = Math.max(returningCustomers, 0);
 
-    // Calculate conversion rates
-    const awarenessToConsideration = awarenessCustomers > 0
-      ? Math.min(100, (considerationCustomers / awarenessCustomers) * 100)
+    const baseForPercentage = (() => {
+      if (awarenessCustomers > 0) return awarenessCustomers;
+      if (interestCustomers > 0) return interestCustomers;
+      if (considerationCustomers > 0) return considerationCustomers;
+      if (purchaseCustomers > 0) return purchaseCustomers;
+      if (retentionCustomers > 0) return retentionCustomers;
+      return 1;
+    })();
+
+    const toPercentage = (value: number) =>
+      baseForPercentage > 0
+        ? roundPercent((value / baseForPercentage) * 100)
+        : 0;
+
+    const awarenessToInterest = awarenessCustomers > 0
+      ? roundPercent((interestCustomers / awarenessCustomers) * 100)
+      : 0;
+    const interestToConsideration = interestCustomers > 0
+      ? roundPercent((considerationCustomers / interestCustomers) * 100)
       : 0;
     const considerationToPurchase = considerationCustomers > 0
-      ? Math.min(100, (purchaseCustomers / considerationCustomers) * 100)
+      ? roundPercent((purchaseCustomers / considerationCustomers) * 100)
       : 0;
     const purchaseToRetention = purchaseCustomers > 0
-      ? Math.min(100, (retentionCustomers / purchaseCustomers) * 100)
+      ? roundPercent((retentionCustomers / purchaseCustomers) * 100)
       : 0;
 
     return [
       {
         stage: "Awareness",
         customers: awarenessCustomers,
-        percentage: 100,
+        percentage: awarenessCustomers > 0 ? 100 : toPercentage(awarenessCustomers),
         avgDays: 0,
-        conversionRate: awarenessToConsideration,
+        conversionRate: awarenessToInterest,
         icon: "solar:eye-bold-duotone",
         color: "primary",
       },
       {
+        stage: "Interest",
+        customers: interestCustomers,
+        percentage: toPercentage(interestCustomers),
+        avgDays: 0,
+        conversionRate: interestToConsideration,
+        icon: "solar:heart-bold-duotone",
+        color: "interest",
+        metaConversionRate,
+      },
+      {
         stage: "Consideration",
         customers: considerationCustomers,
-        percentage: awarenessCustomers > 0
-          ? Math.min(100, (considerationCustomers / awarenessCustomers) * 100)
-          : 0,
+        percentage: toPercentage(considerationCustomers),
         avgDays: 0,
         conversionRate: considerationToPurchase,
         icon: "solar:cart-bold-duotone",
@@ -1222,9 +1273,7 @@ export const getCustomerJourney = query({
       {
         stage: "Purchase",
         customers: purchaseCustomers,
-        percentage: awarenessCustomers > 0
-          ? Math.min(100, (purchaseCustomers / awarenessCustomers) * 100)
-          : 0,
+        percentage: toPercentage(purchaseCustomers),
         avgDays: 0,
         conversionRate: purchaseToRetention,
         icon: "solar:bag-bold-duotone",
@@ -1233,13 +1282,11 @@ export const getCustomerJourney = query({
       {
         stage: "Retention",
         customers: retentionCustomers,
-        percentage: awarenessCustomers > 0
-          ? Math.min(100, (retentionCustomers / awarenessCustomers) * 100)
-          : 0,
+        percentage: toPercentage(retentionCustomers),
         avgDays: 0,
         conversionRate: 0,
         icon: "solar:refresh-circle-bold-duotone",
-        color: "info",
+        color: "retention",
       },
     ];
   },

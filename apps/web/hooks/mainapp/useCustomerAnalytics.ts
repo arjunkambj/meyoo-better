@@ -209,6 +209,7 @@ type BackendJourneyStage = {
   conversionRate: number;
   icon: string;
   color: string;
+  metaConversionRate?: number;
 };
 
 type CustomerAnalyticsResponse = {
@@ -532,6 +533,14 @@ export function useCustomerAnalytics(params: UseCustomerAnalyticsParams = {}) {
       warning: { bg: "bg-warning/10", text: "text-warning" },
       danger: { bg: "bg-danger/10", text: "text-danger" },
       info: { bg: "bg-info/10", text: "text-info" },
+      interest: {
+        bg: "bg-sky-100 dark:bg-sky-500/15",
+        text: "text-sky-700 dark:text-sky-200",
+      },
+      retention: {
+        bg: "bg-emerald-100 dark:bg-emerald-500/15",
+        text: "text-emerald-700 dark:text-emerald-200",
+      },
       default: { bg: "bg-default-100", text: "text-default-500" },
     };
 
@@ -545,6 +554,7 @@ export function useCustomerAnalytics(params: UseCustomerAnalyticsParams = {}) {
       color: stage.color,
       bgColor: (colorMap[stage.color] ?? colorMap.default)!.bg,
       textColor: (colorMap[stage.color] ?? colorMap.default)!.text,
+      metaConversionRate: stage.metaConversionRate,
     }));
   }, [journeyQuery]);
 

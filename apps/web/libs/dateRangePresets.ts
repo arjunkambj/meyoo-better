@@ -64,20 +64,15 @@ export const getPresetRange = (preset: DateRangePresetKey): CalendarDateRange =>
       return { start, end: todayDate };
     }
     case 'this_month': {
-      const start = new Date(now.getFullYear(), now.getMonth(), 1);
-      const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      return {
-        start: parseDate(start.toISOString().slice(0, 10)),
-        end: parseDate(end.toISOString().slice(0, 10)),
-      };
+      const start = todayDate.set({ day: 1 });
+      const monthEnd = start.add({ months: 1 }).subtract({ days: 1 });
+      const end = monthEnd.compare(todayDate) > 0 ? todayDate : monthEnd;
+      return { start, end };
     }
     case 'last_month': {
-      const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const end = new Date(now.getFullYear(), now.getMonth(), 0);
-      return {
-        start: parseDate(start.toISOString().slice(0, 10)),
-        end: parseDate(end.toISOString().slice(0, 10)),
-      };
+      const lastMonthStart = todayDate.subtract({ months: 1 }).set({ day: 1 });
+      const lastMonthEnd = lastMonthStart.add({ months: 1 }).subtract({ days: 1 });
+      return { start: lastMonthStart, end: lastMonthEnd };
     }
     case 'this_year': {
       const start = parseDate(`${now.getFullYear()}-01-01`);

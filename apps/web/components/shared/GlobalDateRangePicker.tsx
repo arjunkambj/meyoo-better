@@ -2,7 +2,6 @@
 
 import {
   Button,
-  Divider,
   Input,
   Popover,
   PopoverContent,
@@ -13,7 +12,9 @@ import { Icon } from "@iconify/react";
 import {
   type CalendarDate,
   type DateValue,
+  getLocalTimeZone,
   parseDate,
+  today,
 } from "@internationalized/date";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AnalyticsDateRange } from "@repo/types";
@@ -97,6 +98,18 @@ function toCalendarDateValue(value: DateValue): CalendarDate {
   return value as CalendarDate;
 }
 
+const areCalendarRangesEqual = (
+  a?: CalendarDateRange | null,
+  b?: CalendarDateRange | null
+): boolean => {
+  if (!a && !b) return true;
+  if (!a || !b) return false;
+  return (
+    calendarDateToString(a.start) === calendarDateToString(b.start) &&
+    calendarDateToString(a.end) === calendarDateToString(b.end)
+  );
+};
+
 export default function GlobalDateRangePicker({
   value,
   preset,
@@ -129,6 +142,16 @@ export default function GlobalDateRangePicker({
     return getPresetRange("last_30_days");
   }, [value, selectedPreset, defaultPreset, presets]);
 
+  const resolvePresetForRange = useCallback(
+    (range: CalendarDateRange) => {
+      const match = presets.find((presetKey) =>
+        areCalendarRangesEqual(getPresetRange(presetKey), range)
+      );
+      return match ?? null;
+    },
+    [presets]
+  );
+
   const [internalRange, setInternalRange] =
     useState<CalendarDateRange>(initialRange);
   const [draftRange, setDraftRange] = useState<CalendarDateRange>(initialRange);
@@ -143,27 +166,22 @@ export default function GlobalDateRangePicker({
     [onAnalyticsChange]
   );
 
-  const rangesEqual = useCallback(
-    (a?: CalendarDateRange, b?: CalendarDateRange) => {
-      if (!a || !b) return false;
-      return (
-        calendarDateToString(a.start) === calendarDateToString(b.start) &&
-        calendarDateToString(a.end) === calendarDateToString(b.end)
-      );
-    },
-    []
-  );
-
   useEffect(() => {
     if (!value) {
       return;
     }
-    if (rangesEqual(value, internalRange) && rangesEqual(value, draftRange)) {
+    if (
+      areCalendarRangesEqual(value, internalRange) &&
+      areCalendarRangesEqual(value, draftRange)
+    ) {
       return;
     }
     setInternalRange(value);
     setDraftRange(value);
-  }, [value, internalRange, draftRange, rangesEqual]);
+    if (preset === undefined) {
+      setSelectedPreset(resolvePresetForRange(value));
+    }
+  }, [value, internalRange, draftRange, preset, resolvePresetForRange]);
 
   useEffect(() => {
     if (preset === undefined || preset === selectedPreset) {
@@ -201,14 +219,26 @@ export default function GlobalDateRangePicker({
   );
 
   const handleCalendarChange = useCallback((range: RangeValue<DateValue>) => {
-    if (!range?.start || !range?.end) return;
-    const nextRange: CalendarDateRange = {
-      start: toCalendarDateValue(range.start),
-      end: toCalendarDateValue(range.end),
-    };
+    if (!range?.start) return;
+
+    const start = toCalendarDateValue(range.start);
+    const end = range.end ? toCalendarDateValue(range.end) : start;
+
+    const nextRange: CalendarDateRange = { start, end };
     setDraftRange(nextRange);
-    setSelectedPreset(null);
-  }, []);
+
+    // Clear preset when manually selecting dates
+    if (preset === undefined) {
+      setSelectedPreset(null);
+    }
+
+    // Auto-apply when both dates are selected
+    if (range.end) {
+      setInternalRange(nextRange);
+      emitChange(nextRange, null);
+      setIsOpen(false);
+    }
+  }, [preset, emitChange]);
 
   const handleInputChange = useCallback(
     (field: "start" | "end", nextValue: string) => {
@@ -219,20 +249,23 @@ export default function GlobalDateRangePicker({
           field === "start"
             ? { start: parsed, end: draftRange.end }
             : { start: draftRange.start, end: parsed };
-        setDraftRange(nextRange);
-        setSelectedPreset(null);
+        const normalizedRange =
+          nextRange.start.compare(nextRange.end) <= 0
+            ? nextRange
+            : { start: nextRange.end, end: nextRange.start };
+        setDraftRange(normalizedRange);
+        setInternalRange(normalizedRange);
+        // Clear preset when manually typing dates
+        if (preset === undefined) {
+          setSelectedPreset(null);
+        }
+        emitChange(normalizedRange, null);
       } catch (error) {
         console.error("Invalid date input", error);
       }
     },
-    [draftRange]
+    [draftRange, preset, emitChange]
   );
-
-  const handleApply = useCallback(() => {
-    setInternalRange(draftRange);
-    emitChange(draftRange, selectedPreset ?? null);
-    setIsOpen(false);
-  }, [draftRange, emitChange, selectedPreset]);
 
   const presetItems = useMemo(() => {
     return presets.map((key) => {
@@ -247,8 +280,12 @@ export default function GlobalDateRangePicker({
   useEffect(() => {
     if (isOpen) {
       setDraftRange(appliedRange);
+      setSelectedPreset((current) => {
+        if (preset !== undefined) return current;
+        return resolvePresetForRange(appliedRange);
+      });
     }
-  }, [isOpen, appliedRange]);
+  }, [isOpen, appliedRange, preset, resolvePresetForRange]);
 
   const triggerLabel = useMemo(() => {
     if (selectedPreset) {
@@ -294,13 +331,13 @@ export default function GlobalDateRangePicker({
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[700px] p-0">
+      <PopoverContent className="w-auto overflow-hidden rounded-2xl p-0">
         <div className="flex">
-          <div className="w-40 border-r border-default-200 bg-default-50 p-3">
-            <p className="mb-2 text-xs font-semibold uppercase text-default-400">
+          <div className="w-44 shrink-0 border-r border-divider bg-content2 p-4">
+            <p className="mb-3 text-xs font-semibold uppercase text-default-500">
               Quick ranges
             </p>
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-1.5">
               {presetItems.map((presetItem) => {
                 const isActive = selectedPreset === presetItem.key;
                 return (
@@ -309,7 +346,7 @@ export default function GlobalDateRangePicker({
                     size="sm"
                     variant={isActive ? "flat" : "light"}
                     color={isActive ? "primary" : "default"}
-                    className="justify-start text-left text-sm font-medium"
+                    className="justify-start text-sm"
                     startContent={
                       isActive && (
                         <Icon
@@ -327,8 +364,8 @@ export default function GlobalDateRangePicker({
             </div>
           </div>
 
-          <div className="flex-1 p-4">
-            <div className="grid grid-cols-2 gap-3">
+          <div className="flex-1 bg-content1 p-6">
+            <div className="grid grid-cols-2 gap-3 mb-6">
               <Input
                 size="sm"
                 placeholder="Start date"
@@ -357,35 +394,18 @@ export default function GlobalDateRangePicker({
               />
             </div>
 
-            <div className="mt-4">
-              <RangeCalendar
-                aria-label="Analytics date range"
-                className="shadow-none"
-                minValue={minDate}
-                maxValue={maxDate}
-                value={draftRange}
-                onChange={handleCalendarChange}
-                visibleMonths={2}
-              />
-            </div>
-
-            <Divider className="my-4" />
-
-            <div className="flex justify-end gap-2">
-              <Button size="sm" variant="flat" onPress={() => setIsOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                size="sm"
-                color="primary"
-                onPress={handleApply}
-                startContent={
-                  <Icon icon="solar:check-circle-bold-duotone" width={16} />
-                }
-              >
-                Apply
-              </Button>
-            </div>
+            <RangeCalendar
+              aria-label="Analytics date range"
+              minValue={minDate}
+              maxValue={maxDate ?? today(getLocalTimeZone())}
+              value={draftRange}
+              onChange={handleCalendarChange}
+              visibleMonths={2}
+              classNames={{
+                base: "bg-transparent",
+                gridWrapper: "gap-6",
+              }}
+            />
           </div>
         </div>
       </PopoverContent>

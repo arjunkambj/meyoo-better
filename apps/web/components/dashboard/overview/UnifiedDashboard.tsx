@@ -223,8 +223,6 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
       ncROAS: overviewMetrics?.ncROAS?.value || 0,
       repurchaseRate: overviewMetrics?.repeatCustomerRate?.value || 0,
       returnRate: overviewMetrics?.returnRate?.value || 0,
-      abandonedCustomers: overviewMetrics?.abandonedCustomers?.value || 0,
-      abandonedRate: overviewMetrics?.abandonedRate?.value || 0,
       adSpendPerOrder:
         overviewMetrics?.adSpendPerOrder?.value ??
         (overviewMetrics?.orders?.value &&

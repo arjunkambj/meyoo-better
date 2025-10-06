@@ -1031,6 +1031,10 @@ function buildOverviewFromAggregates(
       cacPercentageOfAOV,
       prevCacPercentageOfAOV,
     ),
+    abandonedCustomers: 0,
+    abandonedCustomersChange: 0,
+    abandonedRate: 0,
+    abandonedRateChange: 0,
     returnRate,
     returnRateChange: percentageChange(returnRate, prevReturnRate),
     moMRevenueGrowth: 0,
@@ -1757,8 +1761,9 @@ export async function loadCustomerOverviewFromDailyMetrics(
   const periodOrdersPerCustomer = new Map<string, number>();
   let prepaidOrdersInRange = 0;
   const inferPrepaid = (order: Doc<"shopifyOrders">): boolean => {
-    const status = String(order.financialStatus ?? (order as AnyRecord).financial_status ?? "").toLowerCase();
-    const gateway = String(order.gateway ?? (order as AnyRecord).paymentGateway ?? "").toLowerCase();
+    const rawOrder = order as AnyRecord;
+    const status = String(order.financialStatus ?? rawOrder.financial_status ?? "").toLowerCase();
+    const gateway = String((rawOrder.gateway ?? rawOrder.paymentGateway ?? "") as string).toLowerCase();
 
     if (status.includes("cod") || gateway.includes("cod")) {
       return false;
@@ -1831,7 +1836,10 @@ export async function loadCustomerOverviewFromDailyMetrics(
   let repeatCustomersInRange = 0;
   for (const [customerId, periodOrders] of periodOrdersPerCustomer.entries()) {
     const customerDoc = customersById.get(customerId);
-    const lifetimeOrders = toNumber(customerDoc?.ordersCount ?? customerDoc?.orders_count ?? periodOrders);
+    const rawCustomer = customerDoc as AnyRecord | undefined;
+    const lifetimeOrders = toNumber(
+      customerDoc?.ordersCount ?? rawCustomer?.orders_count ?? periodOrders,
+    );
     if (periodOrders > 1) {
       repeatCustomersInRange += 1;
     }

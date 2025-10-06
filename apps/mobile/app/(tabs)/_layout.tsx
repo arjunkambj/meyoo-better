@@ -47,19 +47,7 @@ export default function TabsLayout() {
           ),
         }}
       />
-      <Tabs.Screen
-        name="agent"
-        options={{
-          title: "Agent",
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons
-              name={focused ? "sparkles" : "sparkles-outline"}
-              size={24}
-              color={color}
-            />
-          ),
-        }}
-      />
+      {/* Agent tab removed */}
       <Tabs.Screen
         name="settings"
         options={{

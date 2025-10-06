@@ -74,8 +74,8 @@ const SidebarContent = React.memo(({ onClose }: SidebarContentProps) => {
           "flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200",
           "no-underline w-full group",
           pathname === "/overview"
-            ? "bg-primary/20 text-primary font-semibold"
-            : "text-default-600 hover:text-foreground hover:bg-default-200/70"
+            ? "bg-primary/20 text-primary-600 font-semibold"
+            : "text-default-700 hover:text-foreground hover:bg-default-200/70"
         )}
         href="/overview"
         prefetch={true}
@@ -85,8 +85,8 @@ const SidebarContent = React.memo(({ onClose }: SidebarContentProps) => {
           className={cn(
             "shrink-0 transition-all w-5 h-5",
             pathname === "/overview"
-              ? "text-primary"
-              : "text-default-500 group-hover:text-foreground"
+              ? "text-primary-600"
+              : "text-default-700 group-hover:text-foreground"
           )}
           icon="solar:home-2-bold-duotone"
         />

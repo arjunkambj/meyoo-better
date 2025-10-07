@@ -37,6 +37,38 @@ const toUtcMidnight = (isoDate: string) => new Date(`${isoDate}T00:00:00.000Z`);
 
 const formatISODate = (date: Date) => date.toISOString().slice(0, 10);
 
+const monthShort = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+] as const;
+
+function formatMonthDay(iso: string): string {
+  // iso expected: YYYY-MM-DD (shop/org-local date string)
+  const y = Number(iso.slice(0, 4));
+  const m = Number(iso.slice(5, 7));
+  const d = Number(iso.slice(8, 10));
+  if (!y || !m || !d) return iso;
+  return `${monthShort[m - 1]} ${d}`;
+}
+
+function formatMonthYearFromIsoStart(iso: string): string {
+  // iso expected: YYYY-MM-01
+  const y = Number(iso.slice(0, 4));
+  const m = Number(iso.slice(5, 7));
+  if (!y || !m) return iso;
+  return `${monthShort[m - 1]} ${y}`;
+}
+
 const buildExpectedPeriods = (
   granularity: PnLGranularity,
   range: { startDate: string; endDate: string },
@@ -51,49 +83,50 @@ const buildExpectedPeriods = (
   const definitions: Array<{ key: string; label: string; date: string }> = [];
 
   if (granularity === "daily") {
-    const cursor = new Date(end);
-    for (let index = 0; index < 7; index += 1) {
+    // Generate one bucket per day in the selected range (inclusive)
+    const cursor = new Date(start);
+    while (cursor <= end) {
       const iso = formatISODate(cursor);
       definitions.push({ key: iso, label: iso, date: iso });
-      cursor.setUTCDate(cursor.getUTCDate() - 1);
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
     }
   } else if (granularity === "weekly") {
-    const cursor = new Date(end);
-    const day = cursor.getUTCDay() || 7;
-    if (day !== 1) {
-      cursor.setUTCDate(cursor.getUTCDate() - day + 1);
+    // Align to the Monday of the start week and iterate weeks until end
+    const weekStart = new Date(start);
+    const startDay = weekStart.getUTCDay() || 7;
+    if (startDay !== 1) {
+      weekStart.setUTCDate(weekStart.getUTCDate() - startDay + 1);
     }
 
-    for (let index = 0; index < 6; index += 1) {
-      const weekStart = new Date(cursor);
-      const weekEnd = new Date(cursor);
-      weekEnd.setUTCDate(weekEnd.getUTCDate() + 6);
-      const startIso = formatISODate(weekStart);
-      const endIso = index === 0 ? formatISODate(end) : formatISODate(weekEnd);
-      definitions.push({
-        key: startIso,
-        label: `${startIso} – ${endIso}`,
-        date: startIso,
-      });
-      cursor.setUTCDate(cursor.getUTCDate() - 7);
+    const cursor = new Date(weekStart);
+    while (cursor <= end) {
+      const slotStart = new Date(cursor);
+      const slotEnd = new Date(cursor);
+      slotEnd.setUTCDate(slotEnd.getUTCDate() + 6);
+
+      const startIso = formatISODate(slotStart);
+      const labelEnd = new Date(Math.min(slotEnd.getTime(), end.getTime()));
+      const endIso = formatISODate(labelEnd);
+
+      // For weekly we keep the key/date as the ISO start (shop-local) and label will be formatted later
+      definitions.push({ key: startIso, label: `${startIso} – ${endIso}`, date: startIso });
+      cursor.setUTCDate(cursor.getUTCDate() + 7);
     }
   } else {
-    const cursor = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), 1));
+    // Monthly: from the first of the start month to the first of the end month
+    const monthCursor = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1));
+    const endMonth = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), 1));
 
-    for (let index = 0; index < 3; index += 1) {
-      const monthStartIso = formatISODate(cursor);
-      const monthKey = monthStartIso.slice(0, 7);
-      const displayEnd = index === 0 ? formatISODate(end) : formatISODate(new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 0)));
-      definitions.push({
-        key: `${monthKey}-01`,
-        label: `${monthKey} – ${displayEnd}`,
-        date: `${monthKey}-01`,
-      });
-      cursor.setUTCMonth(cursor.getUTCMonth() - 1);
+    while (monthCursor <= endMonth) {
+      const year = monthCursor.getUTCFullYear();
+      const monthIdx = monthCursor.getUTCMonth();
+      const monthStartIso = `${year}-${String(monthIdx + 1).padStart(2, "0")}-01`;
+      const monthLabel = formatMonthYearFromIsoStart(monthStartIso);
+      definitions.push({ key: monthStartIso, label: monthLabel, date: monthStartIso });
+      monthCursor.setUTCMonth(monthCursor.getUTCMonth() + 1);
     }
   }
 
-  definitions.reverse();
   return definitions;
 };
 
@@ -149,8 +182,8 @@ const metricConfig: Record<
   },
   rtoRevenueLost: {
     label: "RTO Revenue Lost",
-    icon: "solar:trend-down-bold-duotone",
-    iconColor: "text-default-500",
+    icon: "solar:alt-arrow-down-bold",
+    iconColor: "text-danger",
     category: "revenue",
     isSubItem: true,
   },
@@ -205,8 +238,8 @@ const metricConfig: Record<
   },
   totalAdSpend: {
     label: "Marketing Spend",
-    icon: "solar:megaphone-bold-duotone",
-    iconColor: "text-warning-400",
+    icon: "solar:wallet-money-bold-duotone",
+    iconColor: "text-warning",
     category: "operations",
     isSubItem: true,
   },
@@ -302,15 +335,10 @@ export const PnLTable = React.memo(function PnLTable({
 
     const formatPeriodLabel = (period: PnLTablePeriod) => {
       if (granularity === 'weekly' && period.date) {
-        const date = new Date(period.date);
-        return `Week ${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+        return `Week ${formatMonthDay(period.date)}`;
       }
       if (granularity === 'daily') {
-        const date = new Date(period.date || period.label);
-        return date.toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-        });
+        return formatMonthDay(period.date || period.label);
       }
       return period.label;
     };

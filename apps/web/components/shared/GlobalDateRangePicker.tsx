@@ -218,27 +218,30 @@ export default function GlobalDateRangePicker({
     [emitChange]
   );
 
-  const handleCalendarChange = useCallback((range: RangeValue<DateValue>) => {
-    if (!range?.start) return;
+  const handleCalendarChange = useCallback(
+    (range: RangeValue<DateValue>) => {
+      if (!range?.start) return;
 
-    const start = toCalendarDateValue(range.start);
-    const end = range.end ? toCalendarDateValue(range.end) : start;
+      const start = toCalendarDateValue(range.start);
+      const end = range.end ? toCalendarDateValue(range.end) : start;
 
-    const nextRange: CalendarDateRange = { start, end };
-    setDraftRange(nextRange);
+      const nextRange: CalendarDateRange = { start, end };
+      setDraftRange(nextRange);
 
-    // Clear preset when manually selecting dates
-    if (preset === undefined) {
-      setSelectedPreset(null);
-    }
+      // Clear preset when manually selecting dates
+      if (preset === undefined) {
+        setSelectedPreset(null);
+      }
 
-    // Auto-apply when both dates are selected
-    if (range.end) {
-      setInternalRange(nextRange);
-      emitChange(nextRange, null);
-      setIsOpen(false);
-    }
-  }, [preset, emitChange]);
+      // Auto-apply when both dates are selected
+      if (range.end) {
+        setInternalRange(nextRange);
+        emitChange(nextRange, null);
+        setIsOpen(false);
+      }
+    },
+    [preset, emitChange]
+  );
 
   const handleInputChange = useCallback(
     (field: "start" | "end", nextValue: string) => {
@@ -337,7 +340,7 @@ export default function GlobalDateRangePicker({
             <p className="mb-3 text-xs font-semibold uppercase text-default-500">
               Quick ranges
             </p>
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-1">
               {presetItems.map((presetItem) => {
                 const isActive = selectedPreset === presetItem.key;
                 return (
@@ -364,11 +367,14 @@ export default function GlobalDateRangePicker({
             </div>
           </div>
 
-          <div className="flex-1 bg-content1 p-6">
-            <div className="grid grid-cols-2 gap-3 mb-6">
+          <div className="flex-1 bg-content1 px-2 pr-4 py-4">
+            <div className="grid grid-cols-2 gap-3 mb-4">
               <Input
                 size="sm"
                 placeholder="Start date"
+                classNames={{
+                  inputWrapper: "shadow-none dark:bg-background",
+                }}
                 value={calendarDateToString(draftRange.start)}
                 onValueChange={(input) => handleInputChange("start", input)}
                 startContent={
@@ -382,6 +388,9 @@ export default function GlobalDateRangePicker({
               <Input
                 size="sm"
                 placeholder="End date"
+                classNames={{
+                  inputWrapper: "shadow-none dark:bg-background",
+                }}
                 value={calendarDateToString(draftRange.end)}
                 onValueChange={(input) => handleInputChange("end", input)}
                 startContent={
@@ -402,8 +411,9 @@ export default function GlobalDateRangePicker({
               onChange={handleCalendarChange}
               visibleMonths={2}
               classNames={{
-                base: "bg-transparent",
+                base: "shadow-none dark:bg-content1",
                 gridWrapper: "gap-6",
+                gridHeader: "shadow-none",
               }}
             />
           </div>

@@ -7,4 +7,10 @@ module.exports = defineConfig([
   {
     ignores: ['dist/*'],
   },
+  {
+    rules: {
+      // Allow TS path aliases like '@/...' without import resolver noise
+      'import/no-unresolved': 'off',
+    },
+  },
 ]);

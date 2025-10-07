@@ -1,9 +1,8 @@
 import { useAuthActions } from "@convex-dev/auth/react";
 import { Button, useTheme } from "heroui-native";
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Platform, View, Text } from "react-native";
+import { Platform, View, Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { createURL } from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import Svg, { Path } from "react-native-svg";
 

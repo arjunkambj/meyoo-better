@@ -1,11 +1,11 @@
-import type { ReactNode } from 'react';
+import React from 'react';
 import { View, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface AuthScreenProps {
   title: string;
   subtitle?: string;
-  children?: ReactNode;
+  children?: React.ReactNode;
 }
 
 export function AuthScreen({ title, subtitle, children }: AuthScreenProps) {
@@ -24,9 +24,8 @@ export function AuthScreen({ title, subtitle, children }: AuthScreenProps) {
           ) : null}
         </View>
 
-        <View className="flex-1 gap-6">{children}</View>
+        <View className="flex-1 gap-6">{children as any}</View>
       </View>
     </SafeAreaView>
   );
 }
-

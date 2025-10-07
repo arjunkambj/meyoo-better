@@ -277,27 +277,18 @@ export const getOnboardingStatus = query({
           : undefined;
 
     // Heuristic DB-backed completion: if DB has >= expected orders, consider complete
-    const expectedOrders =
+    const _expectedOrders =
       shopifyTotalOrdersSeen !== undefined
         ? shopifyTotalOrdersSeen
         : shopifyOrdersQueued !== undefined
           ? shopifyOrdersQueued
           : undefined;
-    const latestShopifyStatus = latestShopifySession?.status;
-    const shouldSampleOrders =
-      expectedOrders !== undefined &&
-      expectedOrders > 0 &&
-      (!latestShopifyStatus || !ACTIVE_SYNC_STATUSES.has(latestShopifyStatus));
-    let dbHasExpectedOrders = false;
-    if (shouldSampleOrders) {
-      const limit = Math.min(Math.max(expectedOrders - 2 + 5, 500), 5000);
-      const slice = await ctx.db
-        .query("shopifyOrders")
-        .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
-        .order("desc")
-        .take(limit);
-      dbHasExpectedOrders = slice.length >= Math.max(0, expectedOrders - 2);
-    }
+    const _latestShopifyStatus = latestShopifySession?.status;
+    // Previously we sampled a large slice of orders here which caused
+    // significant bandwidth usage for frequent polling. We now avoid this
+    // check entirely in the query path. If needed, a periodic action can
+    // snapshot counts into a lightweight table.
+    const dbHasExpectedOrders = false;
 
     return {
       completed: onboarding.isCompleted || false,

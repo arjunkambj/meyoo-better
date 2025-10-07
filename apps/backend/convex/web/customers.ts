@@ -1,6 +1,6 @@
 import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import { action, query } from "../_generated/server";
 import { api } from "../_generated/api";
 import { validateDateRange, toTimestampRange, type DateRange } from "../utils/analyticsSource";
@@ -712,17 +712,28 @@ export const getCustomerList = query({
     const rangeInput = args.dateRange ?? defaultDateRange();
     const range = validateDateRange(rangeInput);
     const timestamps = toTimestampRange(range);
-    // Get all orders within the date range for this organization
-    const ordersInRange = await ctx.db
-      .query("shopifyOrders")
-      .withIndex("by_organization_and_created", (q) =>
-        q
-          .eq("organizationId", auth.orgId as Id<"organizations">)
-          .gte("shopifyCreatedAt", timestamps.start)
-          .lte("shopifyCreatedAt", timestamps.end),
-      )
-      .filter((q) => q.neq(q.field("financialStatus"), "cancelled"))
-      .collect();
+    // Stream orders in chunks to avoid loading everything at once
+    const ordersInRange: Array<Doc<"shopifyOrders">> = [];
+    let ordersCursor: string | null = null;
+    const ORDERS_PAGE_SIZE = 200;
+    while (true) {
+      const page = await ctx.db
+        .query("shopifyOrders")
+        .withIndex("by_organization_and_created", (q) =>
+          q
+            .eq("organizationId", auth.orgId as Id<"organizations">)
+            .gte("shopifyCreatedAt", timestamps.start)
+            .lte("shopifyCreatedAt", timestamps.end),
+        )
+        .paginate({ numItems: ORDERS_PAGE_SIZE, cursor: ordersCursor });
+
+      for (const o of page.page) {
+        if (o.financialStatus !== "cancelled") ordersInRange.push(o);
+      }
+
+      if (page.isDone || !page.continueCursor) break;
+      ordersCursor = page.continueCursor;
+    }
 
     // Get unique customers who had orders in this period
     const customerIdsInPeriod = new Set<string>();
@@ -741,23 +752,73 @@ export const getCustomerList = query({
       }
     }
 
-    // Get customer documents
-    const allCustomers = await ctx.db
-      .query("shopifyCustomers")
-      .withIndex("by_organization", (q) => q.eq("organizationId", auth.orgId as Id<"organizations">))
-      .collect();
-
+    // Determine requested status early; this controls which customers we must consider
     const statusFilter = args.status ?? "all";
 
-    // Only constrain to in-period customers when the requested status demands it
-    let filteredCustomers = allCustomers;
+    // Prepare optional search term for pre-filtering
+    const searchTerm = args.searchTerm?.trim().toLowerCase();
+
+    // Build the base customer set depending on status filter
+    // - converted: only customers who placed orders in the period
+    // - abandoned_cart/all: all customers in org (to include prospects with zero orders)
+    const customersById = new Map<string, Doc<"shopifyCustomers">>();
     if (statusFilter === "converted") {
-      filteredCustomers = filteredCustomers.filter((c) => customerIdsInPeriod.has(c._id));
+      if (customerIdsInPeriod.size > 0) {
+        const ids = Array.from(customerIdsInPeriod);
+        const BATCH = 50;
+        for (let i = 0; i < ids.length; i += BATCH) {
+          const slice = ids.slice(i, i + BATCH);
+          const fetched = await Promise.all(
+            slice.map((id) => ctx.db.get(id as Id<"shopifyCustomers">)),
+          );
+          for (const c of fetched) {
+            if (!c) continue;
+            customersById.set(c._id as string, c);
+          }
+        }
+      }
+    } else {
+      // Load all customers for the organization; pre-filter by search if provided to limit memory
+      let custCursor: string | null = null;
+      const CUST_PAGE = 250;
+      while (true) {
+        const page = await ctx.db
+          .query("shopifyCustomers")
+          .withIndex("by_organization", (q) =>
+            q.eq("organizationId", auth.orgId as Id<"organizations">),
+          )
+          .paginate({ numItems: CUST_PAGE, cursor: custCursor });
+
+        for (const c of page.page) {
+          if (searchTerm) {
+            const name = `${c.firstName || ""} ${c.lastName || ""}`.toLowerCase();
+            const email = (c.email || "").toLowerCase();
+            if (!name.includes(searchTerm) && !email.includes(searchTerm)) {
+              continue;
+            }
+          }
+          customersById.set(c._id as string, c);
+        }
+
+        if (page.isDone || !page.continueCursor) break;
+        custCursor = page.continueCursor;
+      }
     }
 
-    // Apply search term filter if provided
-    const searchTerm = args.searchTerm?.trim().toLowerCase();
-    if (searchTerm) {
+    // Start from the base customer set and apply status-specific filtering
+    let filteredCustomers = Array.from(customersById.values());
+    if (statusFilter === "abandoned_cart") {
+      filteredCustomers = filteredCustomers.filter(
+        (c) => (ordersByCustomer.get(c._id)?.length ?? 0) === 0,
+      );
+    } else if (statusFilter === "converted") {
+      filteredCustomers = filteredCustomers.filter(
+        (c) => (ordersByCustomer.get(c._id)?.length ?? 0) > 0,
+      );
+    }
+
+    // Apply search term filter if provided (if not already pre-filtered)
+    if (searchTerm && statusFilter === "converted") {
       filteredCustomers = filteredCustomers.filter((c) => {
         const name = `${c.firstName || ""} ${c.lastName || ""}`.toLowerCase();
         const email = (c.email || "").toLowerCase();
@@ -1006,17 +1067,28 @@ export const getGeographicDistribution = query({
     const range = validateDateRange(rangeInput);
     const timestamps = toTimestampRange(range);
 
-    // Get orders in the date range
-    const orders = await ctx.db
-      .query("shopifyOrders")
-      .withIndex("by_organization_and_created", (q) =>
-        q
-          .eq("organizationId", auth.orgId as Id<"organizations">)
-          .gte("shopifyCreatedAt", timestamps.start)
-          .lte("shopifyCreatedAt", timestamps.end),
-      )
-      .filter((q) => q.neq(q.field("financialStatus"), "cancelled"))
-      .collect();
+    // Stream orders in the date range to limit memory and bandwidth
+    const orders: Array<Doc<"shopifyOrders">> = [];
+    let cursor: string | null = null;
+    const PAGE = 200;
+    while (true) {
+      const page = await ctx.db
+        .query("shopifyOrders")
+        .withIndex("by_organization_and_created", (q) =>
+          q
+            .eq("organizationId", auth.orgId as Id<"organizations">)
+            .gte("shopifyCreatedAt", timestamps.start)
+            .lte("shopifyCreatedAt", timestamps.end),
+        )
+        .paginate({ numItems: PAGE, cursor });
+
+      for (const o of page.page) {
+        if (o.financialStatus !== "cancelled") orders.push(o);
+      }
+
+      if (page.isDone || !page.continueCursor) break;
+      cursor = page.continueCursor;
+    }
 
     // Get unique customer IDs from orders
     const customerIds = new Set<string>();
@@ -1026,11 +1098,19 @@ export const getGeographicDistribution = query({
       }
     }
 
-    // Get customer documents
-    const customers = await ctx.db
-      .query("shopifyCustomers")
-      .withIndex("by_organization", (q) => q.eq("organizationId", auth.orgId as Id<"organizations">))
-      .collect();
+    // Load only customers referenced by orders to minimize reads
+    const customers: Doc<"shopifyCustomers">[] = [];
+    const custIds = Array.from(customerIds);
+    const C_BATCH = 50;
+    for (let i = 0; i < custIds.length; i += C_BATCH) {
+      const slice = custIds.slice(i, i + C_BATCH);
+      const fetched = await Promise.all(
+        slice.map((id) => ctx.db.get(id as Id<"shopifyCustomers">)),
+      );
+      for (const c of fetched) {
+        if (c) customers.push(c);
+      }
+    }
 
     // Build geographic aggregations
     const countryMap = new Map<
@@ -1168,30 +1248,40 @@ export const getCustomerJourney = query({
     const metrics = dailyOverview.metrics;
     const returningCustomers = metrics.returningCustomers || 0;
 
-    const metaInsights = await ctx.db
-      .query("metaInsights")
-      .withIndex("by_org_date", (q) =>
-        q
-          .eq("organizationId", auth.orgId as Id<"organizations">)
-          .gte("date", range.startDate)
-          .lte("date", range.endDate),
-      )
-      .filter((q) => q.eq(q.field("entityType"), "account"))
-      .collect();
+    // Sum Meta insights incrementally to avoid fetching a giant array
+    let metaTotals = { impressions: 0, clicks: 0, conversions: 0 } as {
+      impressions: number;
+      clicks: number;
+      conversions: number;
+    };
+    let mCursor: string | null = null;
+    const M_PAGE = 250;
+    while (true) {
+      const page = await ctx.db
+        .query("metaInsights")
+        .withIndex("by_org_date", (q) =>
+          q
+            .eq("organizationId", auth.orgId as Id<"organizations">)
+            .gte("date", range.startDate)
+            .lte("date", range.endDate),
+        )
+        .paginate({ numItems: M_PAGE, cursor: mCursor });
 
-    const metaTotals = metaInsights.reduce(
-      (totals, insight) => {
-        const impressions = typeof insight.impressions === "number" ? insight.impressions : 0;
-        const clicks = typeof insight.clicks === "number" ? insight.clicks : 0;
-        const conversions = typeof insight.conversions === "number" ? insight.conversions : 0;
-        return {
-          impressions: totals.impressions + Math.max(impressions, 0),
-          clicks: totals.clicks + Math.max(clicks, 0),
-          conversions: totals.conversions + Math.max(conversions, 0),
+      for (const insight of page.page) {
+        if ((insight as any).entityType !== "account") continue;
+        const impressions = typeof (insight as any).impressions === "number" ? (insight as any).impressions : 0;
+        const clicks = typeof (insight as any).clicks === "number" ? (insight as any).clicks : 0;
+        const conversions = typeof (insight as any).conversions === "number" ? (insight as any).conversions : 0;
+        metaTotals = {
+          impressions: metaTotals.impressions + Math.max(impressions, 0),
+          clicks: metaTotals.clicks + Math.max(clicks, 0),
+          conversions: metaTotals.conversions + Math.max(conversions, 0),
         };
-      },
-      { impressions: 0, clicks: 0, conversions: 0 },
-    );
+      }
+
+      if (page.isDone || !page.continueCursor) break;
+      mCursor = page.continueCursor;
+    }
 
     const roundPercent = (value: number) => {
       if (!Number.isFinite(value)) {

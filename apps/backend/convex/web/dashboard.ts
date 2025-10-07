@@ -166,7 +166,8 @@ export const getOverviewData = query({
       auth.user._id,
       auth.orgId,
     );
-    const integrationStatus = await computeIntegrationStatus(ctx, auth.orgId);
+    // Read cached status via query to avoid recomputation and large reads
+    const integrationStatus = await ctx.runQuery(api.core.status.getIntegrationStatus, {});
     const orgDoc = await ctx.db.get(auth.orgId as Id<"organizations">);
     const primaryCurrency = orgDoc?.primaryCurrency ?? "USD";
 

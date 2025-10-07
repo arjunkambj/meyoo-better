@@ -106,13 +106,14 @@ export async function computeIntegrationStatus(
     )
     .first();
 
+  // Only read a small recent window for sessions; we don't need large scans
   const latestShopify = await ctx.db
     .query("syncSessions")
     .withIndex("by_org_platform_and_date", (q) =>
       q.eq("organizationId", organizationId).eq("platform", "shopify"),
     )
     .order("desc")
-    .take(10);
+    .take(5);
 
   const latestMeta = await ctx.db
     .query("syncSessions")
@@ -120,7 +121,7 @@ export async function computeIntegrationStatus(
       q.eq("organizationId", organizationId).eq("platform", "meta"),
     )
     .order("desc")
-    .take(10);
+    .take(5);
 
   const initialShopify = latestShopify.find(isInitialSyncSession);
   const initialMeta = latestMeta.find(isInitialSyncSession);
@@ -132,24 +133,13 @@ export async function computeIntegrationStatus(
     (initialShopify?.metadata as any)?.ordersQueued ??
     undefined;
 
-  let dbHasExpectedOrders = false;
-  let ordersInDb = 0;
-  if (typeof expectedOrders === "number" && expectedOrders > 0) {
-    const windowMs = 60 * 24 * 60 * 60 * 1000;
-    const since = Date.now() - windowMs;
-    const target = Math.max(0, expectedOrders - 2);
-
-    const limit = Math.min(Math.max(target + 5, 500), 5000);
-    const slice = await ctx.db
-      .query("shopifyOrders")
-      .withIndex("by_organization_and_created", (q) =>
-        q.eq("organizationId", organizationId).gte("shopifyCreatedAt", since),
-      )
-      .order("desc")
-      .take(limit);
-    ordersInDb = slice.length;
-    dbHasExpectedOrders = ordersInDb >= target;
-  }
+  // Avoid an expensive scan of thousands of orders on every status read.
+  // We no longer attempt to verify `ordersInDb` here — this dramatically
+  // reduces bandwidth for frequent status queries. Instead, rely on the
+  // sync session status and stage completion flags which are already
+  // maintained during sync.
+  const dbHasExpectedOrders = false;
+  const ordersInDb = 0;
 
   const shopifyInitialComplete = Boolean(
     initialShopify &&
@@ -166,33 +156,20 @@ export async function computeIntegrationStatus(
     initialMeta && initialMeta.status === "completed",
   );
 
-  const recentOrder = await ctx.db
-    .query("shopifyOrders")
-    .withIndex("by_organization_and_created", (q) =>
-      q.eq("organizationId", organizationId),
-    )
-    .order("desc")
-    .first();
-
-  const recentInsight = await ctx.db
-    .query("metaInsights")
-    .withIndex("by_organization", (q) => q.eq("organizationId", organizationId))
-    .order("desc")
-    .first();
-
   const onboarding = await ctx.db
     .query("onboarding")
     .withIndex("by_organization", (q) => q.eq("organizationId", organizationId))
     .first();
 
+  // Make readiness depend on session completion rather than scanning orders/insights.
   const analyticsReady = Boolean(
-    (recentOrder || recentInsight || onboarding?.onboardingData?.analyticsTriggeredAt) &&
+    (latestShopify[0] || latestMeta[0] || onboarding?.onboardingData?.analyticsTriggeredAt) &&
       (shopifyStore ? shopifyInitialComplete : true),
   );
 
   const lastCalculatedAt = Math.max(
-    recentOrder?.syncedAt ?? 0,
-    recentInsight?.syncedAt ?? 0,
+    latestShopify[0]?.completedAt ?? latestShopify[0]?.startedAt ?? 0,
+    latestMeta[0]?.completedAt ?? latestMeta[0]?.startedAt ?? 0,
     onboarding?.onboardingData?.analyticsTriggeredAt ?? 0,
   );
 
@@ -205,6 +182,8 @@ export async function computeIntegrationStatus(
         initialShopify?.status === "completed" ? initialShopify.completedAt : undefined,
       lastSyncAt: latestShopify[0]?.completedAt ?? latestShopify[0]?.startedAt,
       expectedOrders,
+      // Intentionally omit ordersInDb to avoid heavy reads; a separate
+      // maintenance job can snapshot this if needed.
       ordersInDb: ordersInDb || undefined,
     },
     meta: {

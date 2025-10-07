@@ -17,6 +17,22 @@ export const getIntegrationStatus = query({
       return emptyIntegrationStatus();
     }
 
+    // Prefer lightweight snapshot when available and fresh
+    const SNAPSHOT_TTL_MS = 60 * 1000; // 1 minute freshness is enough for UI
+    const existing = await ctx.db
+      .query("integrationStatus")
+      .withIndex("by_organization", (q) => q.eq("organizationId", auth.orgId))
+      .first();
+
+    if (existing && Date.now() - (existing.updatedAt ?? 0) < SNAPSHOT_TTL_MS) {
+      return {
+        shopify: existing.shopify,
+        meta: existing.meta,
+        analytics: existing.analytics,
+      };
+    }
+
+    // Fallback to computing on the fly (now lightweight)
     return await computeIntegrationStatus(ctx, auth.orgId);
   },
 });

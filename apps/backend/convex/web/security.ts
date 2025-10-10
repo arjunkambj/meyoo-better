@@ -162,29 +162,6 @@ export const revokeApiKey = mutation({
   },
 });
 
-// Update API key name or permissions
-export const updateApiKey = mutation({
-  args: {
-    id: v.id("apiKeys"),
-    name: v.string(),
-  },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) {
-      throw new Error("Unauthorized");
-    }
-
-    const key = await ctx.db.get(args.id);
-    if (!key || key.userId !== userId) {
-      throw new Error("API key not found");
-    }
-
-    await ctx.db.patch(args.id, { name: args.name });
-    return null;
-  },
-});
-
 // Validate an API key (for internal use - read only)
 export const validateApiKey = query({
   args: {

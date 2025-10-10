@@ -1,15 +1,9 @@
 import { v } from "convex/values";
 
 import type { Id } from "../_generated/dataModel";
-import { action, query, type QueryCtx } from "../_generated/server";
+import { action, query } from "../_generated/server";
 import { api } from "../_generated/api";
-import {
-  dateRangeValidator,
-  defaultDateRange,
-  loadAnalytics,
-  responseValidator,
-  type AnalyticsResponse,
-} from "./analyticsShared";
+import { dateRangeValidator, type AnalyticsResponse } from "./analyticsShared";
 import {
   fetchAnalyticsOrderChunk,
   type AnalyticsSourceKey,
@@ -26,8 +20,6 @@ import type {
 } from "@repo/types";
 import { loadAnalyticsWithChunks } from "../utils/analyticsLoader";
 import { loadOverviewFromDailyMetrics } from "../utils/dailyMetrics";
-
-const responseOrNull = v.union(v.null(), responseValidator);
 
 type DateRangeArg = DateRange;
 
@@ -257,41 +249,6 @@ const ordersPaginationValidator = v.object({
   numItems: v.optional(v.number()),
 });
 
-type QueryHandler = (
-  ctx: QueryCtx,
-  orgId: Id<"organizations">,
-  range: DateRangeArg,
-  extra?: Record<string, unknown>,
-) => Promise<AnalyticsResponse>;
-
-async function handleOrdersQuery(
-  ctx: QueryCtx,
-  dateRange: DateRangeArg,
-  handler?: QueryHandler,
-  extra?: Record<string, unknown>,
-) {
-  const auth = await getUserAndOrg(ctx);
-  if (!auth) return null;
-
-  const range = validateDateRange(dateRange);
-
-  if (handler) {
-    return handler(ctx, auth.orgId as Id<"organizations">, range, extra);
-  }
-
-  return await loadAnalytics(ctx, auth.orgId as Id<"organizations">, range);
-}
-
-export const getOrdersOverview = query({
-  args: {
-    dateRange: dateRangeValidator,
-  },
-  returns: responseOrNull,
-  handler: async (ctx, args) => {
-    return await handleOrdersQuery(ctx, args.dateRange);
-  },
-});
-
 export const getOrdersOverviewMetrics = query({
   args: {
     dateRange: dateRangeValidator,
@@ -328,37 +285,6 @@ export const getOrdersOverviewMetrics = query({
     return {
       metrics,
       meta,
-    };
-  },
-});
-
-export const getRevenueSumForRange = query({
-  args: {
-    dateRange: dateRangeValidator,
-  },
-  returns: responseOrNull,
-  handler: async (ctx, args) => {
-    return await handleOrdersQuery(ctx, args.dateRange);
-  },
-});
-
-export const getOrdersList = query({
-  args: {
-    dateRange: dateRangeValidator,
-    limit: v.optional(v.number()),
-  },
-  returns: responseOrNull,
-  handler: async (ctx, args) => {
-    const response = await handleOrdersQuery(ctx, args.dateRange);
-
-    if (!response) return null;
-
-    return {
-      ...response,
-      meta: {
-        limit: args.limit,
-        note: "Client should apply pagination, sorting, and limiting to raw orders.",
-      },
     };
   },
 });
@@ -527,16 +453,6 @@ export const getOrdersTablePage = query({
   },
 });
 
-export const getStatusDistribution = query({
-  args: {
-    dateRange: dateRangeValidator,
-  },
-  returns: responseOrNull,
-  handler: async (ctx, args) => {
-    return await handleOrdersQuery(ctx, args.dateRange);
-  },
-});
-
 export const getFulfillmentMetrics = query({
   args: {
     dateRange: dateRangeValidator,
@@ -574,17 +490,6 @@ export const getFulfillmentMetrics = query({
       avgFulfillmentCost,
       totalOrders,
     } satisfies OrdersFulfillmentMetrics;
-  },
-});
-
-export const getOrderTimeline = query({
-  args: {
-    dateRange: v.optional(dateRangeValidator),
-  },
-  returns: responseOrNull,
-  handler: async (ctx, args) => {
-    const range = args.dateRange ?? defaultDateRange(14);
-    return await handleOrdersQuery(ctx, range);
   },
 });
 

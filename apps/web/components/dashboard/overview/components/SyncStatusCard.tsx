@@ -1,6 +1,6 @@
 "use client";
 
-import { Card, CardBody, Chip, Progress, Spinner } from "@heroui/react";
+import { Card, CardBody, Chip, Spinner } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { formatDistanceToNow } from "date-fns";
 
@@ -73,8 +73,6 @@ export function SyncStatusCard({ isLoading, data }: Props) {
 
   const stateMeta = STATE_META[data.state];
   const lastUpdated = formatLastUpdated(data.lastUpdated);
-  const progress = data.progress;
-
   return (
     <Card className="border border-warning-200/70 bg-warning-50/40 dark:border-warning-200/30 dark:bg-warning-100/10">
       <CardBody className="space-y-3 py-3">
@@ -102,19 +100,6 @@ export function SyncStatusCard({ isLoading, data }: Props) {
             <p className="text-xs text-default-400">{lastUpdated}</p>
           )}
         </div>
-
-        {progress && (
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-xs text-default-500">
-              <span>Orders processed</span>
-              <span>
-                {progress.processed.toLocaleString()} /{" "}
-                {progress.total.toLocaleString()} ({progress.percent}%)
-              </span>
-            </div>
-            <Progress value={progress.percent} color="warning" size="sm" />
-          </div>
-        )}
 
         {data.error && (
           <div className="rounded-md bg-danger-50/60 px-3 py-2 text-xs text-danger-600 dark:bg-danger-100/10 dark:text-danger-400">

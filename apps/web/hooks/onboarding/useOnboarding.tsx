@@ -1,6 +1,7 @@
 import { useMutation } from "convex/react";
 import { useQuery } from "convex-helpers/react/cache/hooks";
 import { api } from "@/libs/convexApi";
+import type { OnboardingStatus } from "@repo/types";
 import { createContext, useContext, useMemo } from "react";
 import type { ReactNode } from "react";
 
@@ -11,42 +12,11 @@ import type { ReactNode } from "react";
 // Use key-based helpers derived from ONBOARDING_STEPS; no separate numeric mapping.
 
 function useOnboardingInternal() {
-  const status = useQuery(api.core.onboarding.getOnboardingStatus);
+  const rawStatus = useQuery(api.core.onboarding.getOnboardingStatus);
+  const status = rawStatus as OnboardingStatus | null | undefined;
   const integrationStatus = useQuery(api.core.status.getIntegrationStatus);
   type Overall = 'unsynced' | 'syncing' | 'complete' | 'failed';
-  const syncStatus = (status as any)?.syncStatus as
-    | {
-        shopify?: {
-          status: string;
-          overallState?: Overall;
-          recordsProcessed?: number;
-          baselineRecords?: number;
-          ordersProcessed?: number;
-          ordersQueued?: number;
-          totalOrdersSeen?: number;
-          productsProcessed?: number;
-          customersProcessed?: number;
-          startedAt?: number;
-          completedAt?: number;
-          lastError?: string;
-          stageStatus?: {
-            products?: string;
-            inventory?: string;
-            customers?: string;
-            orders?: string;
-          };
-          syncedEntities?: string[];
-        };
-        meta?: {
-          status: string;
-          overallState?: Overall;
-          recordsProcessed?: number;
-          startedAt?: number;
-          completedAt?: number;
-          lastError?: string;
-        };
-      }
-    | undefined;
+  const syncStatus = status?.syncStatus;
   const updateStateMutation = useMutation(
     api.core.onboarding.updateOnboardingState
   );
@@ -59,7 +29,7 @@ function useOnboardingInternal() {
   const shopifySyncStatus = syncStatus?.shopify?.status ?? null;
   const shopifyExpectedOrders =
     integrationStatus?.shopify?.expectedOrders ??
-    (syncStatus?.shopify?.ordersQueued ?? null);
+    null;
   const shopifyOrdersInDb = integrationStatus?.shopify?.ordersInDb ?? null;
   const isInitialSyncComplete = status?.isInitialSyncComplete || false;
   const isShopifySynced =
@@ -77,30 +47,22 @@ function useOnboardingInternal() {
   const hasShopifySyncError = shopifyOverall
     ? shopifyOverall === 'failed'
     : shopifySyncStatus === "failed";
+  const shopifyStages = syncStatus?.shopify?.stages ?? null;
   const shopifySyncProgress = {
     status: shopifySyncStatus,
-    recordsProcessed: syncStatus?.shopify?.recordsProcessed ?? 0,
-    baselineRecords: syncStatus?.shopify?.baselineRecords ?? null,
-    ordersProcessed: syncStatus?.shopify?.ordersProcessed ?? null,
-    ordersQueued: syncStatus?.shopify?.ordersQueued ?? null,
-    totalOrdersSeen: syncStatus?.shopify?.totalOrdersSeen ?? null,
-    productsProcessed: syncStatus?.shopify?.productsProcessed ?? null,
-    customersProcessed: syncStatus?.shopify?.customersProcessed ?? null,
     startedAt: syncStatus?.shopify?.startedAt ?? null,
     completedAt: syncStatus?.shopify?.completedAt ?? null,
     lastError: syncStatus?.shopify?.lastError ?? null,
+    stages: shopifyStages,
   } as const;
-
-  const shopifyStageStatus = syncStatus?.shopify?.stageStatus ?? null;
   const isShopifyProductsSynced =
-    (shopifyStageStatus?.products ?? null) === "completed";
+    Boolean(shopifyStages?.products);
   const isShopifyInventorySynced =
-    (shopifyStageStatus?.inventory ?? null) === "completed";
+    Boolean(shopifyStages?.inventory);
   const isShopifyCustomersSynced =
-    (shopifyStageStatus?.customers ?? null) === "completed";
+    Boolean(shopifyStages?.customers);
   const isShopifyOrdersSynced =
-    (shopifyStageStatus?.orders ?? null) === "completed";
-  const shopifySyncedEntities = syncStatus?.shopify?.syncedEntities ?? undefined;
+    Boolean(shopifyStages?.orders);
 
   // Next step navigation
   const nextStep = async () => {
@@ -149,9 +111,9 @@ function useOnboardingInternal() {
 
   return {
     status,
-    loading: status === undefined,
+    loading: rawStatus === undefined,
     error:
-      status === null && status !== undefined
+      status === null && rawStatus !== undefined
         ? "Failed to load onboarding status"
         : null,
     isCompleted: status?.completed || false,
@@ -184,8 +146,7 @@ function useOnboardingInternal() {
     isShopifySyncing,
     hasShopifySyncError,
     shopifySyncProgress,
-    shopifyStageStatus,
-    shopifySyncedEntities,
+    shopifyStages,
     isShopifyProductsSynced,
     isShopifyInventorySynced,
     isShopifyCustomersSynced,
@@ -226,8 +187,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       value.isShopifySyncing,
       value.hasShopifySyncError,
       value.shopifySyncProgress,
-      value.shopifyStageStatus,
-      value.shopifySyncedEntities,
+      value.shopifyStages,
       value.isShopifyProductsSynced,
       value.isShopifyInventorySynced,
       value.isShopifyCustomersSynced,

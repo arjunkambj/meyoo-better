@@ -135,10 +135,8 @@ export default function VariantCostsClient({
     status,
     isShopifySyncing,
     hasShopifySyncError,
-    shopifySyncProgress,
     isShopifyProductsSynced,
     isShopifyInventorySynced,
-    shopifyStageStatus,
   } = useOnboarding();
   const [saving, setSaving] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
@@ -149,14 +147,13 @@ export default function VariantCostsClient({
     handling?: { value: number; type: "percent" | "flat" };
   }>({});
 
-  const formatStage = (stage?: string | null) =>
-    stage ? stage.replace(/_/g, " ") : "pending";
-
   const isProductDataReady =
     (isShopifyProductsSynced ?? false) || (isShopifyInventorySynced ?? false);
-  const productStageLabel = formatStage(shopifyStageStatus?.products);
-  const inventoryStageLabel = formatStage(shopifyStageStatus?.inventory);
-  const ordersStageLabel = formatStage(shopifyStageStatus?.orders);
+  const syncStateLabel = hasShopifySyncError
+    ? "needs attention"
+    : isShopifySyncing
+      ? "syncing"
+      : "queued";
 
   // Build robust column list to avoid invalid children under TableHeader
   const columns = useMemo(() => {
@@ -467,27 +464,18 @@ export default function VariantCostsClient({
                     : "We\u2019re importing your products and variants from Shopify. Once the sync finishes you\u2019ll be able to set costs."}
                 </p>
                 <p className="text-xs uppercase tracking-wide text-warning-500">
-                  Products: {productStageLabel} • Inventory: {inventoryStageLabel} • Orders stage: {ordersStageLabel}
-                  {typeof shopifySyncProgress.ordersProcessed === 'number' ?
-                    (() => {
-                      const seen = shopifySyncProgress.totalOrdersSeen as number | null;
-                      const queued = shopifySyncProgress.ordersQueued as number | null;
-                      const denom = typeof seen === 'number' ? seen : (queued && queued > 0 ? queued : undefined);
-                      const suffix = denom !== undefined ? ` of ${denom}` : '';
-                      return ` • Orders processed: ${shopifySyncProgress.ordersProcessed}${suffix}`;
-                    })()
-                    : (shopifySyncProgress.recordsProcessed ? ` • Records processed: ${shopifySyncProgress.recordsProcessed}` : '')}
+                  Shopify sync status: {syncStateLabel}
                 </p>
               </div>
             </div>
-            {!hasShopifySyncError && (
-              <div className="flex items-center justify-start gap-2 text-warning-500">
-                <Spinner size="sm" color="warning" />
-                <span className="text-xs">
-                  Feel free to grab a coffee—this only needs to finish once.
-                </span>
-              </div>
-            )}
+            <div className="flex items-center justify-start gap-2 text-warning-500">
+              <Spinner size="sm" color="warning" />
+              <span className="text-xs">
+                {hasShopifySyncError
+                  ? "Head back to the Shopify step to retry the sync."
+                  : "Feel free to grab a coffee—this only needs to finish once."}
+              </span>
+            </div>
           </CardBody>
         </Card>
         <div className="flex flex-wrap items-center justify-center gap-2">

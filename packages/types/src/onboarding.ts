@@ -37,19 +37,15 @@ export type OnboardingStepNumber = typeof ONBOARDING_STEPS[keyof typeof ONBOARDI
 export type OnboardingStepKey = typeof ONBOARDING_STEP_KEYS[OnboardingStepNumber];
 export type OnboardingRoute = typeof ONBOARDING_ROUTES[OnboardingStepKey];
 
-export interface SyncStageStatus {
-  products?: string;
-  inventory?: string;
-  customers?: string;
-  orders?: string;
+export interface SyncStageFlags {
+  products: boolean;
+  inventory: boolean;
+  customers: boolean;
+  orders: boolean;
 }
 
 export interface PlatformSyncStatus {
   status: string;
-  recordsProcessed?: number;
-  baselineRecords?: number;
-  ordersProcessed?: number;
-  ordersQueued?: number;
   /**
    * High-level state for easier UI/logic handling
    * - unsynced: no initial sync has started
@@ -58,13 +54,10 @@ export interface PlatformSyncStatus {
    * - failed: last known initial sync failed
    */
   overallState?: 'unsynced' | 'syncing' | 'complete' | 'failed';
-  productsProcessed?: number;
-  customersProcessed?: number;
+  stages?: SyncStageFlags;
   startedAt?: number;
   completedAt?: number;
   lastError?: string;
-  stageStatus?: SyncStageStatus;
-  syncedEntities?: string[];
 }
 
 export interface OnboardingStatus {

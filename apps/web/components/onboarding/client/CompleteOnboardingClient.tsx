@@ -18,18 +18,15 @@ export default function CompleteOnboardingClient() {
   const {
     finishOnboarding,
     hasShopify,
-    hasMeta,
-    status,
-    hasShopifySyncError,
-    shopifySyncStatus,
-    shopifySyncProgress,
+   hasMeta,
+   status,
+   hasShopifySyncError,
+   shopifySyncStatus,
     isInitialSyncComplete,
     pendingSyncPlatforms: _pendingSyncPlatforms,
     syncStatus,
     shopifySyncState,
     integrationStatus,
-    shopifyExpectedOrders,
-    shopifyOrdersInDb,
   } = useOnboarding();
 
   // (features list removed; unused)
@@ -149,39 +146,6 @@ export default function CompleteOnboardingClient() {
     }
     return shopifySyncStatus ? shopifySyncStatus.replace(/_/g, ' ') : 'not started';
   })();
-  const shopifyOrdersProcessed = shopifySyncProgress.ordersProcessed;
-  const shopifyOrdersQueued = shopifySyncProgress.ordersQueued;
-  const shopifyTotalOrdersSeen = shopifySyncProgress.totalOrdersSeen as
-    | number
-    | null
-    | undefined;
-  const shopifyRecordsProcessed = shopifySyncProgress.recordsProcessed;
-  const shopifyProgressText = (() => {
-    const expected =
-      typeof shopifyExpectedOrders === 'number'
-        ? shopifyExpectedOrders
-        : typeof shopifyTotalOrdersSeen === 'number'
-          ? shopifyTotalOrdersSeen
-          : typeof shopifyOrdersQueued === 'number'
-            ? shopifyOrdersQueued
-            : undefined;
-    const processedBase = Math.max(
-      typeof shopifyOrdersProcessed === 'number' ? shopifyOrdersProcessed : 0,
-      typeof shopifyOrdersInDb === 'number' ? shopifyOrdersInDb : 0,
-      typeof shopifyRecordsProcessed === 'number' ? shopifyRecordsProcessed : 0,
-    );
-
-    if (expected !== undefined && expected > 0) {
-      const corrected = Math.min(expected, processedBase);
-      return `Orders imported: ${corrected} of ${expected}`;
-    }
-
-    if (processedBase > 0) {
-      return `Orders imported: ${processedBase}`;
-    }
-
-    return null;
-  })();
   const syncingDescription = hasShopifySyncError
     ? "The initial Shopify sync failed. You can finish setup now, but we recommend retrying the sync from the Shopify step so analytics stay accurate."
     : activePlatforms.length > 0
@@ -216,8 +180,7 @@ export default function CompleteOnboardingClient() {
                 </p>
                 {activePlatforms.includes("shopify") && (
                   <p className="text-xs uppercase tracking-wide text-warning-500">
-                    Status: {syncStatusLabel}
-                    {shopifyProgressText ? ` • ${shopifyProgressText}` : ""}
+                    Shopify sync status: {syncStatusLabel}
                   </p>
                 )}
                 {activePlatforms.includes("meta") && syncStatus?.meta?.status && (

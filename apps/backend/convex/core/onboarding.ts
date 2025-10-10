@@ -32,6 +32,76 @@ const ACTIVE_SYNC_STATUSES = new Set<SyncSessionStatus>([
 const isInitialSyncSession = (session: Doc<"syncSessions">): boolean =>
   session.type === "initial" || session.metadata?.isInitialSync === true;
 
+type SyncStageFlags = {
+  products: boolean;
+  inventory: boolean;
+  customers: boolean;
+  orders: boolean;
+};
+
+const emptyStageFlags: SyncStageFlags = {
+  products: false,
+  inventory: false,
+  customers: false,
+  orders: false,
+};
+
+const extractStageFlags = (
+  metadata: Record<string, unknown> | undefined,
+): SyncStageFlags => {
+  if (!metadata) {
+    return emptyStageFlags;
+  }
+
+  const stageStatus = (metadata.stageStatus || {}) as Record<string, string>;
+  const syncedEntities = Array.isArray(metadata.syncedEntities)
+    ? new Set(metadata.syncedEntities as string[])
+    : undefined;
+  const isComplete = (key: keyof SyncStageFlags): boolean => {
+    const value = stageStatus?.[key];
+    if (typeof value === "string" && value.toLowerCase() === "completed") {
+      return true;
+    }
+    return syncedEntities?.has(key) ?? false;
+  };
+
+  return {
+    products: isComplete("products"),
+    inventory: isComplete("inventory"),
+    customers: isComplete("customers"),
+    orders: isComplete("orders"),
+  };
+};
+
+type OverallState = "unsynced" | "syncing" | "complete" | "failed";
+
+const deriveOverallState = (sessions: Doc<"syncSessions">[]): OverallState => {
+  if (!sessions.length) {
+    return "unsynced";
+  }
+
+  const relevant = sessions.filter((session) => isInitialSyncSession(session));
+  const targetSessions = relevant.length > 0 ? relevant : sessions;
+
+  if (targetSessions.some((session) => session.status === "completed")) {
+    return "complete";
+  }
+
+  if (
+    targetSessions.some((session) =>
+      ACTIVE_SYNC_STATUSES.has(session.status as SyncSessionStatus),
+    )
+  ) {
+    return "syncing";
+  }
+
+  if (targetSessions.some((session) => session.status === "failed")) {
+    return "failed";
+  }
+
+  return "unsynced";
+};
+
 // ============ QUERIES ============
 
 /**
@@ -69,25 +139,15 @@ export const getOnboardingStatus = query({
                 v.literal("failed"),
               ),
             ),
-            recordsProcessed: v.optional(v.number()),
-            baselineRecords: v.optional(v.number()),
-            ordersProcessed: v.optional(v.number()),
-            ordersQueued: v.optional(v.number()),
-            totalOrdersSeen: v.optional(v.number()),
-            productsProcessed: v.optional(v.number()),
-            customersProcessed: v.optional(v.number()),
+            stages: v.object({
+              products: v.boolean(),
+              inventory: v.boolean(),
+              customers: v.boolean(),
+              orders: v.boolean(),
+            }),
             startedAt: v.optional(v.number()),
             completedAt: v.optional(v.number()),
             lastError: v.optional(v.string()),
-            stageStatus: v.optional(
-              v.object({
-                products: v.optional(v.string()),
-                inventory: v.optional(v.string()),
-                customers: v.optional(v.string()),
-                orders: v.optional(v.string()),
-              }),
-            ),
-            syncedEntities: v.optional(v.array(v.string())),
           }),
         ),
         meta: v.optional(
@@ -130,8 +190,8 @@ export const getOnboardingStatus = query({
       meta: onboarding.hasMetaConnection || false,
     };
 
-    // Prefer the most recent initial sync session for progress display
-    const recentShopifySessions = await ctx.db
+    // Prefer a small recent window for sync insight to keep the payload light
+    const shopifySessions = await ctx.db
       .query("syncSessions")
       .withIndex("by_org_platform_and_date", (q) =>
         q
@@ -139,13 +199,8 @@ export const getOnboardingStatus = query({
           .eq("platform", "shopify"),
       )
       .order("desc")
-      .take(20);
-    const latestShopifyInitial = recentShopifySessions.find((s) =>
-      isInitialSyncSession(s as any),
-    );
-    const latestShopifySession = latestShopifyInitial || recentShopifySessions[0];
-
-    const recentMetaSessions = await ctx.db
+      .take(5);
+    const metaSessions = await ctx.db
       .query("syncSessions")
       .withIndex("by_org_platform_and_date", (q) =>
         q
@@ -153,142 +208,49 @@ export const getOnboardingStatus = query({
           .eq("platform", "meta"),
       )
       .order("desc")
-      .take(20);
-    const latestMetaInitial = recentMetaSessions.find((s) =>
-      isInitialSyncSession(s as any),
+      .take(5);
+
+    const latestShopifySession = shopifySessions[0];
+    const latestMetaSession = metaSessions[0];
+
+    let initialShopifySession = shopifySessions.find((session) =>
+      isInitialSyncSession(session),
     );
-    const latestMetaSession = latestMetaInitial || recentMetaSessions[0];
 
-    // Compute overallState for each platform with initial sync awareness
-    const computeOverall = async (
-      platform: "shopify" | "meta",
-    ): Promise<"unsynced" | "syncing" | "complete" | "failed"> => {
-      // Check completed initial
-      const completed = await ctx.db
+    if (!initialShopifySession) {
+      // Pull the oldest session so stage flags keep the first full import metadata.
+      const oldestShopifySession = await ctx.db
         .query("syncSessions")
-        .withIndex("by_org_platform_and_status", (q) =>
+        .withIndex("by_org_platform_and_date", (q) =>
           q
             .eq("organizationId", orgId)
-            .eq("platform", platform)
-            .eq("status", "completed"),
+            .eq("platform", "shopify"),
         )
-        .take(10);
-      if (completed.find((s) => s.type === "initial" || (s.metadata as any)?.isInitialSync === true)) {
-        return "complete";
+        .order("asc")
+        .first();
+
+      if (oldestShopifySession && isInitialSyncSession(oldestShopifySession)) {
+        initialShopifySession = oldestShopifySession;
       }
-      // Check active initial
-      const actives = await ctx.db
-        .query("syncSessions")
-        .withIndex("by_org_platform_and_status", (q) =>
-          q
-            .eq("organizationId", orgId)
-            .eq("platform", platform)
-            .eq("status", "pending"),
+    }
+
+    const shopifySessionsForStatus = initialShopifySession
+      ? shopifySessions.some(
+          (session) => session._id === initialShopifySession._id,
         )
-        .take(10);
-      const syncing = actives.find((s) => s.type === "initial")
-        ? true
-        : (await ctx.db
-            .query("syncSessions")
-            .withIndex("by_org_platform_and_status", (q) =>
-              q
-                .eq("organizationId", orgId)
-                .eq("platform", platform)
-                .eq("status", "processing"),
-            )
-            .take(10)).find((s) => s.type === "initial")
-          ? true
-          : (await ctx.db
-              .query("syncSessions")
-              .withIndex("by_org_platform_and_status", (q) =>
-                q
-                  .eq("organizationId", orgId)
-                  .eq("platform", platform)
-                  .eq("status", "syncing"),
-              )
-              .take(10)).find((s) => s.type === "initial")
-            ? true
-            : false;
-      if (syncing) return "syncing";
-      // Check failed initial
-      const failed = await ctx.db
-        .query("syncSessions")
-        .withIndex("by_org_platform_and_status", (q) =>
-          q
-            .eq("organizationId", orgId)
-            .eq("platform", platform)
-            .eq("status", "failed"),
-        )
-        .take(10);
-      if (failed.find((s) => s.type === "initial")) {
-        return "failed";
-      }
-      return "unsynced";
-    };
+        ? shopifySessions
+        : [...shopifySessions, initialShopifySession]
+      : shopifySessions;
 
-    let shopifyOverall = await computeOverall("shopify");
-    const metaOverall = await computeOverall("meta");
+    const shopifyMetadata = (
+      initialShopifySession?.metadata ??
+      latestShopifySession?.metadata ??
+      {}
+    ) as Record<string, unknown> | undefined;
+    const shopifyStages = extractStageFlags(shopifyMetadata);
 
-    const shopifyMetadata = (latestShopifySession?.metadata || {}) as Record<
-      string,
-      unknown
-    >;
-    const shopifyStageStatus = shopifyMetadata.stageStatus as
-      | Record<string, string>
-      | undefined;
-    const shopifySyncedEntities = Array.isArray(shopifyMetadata.syncedEntities)
-      ? (shopifyMetadata.syncedEntities as string[])
-      : undefined;
-    const shopifyBaselineRecords =
-      typeof shopifyMetadata.baselineRecords === "number"
-        ? (shopifyMetadata.baselineRecords as number)
-        : undefined;
-    const shopifyOrdersProcessed =
-      typeof shopifyMetadata.ordersProcessed === "number"
-        ? (shopifyMetadata.ordersProcessed as number)
-        : undefined;
-    const shopifyOrdersQueued =
-      typeof shopifyMetadata.ordersQueued === "number"
-        ? (shopifyMetadata.ordersQueued as number)
-        : undefined;
-    const shopifyProductsProcessed =
-      typeof shopifyMetadata.productsProcessed === "number"
-        ? (shopifyMetadata.productsProcessed as number)
-        : undefined;
-    const shopifyCustomersProcessed =
-      typeof shopifyMetadata.customersProcessed === "number"
-        ? (shopifyMetadata.customersProcessed as number)
-        : undefined;
-    const shopifyTotalOrdersSeen =
-      typeof shopifyMetadata.totalOrdersSeen === "number"
-        ? (shopifyMetadata.totalOrdersSeen as number)
-        : undefined;
-
-    const normalizedOrdersProcessed =
-      shopifyOrdersProcessed !== undefined
-        ? shopifyOrdersProcessed
-        : shopifyBaselineRecords !== undefined &&
-            typeof latestShopifySession?.recordsProcessed === "number"
-          ? Math.max(
-              0,
-              (latestShopifySession.recordsProcessed || 0) -
-                shopifyBaselineRecords,
-            )
-          : undefined;
-
-    // Heuristic DB-backed completion: if DB has >= expected orders, consider complete
-    const _expectedOrders =
-      shopifyTotalOrdersSeen !== undefined
-        ? shopifyTotalOrdersSeen
-        : shopifyOrdersQueued !== undefined
-          ? shopifyOrdersQueued
-          : undefined;
-    const _latestShopifyStatus = latestShopifySession?.status;
-    // Previously we sampled a large slice of orders here which caused
-    // significant bandwidth usage for frequent polling. We now avoid this
-    // check entirely in the query path. If needed, a periodic action can
-    // snapshot counts into a lightweight table.
-    const dbHasExpectedOrders = false;
+    const shopifyOverall = deriveOverallState(shopifySessionsForStatus);
+    const metaOverall = deriveOverallState(metaSessions);
 
     return {
       completed: onboarding.isCompleted || false,
@@ -309,45 +271,11 @@ export const getOnboardingStatus = query({
         shopify: latestShopifySession
           ? {
               status: latestShopifySession.status,
-              overallState: (() => {
-                // Heuristic: if orders stage is complete or processed >= queued, treat as complete
-                const stagesComplete = Boolean(
-                  shopifyStageStatus &&
-                    shopifyStageStatus.orders === "completed" &&
-                    shopifyStageStatus.products === "completed" &&
-                    shopifyStageStatus.inventory === "completed" &&
-                    shopifyStageStatus.customers === "completed",
-                );
-                const countsComplete = Boolean(
-                  typeof shopifyOrdersQueued === "number" &&
-                    typeof normalizedOrdersProcessed === "number" &&
-                    shopifyOrdersQueued >= 0 &&
-                    normalizedOrdersProcessed >= shopifyOrdersQueued,
-                );
-                if (stagesComplete || countsComplete || dbHasExpectedOrders) {
-                  shopifyOverall = "complete";
-                }
-                return shopifyOverall;
-              })(),
-              recordsProcessed: latestShopifySession.recordsProcessed,
-              baselineRecords: shopifyBaselineRecords,
-              ordersProcessed: normalizedOrdersProcessed,
-              ordersQueued: shopifyOrdersQueued,
-              totalOrdersSeen: shopifyTotalOrdersSeen,
-              productsProcessed: shopifyProductsProcessed,
-              customersProcessed: shopifyCustomersProcessed,
+              overallState: shopifyOverall,
+              stages: shopifyStages,
               startedAt: latestShopifySession.startedAt,
               completedAt: latestShopifySession.completedAt,
               lastError: latestShopifySession.error,
-              stageStatus: shopifyStageStatus
-                ? {
-                    products: shopifyStageStatus.products,
-                    inventory: shopifyStageStatus.inventory,
-                    customers: shopifyStageStatus.customers,
-                    orders: shopifyStageStatus.orders,
-                  }
-                : undefined,
-              syncedEntities: shopifySyncedEntities,
             }
           : undefined,
         meta: latestMetaSession

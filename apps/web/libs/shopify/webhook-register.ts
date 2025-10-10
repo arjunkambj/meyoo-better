@@ -58,7 +58,6 @@ export async function registerWebhooks(
       "inventory_items/update": "INVENTORY_ITEMS_UPDATE",
       "inventory_items/delete": "INVENTORY_ITEMS_DELETE",
       "orders/create": "ORDERS_CREATE",
-      "orders/updated": "ORDERS_UPDATED",
       "orders/paid": "ORDERS_PAID",
       "orders/cancelled": "ORDERS_CANCELLED",
       "orders/fulfilled": "ORDERS_FULFILLED",
@@ -68,7 +67,6 @@ export async function registerWebhooks(
       "order_transactions/create": "ORDER_TRANSACTIONS_CREATE",
       "refunds/create": "REFUNDS_CREATE",
       "fulfillments/create": "FULFILLMENTS_CREATE",
-      "fulfillments/update": "FULFILLMENTS_UPDATE",
       // Shop + collections
       "shop/update": "SHOP_UPDATE",
       "collections/create": "COLLECTIONS_CREATE",
@@ -91,7 +89,6 @@ export async function registerWebhooks(
       "customers/disable": ["read_customers"],
       // Orders
       "orders/create": ["read_orders"],
-      "orders/updated": ["read_orders"],
       "orders/paid": ["read_orders"],
       "orders/cancelled": ["read_orders"],
       "orders/fulfilled": ["read_orders"],
@@ -107,7 +104,6 @@ export async function registerWebhooks(
       "inventory_items/delete": ["read_inventory"],
       // Fulfillments
       "fulfillments/create": ["read_fulfillments"],
-      "fulfillments/update": ["read_fulfillments"],
       // Collections
       "collections/create": ["read_products"],
       "collections/update": ["read_products"],
@@ -135,7 +131,6 @@ export async function registerWebhooks(
       SHOPIFY_CONFIG.WEBHOOKS.INVENTORY_ITEMS_UPDATE,
       SHOPIFY_CONFIG.WEBHOOKS.INVENTORY_ITEMS_DELETE,
       SHOPIFY_CONFIG.WEBHOOKS.ORDER_CREATE,
-      SHOPIFY_CONFIG.WEBHOOKS.ORDER_UPDATE,
       SHOPIFY_CONFIG.WEBHOOKS.ORDER_PAID,
       SHOPIFY_CONFIG.WEBHOOKS.ORDER_CANCELLED,
       SHOPIFY_CONFIG.WEBHOOKS.ORDER_FULFILLED,
@@ -145,7 +140,6 @@ export async function registerWebhooks(
       "order_transactions/create",
       "refunds/create",
       SHOPIFY_CONFIG.WEBHOOKS.FULFILLMENT_CREATE,
-      SHOPIFY_CONFIG.WEBHOOKS.FULFILLMENT_UPDATE,
       SHOPIFY_CONFIG.WEBHOOKS.SHOP_UPDATE,
       SHOPIFY_CONFIG.WEBHOOKS.COLLECTION_CREATE,
       SHOPIFY_CONFIG.WEBHOOKS.COLLECTION_UPDATE,

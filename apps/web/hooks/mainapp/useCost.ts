@@ -5,7 +5,6 @@ import { useQuery } from "convex-helpers/react/cache/hooks";
 import { api } from "@/libs/convexApi";
 import type { GenericId as Id } from "convex/values";
 import { dateRangeToUtcWithShopPreference } from "@/libs/dateRange";
-import { useOrganizationTimeZone } from "./useUser";
 import { useShopifyTime } from "./useShopifyTime";
 
 /**
@@ -55,21 +54,19 @@ export function useCost(
   type?: keyof typeof COST_TYPES,
   dateRange?: { startDate: string; endDate: string },
 ) {
-  const { timezone } = useOrganizationTimeZone();
   const { offsetMinutes } = useShopifyTime();
   const normalizedRange = useMemo(() => {
     if (!dateRange) return undefined;
     const utcRange = dateRangeToUtcWithShopPreference(
       dateRange,
       typeof offsetMinutes === "number" ? offsetMinutes : undefined,
-      timezone,
     );
     return {
       ...utcRange,
       startDate: dateRange.startDate,
       endDate: dateRange.endDate,
     } as const;
-  }, [dateRange?.endDate, dateRange?.startDate, offsetMinutes, timezone]);
+  }, [dateRange?.endDate, dateRange?.startDate, offsetMinutes]);
 
   const queryArgs = useMemo(
     () => ({

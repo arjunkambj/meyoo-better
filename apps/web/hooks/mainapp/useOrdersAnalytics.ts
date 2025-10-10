@@ -4,7 +4,6 @@ import { useAction } from "convex/react";
 
 import { api } from "@/libs/convexApi";
 import { dateRangeToUtcWithShopPreference } from "@/libs/dateRange";
-import { useOrganizationTimeZone } from "./useUser";
 import { useShopifyTime } from "./useShopifyTime";
 import type {
   AnalyticsOrder,
@@ -50,7 +49,6 @@ interface OrdersPageSnapshot {
 const END_CURSOR = "__end__";
 
 export function useOrdersAnalytics(params: UseOrdersAnalyticsParams = {}) {
-  const { timezone } = useOrganizationTimeZone();
   const { offsetMinutes } = useShopifyTime();
 
   const {
@@ -87,9 +85,8 @@ export function useOrdersAnalytics(params: UseOrdersAnalyticsParams = {}) {
     return dateRangeToUtcWithShopPreference(
       effectiveRange,
       typeof offsetMinutes === "number" ? offsetMinutes : undefined,
-      timezone,
     );
-  }, [effectiveRange, offsetMinutes, timezone]);
+  }, [effectiveRange, offsetMinutes]);
 
   const normalizedRange = useMemo(() => {
     if (!rangeStrings) return null;

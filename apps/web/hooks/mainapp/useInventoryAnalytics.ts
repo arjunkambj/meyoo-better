@@ -5,7 +5,6 @@ import type { Product } from "@/components/dashboard/(analytics)/inventory/compo
 
 import { api } from "@/libs/convexApi";
 import { dateRangeToUtcWithShopPreference } from "@/libs/dateRange";
-import { useOrganizationTimeZone } from "./useUser";
 import { useShopifyTime } from "./useShopifyTime";
 
 // Local type definitions aligned with Convex returns
@@ -126,7 +125,6 @@ export function useInventoryAnalytics(
     pageSize = 50,
   } = params;
 
-  const { timezone } = useOrganizationTimeZone();
   const { offsetMinutes } = useShopifyTime();
 
   const normalizedDateRange = useMemo(() => {
@@ -134,14 +132,13 @@ export function useInventoryAnalytics(
     const utcRange = dateRangeToUtcWithShopPreference(
       dateRange,
       typeof offsetMinutes === "number" ? offsetMinutes : undefined,
-      timezone,
     );
     return {
       ...utcRange,
       startDate: dateRange.startDate,
       endDate: dateRange.endDate,
     } as const;
-  }, [dateRange?.endDate, dateRange?.startDate, offsetMinutes, timezone]);
+  }, [dateRange?.endDate, dateRange?.startDate, offsetMinutes]);
 
   // Use consolidated action for overview, alerts, topPerformers, and stockMovement
   const [metricsData, setMetricsData] = useState<any>(null);

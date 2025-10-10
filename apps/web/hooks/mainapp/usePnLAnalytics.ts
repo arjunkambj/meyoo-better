@@ -4,7 +4,6 @@ import { useQuery } from "convex-helpers/react/cache/hooks";
 import { api } from "@/libs/convexApi";
 import { dateRangeToUtcWithShopPreference } from "@/libs/dateRange";
 import { useShopifyTime } from "./useShopifyTime";
-import { useOrganizationTimeZone } from "./useUser";
 import type { PnLAnalyticsResult, PnLGranularity, PnLKPIMetrics, PnLTablePeriod } from "@repo/types";
 
 interface UsePnLAnalyticsParams {
@@ -15,7 +14,6 @@ interface UsePnLAnalyticsParams {
 export function usePnLAnalytics(params?: UsePnLAnalyticsParams) {
   const [granularity, setGranularity] = useState<PnLGranularity>("daily");
   const { offsetMinutes, isLoading: isShopTimeLoading } = useShopifyTime();
-  const { timezone, loading: isTimezoneLoading } = useOrganizationTimeZone();
 
   const defaultDateRange = useMemo<{ startDate: string; endDate: string }>(() => {
     const endDate = new Date();
@@ -30,15 +28,14 @@ export function usePnLAnalytics(params?: UsePnLAnalyticsParams) {
   const startDate = params?.startDate ?? defaultDateRange.startDate;
   const endDate = params?.endDate ?? defaultDateRange.endDate;
 
-  const canRunQueries = !isShopTimeLoading && !isTimezoneLoading;
+  const canRunQueries = !isShopTimeLoading;
 
   const utcDateRange = useMemo(() => {
     if (!canRunQueries) return undefined;
     const baseRange = { startDate, endDate } as const;
     const utcRange = dateRangeToUtcWithShopPreference(
       baseRange,
-      offsetMinutes,
-      timezone,
+      typeof offsetMinutes === "number" ? offsetMinutes : undefined,
     );
 
     return {
@@ -48,7 +45,7 @@ export function usePnLAnalytics(params?: UsePnLAnalyticsParams) {
       startDate,
       endDate,
     };
-  }, [canRunQueries, startDate, endDate, offsetMinutes, timezone]);
+  }, [canRunQueries, startDate, endDate, offsetMinutes]);
 
   const args = useMemo(() => {
     if (!utcDateRange) return "skip" as const;

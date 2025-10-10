@@ -319,7 +319,6 @@ async function handleTopicInline(
 
   switch (topic) {
     case "orders/create":
-    case "orders/updated":
     case "orders/paid":
     case "orders/cancelled":
     case "orders/fulfilled":
@@ -632,8 +631,7 @@ async function handleTopicInline(
       break;
     }
 
-    case "fulfillments/create":
-    case "fulfillments/update": {
+    case "fulfillments/create": {
       if (!organizationId) break;
       const f: any = payload;
       const trackingNumbers = toStringArray(f.tracking_numbers) ?? [];

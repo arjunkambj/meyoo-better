@@ -709,18 +709,6 @@ export const shopify: any = createIntegration({
     },
 
     /**
-     * Order updated webhook
-     */
-    "orders/updated": async (ctx: any, payload: any) => {
-      const order = parseOrderWebhook(payload);
-
-      await ctx.runMutation(internal.integrations.shopify.updateOrderInternal, {
-        organizationId: payload.organizationId as string,
-        order: order as Doc<"shopifyOrders">,
-      });
-    },
-
-    /**
      * Product created webhook
      */
     "products/create": async (ctx: any, payload: any) => {
@@ -975,21 +963,6 @@ export const shopify: any = createIntegration({
 
       await ctx.runMutation(
         internal.integrations.shopify.storeFulfillmentInternal,
-        {
-          organizationId: fulfillment.organizationId as Id<"organizations">,
-          fulfillment,
-        }
-      );
-    },
-
-    /**
-     * Fulfillment update webhook
-     */
-    "fulfillments/update": async (ctx: any, payload: any) => {
-      const fulfillment = parseFulfillmentWebhook(payload);
-
-      await ctx.runMutation(
-        internal.integrations.shopify.updateFulfillmentInternal,
         {
           organizationId: fulfillment.organizationId as Id<"organizations">,
           fulfillment,
@@ -2880,29 +2853,6 @@ export const storeCustomersInternal = internalMutation({
   },
 });
 
-export const updateOrderInternal = internalMutation({
-  args: {
-    organizationId: v.string(),
-    order: v.any(),
-  },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    const existing = await ctx.db
-      .query("shopifyOrders")
-      .withIndex("by_shopify_id", (q) => q.eq("shopifyId", args.order.id))
-      .first();
-
-    if (existing) {
-      await ctx.db.patch(existing._id, {
-        ...args.order,
-        syncedAt: Date.now(),
-      });
-    }
-
-    return null;
-  },
-});
-
 export const storeTransactionsInternal = internalMutation({
   args: {
     organizationId: v.id("organizations"),
@@ -3666,36 +3616,6 @@ export const storeFulfillmentInternal = internalMutation({
   },
 });
 
-export const updateFulfillmentInternal = internalMutation({
-  args: {
-    organizationId: v.id("organizations"),
-    fulfillment: v.any(),
-  },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    const existing = await ctx.db
-      .query("shopifyFulfillments")
-      .withIndex("by_shopify_id", (q) =>
-        q.eq("shopifyId", args.fulfillment.shopifyId)
-      )
-      .first();
-
-    if (existing) {
-      await ctx.db.patch(existing._id, {
-        ...args.fulfillment,
-        syncedAt: Date.now(),
-      });
-    } else {
-      await (ctx.db.insert as any)("shopifyFulfillments", {
-        ...args.fulfillment,
-        syncedAt: Date.now(),
-      });
-    }
-
-    return null;
-  },
-});
-
 export const updateShopDetailsInternal = internalMutation({
   args: {
     organizationId: v.id("organizations"),
@@ -3790,7 +3710,6 @@ export const webhooks = {
       // Process based on topic
       switch (topic) {
         case "orders/create":
-        case "orders/updated":
           await ctx.runMutation(
             internal.integrations.shopify.storeOrdersInternal,
             {
@@ -3800,19 +3719,24 @@ export const webhooks = {
           );
           break;
 
-        case "orders/cancelled":
+        case "orders/cancelled": {
+          const orderIdentifier = payload.shopifyId ?? payload.id;
+
+          if (!orderIdentifier) {
+            throw new Error("Order ID not found in payload");
+          }
+
           await ctx.runMutation(
-            internal.integrations.shopify.updateOrderInternal,
+            internal.integrations.shopify.updateOrderStatusInternal,
             {
               organizationId,
-              order: {
-                ...payload,
-                cancelledAt: payload.cancelled_at,
-                financialStatus: "cancelled",
-              },
+              orderId: String(orderIdentifier),
+              financialStatus: "cancelled",
+              fulfillmentStatus: "cancelled",
             }
           );
           break;
+        }
       }
 
       return null;

@@ -6,8 +6,7 @@ Summary
 - Total useMutation calls in apps/web: 33 (hooks directory: 27)
 - Unused custom hooks in apps/web (no usages outside hooks/):
   - useMediaQuery
-  - useOrganizationTimeZone
-  - useShopifyTime
+- useShopifyTime
   - useTeamMembers
   - useTicket
 
@@ -44,7 +43,6 @@ All Custom Hooks (exported from apps/web/hooks)
 - useOnboardingCosts
 - useOrdersAnalytics
 - useOrganization
-- useOrganizationTimeZone
 - usePassword
 - usePnLAnalytics
 - useSaveVariantCosts

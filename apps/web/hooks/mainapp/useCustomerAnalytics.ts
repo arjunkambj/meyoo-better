@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { api } from "@/libs/convexApi";
 import { dateRangeToUtcWithShopPreference } from "@/libs/dateRange";
-import { useOrganizationTimeZone, useUser } from "./useUser";
+import { useUser } from "./useUser";
 import { useShopifyTime } from "./useShopifyTime";
 import type { JourneyStage } from "@/components/dashboard/(analytics)/customer-insights/components/CustomerJourney";
 import type { CohortData } from "@/components/dashboard/(analytics)/orders-insights/components/CohortAnalysis";
@@ -236,7 +236,6 @@ const defaultRange = () => {
 
 export function useCustomerAnalytics(params: UseCustomerAnalyticsParams = {}) {
   const { primaryCurrency } = useUser();
-  const { timezone } = useOrganizationTimeZone();
   const { offsetMinutes } = useShopifyTime();
 
   const {
@@ -274,9 +273,8 @@ export function useCustomerAnalytics(params: UseCustomerAnalyticsParams = {}) {
     return dateRangeToUtcWithShopPreference(
       effectiveDateRange,
       typeof offsetMinutes === "number" ? offsetMinutes : undefined,
-      timezone,
     );
-  }, [effectiveDateRange, offsetMinutes, timezone]);
+  }, [effectiveDateRange, offsetMinutes]);
 
   const normalizedRange = useMemo(() => {
     if (!rangeStrings) return null;

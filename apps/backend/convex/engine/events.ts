@@ -30,7 +30,6 @@ export const EVENT_TYPES = {
 
   // Data events
   ORDER_CREATED: "order:created",
-  ORDER_UPDATED: "order:updated",
   ORDER_CANCELLED: "order:cancelled",
   PRODUCT_UPDATED: "product:updated",
   CUSTOMER_CREATED: "customer:created",
@@ -199,7 +198,6 @@ async function routeEvent(
 
     // Order events - trigger analytics
     case EVENT_TYPES.ORDER_CREATED:
-    case EVENT_TYPES.ORDER_UPDATED:
     case EVENT_TYPES.ORDER_CANCELLED:
       await workpool.enqueueAction(
         ctx,

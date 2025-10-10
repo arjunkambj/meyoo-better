@@ -9,7 +9,6 @@ export const INTEGRATIONS = {
     apiVersion: LATEST_API_VERSION,
     webhooks: [
       "ORDERS_CREATE",
-      "ORDERS_UPDATED",
       "ORDERS_CANCELLED",
       "ORDERS_FULFILLED",
       "PRODUCTS_CREATE",
@@ -19,7 +18,6 @@ export const INTEGRATIONS = {
       "CUSTOMERS_UPDATE",
       "INVENTORY_LEVELS_UPDATE",
       "FULFILLMENTS_CREATE",
-      "FULFILLMENTS_UPDATE",
     ],
     syncInterval: 60 * 60 * 1000, // 1 hour
     batchSize: 250,

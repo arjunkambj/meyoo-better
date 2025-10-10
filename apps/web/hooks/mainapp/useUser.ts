@@ -2,7 +2,6 @@ import { useMutation } from "convex/react";
 import { useQuery } from "convex-helpers/react/cache/hooks";
 
 import { api } from "@/libs/convexApi";
-import { isIanaTimeZone } from "@repo/time";
 
 /**
  * User and Organization Management Hooks
@@ -81,13 +80,6 @@ export function useCurrentUser() {
  * Get team members for current organization
  */
 // (removed) useTeamMembers
-
-// ============ ORGANIZATION HOOKS ============
-
-/**
- * Get organization's configured timezone (single source of truth)
- */
-// (removed) useOrganizationTimeZone
 
 // ============ MUTATION HOOKS ============
 

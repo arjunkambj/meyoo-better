@@ -50,7 +50,6 @@ export const SHOPIFY_CONFIG = {
 
     // Order events
     ORDER_CREATE: "orders/create",
-    ORDER_UPDATE: "orders/updated",
     ORDER_CANCELLED: "orders/cancelled",
     ORDER_FULFILLED: "orders/fulfilled",
     ORDER_PAID: "orders/paid",
@@ -71,7 +70,6 @@ export const SHOPIFY_CONFIG = {
 
     // Fulfillment events
     FULFILLMENT_CREATE: "fulfillments/create",
-    FULFILLMENT_UPDATE: "fulfillments/update",
 
     // App events
     APP_UNINSTALLED: "app/uninstalled",
@@ -197,7 +195,6 @@ export function getCriticalWebhookTopics(): string[] {
     SHOPIFY_CONFIG.WEBHOOKS.PRODUCT_UPDATE,
     SHOPIFY_CONFIG.WEBHOOKS.PRODUCT_DELETE,
     SHOPIFY_CONFIG.WEBHOOKS.ORDER_CREATE,
-    SHOPIFY_CONFIG.WEBHOOKS.ORDER_UPDATE,
     SHOPIFY_CONFIG.WEBHOOKS.INVENTORY_LEVELS_UPDATE,
   ];
 }

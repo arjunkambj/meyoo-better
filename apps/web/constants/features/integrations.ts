@@ -73,7 +73,6 @@ export const SHOPIFY_WEBHOOK_TOPICS = [
   "collections/update",
   "collections/delete",
   "orders/create",
-  "orders/updated",
   "orders/paid",
   "orders/cancelled",
   "orders/fulfilled",
@@ -95,7 +94,6 @@ export const SHOPIFY_WEBHOOK_TOPICS = [
   "inventory_items/delete",
   "order_transactions/create",
   "fulfillments/create",
-  "fulfillments/update",
 ];
 
 export const META_AD_OBJECTIVES = [

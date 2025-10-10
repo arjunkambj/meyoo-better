@@ -1,0 +1,75 @@
+# Convex Cleanup TODO
+
+Refactor unused/legacy Convex functions in batches of three files. After completing each batch, run `bun run lint` and `bun run check-types` before moving to the next batch.
+
+## Batch 1
+- [x] Trim unused exports in `apps/backend/convex/agent/firecrawl.ts`
+- [x] Trim unused exports in `apps/backend/convex/billing/organizationHelpers.ts`
+- [x] Trim unused exports in `apps/backend/convex/billing/trackUsage.ts`
+- [x] `bun run lint` & `bun run check-types`
+
+## Batch 2
+- [x] Trim unused exports in `apps/backend/convex/core/costs.ts`
+- [x] Trim unused exports in `apps/backend/convex/core/memberships.ts`
+- [x] Trim unused exports in `apps/backend/convex/core/onboarding.ts`
+- [x] `bun run lint` & `bun run check-types`
+
+## Batch 3
+- [x] Trim unused exports in `apps/backend/convex/core/organizationLookup.ts`
+- [x] Trim unused exports in `apps/backend/convex/core/organizations.ts`
+- [x] Trim unused exports in `apps/backend/convex/core/shopDomainHelper.ts`
+- [x] `bun run lint` & `bun run check-types`
+
+## Batch 4
+- [ ] Trim unused exports in `apps/backend/convex/core/teams.ts`
+- [ ] Trim unused exports in `apps/backend/convex/core/time.ts`
+- [ ] Trim unused exports in `apps/backend/convex/core/usage.ts`
+- [ ] `bun run lint` & `bun run check-types`
+
+## Batch 5
+- [ ] Trim unused exports in `apps/backend/convex/core/users.ts`
+- [ ] Trim unused exports in `apps/backend/convex/engine/events.ts`
+- [ ] Trim unused exports in `apps/backend/convex/engine/health.ts`
+- [ ] `bun run lint` & `bun run check-types`
+
+## Batch 6
+- [ ] Trim unused exports in `apps/backend/convex/engine/optimizer.ts`
+- [ ] Trim unused exports in `apps/backend/convex/engine/orchestrator.ts`
+- [ ] Trim unused exports in `apps/backend/convex/engine/scheduler.ts`
+- [ ] `bun run lint` & `bun run check-types`
+
+## Batch 7
+- [ ] Trim unused exports in `apps/backend/convex/engine/syncJobs.ts`
+- [ ] Trim unused exports in `apps/backend/convex/integrations/meta.ts`
+- [ ] Trim unused exports in `apps/backend/convex/integrations/metaInternal.ts`
+- [ ] `bun run lint` & `bun run check-types`
+
+## Batch 8
+- [ ] Trim unused exports in `apps/backend/convex/integrations/metaSync.ts`
+- [ ] Trim unused exports in `apps/backend/convex/integrations/shopify.ts`
+- [ ] Trim unused exports in `apps/backend/convex/integrations/shopifySync.ts`
+- [ ] `bun run lint` & `bun run check-types`
+
+## Batch 9
+- [ ] Trim unused exports in `apps/backend/convex/jobs/maintenance.ts`
+- [ ] Trim unused exports in `apps/backend/convex/jobs/maintenanceHandlers.ts`
+- [ ] Trim unused exports in `apps/backend/convex/meyoo/admin.ts`
+- [ ] `bun run lint` & `bun run check-types`
+
+## Batch 10
+- [ ] Trim unused exports in `apps/backend/convex/web/analytics.ts`
+- [ ] Trim unused exports in `apps/backend/convex/web/customers.ts`
+- [ ] Trim unused exports in `apps/backend/convex/web/dashboard.ts`
+- [ ] `bun run lint` & `bun run check-types`
+
+## Batch 11
+- [ ] Trim unused exports in `apps/backend/convex/web/integrationRequests.ts`
+- [ ] Trim unused exports in `apps/backend/convex/web/inventory.ts`
+- [ ] Trim unused exports in `apps/backend/convex/web/orders.ts`
+- [ ] `bun run lint` & `bun run check-types`
+
+## Batch 12
+- [ ] Trim unused exports in `apps/backend/convex/web/pnl.ts`
+- [ ] Trim unused exports in `apps/backend/convex/web/security.ts`
+- [ ] Trim unused exports in `apps/backend/convex/web/sync.ts`
+- [ ] `bun run lint` & `bun run check-types`

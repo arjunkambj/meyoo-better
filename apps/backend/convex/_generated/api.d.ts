@@ -21,7 +21,6 @@ import type * as auth from "../auth.js";
 import type * as authFinalize from "../authFinalize.js";
 import type * as authHelpers from "../authHelpers.js";
 import type * as billing_organizationHelpers from "../billing/organizationHelpers.js";
-import type * as billing_trackUsage from "../billing/trackUsage.js";
 import type * as core_costs from "../core/costs.js";
 import type * as core_currency from "../core/currency.js";
 import type * as core_dashboard from "../core/dashboard.js";
@@ -141,7 +140,6 @@ declare const fullApi: ApiFromModules<{
   authFinalize: typeof authFinalize;
   authHelpers: typeof authHelpers;
   "billing/organizationHelpers": typeof billing_organizationHelpers;
-  "billing/trackUsage": typeof billing_trackUsage;
   "core/costs": typeof core_costs;
   "core/currency": typeof core_currency;
   "core/dashboard": typeof core_dashboard;

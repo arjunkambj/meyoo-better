@@ -1,5 +1,9 @@
 # Repository Guidelines
 
+##
+
+- always remove legecy or unused funtion , we are doing rewrite of some funtion , make sure old get deleted
+
 ## Agent & Components Usage Rules
 
 - Always fetch latest Context7 docs before editing code that touches Convex Agent, Resend, or other Convex components (`/get-convex/agent`, `/get-convex/resend`, etc.).

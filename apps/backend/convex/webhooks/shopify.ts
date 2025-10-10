@@ -458,7 +458,9 @@ async function handleTopicInline(
           totalVariants: variants.length,
           tags: typeof p.tags === "string"
             ? p.tags.split(",").map((t: string) => t.trim()).filter(Boolean)
-            : [],
+            : Array.isArray(p.tags)
+              ? p.tags.map((t: any) => String(t).trim()).filter(Boolean)
+              : [],
           shopifyCreatedAt: toNum(toTs(p.created_at) ?? Date.now()),
           shopifyUpdatedAt: toNum(toTs(p.updated_at) ?? Date.now()),
           publishedAt: toTs(p.published_at),

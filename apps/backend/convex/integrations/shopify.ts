@@ -19,7 +19,7 @@ import { createIntegration, type SyncResult } from "./_base";
 import { normalizeShopDomain } from "../utils/shop";
 import { msToDateString, type MsToDateOptions } from "../utils/date";
 import { createJob, PRIORITY } from "../engine/workpool";
-import { toStringArray } from "../utils/shopify";
+import { toStringArray, toMs } from "../utils/shopify";
 import { createNewUserData } from "../authHelpers";
 
 const logger = createSimpleLogger("Shopify");
@@ -3204,20 +3204,20 @@ export const upsertCustomerFromWebhook = internalMutation({
       organizationId: args.organizationId as Id<"organizations">,
       storeId: args.storeId as Id<"shopifyStores">,
       shopifyId,
-      email: (args.customer.email as string) || undefined,
-      phone: (args.customer.phone as string) || undefined,
-      firstName: (args.customer.first_name as string) || undefined,
-      lastName: (args.customer.last_name as string) || undefined,
+      email: toOptionalString(args.customer.email),
+      phone: toOptionalString(args.customer.phone),
+      firstName: toOptionalString(args.customer.first_name),
+      lastName: toOptionalString(args.customer.last_name),
       ordersCount: existing?.ordersCount ?? 0,
       totalSpent: existing?.totalSpent ?? 0,
       tags:
         typeof args.customer.tags === "string"
           ? (args.customer.tags as string).split(",").map((t) => t.trim()).filter(Boolean)
           : Array.isArray(args.customer.tags)
-            ? (args.customer.tags as string[])
+            ? (args.customer.tags as string[]).map((t) => String(t).trim()).filter(Boolean)
             : [],
-      shopifyCreatedAt: Date.parse(String(args.customer.created_at || Date.now())),
-      shopifyUpdatedAt: Date.parse(String(args.customer.updated_at || Date.now())),
+      shopifyCreatedAt: toMs(args.customer.created_at) ?? Date.now(),
+      shopifyUpdatedAt: toMs(args.customer.updated_at) ?? Date.now(),
       syncedAt: Date.now(),
     };
 

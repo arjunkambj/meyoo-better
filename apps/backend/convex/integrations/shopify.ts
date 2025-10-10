@@ -236,6 +236,12 @@ const ORGANIZATION_TABLES = [
   "dailyMetrics",
   "integrationSessions",
   "syncSessions",
+  "syncProfiles",
+  "integrationStatus",
+  "usage",
+  "invoices",
+  "integrationRequests",
+  "gdprRequests",
   "invites",
   "notifications",
 ] as const;
@@ -268,9 +274,42 @@ const organizationTableValidator = v.union(
   v.literal("dailyMetrics"),
   v.literal("integrationSessions"),
   v.literal("syncSessions"),
+  v.literal("syncProfiles"),
+  v.literal("integrationStatus"),
+  v.literal("usage"),
+  v.literal("invoices"),
+  v.literal("integrationRequests"),
+  v.literal("gdprRequests"),
   v.literal("invites"),
   v.literal("notifications"),
 );
+
+const ORGANIZATION_TABLE_INDEXES: Record<OrganizationDataTable, string> = {
+  shopifyProductVariants: "by_organization",
+  shopifyOrderItems: "by_organization",
+  shopifyTransactions: "by_organization",
+  shopifyRefunds: "by_organization",
+  shopifyFulfillments: "by_organization",
+  shopifyInventory: "by_organization",
+  shopifyInventoryTotals: "by_organization",
+  metaAdAccounts: "by_organization",
+  metaInsights: "by_organization",
+  shopifyAnalytics: "by_organization",
+  globalCosts: "by_organization",
+  manualReturnRates: "by_organization",
+  variantCosts: "by_organization",
+  dailyMetrics: "by_organization",
+  integrationSessions: "by_organization",
+  syncSessions: "by_organization",
+  syncProfiles: "by_organization",
+  integrationStatus: "by_organization",
+  usage: "by_org_month",
+  invoices: "by_organization",
+  integrationRequests: "by_organization",
+  gdprRequests: "by_organization",
+  invites: "by_organization",
+  notifications: "by_organization",
+};
 
 const storeTableValidator = v.union(
   v.literal("shopifyProducts"),
@@ -349,8 +388,11 @@ export const deleteOrganizationDataBatch = internalMutation({
     const batchSize = normalizeBatchSize(args.batchSize);
     const table = args.table as OrganizationDataTable;
 
+    const indexName =
+      ORGANIZATION_TABLE_INDEXES[table] ?? ("by_organization" as const);
+
     const query = (ctx.db.query(table) as any).withIndex(
-      "by_organization" as any,
+      indexName as any,
       (q: any) => q.eq("organizationId", args.organizationId),
     );
 

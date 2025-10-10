@@ -51,16 +51,16 @@ Refactor unused/legacy Convex functions in batches of three files. After complet
 - [x] `bun run lint` & `bun run check-types`
 
 ## Batch 9
-- [ ] Trim unused exports in `apps/backend/convex/jobs/maintenance.ts`
-- [ ] Trim unused exports in `apps/backend/convex/jobs/maintenanceHandlers.ts`
-- [ ] Trim unused exports in `apps/backend/convex/meyoo/admin.ts`
-- [ ] `bun run lint` & `bun run check-types`
+- [x] Trim unused exports in `apps/backend/convex/jobs/maintenance.ts`
+- [x] Trim unused exports in `apps/backend/convex/jobs/maintenanceHandlers.ts`
+- [x] Trim unused exports in `apps/backend/convex/meyoo/admin.ts`
+- [x] `bun run lint` & `bun run check-types`
 
 ## Batch 10
-- [ ] Trim unused exports in `apps/backend/convex/web/analytics.ts`
-- [ ] Trim unused exports in `apps/backend/convex/web/customers.ts`
-- [ ] Trim unused exports in `apps/backend/convex/web/dashboard.ts`
-- [ ] `bun run lint` & `bun run check-types`
+- [x] Trim unused exports in `apps/backend/convex/web/analytics.ts`
+- [x] Trim unused exports in `apps/backend/convex/web/customers.ts`
+- [x] Trim unused exports in `apps/backend/convex/web/dashboard.ts`
+- [x] `bun run lint` & `bun run check-types`
 
 ## Batch 11
 - [ ] Trim unused exports in `apps/backend/convex/web/integrationRequests.ts`

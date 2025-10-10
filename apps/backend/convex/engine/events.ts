@@ -236,29 +236,12 @@ async function routeEvent(
 
     // Sync events
     case EVENT_TYPES.SYNC_FAILED:
-      // Log failure and potentially alert
-      await workpool.enqueueAction(
-        ctx,
-        (internal.jobs.maintenanceHandlers as any).handleSyncFailure,
-        {
-          organizationId,
-          sessionId: metadata?.sessionId,
-          error: metadata?.error,
-        },
-      );
+      // Legacy maintenance handler removed; rely on workpool retry telemetry.
       break;
 
     // Integration events
     case EVENT_TYPES.INTEGRATION_DISCONNECTED:
-      // Mark integration as inactive and reset onboarding flags
-      await workpool.enqueueAction(
-        ctx,
-        (internal.jobs.maintenance as any).handleDisconnection,
-        {
-          organizationId,
-          platform: metadata?.platform,
-        },
-      );
+      // Legacy disconnection flow removed; onboarding updates handled elsewhere.
       break;
 
     case EVENT_TYPES.INTEGRATION_RATE_LIMITED:

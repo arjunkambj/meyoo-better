@@ -4,11 +4,9 @@ import type { Id } from "../_generated/dataModel";
 import { action, query, type ActionCtx, type QueryCtx } from "../_generated/server";
 import { api } from "../_generated/api";
 import {
-  datasetValidator,
   dateRangeValidator,
   defaultDateRange,
   loadAnalytics,
-  responseValidator,
   type AnalyticsResponse,
 } from "./analyticsShared";
 import {
@@ -26,11 +24,6 @@ import { loadAnalyticsWithChunks } from "../utils/analyticsLoader";
 import { loadOverviewFromDailyMetrics } from "../utils/dailyMetrics";
 
 type IntegrationStatus = Awaited<ReturnType<typeof computeIntegrationStatus>>;
-
-const responseOrNull = v.union(v.null(), responseValidator);
-
-type DateRangeArg = DateRange;
-
 type OverviewPayload = {
   dateRange: DateRange;
   organizationId: string;
@@ -92,42 +85,6 @@ function derivePreviousRange(range: DateRange): DateRange | null {
     startDate: shiftDateString(range.startDate, -spanDays),
     endDate: shiftDateString(range.startDate, -1),
   } satisfies DateRange;
-}
-
-async function loadDashboardAnalytics(
-  ctx: QueryCtx,
-  orgId: Id<"organizations">,
-  range: DateRange,
-): Promise<AnalyticsResponse> {
-  return await loadAnalytics(ctx, orgId, range, {
-    datasets: DASHBOARD_SUMMARY_DATASETS,
-  });
-}
-
-
-type QueryHandler = (
-  ctx: QueryCtx,
-  orgId: Id<"organizations">,
-  range: DateRange,
-  extraArgs?: Record<string, unknown>,
-) => Promise<AnalyticsResponse>;
-
-async function runDashboardQuery(
-  ctx: QueryCtx,
-  dateRange: DateRangeArg | DateRange,
-  handler?: QueryHandler,
-  extraArgs?: Record<string, unknown>,
-) {
-  const auth = await getUserAndOrg(ctx);
-  if (!auth) return null;
-
-  const range = validateDateRange(dateRange);
-
-  if (handler) {
-    return handler(ctx, auth.orgId as Id<"organizations">, range, extraArgs);
-  }
-
-  return await loadAnalytics(ctx, auth.orgId as Id<"organizations">, range);
 }
 
 export const getOverviewData = query({
@@ -349,128 +306,6 @@ const getOverviewDataActionDefinition = {
 };
 
 export const getOverviewDataAction = action(getOverviewDataActionDefinition);
-
-export const getDashboardSummary = query({
-  args: {
-    startDate: v.string(),
-    endDate: v.string(),
-  },
-  returns: responseOrNull,
-  handler: async (ctx, args) => {
-    return await runDashboardQuery(
-      ctx,
-      { startDate: args.startDate, endDate: args.endDate },
-      loadDashboardAnalytics,
-    );
-  },
-});
-
-export const getTrendingProducts = query({
-  args: {
-    dateRange: v.optional(dateRangeValidator),
-    limit: v.optional(v.number()),
-  },
-  returns: responseOrNull,
-  handler: async (ctx, args) => {
-    const range = args.dateRange ?? defaultDateRange();
-    const response = await runDashboardQuery(ctx, range);
-
-    if (!response) return null;
-
-    const limit = args.limit && args.limit > 0 ? args.limit : undefined;
-
-    return {
-      ...response,
-      meta: {
-        limit,
-        note: "Client is responsible for computing trending products from raw data.",
-      },
-    };
-  },
-});
-
-export const getRecentActivity = query({
-  args: {
-    dateRange: v.optional(dateRangeValidator),
-  },
-  returns: responseOrNull,
-  handler: async (ctx, args) => {
-    const range = args.dateRange ?? defaultDateRange(7);
-    return await runDashboardQuery(ctx, range);
-  },
-});
-
-export const getPerformanceIndicators = query({
-  args: {
-    dateRange: v.optional(dateRangeValidator),
-  },
-  returns: responseOrNull,
-  handler: async (ctx, args) => {
-    const range = args.dateRange ?? defaultDateRange(30);
-    return await runDashboardQuery(ctx, range);
-  },
-});
-
-export const getTrendingMetrics = query({
-  args: {
-    dateRange: v.optional(dateRangeValidator),
-  },
-  returns: responseOrNull,
-  handler: async (ctx, args) => {
-    const range = args.dateRange ?? defaultDateRange(14);
-    return await runDashboardQuery(ctx, range);
-  },
-});
-
-export const getActivityFeed = query({
-  args: {
-    dateRange: v.optional(dateRangeValidator),
-    limit: v.optional(v.number()),
-  },
-  returns: responseOrNull,
-  handler: async (ctx, args) => {
-    const range = args.dateRange ?? defaultDateRange(14);
-    const response = await runDashboardQuery(ctx, range);
-
-    if (!response) return null;
-
-    return {
-      ...response,
-      meta: {
-        limit: args.limit,
-        note: "Client should sort and truncate activity feed based on raw data.",
-      },
-    };
-  },
-});
-
-export const getSyncStatus = query({
-  args: {},
-  returns: v.union(
-    v.null(),
-    v.object({
-      dateRange: dateRangeValidator,
-      data: datasetValidator,
-      meta: v.optional(v.any()),
-    }),
-  ),
-  handler: async (ctx) => {
-    const auth = await getUserAndOrg(ctx);
-    if (!auth) return null;
-
-    const range = defaultDateRange(1);
-    const response = await loadAnalytics(ctx, auth.orgId as Id<"organizations">, range);
-
-    return {
-      dateRange: response.dateRange,
-      data: response.data,
-      meta: {
-        message:
-          "Use raw datasets to derive sync status. Server no longer tracks realtime metrics cache.",
-      },
-    };
-  },
-});
 
 function parseTimeRange(timeRange?: string | null): number {
   switch (timeRange) {

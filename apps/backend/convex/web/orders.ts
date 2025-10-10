@@ -26,12 +26,11 @@ type DateRangeArg = DateRange;
 const ORDER_ANALYTICS_DATASETS = [
   "orders",
   "orderItems",
+  "transactions",
+  "refunds",
+  "fulfillments",
   "variants",
   "variantCosts",
-  "globalCosts",
-  "manualReturnRates",
-  "metaInsights",
-  "analytics",
 ] as const satisfies readonly AnalyticsSourceKey[];
 
 const DEFAULT_ORDERS_PAGE_SIZE = 50;

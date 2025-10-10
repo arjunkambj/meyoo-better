@@ -401,54 +401,117 @@ export const getCohortAnalysis = query({
     const range = validateDateRange(rangeInput);
     const timestamps = toTimestampRange(range);
 
-    // Get all orders for this organization up to the end of the date range
-    const allOrders = await ctx.db
-      .query("shopifyOrders")
-      .withIndex("by_organization_and_created", (q) =>
-        q
-          .eq("organizationId", auth.orgId as Id<"organizations">)
-          .lte("shopifyCreatedAt", timestamps.end),
-      )
-      .filter((q) => q.neq(q.field("financialStatus"), "cancelled"))
-      .collect();
+    const cohortType = args.cohortType ?? "monthly";
+    const DAY_MS = 24 * 60 * 60 * 1000;
 
-    // Group orders by customer and find first purchase month
-    const customerCohorts = new Map<
+    const toCohortKey = (ms: number): string => {
+      const date = new Date(ms);
+      if (cohortType === "weekly") {
+        const target = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+        const day = target.getUTCDay() || 7;
+        target.setUTCDate(target.getUTCDate() + 4 - day);
+        const yearStart = new Date(Date.UTC(target.getUTCFullYear(), 0, 1));
+        const week = Math.ceil(((target.getTime() - yearStart.getTime()) / DAY_MS + 1) / 7);
+        return `${target.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
+      }
+
+      const year = date.getUTCFullYear();
+      const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+      return `${year}-${month}`;
+    };
+
+    const periodDifference = (startMs: number, currentMs: number): number => {
+      if (currentMs < startMs) {
+        return 0;
+      }
+      if (cohortType === "weekly") {
+        return Math.floor((currentMs - startMs) / (7 * DAY_MS));
+      }
+      const start = new Date(startMs);
+      const current = new Date(currentMs);
+      return (
+        (current.getUTCFullYear() - start.getUTCFullYear()) * 12 +
+        (current.getUTCMonth() - start.getUTCMonth())
+      );
+    };
+
+    const cohortCustomers = new Map<
       string,
-      { cohortMonth: string; orders: Array<{ date: Date; amount: number }> }
+      { firstOrderMs: number }
     >();
 
-    for (const order of allOrders) {
-      if (!order.customerId) continue;
+    const customerIds = new Set<string>();
+    const CUSTOMER_PAGE_SIZE = 200;
+    let customerCursor: string | null = null;
 
-      const orderDate = new Date(order.shopifyCreatedAt);
-      const customerId = order.customerId;
+    while (true) {
+      const page = await ctx.db
+        .query("shopifyCustomers")
+        .withIndex("by_organization_and_created", (q) =>
+          q
+            .eq("organizationId", auth.orgId as Id<"organizations">)
+            .gte("shopifyCreatedAt", timestamps.start)
+            .lte("shopifyCreatedAt", timestamps.end),
+        )
+        .paginate({ numItems: CUSTOMER_PAGE_SIZE, cursor: customerCursor });
 
-      if (!customerCohorts.has(customerId)) {
-        customerCohorts.set(customerId, {
-          cohortMonth: "",
-          orders: [],
+      for (const customer of page.page) {
+        const id = customer._id as string;
+        cohortCustomers.set(id, { firstOrderMs: customer.shopifyCreatedAt });
+        customerIds.add(id);
+      }
+
+      if (page.isDone || !page.continueCursor) {
+        break;
+      }
+
+      customerCursor = page.continueCursor;
+    }
+
+    if (cohortCustomers.size === 0) {
+      return [];
+    }
+
+    const ordersByCustomer = new Map<
+      string,
+      Array<{ date: number; amount: number }>
+    >();
+
+    const ORDER_PAGE_SIZE = 200;
+    let orderCursor: string | null = null;
+
+    while (true) {
+      const page = await ctx.db
+        .query("shopifyOrders")
+        .withIndex("by_organization_and_created", (q) =>
+          q
+            .eq("organizationId", auth.orgId as Id<"organizations">)
+            .gte("shopifyCreatedAt", timestamps.start)
+            .lte("shopifyCreatedAt", timestamps.end),
+        )
+        .paginate({ numItems: ORDER_PAGE_SIZE, cursor: orderCursor });
+
+      for (const order of page.page) {
+        if (!order.customerId) continue;
+        const customerId = order.customerId as string;
+        if (!customerIds.has(customerId)) continue;
+        if (order.financialStatus === "cancelled") continue;
+
+        const bucket = ordersByCustomer.get(customerId) ?? [];
+        bucket.push({
+          date: order.shopifyCreatedAt,
+          amount: Number(order.totalPrice) || 0,
         });
+        ordersByCustomer.set(customerId, bucket);
       }
 
-      const customerData = customerCohorts.get(customerId)!;
-      customerData.orders.push({
-        date: orderDate,
-        amount: order.totalPrice,
-      });
-    }
-
-    // Determine cohort month (first purchase) for each customer
-    for (const [_customerId, data] of customerCohorts.entries()) {
-      data.orders.sort((a, b) => a.date.getTime() - b.date.getTime());
-      const firstOrder = data.orders[0];
-      if (firstOrder) {
-        const cohortDate = firstOrder.date;
-        data.cohortMonth = `${cohortDate.getFullYear()}-${String(cohortDate.getMonth() + 1).padStart(2, "0")}`;
+      if (page.isDone || !page.continueCursor) {
+        break;
       }
+
+      orderCursor = page.continueCursor;
     }
 
-    // Group by cohort
     const cohorts = new Map<
       string,
       {
@@ -457,49 +520,46 @@ export const getCohortAnalysis = query({
       }
     >();
 
-    for (const [customerId, data] of customerCohorts.entries()) {
-      const cohortMonth = data.cohortMonth;
-      if (!cohortMonth) continue;
-
-      if (!cohorts.has(cohortMonth)) {
-        cohorts.set(cohortMonth, {
+    for (const [customerId, meta] of cohortCustomers.entries()) {
+      const cohortKey = toCohortKey(meta.firstOrderMs);
+      if (!cohorts.has(cohortKey)) {
+        cohorts.set(cohortKey, {
           customers: new Set(),
           ordersByPeriod: new Map(),
         });
       }
 
-      const cohort = cohorts.get(cohortMonth)!;
-      cohort.customers.add(customerId);
+      const cohortBucket = cohorts.get(cohortKey)!;
+      cohortBucket.customers.add(customerId);
 
-      // Calculate period (months since cohort) for each order
-      const [cohortYear, cohortMonthNum] = cohortMonth.split("-").map(Number);
-      for (const order of data.orders) {
-        const orderYear = order.date.getFullYear();
-        const orderMonth = order.date.getMonth() + 1;
+      const orders = (ordersByCustomer.get(customerId) ?? []).sort(
+        (a, b) => a.date - b.date,
+      );
 
-        const period =
-          (orderYear - cohortYear!) * 12 + (orderMonth - cohortMonthNum!);
-
-        if (!cohort.ordersByPeriod.has(period)) {
-          cohort.ordersByPeriod.set(period, {
+      for (const order of orders) {
+        const period = Math.max(0, periodDifference(meta.firstOrderMs, order.date));
+        if (!cohortBucket.ordersByPeriod.has(period)) {
+          cohortBucket.ordersByPeriod.set(period, {
             customers: new Set(),
             revenue: 0,
           });
         }
-
-        const periodData = cohort.ordersByPeriod.get(period)!;
-        periodData.customers.add(customerId);
-        periodData.revenue += order.amount;
+        const periodBucket = cohortBucket.ordersByPeriod.get(period)!;
+        periodBucket.customers.add(customerId);
+        periodBucket.revenue += order.amount;
       }
     }
 
-    // Build cohort analysis result
     const cohortResults = Array.from(cohorts.entries())
-      .map(([cohortMonth, cohortData]) => {
+      .map(([cohortKey, cohortData]) => {
         const cohortSize = cohortData.customers.size;
+        if (cohortSize === 0) {
+          return null;
+        }
+
         const periods = Array.from(cohortData.ordersByPeriod.entries())
           .sort(([a], [b]) => a - b)
-          .slice(0, 12) // Limit to 12 periods
+          .slice(0, 12)
           .map(([period, data]) => ({
             period,
             retained: data.customers.size,
@@ -508,13 +568,14 @@ export const getCohortAnalysis = query({
           }));
 
         return {
-          cohort: cohortMonth,
+          cohort: cohortKey,
           cohortSize,
           periods,
         };
       })
-      .sort((a, b) => b.cohort.localeCompare(a.cohort)) // Most recent first
-      .slice(0, 12); // Last 12 cohorts
+      .filter((entry): entry is { cohort: string; cohortSize: number; periods: { period: number; retained: number; percentage: number; revenue: number; }[] } => Boolean(entry))
+      .sort((a, b) => b.cohort.localeCompare(a.cohort))
+      .slice(0, 12);
 
     return cohortResults;
   },

@@ -51,6 +51,87 @@ type ContextWithDb = {
   runQuery?: MutationCtx["runQuery"];
 };
 
+function toUniqueStringArray(ids: Iterable<string>): string[] {
+  const seen = new Set<string>();
+  for (const value of ids) {
+    if (typeof value !== "string") continue;
+    const trimmed = value.trim();
+    if (!trimmed) continue;
+    seen.add(trimmed);
+  }
+  return Array.from(seen);
+}
+
+async function fetchExistingProductsByShopifyIds(
+  ctx: MutationCtx,
+  storeId: Id<"shopifyStores">,
+  ids: Iterable<string>,
+): Promise<Map<string, Doc<"shopifyProducts">>> {
+  const result = new Map<string, Doc<"shopifyProducts">>();
+  const targets = toUniqueStringArray(ids);
+
+  if (targets.length === 0) {
+    return result;
+  }
+
+  for (const batch of chunkArray(targets, BULK_OPS.LOOKUP_SIZE)) {
+    const matches = await Promise.all(
+      batch.map((shopifyId) =>
+        ctx.db
+          .query("shopifyProducts")
+          .withIndex("by_shopify_id_store", (q) =>
+            q.eq("shopifyId", shopifyId).eq("storeId", storeId),
+          )
+          .first(),
+      ),
+    );
+
+    matches.forEach((doc, index) => {
+      const shopifyId = batch[index]!;
+      if (doc) {
+        result.set(shopifyId, doc);
+      }
+    });
+  }
+
+  return result;
+}
+
+async function fetchExistingVariantsByShopifyIds(
+  ctx: MutationCtx,
+  organizationId: Id<"organizations">,
+  ids: Iterable<string>,
+): Promise<Map<string, Doc<"shopifyProductVariants">>> {
+  const result = new Map<string, Doc<"shopifyProductVariants">>();
+  const targets = toUniqueStringArray(ids);
+
+  if (targets.length === 0) {
+    return result;
+  }
+
+  for (const batch of chunkArray(targets, BULK_OPS.LOOKUP_SIZE)) {
+    const matches = await Promise.all(
+      batch.map((shopifyId) =>
+        ctx.db
+          .query("shopifyProductVariants")
+          .withIndex("by_organization_shopify_id", (q) =>
+            q.eq("organizationId", organizationId).eq("shopifyId", shopifyId),
+          )
+          .first(),
+      ),
+    );
+
+    matches.forEach((doc, index) => {
+      const shopifyId = batch[index]!;
+      if (doc) {
+        result.set(shopifyId, doc);
+      }
+    });
+  }
+
+  return result;
+}
+
 export async function hasCompletedInitialShopifySync(
   ctx: ContextWithDb,
   organizationId: Id<"organizations">,
@@ -1894,24 +1975,16 @@ export const storeProductsInternal = internalMutation({
       return null;
     }
 
-    // Step 1: Bulk fetch existing products
-    const productShopifyIds = args.products.map((p) => p.shopifyId);
-    const existingProducts = new Map();
-
-    const products = await ctx.db
-      .query("shopifyProducts")
-      .withIndex("by_store", (q) => q.eq("storeId", store._id))
-      .collect();
-
-    for (const product of products) {
-      if (productShopifyIds.includes(product.shopifyId)) {
-        existingProducts.set(product.shopifyId, product);
-      }
-    }
+    // Step 1: Bulk fetch existing products without scanning the entire collection
+    const existingProducts = await fetchExistingProductsByShopifyIds(
+      ctx,
+      store._id,
+      args.products.map((product) => product.shopifyId),
+    );
 
     // Step 2: Collect all variants from all products
     const allVariants = [];
-    const variantShopifyIds = new Set();
+    const variantShopifyIds = new Set<string>();
     const productIdMap = new Map();
 
     // Process products and collect variants
@@ -1962,22 +2035,11 @@ export const storeProductsInternal = internalMutation({
     }
 
     // Step 3: Bulk fetch existing variants
-    const existingVariants = new Map();
-
-    if (variantShopifyIds.size > 0) {
-      const variants = await ctx.db
-        .query("shopifyProductVariants")
-        .withIndex("by_organization", (q) =>
-          q.eq("organizationId", args.organizationId as Id<"organizations">),
-        )
-        .collect();
-
-      for (const variant of variants) {
-        if (variantShopifyIds.has(variant.shopifyId)) {
-          existingVariants.set(variant.shopifyId, variant);
-        }
-      }
-    }
+    const existingVariants = await fetchExistingVariantsByShopifyIds(
+      ctx,
+      args.organizationId as Id<"organizations">,
+      variantShopifyIds,
+    );
 
     // Step 4: Process variants and collect inventory data
     const inventoryToStore = [];
@@ -2538,7 +2600,7 @@ export const storeOrdersInternal = internalMutation({
     if (allLineItems.length > 0) {
       // Collect unique product and variant IDs
       const productShopifyIds = new Set();
-      const variantShopifyIds = new Set();
+      const variantShopifyIds = new Set<string>();
 
       for (const item of allLineItems) {
         if (item.shopifyProductId) productShopifyIds.add(item.shopifyProductId);

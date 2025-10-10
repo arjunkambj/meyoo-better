@@ -226,6 +226,7 @@ export const shopifyProductVariants = defineTable({
 })
   .index("by_product", ["productId"])
   .index("by_shopify_id", ["shopifyId"])
+  .index("by_organization_shopify_id", ["organizationId", "shopifyId"])
   .index("by_sku", ["sku"])
   .index("by_barcode", ["barcode"])
   .index("by_organization", ["organizationId"])
@@ -276,6 +277,7 @@ export const shopifyCustomers = defineTable({
   syncedAt: v.number(),
 })
   .index("by_organization", ["organizationId"])
+  .index("by_organization_and_created", ["organizationId", "shopifyCreatedAt"])
   .index("by_store", ["storeId"])
   .index("by_shopify_id", ["shopifyId"])
   .index("by_email", ["email"])

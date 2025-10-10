@@ -4,6 +4,8 @@
 
 - always remove legecy or unused funtion , we are doing rewrite of some funtion , make sure old get deleted
 
+- explain explain in simple plain langagues without addin jargons. with clariy
+
 ## Agent & Components Usage Rules
 
 - Always fetch latest Context7 docs before editing code that touches Convex Agent, Resend, or other Convex components (`/get-convex/agent`, `/get-convex/resend`, etc.).

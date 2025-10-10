@@ -24,6 +24,7 @@ import { loadAnalyticsWithChunks } from "../utils/analyticsLoader";
 import type { AnalyticsResponse } from "../web/analyticsShared";
 import { toUtcRangeForOffset } from "@repo/time";
 import { getShopUtcOffsetMinutes } from "../../libs/time/shopTime";
+import { createJob, PRIORITY } from "./workpool";
 
 const datasetCountValidator = v.object({
   orders: v.number(),
@@ -303,6 +304,179 @@ export const calculateAnalytics = internalAction({
       duration: Date.now() - startedAt,
       datasetCounts: counts,
     };
+  },
+});
+
+export const enqueueDailyRebuildRequests = internalMutation({
+  args: {
+    organizationId: v.id("organizations"),
+    dates: v.array(v.string()),
+    debounceMs: v.optional(v.number()),
+    scope: v.optional(v.string()),
+  },
+  returns: v.object({ dates: v.array(v.string()) }),
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const debounceWindow = Math.max(0, args.debounceMs ?? 10_000);
+    const normalizedDates = new Set<string>();
+
+    for (const rawDate of args.dates) {
+      try {
+        normalizedDates.add(normalizeDateString(rawDate));
+      } catch (_error) {
+        // Skip invalid dates
+      }
+    }
+
+    if (normalizedDates.size === 0) {
+      return { dates: [] };
+    }
+
+    const scheduledDates: string[] = [];
+
+    for (const date of normalizedDates) {
+      const existing = await ctx.db
+        .query("analyticsRebuildLocks")
+        .withIndex("by_org_date", (q) =>
+          q.eq("organizationId", args.organizationId).eq("date", date),
+        )
+        .first();
+
+      const lockExpiresAt = now + debounceWindow;
+
+      if (existing) {
+        await ctx.db.patch(existing._id, {
+          lockedUntil: lockExpiresAt,
+          lastScope: args.scope ?? existing.lastScope,
+          createdAt: existing.createdAt ?? now,
+          updatedAt: now,
+        });
+      } else {
+        await ctx.db.insert("analyticsRebuildLocks", {
+          organizationId: args.organizationId,
+          date,
+          lockedUntil: lockExpiresAt,
+          lastScope: args.scope,
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
+
+      const delay = Math.max(lockExpiresAt - now, 0);
+      await ctx.scheduler.runAfter(
+        delay,
+        internal.engine.analytics.processRebuildLock,
+        {
+          organizationId: args.organizationId,
+          date,
+        },
+      );
+
+      scheduledDates.push(date);
+    }
+
+    return { dates: scheduledDates };
+  },
+});
+
+export const consumeRebuildLock = internalMutation({
+  args: {
+    organizationId: v.id("organizations"),
+    date: v.string(),
+  },
+  returns: v.object({
+    ready: v.boolean(),
+    lockedUntil: v.optional(v.number()),
+    scope: v.optional(v.string()),
+  }),
+  handler: async (ctx, args) => {
+    const lock = await ctx.db
+      .query("analyticsRebuildLocks")
+      .withIndex("by_org_date", (q) =>
+        q.eq("organizationId", args.organizationId).eq("date", args.date),
+      )
+      .first();
+
+    if (!lock) {
+      return { ready: false };
+    }
+
+    const now = Date.now();
+
+    if (lock.lockedUntil > now) {
+      return {
+        ready: false,
+        lockedUntil: lock.lockedUntil,
+        scope: lock.lastScope ?? undefined,
+      };
+    }
+
+    await ctx.db.delete(lock._id);
+
+    return {
+      ready: true,
+      scope: lock.lastScope ?? undefined,
+    };
+  },
+});
+
+export const processRebuildLock = internalAction({
+  args: {
+    organizationId: v.id("organizations"),
+    date: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const result = await ctx.runMutation(
+      internal.engine.analytics.consumeRebuildLock,
+      args,
+    );
+
+    if (!result) {
+      return null;
+    }
+
+    const now = Date.now();
+
+    if (!result.ready) {
+      if (result.lockedUntil && result.lockedUntil > now) {
+        await ctx.scheduler.runAfter(
+          Math.max(result.lockedUntil - now, 0),
+          internal.engine.analytics.processRebuildLock,
+          args,
+        );
+      }
+
+      return null;
+    }
+
+    try {
+      await createJob(
+        ctx,
+        "analytics:rebuildDaily",
+        PRIORITY.LOW,
+        {
+          organizationId: args.organizationId,
+          dates: [args.date],
+        },
+        {
+          context: {
+            scope: result.scope ?? "analytics.debounce",
+            date: args.date,
+          },
+        },
+      );
+    } catch (error) {
+      await ctx.runMutation(internal.engine.analytics.enqueueDailyRebuildRequests, {
+        organizationId: args.organizationId,
+        dates: [args.date],
+        debounceMs: 10_000,
+        scope: result.scope ?? "analytics.debounce",
+      });
+      throw error;
+    }
+
+    return null;
   },
 });
 

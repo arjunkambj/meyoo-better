@@ -40,3 +40,15 @@ export const dailyMetrics = defineTable({
 })
   .index("by_organization_date", ["organizationId", "date"])
   .index("by_organization", ["organizationId"]);
+
+// Short-lived locks to debounce analytics rebuild scheduling
+export const analyticsRebuildLocks = defineTable({
+  organizationId: v.id("organizations"),
+  date: v.string(),
+  lockedUntil: v.number(),
+  lastScope: v.optional(v.string()),
+  createdAt: v.number(),
+  updatedAt: v.number(),
+})
+  .index("by_org_date", ["organizationId", "date"])
+  .index("by_locked_until", ["lockedUntil"]);

@@ -275,31 +275,8 @@ export async function fetchAnalyticsOrderChunk(
   }
 
   let customers: Doc<"shopifyCustomers">[] = [];
-  if (needCustomers) {
-    if (customerIds && customerIds.size > 0) {
-      customers = await fetchCustomers(ctx, customerIds);
-    }
-
-    // Include customers who didn't place an order in the requested range
-    if (!options?.cursor) {
-      const organizationCustomers = await ctx.db
-        .query("shopifyCustomers")
-        .withIndex("by_organization", (q) => q.eq("organizationId", organizationId))
-        .collect();
-
-      if (customers.length === 0) {
-        customers = organizationCustomers;
-      } else if (organizationCustomers.length > 0) {
-        const seen = new Set(customers.map((customer) => customer._id as string));
-        for (const customer of organizationCustomers) {
-          const id = customer._id as string;
-          if (!seen.has(id)) {
-            customers.push(customer);
-            seen.add(id);
-          }
-        }
-      }
-    }
+  if (needCustomers && customerIds && customerIds.size > 0) {
+    customers = await fetchCustomers(ctx, customerIds);
   }
 
   let products: Doc<"shopifyProducts">[] = [];

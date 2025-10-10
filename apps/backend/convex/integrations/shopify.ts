@@ -183,6 +183,49 @@ const ORDER_COMPARE_FIELDS: ReadonlyArray<keyof Doc<"shopifyOrders">> = [
   "shippingAddress",
 ];
 
+const LINE_ITEM_COMPARE_FIELDS: ReadonlyArray<keyof Doc<"shopifyOrderItems">> = [
+  "shopifyProductId",
+  "shopifyVariantId",
+  "productId",
+  "variantId",
+  "title",
+  "variantTitle",
+  "sku",
+  "quantity",
+  "price",
+  "totalDiscount",
+  "fulfillableQuantity",
+  "fulfillmentStatus",
+];
+
+const TRANSACTION_COMPARE_FIELDS: ReadonlyArray<keyof Doc<"shopifyTransactions">> = [
+  "orderId",
+  "shopifyOrderId",
+  "kind",
+  "status",
+  "gateway",
+  "amount",
+  "fee",
+  "paymentId",
+  "shopifyCreatedAt",
+  "processedAt",
+];
+
+const REFUND_COMPARE_FIELDS: ReadonlyArray<keyof Doc<"shopifyRefunds">> = [
+  "orderId",
+  "shopifyOrderId",
+  "note",
+  "userId",
+  "totalRefunded",
+  "refundLineItems",
+  "shopifyCreatedAt",
+  "processedAt",
+];
+
+const CUSTOMER_WEBHOOK_COMPARE_FIELDS: ReadonlyArray<
+  keyof Doc<"shopifyCustomers">
+> = ["email", "phone", "firstName", "lastName"];
+
 const valuesMatch = (a: unknown, b: unknown): boolean => {
   if (Array.isArray(a) || Array.isArray(b)) {
     return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
@@ -204,6 +247,78 @@ const hasOrderMeaningfulChange = (
   candidate: Record<string, unknown>,
 ): boolean => {
   for (const field of ORDER_COMPARE_FIELDS) {
+    if (
+      !valuesMatch(
+        (existing as Record<string, unknown>)[field as string],
+        candidate[field as string],
+      )
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+const hasOrderItemMeaningfulChange = (
+  existing: Doc<"shopifyOrderItems">,
+  candidate: Record<string, unknown>,
+): boolean => {
+  for (const field of LINE_ITEM_COMPARE_FIELDS) {
+    if (
+      !valuesMatch(
+        (existing as Record<string, unknown>)[field as string],
+        candidate[field as string],
+      )
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+const hasTransactionMeaningfulChange = (
+  existing: Doc<"shopifyTransactions">,
+  candidate: Record<string, unknown>,
+): boolean => {
+  for (const field of TRANSACTION_COMPARE_FIELDS) {
+    if (
+      !valuesMatch(
+        (existing as Record<string, unknown>)[field as string],
+        candidate[field as string],
+      )
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+const hasRefundMeaningfulChange = (
+  existing: Doc<"shopifyRefunds">,
+  candidate: Record<string, unknown>,
+): boolean => {
+  for (const field of REFUND_COMPARE_FIELDS) {
+    if (
+      !valuesMatch(
+        (existing as Record<string, unknown>)[field as string],
+        candidate[field as string],
+      )
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+const hasCustomerWebhookChange = (
+  existing: Doc<"shopifyCustomers">,
+  candidate: Record<string, unknown>,
+): boolean => {
+  for (const field of CUSTOMER_WEBHOOK_COMPARE_FIELDS) {
     if (
       !valuesMatch(
         (existing as Record<string, unknown>)[field as string],
@@ -2206,6 +2321,8 @@ export const storeOrdersInternal = internalMutation({
 
     // Step 1: Collect all unique customers from orders
     const customerDataMap = new Map();
+    const changedOrders = new Set<string>();
+    const orderCreatedAtMap = new Map<string, number>();
 
     for (const order of args.orders) {
       if (order.customer) {
@@ -2248,15 +2365,28 @@ export const storeOrdersInternal = internalMutation({
 
       if (existing) {
         customerIdMap.set(shopifyId, existing._id);
-        // Update existing customer if needed
-        await ctx.db.patch(existing._id, {
-          email: customerData.email || existing.email,
-          firstName: customerData.firstName || existing.firstName,
-          lastName: customerData.lastName || existing.lastName,
-          phone: customerData.phone || existing.phone,
-          shopifyUpdatedAt: Date.now(),
-          syncedAt: Date.now(),
-        });
+        const candidate = {
+          email: Object.prototype.hasOwnProperty.call(customerData, "email")
+            ? toOptionalString(customerData.email)
+            : existing.email,
+          firstName: Object.prototype.hasOwnProperty.call(customerData, "firstName")
+            ? toOptionalString(customerData.firstName)
+            : existing.firstName,
+          lastName: Object.prototype.hasOwnProperty.call(customerData, "lastName")
+            ? toOptionalString(customerData.lastName)
+            : existing.lastName,
+          phone: Object.prototype.hasOwnProperty.call(customerData, "phone")
+            ? toOptionalString(customerData.phone)
+            : existing.phone,
+        };
+
+        if (hasCustomerWebhookChange(existing, candidate)) {
+          await ctx.db.patch(existing._id, {
+            ...candidate,
+            shopifyUpdatedAt: Date.now(),
+            syncedAt: Date.now(),
+          });
+        }
       } else {
         // Prepare new customer for insert
         const newCustomerId = await ctx.db.insert("shopifyCustomers", {
@@ -2304,6 +2434,7 @@ export const storeOrdersInternal = internalMutation({
     const allLineItems = [];
 
     for (const orderData of args.orders) {
+      orderCreatedAtMap.set(orderData.shopifyId, orderData.shopifyCreatedAt);
       const customerId = orderData.customer
         ? customerIdMap.get(orderData.customer.shopifyId)
         : undefined;
@@ -2355,10 +2486,12 @@ export const storeOrdersInternal = internalMutation({
 
       const existing = existingOrders.get(orderData.shopifyId);
       let orderId: Id<"shopifyOrders">;
+      let orderWasMutated = false;
 
       if (existing) {
         if (hasOrderMeaningfulChange(existing, orderToStore)) {
           await ctx.db.patch(existing._id, orderToStore);
+          orderWasMutated = true;
         }
         orderId = existing._id;
       } else {
@@ -2374,11 +2507,17 @@ export const storeOrdersInternal = internalMutation({
         if (existingForStore) {
           if (hasOrderMeaningfulChange(existingForStore, orderToStore)) {
             await ctx.db.patch(existingForStore._id, orderToStore);
+            orderWasMutated = true;
           }
           orderId = existingForStore._id as Id<"shopifyOrders">;
         } else {
           orderId = await ctx.db.insert("shopifyOrders", orderToStore);
+          orderWasMutated = true;
         }
+      }
+
+      if (orderWasMutated) {
+        changedOrders.add(orderData.shopifyId);
       }
 
       orderIdMap.set(orderData.shopifyId, orderId);
@@ -2486,9 +2625,13 @@ export const storeOrdersInternal = internalMutation({
         };
 
         const existingItem = existingLineItems.get(item.shopifyId);
+        let itemChanged = false;
 
         if (existingItem) {
-          await ctx.db.patch(existingItem._id, itemToStore);
+          if (hasOrderItemMeaningfulChange(existingItem, itemToStore)) {
+            await ctx.db.patch(existingItem._id, itemToStore);
+            itemChanged = true;
+          }
         } else {
           // Re-check to avoid duplicates in concurrent writes
           const maybeItem = await ctx.db
@@ -2499,19 +2642,39 @@ export const storeOrdersInternal = internalMutation({
             .first();
 
           if (maybeItem) {
-            await ctx.db.patch(maybeItem._id, itemToStore);
+            if (hasOrderItemMeaningfulChange(maybeItem, itemToStore)) {
+              await ctx.db.patch(maybeItem._id, itemToStore);
+              itemChanged = true;
+            }
           } else {
             await ctx.db.insert("shopifyOrderItems", itemToStore);
+            itemChanged = true;
           }
+        }
+
+        if (itemChanged) {
+          changedOrders.add(item.orderShopifyId);
         }
       }
     }
 
-    logger.info(`Processed ${args.orders.length} orders with bulk operations`);
+    if (changedOrders.size === 0) {
+      logger.info("Skipped analytics rebuild (no order changes detected)", {
+        organizationId: String(organizationId),
+        ordersReceived: args.orders.length,
+      });
+      return null;
+    }
+
+    logger.info(`Processed ${args.orders.length} orders with bulk operations`, {
+      mutatedOrders: changedOrders.size,
+    });
 
     const affectedDates = new Set<string>();
-    for (const order of args.orders) {
-      const date = msToDateString(order.shopifyCreatedAt, dateFormattingOptions);
+    for (const shopifyId of changedOrders) {
+      const createdAt = orderCreatedAtMap.get(shopifyId);
+      if (!createdAt) continue;
+      const date = msToDateString(createdAt, dateFormattingOptions);
       if (date) {
         affectedDates.add(date);
       }
@@ -2539,19 +2702,6 @@ export const storeOrdersInternal = internalMutation({
           },
         },
       );
-    }
-
-    // Calculate customer metrics for affected customers
-    const uniqueCustomerIds = new Set<Id<"shopifyCustomers">>();
-
-    for (const order of args.orders) {
-      if (order.customer) {
-        const customerId = customerIdMap.get(order.customer.shopifyId);
-
-        if (customerId) {
-          uniqueCustomerIds.add(customerId);
-        }
-      }
     }
 
     return null;
@@ -2848,15 +2998,23 @@ export const storeTransactionsInternal = internalMutation({
         processedAt: transaction.processedAt,
       };
 
+      let transactionMutated = false;
+
       if (existing) {
-        await ctx.db.patch(existing._id, transactionData);
+        if (hasTransactionMeaningfulChange(existing, transactionData)) {
+          await ctx.db.patch(existing._id, transactionData);
+          transactionMutated = true;
+        }
       } else {
         await ctx.db.insert("shopifyTransactions", transactionData);
+        transactionMutated = true;
       }
 
-      const date = msToDateString(transaction.shopifyCreatedAt, dateFormattingOptions);
-      if (date) {
-        affectedDates.add(date);
+      if (transactionMutated) {
+        const date = msToDateString(transaction.shopifyCreatedAt, dateFormattingOptions);
+        if (date) {
+          affectedDates.add(date);
+        }
       }
     }
 
@@ -2881,28 +3039,34 @@ export const storeTransactionsInternal = internalMutation({
       }
     }
 
-    const canSchedule =
-      args.shouldScheduleAnalytics !== undefined
-        ? args.shouldScheduleAnalytics
-        : await hasCompletedInitialShopifySync(ctx, organizationId);
+    if (affectedDates.size > 0) {
+      const canSchedule =
+        args.shouldScheduleAnalytics !== undefined
+          ? args.shouldScheduleAnalytics
+          : await hasCompletedInitialShopifySync(ctx, organizationId);
 
-    if (canSchedule && affectedDates.size > 0) {
-      const dates = Array.from(affectedDates);
-      await createJob(
-        ctx,
-        "analytics:rebuildDaily",
-        PRIORITY.LOW,
-        {
-          organizationId,
-          dates,
-        },
-        {
-          context: {
-            scope: "shopify.storeTransactions",
-            totalDates: dates.length,
+      if (canSchedule) {
+        const dates = Array.from(affectedDates);
+        await createJob(
+          ctx,
+          "analytics:rebuildDaily",
+          PRIORITY.LOW,
+          {
+            organizationId,
+            dates,
           },
-        },
-      );
+          {
+            context: {
+              scope: "shopify.storeTransactions",
+              totalDates: dates.length,
+            },
+          },
+        );
+      }
+    }
+
+    if (affectedDates.size === 0 && retryTransactions.length === 0) {
+      return null;
     }
 
     return null;
@@ -2963,15 +3127,23 @@ export const storeRefundsInternal = internalMutation({
         processedAt: refund.processedAt,
       };
 
+      let refundMutated = false;
+
       if (existing) {
-        await ctx.db.patch(existing._id, refundData);
+        if (hasRefundMeaningfulChange(existing, refundData)) {
+          await ctx.db.patch(existing._id, refundData);
+          refundMutated = true;
+        }
       } else {
         await ctx.db.insert("shopifyRefunds", refundData);
+        refundMutated = true;
       }
 
-      const date = msToDateString(refund.shopifyCreatedAt, dateFormattingOptions);
-      if (date) {
-        affectedDates.add(date);
+      if (refundMutated) {
+        const date = msToDateString(refund.shopifyCreatedAt, dateFormattingOptions);
+        if (date) {
+          affectedDates.add(date);
+        }
       }
     }
 
@@ -2996,28 +3168,34 @@ export const storeRefundsInternal = internalMutation({
       }
     }
 
-    const canSchedule =
-      args.shouldScheduleAnalytics !== undefined
-        ? args.shouldScheduleAnalytics
-        : await hasCompletedInitialShopifySync(ctx, organizationId);
+    if (affectedDates.size > 0) {
+      const canSchedule =
+        args.shouldScheduleAnalytics !== undefined
+          ? args.shouldScheduleAnalytics
+          : await hasCompletedInitialShopifySync(ctx, organizationId);
 
-    if (canSchedule && affectedDates.size > 0) {
-      const dates = Array.from(affectedDates);
-      await createJob(
-        ctx,
-        "analytics:rebuildDaily",
-        PRIORITY.LOW,
-        {
-          organizationId,
-          dates,
-        },
-        {
-          context: {
-            scope: "shopify.storeRefunds",
-            totalDates: dates.length,
+      if (canSchedule) {
+        const dates = Array.from(affectedDates);
+        await createJob(
+          ctx,
+          "analytics:rebuildDaily",
+          PRIORITY.LOW,
+          {
+            organizationId,
+            dates,
           },
-        },
-      );
+          {
+            context: {
+              scope: "shopify.storeRefunds",
+              totalDates: dates.length,
+            },
+          },
+        );
+      }
+    }
+
+    if (affectedDates.size === 0 && retryRefunds.length === 0) {
+      return null;
     }
 
     return null;

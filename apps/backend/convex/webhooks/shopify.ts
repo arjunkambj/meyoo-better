@@ -12,7 +12,6 @@ import {
 import { optionalEnv, requireEnv } from "../utils/env";
 import type { Id } from "../_generated/dataModel";
 import { msToDateString, type MsToDateOptions } from "../utils/date";
-import { createJob, PRIORITY } from "../engine/workpool";
 import { hasCompletedInitialShopifySync } from "../integrations/shopify";
 
 const logger = createSimpleLogger("Webhooks.Shopify");
@@ -44,25 +43,18 @@ const scheduleAnalyticsRebuild = async (
     .map((date) => (date ? String(date) : ""))
     .filter((date): date is string => Boolean(date));
 
-  if (normalized.length === 0) {
+  const deduped = Array.from(new Set(normalized));
+
+  if (deduped.length === 0) {
     return;
   }
 
-  await createJob(
-    ctx,
-    "analytics:rebuildDaily",
-    PRIORITY.LOW,
-    {
-      organizationId,
-      dates: normalized,
-    },
-    {
-      context: {
-        scope,
-        totalDates: normalized.length,
-      },
-    },
-  );
+  await ctx.runMutation(internal.engine.analytics.enqueueDailyRebuildRequests, {
+    organizationId,
+    dates: deduped,
+    debounceMs: 10_000,
+    scope,
+  });
 };
 
 const safeSerialize = (value: unknown): string => {

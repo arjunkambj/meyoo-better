@@ -17,7 +17,7 @@ import {
 } from "./schema/core";
 import { globalCosts, manualReturnRates, variantCosts } from "./schema/costs";
 import { metaAdAccounts, metaInsights } from "./schema/meta";
-import { dailyMetrics } from "./schema/metrics";
+import { dailyMetrics, analyticsRebuildLocks } from "./schema/metrics";
 import { gdprRequests, auditLogs, webhookReceipts, apiKeys } from "./schema/security";
 import { tickets, ticketResponses } from "./schema/tickets";
 import {
@@ -88,6 +88,7 @@ export default defineSchema({
 
   // Daily metrics snapshots
   dailyMetrics,
+  analyticsRebuildLocks,
 
   // Operations tables
   webhookReceipts,

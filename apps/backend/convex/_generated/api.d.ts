@@ -32,7 +32,6 @@ import type * as core_shopDomainHelper from "../core/shopDomainHelper.js";
 import type * as core_status from "../core/status.js";
 import type * as core_teams from "../core/teams.js";
 import type * as core_time from "../core/time.js";
-import type * as core_usage from "../core/usage.js";
 import type * as core_users from "../core/users.js";
 import type * as crons from "../crons.js";
 import type * as emails_http from "../emails/http.js";
@@ -151,7 +150,6 @@ declare const fullApi: ApiFromModules<{
   "core/status": typeof core_status;
   "core/teams": typeof core_teams;
   "core/time": typeof core_time;
-  "core/usage": typeof core_usage;
   "core/users": typeof core_users;
   crons: typeof crons;
   "emails/http": typeof emails_http;

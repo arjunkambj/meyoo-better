@@ -837,16 +837,7 @@ Generated at 2025-10-10T06:10:52.452Z
 - sendOtp from ./emails/http used in apps/backend/convex/http.ts
 
 ## Unused Functions
-- query core.teams.getInvitations — apps/backend/convex/core/teams.ts:130
-- mutation core.teams.updateMemberRole — apps/backend/convex/core/teams.ts:471
-- mutation core.teams.cancelInvitation — apps/backend/convex/core/teams.ts:546
-- internalQuery core.teams.getUserByEmail — apps/backend/convex/core/teams.ts:592
-- internalQuery core.teams.getPendingInvitation — apps/backend/convex/core/teams.ts:608
-- internalMutation core.teams.createInvitedUser — apps/backend/convex/core/teams.ts:631
-- internalMutation core.teams.createInvitation — apps/backend/convex/core/teams.ts:649
 - action core.time.getShopTimeInfo — apps/backend/convex/core/time.ts:8
-- internalMutation core.usage.recordUsage — apps/backend/convex/core/usage.ts:5
-- internalQuery core.usage.getUsage — apps/backend/convex/core/usage.ts:58
 - mutation core.users.inviteTeamMember — apps/backend/convex/core/users.ts:294
 - internalQuery core.users.getUsersByOrganization — apps/backend/convex/core/users.ts:386
 - internalQuery engine.events.getRecentEvents — apps/backend/convex/engine/events.ts:311

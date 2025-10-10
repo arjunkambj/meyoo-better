@@ -21,10 +21,10 @@ Refactor unused/legacy Convex functions in batches of three files. After complet
 - [x] `bun run lint` & `bun run check-types`
 
 ## Batch 4
-- [ ] Trim unused exports in `apps/backend/convex/core/teams.ts`
-- [ ] Trim unused exports in `apps/backend/convex/core/time.ts`
-- [ ] Trim unused exports in `apps/backend/convex/core/usage.ts`
-- [ ] `bun run lint` & `bun run check-types`
+- [x] Trim unused exports in `apps/backend/convex/core/teams.ts`
+- [x] Verify `apps/backend/convex/core/time.ts` usage (`getShopTimeInfo` kept)
+- [x] Trim unused exports in `apps/backend/convex/core/usage.ts`
+- [x] `bun run lint` & `bun run check-types`
 
 ## Batch 5
 - [ ] Trim unused exports in `apps/backend/convex/core/users.ts`

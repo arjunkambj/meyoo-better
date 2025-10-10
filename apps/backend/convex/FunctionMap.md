@@ -410,20 +410,6 @@ Generated at 2025-10-10T06:10:52.452Z
 ## engine.scheduler
 - internalMutation `scheduleNext` — apps/backend/convex/engine/scheduler.ts:20
   - used at apps/backend/convex/engine/orchestrator.ts:207
-- mutation `triggerInitialSync` — apps/backend/convex/engine/scheduler.ts:162
-  - not referenced
-- internalMutation `scheduleInitialSync` — apps/backend/convex/engine/scheduler.ts:176
-  - not referenced
-- internalMutation `runHourlyCheck` — apps/backend/convex/engine/scheduler.ts:251
-  - not referenced
-- internalQuery `getLastSyncTime` — apps/backend/convex/engine/scheduler.ts:321
-  - not referenced
-- internalMutation `scheduleSync` — apps/backend/convex/engine/scheduler.ts:348
-  - not referenced
-- mutation `pauseSyncing` — apps/backend/convex/engine/scheduler.ts:421
-  - not referenced
-- mutation `resumeSyncing` — apps/backend/convex/engine/scheduler.ts:447
-  - not referenced
 ## engine.syncJobs
 - mutation `triggerInitialSync` — apps/backend/convex/engine/syncJobs.ts:13
   - used at apps/web/app/api/v1/shopify/callback/helpers.ts:136
@@ -838,25 +824,7 @@ Generated at 2025-10-10T06:10:52.452Z
 
 ## Unused Functions
 - action core.time.getShopTimeInfo — apps/backend/convex/core/time.ts:8
-- mutation core.users.inviteTeamMember — apps/backend/convex/core/users.ts:294
 - internalQuery core.users.getUsersByOrganization — apps/backend/convex/core/users.ts:386
-- internalQuery engine.events.getRecentEvents — apps/backend/convex/engine/events.ts:311
-- internalMutation engine.events.emitBatchEvents — apps/backend/convex/engine/events.ts:364
-- internalQuery engine.health.overview — apps/backend/convex/engine/health.ts:8
-- internalMutation engine.optimizer.optimizeSyncFrequency — apps/backend/convex/engine/optimizer.ts:17
-- internalQuery engine.optimizer.getCostAnalysis — apps/backend/convex/engine/optimizer.ts:87
-- internalQuery engine.optimizer.predictOptimalSyncTimes — apps/backend/convex/engine/optimizer.ts:172
-- internalMutation engine.optimizer.balanceSyncLoad — apps/backend/convex/engine/optimizer.ts:291
-- internalQuery engine.optimizer.getSyncRecommendations — apps/backend/convex/engine/optimizer.ts:353
-- internalAction engine.orchestrator.batchExecute — apps/backend/convex/engine/orchestrator.ts:459
-- internalMutation engine.orchestrator.getSyncStatus — apps/backend/convex/engine/orchestrator.ts:527
-- mutation engine.scheduler.triggerImmediate — apps/backend/convex/engine/scheduler.ts:162
-- internalMutation engine.scheduler.scheduleInitialSync — apps/backend/convex/engine/scheduler.ts:176
-- internalMutation engine.scheduler.runHourlyCheck — apps/backend/convex/engine/scheduler.ts:251
-- internalQuery engine.scheduler.getLastSyncTime — apps/backend/convex/engine/scheduler.ts:321
-- internalMutation engine.scheduler.scheduleSync — apps/backend/convex/engine/scheduler.ts:348
-- mutation engine.scheduler.pauseSyncing — apps/backend/convex/engine/scheduler.ts:421
-- mutation engine.scheduler.resumeSyncing — apps/backend/convex/engine/scheduler.ts:447
 - mutation engine.syncJobs.triggerAccountSync — apps/backend/convex/engine/syncJobs.ts:236
 - query integrations.meta.getInsights — apps/backend/convex/integrations/meta.ts:1024
 - query integrations.meta.getCampaigns — apps/backend/convex/integrations/meta.ts:1074

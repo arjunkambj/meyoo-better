@@ -27,16 +27,16 @@ Refactor unused/legacy Convex functions in batches of three files. After complet
 - [x] `bun run lint` & `bun run check-types`
 
 ## Batch 5
-- [ ] Trim unused exports in `apps/backend/convex/core/users.ts`
-- [ ] Trim unused exports in `apps/backend/convex/engine/events.ts`
-- [ ] Trim unused exports in `apps/backend/convex/engine/health.ts`
-- [ ] `bun run lint` & `bun run check-types`
+- [x] Trim unused exports in `apps/backend/convex/core/users.ts`
+- [x] Trim unused exports in `apps/backend/convex/engine/events.ts`
+- [x] Trim unused exports in `apps/backend/convex/engine/health.ts`
+- [x] `bun run lint` & `bun run check-types`
 
 ## Batch 6
-- [ ] Trim unused exports in `apps/backend/convex/engine/optimizer.ts`
-- [ ] Trim unused exports in `apps/backend/convex/engine/orchestrator.ts`
-- [ ] Trim unused exports in `apps/backend/convex/engine/scheduler.ts`
-- [ ] `bun run lint` & `bun run check-types`
+- [x] Trim unused exports in `apps/backend/convex/engine/optimizer.ts`
+- [x] Trim unused exports in `apps/backend/convex/engine/orchestrator.ts`
+- [x] Trim unused exports in `apps/backend/convex/engine/scheduler.ts`
+- [x] `bun run lint` & `bun run check-types`
 
 ## Batch 7
 - [ ] Trim unused exports in `apps/backend/convex/engine/syncJobs.ts`

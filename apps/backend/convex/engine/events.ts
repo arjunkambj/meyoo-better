@@ -3,7 +3,7 @@ import type { GenericMutationCtx } from "convex/server";
 import { v } from "convex/values";
 import { components, internal } from "../_generated/api";
 import type { DataModel, Id } from "../_generated/dataModel";
-import { internalMutation, internalQuery } from "../_generated/server";
+import { internalMutation } from "../_generated/server";
 
 import { PRIORITY } from "./workpool";
 
@@ -262,16 +262,7 @@ async function routeEvent(
       break;
 
     case EVENT_TYPES.INTEGRATION_RATE_LIMITED:
-      // Update rate limit tracking
-      await workpool.enqueueAction(
-        ctx,
-        (internal.engine.optimizer as any).handleRateLimit,
-        {
-          organizationId,
-          platform: metadata?.platform,
-          retryAfter: metadata?.retryAfter,
-        },
-      );
+      // Rate limit handling disabled; rely on platform auto-retry
       break;
 
     // Analytics events
@@ -304,35 +295,6 @@ async function routeEvent(
 }
 
 /**
- * Get recent events for an organization
- */
-export const getRecentEvents = internalQuery({
-  args: {
-    organizationId: v.id("organizations"),
-    limit: v.optional(v.number()),
-    eventTypes: v.optional(v.array(v.string())),
-  },
-
-  handler: async (ctx, args) => {
-    const query = ctx.db
-      .query("auditLogs")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId),
-      )
-      .order("desc");
-
-    const events = await query.take(args.limit || 100);
-
-    // Filter by event types if specified
-    if (args.eventTypes && args.eventTypes.length > 0) {
-      return events.filter((e) => args.eventTypes?.includes(e.action));
-    }
-
-    return events;
-  },
-});
-
-/**
  * Process event queue (called periodically)
  */
 export const processEventQueue: any = internalMutation({
@@ -359,74 +321,4 @@ export const processEventQueue: any = internalMutation({
 /**
  * Emit batch events (for bulk operations)
  */
-export const emitBatchEvents = internalMutation({
-  args: {
-    events: v.array(
-      v.object({
-        type: v.string(),
-        organizationId: v.id("organizations"),
-        userId: v.id("users"),
-        metadata: v.optional(v.record(v.string(), v.any())),
-        category: v.optional(
-          v.union(
-            v.literal("settings"),
-            v.literal("integration"),
-            v.literal("user_management"),
-            v.literal("data_management"),
-          ),
-        ),
-      }),
-    ),
-  },
-  returns: v.object({
-    processed: v.number(),
-    events: v.array(
-      v.object({
-        eventId: v.id("auditLogs"),
-        type: v.string(),
-      }),
-    ),
-  }),
-  handler: async (ctx, args) => {
-    const workpool = new Workpool(components.mainWorkpool, {
-      maxParallelism: 10,
-    });
-    const results: { eventId: Id<"auditLogs">; type: string }[] = [];
-
-    for (const event of args.events) {
-      const timestamp = Date.now();
-
-      // Store event
-      const eventId = await ctx.db.insert("auditLogs", {
-        organizationId: event.organizationId,
-        userId: event.userId,
-        action: event.type,
-        category: event.category || "data_management",
-        details: {
-          metadata: event.metadata || {},
-        },
-        ipAddress: "",
-        userAgent: "",
-        createdAt: timestamp,
-      });
-
-      // Get priority
-      const priority = EVENT_PRIORITY_MAP[event.type] || PRIORITY.NORMAL;
-
-      // Route event
-      await routeEvent(ctx, workpool, {
-        eventId,
-        type: event.type,
-        organizationId: event.organizationId,
-        userId: event.userId,
-        metadata: event.metadata,
-        timestamp,
-        priority,
-      });
-
-      results.push({ eventId, type: event.type });
-    }
-
-    return { processed: results.length, events: results };
-  },
-});
+/** intentionally removed legacy emitBatchEvents */

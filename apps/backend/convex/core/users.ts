@@ -289,35 +289,6 @@ export const updateProfile = mutation({
 });
 
 /**
- * Invite team member
- */
-export const inviteTeamMember = mutation({
-  args: {
-    email: v.string(),
-    role: v.union(v.literal("StoreTeam")),
-  },
-  returns: v.object({
-    success: v.boolean(),
-    message: v.string(),
-  }),
-  handler: async (ctx, args) => {
-    const { membership } = await requireUserAndOrg(ctx);
-
-    // Check if user has permission to invite
-    if (membership?.role !== "StoreOwner") {
-      throw new Error("Insufficient permissions to invite team members");
-    }
-
-    // Create invitation (email sending to be implemented)
-
-    return {
-      success: true,
-      message: `Invitation sent to ${args.email}`,
-    };
-  },
-});
-
-/**
  * Update organization name for all users in organization
  */
 export const updateOrganizationName = mutation({

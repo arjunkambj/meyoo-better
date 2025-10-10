@@ -1438,82 +1438,6 @@ export const getProductVariants = query({
   },
 });
 
-export const getOrders = query({
-  args: {
-    limit: v.optional(v.number()),
-    status: v.optional(v.string()),
-  },
-  returns: v.array(
-    v.object({
-      _id: v.id("shopifyOrders"),
-      _creationTime: v.number(),
-      organizationId: v.string(),
-      storeId: v.id("shopifyStores"),
-      shopifyId: v.string(),
-      orderNumber: v.string(),
-      name: v.string(),
-      customerId: v.optional(v.id("shopifyCustomers")),
-      email: v.optional(v.string()),
-      phone: v.optional(v.string()),
-      shopifyCreatedAt: v.number(),
-      processedAt: v.optional(v.number()),
-      updatedAt: v.optional(v.number()),
-      closedAt: v.optional(v.number()),
-      cancelledAt: v.optional(v.number()),
-      totalPrice: v.number(),
-      subtotalPrice: v.number(),
-      totalDiscounts: v.number(),
-      totalTip: v.optional(v.number()),
-      financialStatus: v.optional(v.string()),
-      fulfillmentStatus: v.optional(v.string()),
-      totalItems: v.number(),
-      totalQuantity: v.number(),
-      totalWeight: v.optional(v.number()),
-      totalWeightUnit: v.optional(v.string()),
-      shippingAddress: v.optional(
-        v.object({
-          country: v.optional(v.string()),
-          province: v.optional(v.string()),
-          city: v.optional(v.string()),
-          zip: v.optional(v.string()),
-        })
-      ),
-      tags: v.optional(v.array(v.string())),
-      note: v.optional(v.string()),
-      syncedAt: v.number(),
-    })
-  ),
-  handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-
-    if (!userId) return [];
-    const user = await ctx.db.get(userId);
-
-    if (!user?.organizationId) return [];
-
-    const orgId = user.organizationId;
-
-    // Use take() instead of collect() + slice for efficiency
-    if (args.status) {
-      // Need proper index for status filtering
-      const allOrders = await ctx.db
-        .query("shopifyOrders")
-        .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
-        .take(1000); // Take reasonable limit first
-
-      // Filter by status in memory for now (needs index in schema)
-      return allOrders
-        .filter((order) => order.financialStatus === args.status)
-        .slice(0, args.limit || 100);
-    }
-
-    return await ctx.db
-      .query("shopifyOrders")
-      .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
-      .take(args.limit || 100);
-  },
-});
-
 /**
  * Public version of getStoreByDomain for session management
  */
@@ -1639,39 +1563,6 @@ export const getPublicActiveStore = query({
       .first();
 
     return store || null;
-  },
-});
-
-/**
- * Get Shopify session by shop domain for billing verification
- */
-export const getSessionByShopDomain = query({
-  args: { shopDomain: v.string() },
-  returns: v.union(
-    v.null(),
-    v.object({
-      shop: v.string(),
-      accessToken: v.string(),
-      scope: v.string(),
-      isActive: v.boolean(),
-    })
-  ),
-  handler: async (ctx, args) => {
-    // Get the store by shop domain
-    const domain = normalizeShopDomain(args.shopDomain);
-    const store = await ctx.db
-      .query("shopifyStores")
-      .withIndex("by_shop_domain", (q) => q.eq("shopDomain", domain))
-      .first();
-
-    if (!store || !store.isActive) return null;
-
-    return {
-      shop: store.shopDomain,
-      accessToken: store.accessToken,
-      scope: store.scope || "",
-      isActive: store.isActive,
-    };
   },
 });
 

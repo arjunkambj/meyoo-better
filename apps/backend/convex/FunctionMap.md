@@ -455,9 +455,6 @@ Generated at 2025-10-10T06:10:52.452Z
 - query `getAdAccounts` — apps/backend/convex/integrations/meta.ts:958
   - used at apps/web/hooks/mainapp/useIntegration.ts:16
   - used at apps/web/components/onboarding/client/AccountSelectionClient.tsx:25
-- query `getAdAccount` — apps/backend/convex/integrations/meta.ts:990
-  - used at apps/web/hooks/mainapp/useIntegration.ts:16
-  - used at apps/web/components/onboarding/client/AccountSelectionClient.tsx:25
 - mutation `setPrimaryAdAccount` — apps/backend/convex/integrations/meta.ts:1138
   - used at apps/web/components/onboarding/client/AccountSelectionClient.tsx:26
 - mutation `storeAdAccountsFromCallback` — apps/backend/convex/integrations/meta.ts:1241
@@ -549,8 +546,6 @@ Generated at 2025-10-10T06:10:52.452Z
   - used at apps/backend/convex/jobs/syncHandlers.ts:341
 - internalAction `syncShopifyProducts` — apps/backend/convex/integrations/shopifySync.ts:1328
   - used at apps/backend/convex/jobs/syncHandlers.ts:227
-- internalAction `syncSessions` — apps/backend/convex/integrations/shopifySync.ts:1814
-  - used at apps/backend/convex/jobs/syncHandlers.ts:447
 ## integrations.tokenManager
 - internalAction `getValidAccessToken` — apps/backend/convex/integrations/tokenManager.ts:114
   - used at apps/backend/convex/integrations/meta.ts:917
@@ -834,20 +829,13 @@ Generated at 2025-10-10T06:10:52.452Z
 - query integrations.meta.getAudienceInsights — apps/backend/convex/integrations/meta.ts:1612
 - query integrations.meta.getAdSets — apps/backend/convex/integrations/meta.ts:1657
 - query integrations.meta.getAds — apps/backend/convex/integrations/meta.ts:1678
-- mutation integrations.meta.triggerSync — apps/backend/convex/integrations/meta.ts:1699
-- query integrations.meta.getSyncStatus — apps/backend/convex/integrations/meta.ts:1711
-- internalAction integrations.metaInternal.debugMetaTokenInternal — apps/backend/convex/integrations/metaInternal.ts:150
-- internalAction integrations.metaSync.validate — apps/backend/convex/integrations/metaSync.ts:509
 - internalQuery integrations.shopify.getOrderByShopifyIdInternal — apps/backend/convex/integrations/shopify.ts:108
 - internalQuery integrations.shopify.getCustomerByShopifyIdInternal — apps/backend/convex/integrations/shopify.ts:126
-- query integrations.shopify.getOrders — apps/backend/convex/integrations/shopify.ts:1468
-- query integrations.shopify.getSessionByShopDomain — apps/backend/convex/integrations/shopify.ts:1675
 - internalMutation integrations.shopify.updateStoreLastSyncInternal — apps/backend/convex/integrations/shopify.ts:1734
 - internalQuery integrations.shopify.getLastSyncTimeInternal — apps/backend/convex/integrations/shopify.ts:1756
 - internalMutation integrations.shopify.handleGDPRDataRequest — apps/backend/convex/integrations/shopify.ts:4419
 - internalMutation integrations.shopify.handleGDPRRedact — apps/backend/convex/integrations/shopify.ts:4516
 - internalMutation integrations.shopify.handleGDPRShopRedact — apps/backend/convex/integrations/shopify.ts:4621
-- internalAction integrations.shopifySync.syncSessions — apps/backend/convex/integrations/shopifySync.ts:1814
 - internalAction jobs.maintenance.handleSyncFailure — apps/backend/convex/jobs/maintenance.ts:102
 - internalAction jobs.maintenance.handleDisconnection — apps/backend/convex/jobs/maintenance.ts:158
 - internalAction jobs.maintenance.clearCache — apps/backend/convex/jobs/maintenance.ts:195

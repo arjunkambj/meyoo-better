@@ -39,16 +39,16 @@ Refactor unused/legacy Convex functions in batches of three files. After complet
 - [x] `bun run lint` & `bun run check-types`
 
 ## Batch 7
-- [ ] Trim unused exports in `apps/backend/convex/engine/syncJobs.ts`
-- [ ] Trim unused exports in `apps/backend/convex/integrations/meta.ts`
-- [ ] Trim unused exports in `apps/backend/convex/integrations/metaInternal.ts`
-- [ ] `bun run lint` & `bun run check-types`
+- [x] Trim unused exports in `apps/backend/convex/engine/syncJobs.ts`
+- [x] Trim unused exports in `apps/backend/convex/integrations/meta.ts`
+- [x] Trim unused exports in `apps/backend/convex/integrations/metaInternal.ts`
+- [x] `bun run lint` & `bun run check-types`
 
 ## Batch 8
-- [ ] Trim unused exports in `apps/backend/convex/integrations/metaSync.ts`
-- [ ] Trim unused exports in `apps/backend/convex/integrations/shopify.ts`
-- [ ] Trim unused exports in `apps/backend/convex/integrations/shopifySync.ts`
-- [ ] `bun run lint` & `bun run check-types`
+- [x] Trim unused exports in `apps/backend/convex/integrations/metaSync.ts`
+- [x] Trim unused exports in `apps/backend/convex/integrations/shopify.ts`
+- [x] Trim unused exports in `apps/backend/convex/integrations/shopifySync.ts`
+- [x] `bun run lint` & `bun run check-types`
 
 ## Batch 9
 - [ ] Trim unused exports in `apps/backend/convex/jobs/maintenance.ts`

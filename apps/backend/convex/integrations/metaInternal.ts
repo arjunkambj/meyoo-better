@@ -1,11 +1,8 @@
 import { v } from "convex/values";
 
 import { createSimpleLogger } from "../../libs/logging/simple";
-import { internal } from "../_generated/api";
-import { internalAction, internalMutation, internalQuery } from "../_generated/server";
-import type { Id } from "../_generated/dataModel";
+import { internalMutation, internalQuery } from "../_generated/server";
 import { createJob, PRIORITY } from "../engine/workpool";
-import { debugToken } from "./metaTokens";
 import { normalizeDateString } from "../utils/date";
 
 const logger = createSimpleLogger("MetaInternal");
@@ -130,60 +127,5 @@ export const storeCampaignsInternal = internalMutation({
     // You could store these in a campaigns table if needed
     // For now, just log them
     return null;
-  },
-});
-
-/**
- * Debug current organization's Meta access token.
- * Optionally fetches a fresh/valid token via token manager before debugging.
- */
-type DebugMetaTokenResult = {
-  ok: boolean;
-  error?: string;
-  sessionId?: Id<"integrationSessions">;
-  tokenKind?: "short" | "long" | undefined;
-  expiresAt?: number | undefined;
-  lastRefreshedAt?: number | undefined;
-  debug?: any;
-};
-
-export const debugMetaTokenInternal = internalAction({
-  args: {
-    organizationId: v.id("organizations"),
-    useManager: v.optional(v.boolean()),
-  },
-  handler: async (ctx, args): Promise<DebugMetaTokenResult> => {
-    try {
-      // Always use token manager to obtain a valid token
-      const token = await ctx.runAction(
-        internal.integrations.tokenManager.getValidAccessToken,
-        {
-          organizationId: args.organizationId,
-          platform: "meta",
-        },
-      );
-
-      // Fetch session metadata via tokenManager's internal query
-      const session = await ctx.runQuery(
-        internal.integrations.tokenManager.getActiveSessionInternal,
-        {
-          organizationId: args.organizationId,
-          platform: "meta",
-        },
-      );
-
-      const info = await debugToken(token as string);
-      return {
-        ok: true,
-        sessionId: session?._id,
-        tokenKind: session?.metadata?.tokenKind,
-        expiresAt: session?.expiresAt,
-        lastRefreshedAt: session?.metadata?.lastRefreshedAt,
-        debug: info,
-      };
-    } catch (e: any) {
-      logger.warn("debugMetaTokenInternal failed", { error: String(e?.message || e) });
-      return { ok: false, error: String(e?.message || e) };
-    }
   },
 });

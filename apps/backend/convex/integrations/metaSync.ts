@@ -504,28 +504,6 @@ export const incremental = internalAction({
 });
 
 /**
- * Validate connection
- */
-export const validate = internalAction({
-  args: {
-    organizationId: v.string(),
-  },
-  handler: async (_ctx, _args) => {
-
-    try {
-      // TODO: Check if access token is still valid
-      // Make a simple API call to verify
-
-      return { valid: true };
-    } catch (error) {
-      console.error(`[Meta] Connection validation failed`, error);
-
-      return { valid: false };
-    }
-  },
-});
-
-/**
  * Pull a single day of account-level insights (minimal fields) and store.
  * Designed for fixed-interval batching.
  */

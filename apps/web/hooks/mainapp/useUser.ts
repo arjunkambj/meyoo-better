@@ -80,28 +80,14 @@ export function useCurrentUser() {
 /**
  * Get team members for current organization
  */
-export function useTeamMembers() {
-  const members = useQuery(api.core.users.getTeamMembers);
-
-  return {
-    members: members || [],
-    loading: members === undefined,
-    error: null,
-  };
-}
+// (removed) useTeamMembers
 
 // ============ ORGANIZATION HOOKS ============
 
 /**
  * Get organization's configured timezone (single source of truth)
  */
-export function useOrganizationTimeZone() {
-  const organization = useQuery(api.core.organizations.getCurrentOrganization);
-  const loading = organization === undefined;
-  const timezoneRaw = organization?.timezone;
-  const timezone = isIanaTimeZone(timezoneRaw) ? (timezoneRaw as string) : 'UTC';
-  return { timezone, loading };
-}
+// (removed) useOrganizationTimeZone
 
 // ============ MUTATION HOOKS ============
 

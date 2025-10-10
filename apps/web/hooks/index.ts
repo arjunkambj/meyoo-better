@@ -8,7 +8,6 @@ export * from "./mainapp";
 // ============ ONBOARDING HOOKS ============
 export * from "./onboarding";
 // ============ UTIL HOOKS ============
-export * from "./useMediaQuery";
 export * from "./usePassword";
 export * from "./useApiKeys";
 export * from "./useAgent";

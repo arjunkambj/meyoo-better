@@ -87,23 +87,7 @@ export function useUserTickets(
 /**
  * Get single ticket with responses
  */
-export function useTicket(ticketId: Id<"tickets"> | undefined) {
-  const ticket = useQuery(
-    api.web.tickets.getTicket,
-    ticketId ? { ticketId } : "skip"
-  );
-
-  const loading = ticket === undefined;
-  const error =
-    ticket === null && !loading ? "Ticket not found or access denied" : null;
-
-  return {
-    ticket,
-    loading,
-    error,
-    hasResponses: (ticket?.responses && ticket.responses.length > 0) ?? false,
-  };
-}
+// (removed) useTicket
 
 /**
  * Get all tickets (admin only)

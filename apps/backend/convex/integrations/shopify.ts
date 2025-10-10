@@ -1719,10 +1719,14 @@ export const storeProductsInternal = internalMutation({
       }
 
       try {
-        await ctx.runMutation(internal.core.onboarding.monitorInitialSyncs, {
-          organizationId: args.organizationId,
-          limit: 1,
-        });
+        await ctx.runMutation(
+          internal.core.onboarding.triggerMonitorIfOnboardingComplete,
+          {
+            organizationId: args.organizationId,
+            limit: 1,
+            reason: "shopify_store_inactive",
+          },
+        );
       } catch (monitorError) {
         logger.warn(
           "monitorInitialSyncs failed after detecting inactive Shopify store",

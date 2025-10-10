@@ -983,10 +983,14 @@ export const completeOnboarding = mutation({
 
     // Always kick off a monitoring pass immediately so analytics can trigger
     try {
-      await ctx.runMutation(internal.core.onboarding.monitorInitialSyncs, {
-        organizationId: user.organizationId as Id<"organizations">,
-        limit: 1,
-      });
+      await ctx.runMutation(
+        internal.core.onboarding.triggerMonitorIfOnboardingComplete,
+        {
+          organizationId: user.organizationId as Id<"organizations">,
+          limit: 1,
+          reason: "onboarding_complete",
+        },
+      );
     } catch (monitorError) {
       console.warn(
         `[ONBOARDING] monitorInitialSyncs immediate run failed for ${user.organizationId}`,
@@ -1014,6 +1018,55 @@ export const completeOnboarding = mutation({
       platformsSyncing: pendingPlatformsList,
       syncJobs: syncJobs.length > 0 ? syncJobs : undefined,
       syncErrors: syncErrors.length > 0 ? syncErrors : undefined,
+    };
+  },
+});
+
+/**
+ * Trigger monitoring only when onboarding has been completed.
+ * Prevents monitorInitialSyncs from running for organizations
+ * that haven't reached the completion step yet.
+ */
+export const triggerMonitorIfOnboardingComplete = internalMutation({
+  args: {
+    organizationId: v.id("organizations"),
+    limit: v.optional(v.number()),
+    reason: v.optional(v.string()),
+  },
+  returns: v.object({
+    triggered: v.boolean(),
+    reason: v.optional(v.string()),
+  }),
+  handler: async (ctx, args) => {
+    const onboarding = await ctx.db
+      .query("onboarding")
+      .withIndex("by_organization", (q) =>
+        q.eq("organizationId", args.organizationId),
+      )
+      .first();
+
+    if (!onboarding) {
+      return {
+        triggered: false,
+        reason: "onboarding_not_found",
+      };
+    }
+
+    if (!onboarding.isCompleted) {
+      return {
+        triggered: false,
+        reason: "onboarding_incomplete",
+      };
+    }
+
+    await ctx.runMutation(internal.core.onboarding.monitorInitialSyncs, {
+      organizationId: args.organizationId,
+      limit: args.limit ?? 1,
+    });
+
+    return {
+      triggered: true,
+      reason: args.reason,
     };
   },
 });

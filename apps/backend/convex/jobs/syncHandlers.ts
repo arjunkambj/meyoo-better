@@ -234,10 +234,14 @@ export const handleInitialSync = internalAction({
       );
 
       try {
-        await ctx.runMutation(internal.core.onboarding.monitorInitialSyncs, {
-          organizationId: args.organizationId,
-          limit: 1,
-        });
+        await ctx.runMutation(
+          internal.core.onboarding.triggerMonitorIfOnboardingComplete,
+          {
+            organizationId: args.organizationId,
+            limit: 1,
+            reason: `sync_${args.platform}_completed`,
+          },
+        );
       } catch (monitorError) {
         console.warn(
           `[INITIAL_SYNC] monitorInitialSyncs failed for ${args.platform} ${args.organizationId}`,
@@ -262,10 +266,14 @@ export const handleInitialSync = internalAction({
       });
 
       try {
-        await ctx.runMutation(internal.core.onboarding.monitorInitialSyncs, {
-          organizationId: args.organizationId,
-          limit: 1,
-        });
+        await ctx.runMutation(
+          internal.core.onboarding.triggerMonitorIfOnboardingComplete,
+          {
+            organizationId: args.organizationId,
+            limit: 1,
+            reason: `sync_${args.platform}_error`,
+          },
+        );
       } catch (monitorError) {
         console.warn(
           `[INITIAL_SYNC] monitorInitialSyncs failed after error for ${args.platform} ${args.organizationId}`,
@@ -405,10 +413,14 @@ export const handleShopifyOrdersBatch = internalAction({
             },
           });
 
-          await ctx.runMutation(internal.core.onboarding.monitorInitialSyncs, {
-            organizationId: args.organizationId,
-            limit: 1,
-          });
+          await ctx.runMutation(
+            internal.core.onboarding.triggerMonitorIfOnboardingComplete,
+            {
+              organizationId: args.organizationId,
+              limit: 1,
+              reason: "shopify_orders_batch_complete",
+            },
+          );
         }
       }
 

@@ -333,10 +333,14 @@ export const initializeSyncSessionBatches = internalMutation({
         },
       });
 
-      await ctx.runMutation(internal.core.onboarding.monitorInitialSyncs, {
-        organizationId: session.organizationId as Id<"organizations">,
-        limit: 1,
-      });
+      await ctx.runMutation(
+        internal.core.onboarding.triggerMonitorIfOnboardingComplete,
+        {
+          organizationId: session.organizationId as Id<"organizations">,
+          limit: 1,
+          reason: "sync_session_completed",
+        },
+      );
     }
   },
 });

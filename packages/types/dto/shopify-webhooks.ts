@@ -23,8 +23,8 @@ export interface ShopifyProductWebhookPayload extends ShopifyWebhookPayload {
   tags?: string;
   status: string;
   variants?: Array<{
-    id: number;
-    product_id: number;
+    id: number | string;
+    product_id: number | string;
     title: string;
     sku?: string;
     price: string;
@@ -44,12 +44,12 @@ export interface ShopifyOrderWebhookPayload extends ShopifyWebhookPayload {
   total_price: string;
   currency: string;
   line_items?: Array<{
-    id: number;
+    id: number | string;
     title: string;
     quantity: number;
     price: string;
-    variant_id?: number;
-    product_id?: number;
+    variant_id?: number | string;
+    product_id?: number | string;
   }>;
 }
 
@@ -71,8 +71,8 @@ export interface ShopifyCustomerWebhookPayload extends ShopifyWebhookPayload {
  * Inventory webhook payloads
  */
 export interface ShopifyInventoryWebhookPayload {
-  inventory_item_id: number;
-  location_id: number;
+  inventory_item_id: number | string;
+  location_id: number | string;
   available: number;
   updated_at: string;
 }
@@ -81,12 +81,38 @@ export interface ShopifyInventoryWebhookPayload {
  * App uninstalled webhook payload
  */
 export interface ShopifyAppUninstalledPayload {
-  id: number;
+  id: number | string;
   name: string;
   email: string;
   domain: string;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * One-time app purchase payload
+ */
+export interface ShopifyAppPurchaseOneTimePayload extends ShopifyWebhookPayload {
+  name?: string;
+  test?: boolean;
+  status?: string;
+  amount?:
+    | string
+    | {
+        amount?: string;
+        currency?: string;
+        currency_code?: string;
+      };
+  price?:
+    | string
+    | {
+        amount?: string;
+        currency?: string;
+        currency_code?: string;
+      };
+  currency?: string;
+  currency_code?: string;
+  admin_graphql_api_id?: string;
 }
 
 /**
@@ -115,7 +141,7 @@ export interface ShopifyWebhookRegistrationDTO {
  * Webhook registration response
  */
 export interface ShopifyWebhookResponseDTO {
-  id: number;
+  id: number | string;
   address: string;
   topic: string;
   created_at: string;

@@ -604,11 +604,34 @@ async function handleTopicInline(
           userId: r.user_id ? String(r.user_id) : undefined,
           totalRefunded: toMoney(r.transactions?.[0]?.amount ?? 0),
           refundLineItems: Array.isArray(r.refund_line_items)
-            ? r.refund_line_items.map((it: any) => ({
-                lineItemId: it.line_item?.id ? String(it.line_item.id) : "",
-                quantity: toNum(it.quantity),
-                subtotal: toMoney(it.subtotal ?? 0),
-              }))
+            ? r.refund_line_items
+                .map((it: any) => {
+                  const rawLineItemId =
+                    it.line_item?.id ?? it.line_item_id ?? it.id;
+                  if (!rawLineItemId) {
+                    return null;
+                  }
+                  return {
+                    lineItemId: String(rawLineItemId),
+                    quantity: toNum(it.quantity),
+                    subtotal: toMoney(it.subtotal ?? 0),
+                  };
+                })
+                .filter(
+                  (
+                    entry:
+                      | {
+                          lineItemId: string;
+                          quantity: number;
+                          subtotal: number;
+                        }
+                      | null,
+                  ): entry is {
+                    lineItemId: string;
+                    quantity: number;
+                    subtotal: number;
+                  } => entry !== null,
+                )
             : [],
           shopifyCreatedAt: toNum(toTs(r.created_at) ?? Date.now()),
           processedAt: toTs(r.processed_at),
@@ -793,6 +816,44 @@ async function handleTopicInline(
         transactions: txs,
       });
       // analytics recalculation handled client-side
+      break;
+    }
+
+    case "app_purchases/one_time": {
+      if (!organizationId) break;
+      const rawPurchase: any =
+        (payload as any)?.app_purchase_one_time ?? payload ?? {};
+      const rawAmount = rawPurchase.amount ?? rawPurchase.price ?? 0;
+      const normalizedAmount =
+        typeof rawAmount === "object" && rawAmount !== null
+          ? rawAmount.amount ?? rawAmount.price ?? 0
+          : rawAmount;
+      const amount = toMoney(normalizedAmount);
+      const currency =
+        (typeof rawAmount === "object" && rawAmount !== null
+          ? rawAmount.currency_code ?? rawAmount.currency
+          : undefined) ??
+        rawPurchase.currency_code ??
+        rawPurchase.currency;
+      const purchaseId =
+        toOptionalString(rawPurchase.admin_graphql_api_id) ??
+        (rawPurchase.id !== undefined ? String(rawPurchase.id) : undefined);
+      const status = toOptionalString(rawPurchase.status);
+
+      await ctx.runMutation(internal.engine.events.emitEvent, {
+        type: "billing:one_time_purchase",
+        organizationId,
+        category: "integration",
+        metadata: {
+          purchaseId,
+          name: toOptionalString(rawPurchase.name),
+          status,
+          test: rawPurchase.test === true,
+          amount,
+          currency,
+          payload: rawPurchase,
+        },
+      });
       break;
     }
 

@@ -38,8 +38,8 @@ export function WidgetRenderer({
           poasChange={overviewMetrics?.poas?.change ?? 0}
           roas={metricsData.blendedRoas ?? 0}
           roasChange={overviewMetrics?.blendedRoas?.change ?? 0}
-          roasUTM={metricsData.roasUTM ?? 0}
-          roasUTMChange={metricsData.roasUTMChange ?? 0}
+          roasUTM={overviewMetrics?.roasUTM?.value ?? metricsData.roasUTM ?? 0}
+          roasUTMChange={overviewMetrics?.roasUTM?.change ?? 0}
           totalAdSpend={metricsData.blendedMarketingCost ?? 0}
         />
       );

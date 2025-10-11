@@ -24,7 +24,6 @@ export * from './useInventoryAnalytics';
 export * from './useInvoices';
 // ============ ANALYTICS HOOKS ============
 export * from './useAnalyticsDateRange';
-export * from './useInitialSyncStatus';
 export * from './useOrdersAnalytics';
 export * from './useOrdersInsights';
 export * from './useOrganization';

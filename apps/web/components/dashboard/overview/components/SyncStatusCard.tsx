@@ -4,14 +4,28 @@ import { Card, CardBody, Chip, Spinner } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { formatDistanceToNow } from "date-fns";
 
-import type {
-  InitialSyncCardData,
-  SyncCardState,
-} from "@/hooks/mainapp/useInitialSyncStatus";
+export type SyncCardState = "syncing" | "waiting" | "failed";
+
+export type SyncStageInfo = {
+  key: "products" | "inventory" | "customers" | "orders";
+  label: string;
+  completed: boolean;
+};
+
+export type SyncStatusCardData = {
+  platform: "shopify";
+  state: SyncCardState;
+  message: string;
+  progress: null;
+  stages: SyncStageInfo[];
+  lastUpdated: number | null;
+  error?: string | null;
+  pendingPlatforms: string[];
+};
 
 type Props = {
   isLoading: boolean;
-  data: InitialSyncCardData | null;
+  data: SyncStatusCardData | null;
 };
 
 type ChipColor =

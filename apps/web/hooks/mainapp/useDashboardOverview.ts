@@ -7,6 +7,7 @@ import { getCurrencySymbol } from "@/libs/utils/format";
 import type {
   ChannelRevenueBreakdown,
   OverviewComputation,
+  OnboardingStatus,
   PlatformMetrics,
 } from "@repo/types";
 import { DEFAULT_DASHBOARD_CONFIG, type DashboardConfig } from "@repo/types";
@@ -57,6 +58,40 @@ type OverviewMetricView = {
 };
 type OverviewMetricsView = Record<string, OverviewMetricView>;
 
+type IntegrationStages = {
+  products: boolean;
+  inventory: boolean;
+  customers: boolean;
+  orders: boolean;
+};
+
+type IntegrationStatus = {
+  shopify: {
+    connected: boolean;
+    initialSynced: boolean;
+    stages: IntegrationStages;
+    lastInitialCompletedAt?: number;
+    lastSyncAt?: number;
+    expectedOrders?: number;
+    ordersInDb?: number;
+  };
+  meta: {
+    connected: boolean;
+    initialSynced: boolean;
+    lastInitialCompletedAt?: number;
+    lastSyncAt?: number;
+  };
+  analytics: {
+    ready: boolean;
+    lastCalculatedAt?: number;
+  };
+};
+
+type OverviewMeta = Record<string, unknown> & {
+  userRole?: string | null;
+  canViewDevTools?: boolean;
+};
+
 type OverviewResponse = {
   dateRange: DateRangeArgs;
   organizationId: string;
@@ -65,7 +100,9 @@ type OverviewResponse = {
   channelRevenue?: ChannelRevenueBreakdown | null;
   primaryCurrency?: string;
   dashboardConfig: DashboardConfig;
-  meta?: Record<string, unknown>;
+  integrationStatus?: IntegrationStatus;
+  onboardingStatus?: OnboardingStatus | null;
+  meta?: OverviewMeta;
 } | null;
 
 
@@ -233,6 +270,7 @@ function buildOverviewMetrics(
     metaSpendPercentage: {
       label: "Meta % of Ad Spend",
       value: summary.metaSpendPercentage || 0,
+      change: summary.metaSpendPercentageChange || 0,
       suffix: "%",
       decimal: 1,
     },
@@ -256,6 +294,12 @@ function buildOverviewMetrics(
       change: summary.metaROASChange || 0,
       decimal: 2,
     },
+    roasUTM: {
+      label: "UTM ROAS",
+      value: metricMap.roasUTM?.value ?? summary.metaROAS || 0,
+      change: metricMap.roasUTM?.change ?? summary.metaROASChange || 0,
+      decimal: 2,
+    },
     cogs: {
       label: "COGS",
       value: summary.cogs || 0,
@@ -264,17 +308,15 @@ function buildOverviewMetrics(
     },
     cogsPercentageOfGross: {
       label: "COGS % of Gross",
-      value:
-        summary.grossSales > 0
-          ? (summary.cogs / summary.grossSales) * 100
-          : 0,
+      value: summary.cogsPercentageOfGross || 0,
+      change: summary.cogsPercentageOfGrossChange || 0,
       suffix: "%",
       decimal: 1,
     },
     cogsPercentageOfNet: {
       label: "COGS % of Revenue",
-      value:
-        summary.revenue > 0 ? (summary.cogs / summary.revenue) * 100 : 0,
+      value: summary.cogsPercentageOfNet || 0,
+      change: summary.cogsPercentageOfNetChange || 0,
       suffix: "%",
       decimal: 1,
     },
@@ -305,10 +347,8 @@ function buildOverviewMetrics(
     },
     taxesPercentageOfRevenue: {
       label: "Taxes % of Revenue",
-      value:
-        summary.revenue > 0
-          ? (summary.taxesCollected / summary.revenue) * 100
-          : 0,
+      value: summary.taxesPercentageOfRevenue || 0,
+      change: summary.taxesPercentageOfRevenueChange || 0,
       suffix: "%",
       decimal: 1,
     },
@@ -348,11 +388,7 @@ function buildOverviewMetrics(
     },
     repeatCustomerRate: {
       label: "Repeat Rate",
-      value:
-        summary.repeatCustomerRate ||
-        (summary.customers > 0
-          ? (summary.returningCustomers / summary.customers) * 100
-          : 0),
+      value: summary.repeatCustomerRate || 0,
       change: summary.repeatCustomerRateChange || 0,
       suffix: "%",
       decimal: 1,
@@ -371,24 +407,15 @@ function buildOverviewMetrics(
     },
     customerAcquisitionCost: {
       label: "CAC",
-      value:
-        summary.customerAcquisitionCost ||
-        (summary.newCustomers > 0
-          ? summary.blendedMarketingCost / summary.newCustomers
-          : 0),
+      value: summary.customerAcquisitionCost || 0,
       change: summary.customerAcquisitionCostChange || 0,
       prefix: currencySymbol,
       decimal: 2,
     },
     cacPercentageOfAOV: {
       label: "CAC % of AOV",
-      value:
-        summary.avgOrderValue > 0 && summary.newCustomers > 0
-          ? (summary.blendedMarketingCost /
-              summary.newCustomers /
-              summary.avgOrderValue) *
-            100
-          : 0,
+      value: summary.cacPercentageOfAOV || 0,
+      change: summary.cacPercentageOfAOVChange || 0,
       suffix: "%",
       decimal: 1,
     },
@@ -413,41 +440,36 @@ function buildOverviewMetrics(
     },
     avgOrderProfit: {
       label: "Avg Order Profit",
-      value: summary.avgOrderProfit ||
-        (summary.orders > 0 ? summary.profit / summary.orders : 0),
+      value: summary.avgOrderProfit || 0,
       change: summary.avgOrderProfitChange || 0,
       prefix: currencySymbol,
       decimal: 2,
     },
     avgOrderCost: {
       label: "Avg Order Cost",
-      value: summary.avgOrderCost ||
-        (summary.orders > 0
-          ? (summary.revenue - summary.profit) / summary.orders
-          : 0),
+      value: summary.avgOrderCost || 0,
       change: summary.avgOrderCostChange || 0,
       prefix: currencySymbol,
       decimal: 2,
     },
     adSpendPerOrder: {
       label: "Ad Spend / Order",
-      value: summary.adSpendPerOrder ||
-        (summary.orders > 0
-          ? summary.blendedMarketingCost / summary.orders
-          : 0),
+      value: summary.adSpendPerOrder || 0,
       change: summary.adSpendPerOrderChange || 0,
       prefix: currencySymbol,
       decimal: 2,
     },
     profitPerOrder: {
       label: "Profit/Order",
-      value: summary.orders > 0 ? summary.profit / summary.orders : 0,
+      value: summary.profitPerOrder || 0,
+      change: summary.profitPerOrderChange || 0,
       prefix: currencySymbol,
       decimal: 2,
     },
     profitPerUnit: {
       label: "Profit/Unit",
-      value: summary.unitsSold > 0 ? summary.profit / summary.unitsSold : 0,
+      value: summary.profitPerUnit || 0,
+      change: summary.profitPerUnitChange || 0,
       prefix: currencySymbol,
       decimal: 2,
     },
@@ -477,6 +499,11 @@ export function useDashboardOverview(dateRange: DateRangeArgs) {
   const platformMetrics = data?.platformMetrics ?? EMPTY_PLATFORM_METRICS;
   const channelRevenue = data?.channelRevenue ?? null;
   const dashboardConfig = data?.dashboardConfig ?? DEFAULT_DASHBOARD_CONFIG;
+  const integrationStatus = data?.integrationStatus ?? null;
+  const onboardingStatus = data?.onboardingStatus ?? null;
+  const meta = data?.meta as OverviewMeta | undefined;
+  const userRole = (meta?.userRole ?? null) as string | null;
+  const canViewDevTools = meta?.canViewDevTools === true;
   const saveConfig = useCallback(
     async (config: DashboardConfig) => {
       try {
@@ -500,6 +527,10 @@ export function useDashboardOverview(dateRange: DateRangeArgs) {
     dashboardConfig,
     saveConfig,
     primaryCurrency,
-    meta: data?.meta,
+    integrationStatus,
+    onboardingStatus,
+    userRole,
+    canViewDevTools,
+    meta,
   };
 }

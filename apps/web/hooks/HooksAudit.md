@@ -31,7 +31,6 @@ All Custom Hooks (exported from apps/web/hooks)
 - useDevTools
 - useExpenses
 - useFeatureAccess
-- useInitialSyncStatus
 - useIntegration
 - useIntegrationStatus
 - useInventoryAnalytics
@@ -75,7 +74,6 @@ Per‑Hook: useQuery/useMutation counts (inside each hook file)
 - apps/web/hooks/mainapp/useShopifyTime.ts — useQuery=0, useMutation=0
 - apps/web/hooks/mainapp/useDashboardOverview.ts — useQuery=1, useMutation=1
 - apps/web/hooks/mainapp/useInventoryAnalytics.ts — useQuery=1, useMutation=0
-- apps/web/hooks/mainapp/useInitialSyncStatus.ts — useQuery=1, useMutation=0
 - apps/web/hooks/mainapp/useOrganization.ts — useQuery=1, useMutation=2
 - apps/web/hooks/mainapp/useFeatureAccess.tsx — useQuery=0, useMutation=0
 - apps/web/hooks/mainapp/useIntegrationRequests.ts — useQuery=0, useMutation=1
@@ -122,7 +120,6 @@ Per‑Hook: usage locations (outside hooks/)
 - useDeleteTicket — apps/web/components/dashboard/(features)/settings/help/HelpSettingsView.tsx
 - useDevTools — apps/web/components/dashboard/overview/DevTools.tsx
 - useFeatureAccess — apps/web/components/shared/billing/FeatureGate.tsx
-- useInitialSyncStatus — apps/web/components/dashboard/overview/UnifiedDashboard.tsx
 - useIntegration —
   apps/web/components/dashboard/(features)/integrations/IntegrationsView.tsx
   apps/web/components/onboarding/client/MarketingIntegrationsClient.tsx

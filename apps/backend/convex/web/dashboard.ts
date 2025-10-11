@@ -15,7 +15,13 @@ import {
   type DateRange,
 } from "../utils/analyticsSource";
 import { computeOverviewMetrics, computePlatformMetrics, computeChannelRevenue } from "../utils/analyticsAggregations";
-import type { OverviewComputation, ChannelRevenueBreakdown, PlatformMetrics } from "@repo/types";
+import type {
+  OverviewComputation,
+  ChannelRevenueBreakdown,
+  PlatformMetrics,
+  MetricValue,
+  OnboardingStatus,
+} from "@repo/types";
 import { DEFAULT_DASHBOARD_CONFIG } from "@repo/types";
 import { getUserAndOrg } from "../utils/auth";
 import { resolveDashboardConfig } from "../utils/dashboardConfig";
@@ -33,6 +39,7 @@ type OverviewPayload = {
   primaryCurrency?: string;
   dashboardConfig: { kpis: string[]; widgets: string[] };
   integrationStatus: IntegrationStatus;
+  onboardingStatus: OnboardingStatus | null;
   meta?: Record<string, unknown> | undefined;
 };
 
@@ -55,6 +62,140 @@ const DASHBOARD_SUMMARY_DATASETS = [
   "metaInsights",
   "analytics",
 ] as const satisfies readonly AnalyticsSourceKey[];
+
+function mergePlatformMetrics(
+  base: PlatformMetrics | null | undefined,
+  supplemental: PlatformMetrics | null | undefined,
+): PlatformMetrics | null {
+  if (!base && !supplemental) {
+    return null;
+  }
+
+  return {
+    ...(base ?? {}),
+    ...(supplemental ?? {}),
+  } as PlatformMetrics;
+}
+
+const onboardingStatusValidator = v.union(
+  v.null(),
+  v.object({
+    completed: v.boolean(),
+    currentStep: v.number(),
+    completedSteps: v.array(v.string()),
+    connections: v.object({
+      shopify: v.boolean(),
+      meta: v.boolean(),
+    }),
+    hasShopifySubscription: v.boolean(),
+    isProductCostSetup: v.boolean(),
+    isExtraCostSetup: v.boolean(),
+    isInitialSyncComplete: v.boolean(),
+    pendingSyncPlatforms: v.optional(v.array(v.string())),
+    analyticsTriggeredAt: v.optional(v.number()),
+    lastSyncCheckAt: v.optional(v.number()),
+    syncCheckAttempts: v.optional(v.number()),
+    syncStatus: v.object({
+      shopify: v.optional(
+        v.object({
+          status: v.string(),
+          overallState: v.optional(
+            v.union(
+              v.literal("unsynced"),
+              v.literal("syncing"),
+              v.literal("complete"),
+              v.literal("failed"),
+            ),
+          ),
+          stages: v.object({
+            products: v.boolean(),
+            inventory: v.boolean(),
+            customers: v.boolean(),
+            orders: v.boolean(),
+          }),
+          startedAt: v.optional(v.number()),
+          completedAt: v.optional(v.number()),
+          lastError: v.optional(v.string()),
+        }),
+      ),
+      meta: v.optional(
+        v.object({
+          status: v.string(),
+          overallState: v.optional(
+            v.union(
+              v.literal("unsynced"),
+              v.literal("syncing"),
+              v.literal("complete"),
+              v.literal("failed"),
+            ),
+          ),
+          recordsProcessed: v.optional(v.number()),
+          startedAt: v.optional(v.number()),
+          completedAt: v.optional(v.number()),
+          lastError: v.optional(v.string()),
+        }),
+      ),
+    }),
+  }),
+);
+
+function cloneOverview(overview: OverviewComputation | null): OverviewComputation | null {
+  if (!overview) return null;
+
+  return {
+    summary: { ...overview.summary },
+    metrics: { ...(overview.metrics ?? {}) },
+    extras: { ...(overview.extras ?? {}) },
+  } satisfies OverviewComputation;
+}
+
+function extractMetaRevenue(
+  channelRevenue: ChannelRevenueBreakdown | null | undefined,
+): number {
+  if (!channelRevenue?.channels?.length) {
+    return 0;
+  }
+
+  const metaChannel = channelRevenue.channels.find((channel) => {
+    const name = channel.name?.toLowerCase?.() ?? "";
+    return name === "meta ads" || name === "meta";
+  });
+
+  return metaChannel?.revenue ?? 0;
+}
+
+function applyUtmRoasMetric(
+  overview: OverviewComputation | null,
+  channelRevenue: ChannelRevenueBreakdown | null | undefined,
+): void {
+  if (!overview?.summary) {
+    return;
+  }
+
+  const metaRevenue = extractMetaRevenue(channelRevenue);
+  const metaAdSpend = overview.summary.metaAdSpend ?? 0;
+
+  if (!Number.isFinite(metaRevenue) || !Number.isFinite(metaAdSpend)) {
+    return;
+  }
+
+  const value = metaAdSpend > 0 ? metaRevenue / metaAdSpend : 0;
+  const existingChange = Number.isFinite(overview.summary.metaROASChange)
+    ? overview.summary.metaROASChange
+    : 0;
+
+  overview.summary.metaROAS = value;
+  overview.summary.metaROASChange = existingChange ?? 0;
+
+  const metric: MetricValue = {
+    value,
+    change: Number.isFinite(existingChange) ? existingChange : 0,
+  } satisfies MetricValue;
+
+  overview.metrics = overview.metrics ?? {};
+  overview.metrics.metaROAS = metric;
+  overview.metrics.roasUTM = { ...metric } satisfies MetricValue;
+}
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -107,6 +248,7 @@ export const getOverviewData = query({
         widgets: v.array(v.string()),
       }),
       integrationStatus: integrationStatusValidator,
+      onboardingStatus: onboardingStatusValidator,
       meta: v.optional(v.any()),
     }),
   ),
@@ -123,8 +265,11 @@ export const getOverviewData = query({
       auth.user._id,
       auth.orgId,
     );
+    const userRole = auth.membership?.role ?? null;
+    const canViewDevTools = userRole === "StoreOwner";
     // Read cached status via query to avoid recomputation and large reads
     const integrationStatus = await ctx.runQuery(api.core.status.getIntegrationStatus, {});
+    const onboardingStatus = await ctx.runQuery(api.core.onboarding.getOnboardingStatus, {});
     const orgDoc = await ctx.db.get(auth.orgId as Id<"organizations">);
     const primaryCurrency = orgDoc?.primaryCurrency ?? "USD";
 
@@ -146,33 +291,42 @@ export const getOverviewData = query({
         primaryCurrency,
         dashboardConfig,
         integrationStatus,
+        onboardingStatus,
         meta: {
           strategy: "dailyMetrics",
           status: "calculating",
           message: "Metrics are being calculated. This usually takes 10-30 seconds after sync completion.",
+          userRole,
+          canViewDevTools,
         },
       } satisfies OverviewPayload;
     }
+
+    const overview = cloneOverview(dailyOverview.overview);
+    const meta: Record<string, unknown> = {
+      ...(dailyOverview.meta ?? {}),
+      strategy: "dailyMetrics",
+      userRole,
+      canViewDevTools,
+    };
 
     // Metrics available from dailyMetrics table
     const basePayload: OverviewPayload = {
       dateRange: range,
       organizationId: auth.orgId,
-      overview: dailyOverview.overview,
+      overview,
       platformMetrics: dailyOverview.platformMetrics,
       channelRevenue: null,
       primaryCurrency,
       dashboardConfig,
       integrationStatus,
-      meta: {
-        strategy: "dailyMetrics",
-        ...dailyOverview.meta,
-      },
+      onboardingStatus,
+      meta,
     } satisfies OverviewPayload;
 
     // Try to load minimal supplemental data for channel revenue
     // Using small dataset to avoid large reads
-    const supplementalDatasets = ["orders"] as const;
+    const supplementalDatasets = ["orders", "analytics", "metaInsights"] as const;
     try {
       const analyticsResponse = await loadAnalytics(
         ctx,
@@ -184,13 +338,19 @@ export const getOverviewData = query({
       );
 
       const channelRevenue = computeChannelRevenue(analyticsResponse);
+      applyUtmRoasMetric(overview, channelRevenue);
+      const supplementalPlatformMetrics = computePlatformMetrics(analyticsResponse);
+      const mergedPlatformMetrics = mergePlatformMetrics(
+        dailyOverview.platformMetrics,
+        supplementalPlatformMetrics,
+      );
 
       return {
         ...basePayload,
         channelRevenue,
+        platformMetrics: mergedPlatformMetrics ?? dailyOverview.platformMetrics,
         meta: {
-          strategy: "dailyMetrics",
-          ...dailyOverview.meta,
+          ...meta,
           supplemental: {
             datasets: supplementalDatasets,
           },
@@ -224,12 +384,15 @@ const getOverviewDataActionDefinition = {
         widgets: v.array(v.string()),
       }),
       integrationStatus: integrationStatusValidator,
+      onboardingStatus: onboardingStatusValidator,
       meta: v.optional(v.any()),
     }),
   ),
   handler: async (ctx: ActionCtx, args: OverviewArgs): Promise<OverviewPayload | null> => {
     const auth = await getUserAndOrg(ctx);
     if (!auth) return null;
+    const userRole = auth.membership?.role ?? null;
+    const canViewDevTools = userRole === "StoreOwner";
 
     const range = args.startDate && args.endDate
       ? validateDateRange({ startDate: args.startDate, endDate: args.endDate })
@@ -280,10 +443,24 @@ const getOverviewDataActionDefinition = {
 
     const dashboardLayout = await ctx.runQuery(api.core.dashboard.getDashboardLayout, {});
     const integrationStatus = await ctx.runQuery(api.core.status.getIntegrationStatus, {});
+    const onboardingStatus = await ctx.runQuery(api.core.onboarding.getOnboardingStatus, {});
 
     const overview = computeOverviewMetrics(analyticsResponse, previousAnalyticsResponse);
     const platformMetrics = computePlatformMetrics(analyticsResponse);
     const channelRevenue = computeChannelRevenue(analyticsResponse);
+    applyUtmRoasMetric(overview, channelRevenue);
+
+    const primaryCurrency =
+      (await ctx.runQuery(api.core.currency.getPrimaryCurrencyForOrg, {
+        orgId: auth.orgId as Id<"organizations">,
+      })) ?? "USD";
+
+    const metaPayload: Record<string, unknown> = {
+      ...(analyticsResponse.meta ?? {}),
+      ...(previousRange ? { previousRange } : {}),
+      userRole,
+      canViewDevTools,
+    };
 
     return {
       dateRange: analyticsResponse.dateRange,
@@ -291,16 +468,11 @@ const getOverviewDataActionDefinition = {
       overview,
       platformMetrics,
       channelRevenue,
-      primaryCurrency:
-        (await ctx.runQuery(api.core.currency.getPrimaryCurrencyForOrg, {
-          orgId: auth.orgId as Id<"organizations">,
-        })) ?? "USD",
+      primaryCurrency,
       dashboardConfig: dashboardLayout ?? DEFAULT_DASHBOARD_CONFIG,
       integrationStatus,
-      meta: {
-        ...(analyticsResponse.meta ?? {}),
-        ...(previousRange ? { previousRange } : {}),
-      },
+      onboardingStatus,
+      meta: metaPayload,
     } satisfies OverviewPayload;
   },
 };

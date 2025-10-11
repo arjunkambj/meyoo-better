@@ -3,14 +3,10 @@
 import { Spacer } from "@heroui/react";
 import { useAtomValue } from "jotai";
 import React, { useCallback, useMemo, useState } from "react";
-import {
-  useAnalyticsDateRange,
-  useDashboardOverview,
-  useInitialSyncStatus,
-  useUser,
-} from "@/hooks";
+import { useAnalyticsDateRange, useDashboardOverview } from "@/hooks";
 import { devToolsVisibleAtom } from "@/store/atoms";
-import { DEFAULT_DASHBOARD_CONFIG, type ChannelRevenueBreakdown } from "@repo/types";
+import { DEFAULT_DASHBOARD_CONFIG, type OnboardingStatus } from "@repo/types";
+import type { SyncStatusCardData, SyncCardState } from "./components/SyncStatusCard";
 
 import { CustomizationModalUnified } from "./CustomizationModalUnified";
 import { DashboardHeader } from "./components/DashboardHeader";
@@ -19,39 +15,131 @@ import { SyncStatusCard } from "./components/SyncStatusCard";
 import { WidgetsContainer } from "./components/WidgetsContainer";
 import { DevTools } from "./DevTools";
 
-type OverviewMetricView = {
-  value: number;
-  change?: number;
-  label?: string;
-  prefix?: string;
-  suffix?: string;
-  decimal?: number;
+type StageKey = "products" | "inventory" | "customers" | "orders";
+type SyncStageInfo = SyncStatusCardData["stages"][number];
+
+const STAGE_LABELS: Record<StageKey, string> = {
+  products: "Products",
+  inventory: "Inventory",
+  customers: "Customers",
+  orders: "Orders",
 };
 
-const derivePreviousValue = (current: number, changePercent?: number) => {
-  if (!Number.isFinite(current) || current === 0) {
-    return 0;
+const buildPreviewCard = (): SyncStatusCardData => ({
+  platform: "shopify",
+  state: "syncing",
+  message: "Preview: Shopify sync in progress.",
+  progress: null,
+  stages: (Object.keys(STAGE_LABELS) as StageKey[]).map((key) => ({
+    key,
+    label: STAGE_LABELS[key],
+    completed: key === "products" || key === "inventory",
+  })),
+  lastUpdated: Date.now(),
+  error: null,
+  pendingPlatforms: ["shopify"],
+});
+
+const toStageEntries = (
+  stages: {
+    products?: boolean;
+    inventory?: boolean;
+    customers?: boolean;
+    orders?: boolean;
+  } | null | undefined,
+): SyncStageInfo[] =>
+  (Object.keys(STAGE_LABELS) as StageKey[]).map((key) => ({
+    key,
+    label: STAGE_LABELS[key],
+    completed: Boolean(stages?.[key]),
+  }));
+
+function buildSyncStatusCardData(
+  status: OnboardingStatus | null | undefined,
+  debugForce: boolean,
+): SyncStatusCardData | null {
+  const previewCard = debugForce ? buildPreviewCard() : null;
+
+  if (!status) {
+    return previewCard;
   }
-  if (changePercent === undefined || !Number.isFinite(changePercent)) {
-    return current;
+
+  const hasShopifyConnection = status.connections?.shopify ?? false;
+  if (!hasShopifyConnection && !debugForce) {
+    return null;
   }
 
-  const ratio = 1 + changePercent / 100;
+  const shopify = status.syncStatus?.shopify;
+  const overall = shopify?.overallState ?? null;
+  const isInitialSyncComplete = status.isInitialSyncComplete ?? false;
 
-  if (!Number.isFinite(ratio) || ratio <= 0) {
-    return 0;
+  if (!debugForce && (isInitialSyncComplete || overall === "complete")) {
+    return null;
   }
 
-  return current / ratio;
-};
+  const normalizedState: SyncCardState = (() => {
+    if (overall === "failed" || shopify?.status === "failed") {
+      return "failed";
+    }
+    if (
+      overall === "syncing" ||
+      shopify?.status === "processing" ||
+      shopify?.status === "syncing" ||
+      shopify?.status === "pending"
+    ) {
+      return "syncing";
+    }
+    if (!shopify) {
+      return debugForce ? "syncing" : "waiting";
+    }
+    return "waiting";
+  })();
 
-const computePercentChange = (current: number, previous: number) => {
-  if (!Number.isFinite(previous) || previous === 0) {
-    return current > 0 ? 100 : 0;
+  const lastUpdated =
+    (typeof status.lastSyncCheckAt === "number" ? status.lastSyncCheckAt : null) ??
+    (typeof shopify?.completedAt === "number" ? shopify.completedAt : null) ??
+    (typeof shopify?.startedAt === "number" ? shopify.startedAt : null) ??
+    (debugForce ? Date.now() : null);
+
+  const message = (() => {
+    if (normalizedState === "failed") {
+      return "Initial Shopify sync needs attention. Review the error and retry the sync.";
+    }
+    if (normalizedState === "syncing") {
+      return debugForce
+        ? "Preview: Shopify sync in progress."
+        : "We're syncing your Shopify data. Feel free to explore the dashboard while this finishes.";
+    }
+    return "Shopify sync is queued and should start momentarily.";
+  })();
+
+  const result: SyncStatusCardData = {
+    platform: "shopify",
+    state: normalizedState,
+    message,
+    progress: null,
+    stages: toStageEntries(shopify?.stages ?? null),
+    lastUpdated,
+    error: shopify?.lastError ?? null,
+    pendingPlatforms: status.pendingSyncPlatforms ?? [],
+  };
+
+  if (debugForce && previewCard) {
+    return {
+      ...previewCard,
+      ...result,
+      state: result.state === "waiting" ? "syncing" : result.state,
+      stages: result.stages.length > 0 ? result.stages : previewCard.stages,
+      lastUpdated: result.lastUpdated ?? previewCard.lastUpdated,
+      pendingPlatforms:
+        result.pendingPlatforms.length > 0
+          ? result.pendingPlatforms
+          : previewCard.pendingPlatforms,
+    } satisfies SyncStatusCardData;
   }
 
-  return ((current - previous) / previous) * 100;
-};
+  return result;
+}
 
 export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
   const [isCustomizing, setIsCustomizing] = useState(false);
@@ -62,180 +150,57 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
     updateRange: updateOverviewRange,
   } = useAnalyticsDateRange('dashboard-overview', { defaultPreset: 'today', sharedKey: null });
   const devToolsVisible = useAtomValue(devToolsVisibleAtom);
-  const { role } = useUser();
-  const canViewDevTools = role === 'StoreOwner';
-
   const {
     isLoading,
     overviewMetrics,
     platformMetrics,
-    channelRevenue,
     dashboardConfig,
     saveConfig,
     primaryCurrency,
+    onboardingStatus,
+    canViewDevTools,
   } = useDashboardOverview({ startDate: overviewRange.startDate, endDate: overviewRange.endDate });
 
-  const {
-    isLoading: isSyncStatusLoading,
-    shouldDisplay: shouldShowSyncCard,
-    data: syncCardData,
-  } = useInitialSyncStatus();
+  const debugForce = typeof window !== "undefined" && window.location.search.includes("previewSyncCard");
+  const syncCardData: SyncStatusCardData | null = useMemo(
+    () => buildSyncStatusCardData(onboardingStatus ?? null, debugForce),
+    [onboardingStatus, debugForce],
+  );
+  const shouldShowSyncCard = Boolean(syncCardData);
+  const isSyncStatusLoading = isLoading && !syncCardData;
 
   // Note: Cost setup status is now tracked in onboarding table
   const showCostSetupWarning = false; // TODO: Get from onboarding status when needed
 
   const config = dashboardConfig;
-  const channelBreakdown: ChannelRevenueBreakdown | undefined = channelRevenue ?? undefined;
 
-  const utmRoas = useMemo(() => {
-    const channels = channelBreakdown?.channels ?? [];
-    if (channels.length === 0) {
-      return { value: 0, change: 0 };
+  const overviewMetricValues = useMemo<Record<string, number>>(() => {
+    if (!overviewMetrics) {
+      return {};
     }
 
-    const paidChannels = channels.filter((channel) =>
-      ["Meta Ads"].includes(channel.name),
-    );
+    return Object.fromEntries(
+      Object.entries(overviewMetrics).map(([key, metric]) => [
+        key,
+        metric.value ?? 0,
+      ]),
+    ) as Record<string, number>;
+  }, [overviewMetrics]);
 
-    const currentRevenue = paidChannels.reduce((sum, channel) => sum + (channel.revenue || 0), 0);
-
-    const previousRevenue = paidChannels.reduce((sum, channel) => {
-      const prev = derivePreviousValue(channel.revenue || 0, channel.change);
-
-      return sum + prev;
-    }, 0);
-
-    const metaAdSpendMetric =
-      (overviewMetrics?.metaAdSpend as OverviewMetricView | undefined) ||
-      undefined;
-
-    const currentMetaAdSpend = metaAdSpendMetric?.value || 0;
-    const currentAdSpend = currentMetaAdSpend;
-
-    const previousAdSpend =
-      derivePreviousValue(currentMetaAdSpend, metaAdSpendMetric?.change);
-
-    const currentRoas =
-      currentAdSpend > 0 ? currentRevenue / currentAdSpend : 0;
-    const previousRoas =
-      previousAdSpend > 0 ? previousRevenue / previousAdSpend : 0;
-
-    return {
-      value: currentRoas,
-      change: computePercentChange(currentRoas, previousRoas),
-    };
-  }, [channelBreakdown, overviewMetrics]);
-
-  // Combine all metrics data
   const allMetricsData = useMemo(() => {
     const platformNumbers = platformMetrics as unknown as Record<string, number>;
-    return {
-      // Overview metrics
-      revenue: overviewMetrics?.revenue?.value || 0,
-      netProfit: overviewMetrics?.netProfit?.value || 0,
-      netProfitMargin: overviewMetrics?.netProfitMargin?.value || 0,
-      orders: overviewMetrics?.orders?.value || 0,
-      avgOrderValue: overviewMetrics?.avgOrderValue?.value || 0,
-      blendedRoas: overviewMetrics?.blendedRoas?.value || 0,
-      prepaidRate: overviewMetrics?.prepaidRate?.value || 0,
-
-      // Revenue & Margins
-      grossSales: overviewMetrics?.revenue?.value ?? 0,
-      discounts: overviewMetrics?.discounts?.value || 0,
-      discountRate: overviewMetrics?.discountRate?.value || 0,
-      rtoRevenueLost: overviewMetrics?.rtoRevenueLost?.value || 0,
-      manualReturnRate: overviewMetrics?.manualReturnRate?.value || 0,
-      grossProfit: overviewMetrics?.grossProfit?.value || 0,
-      grossProfitMargin: overviewMetrics?.grossProfitMargin?.value || 0,
-      contributionMargin: overviewMetrics?.contributionMargin?.value || 0,
-      contributionMarginPercentage:
-        overviewMetrics?.contributionMarginPercentage?.value || 0,
-      operatingMargin: overviewMetrics?.operatingMargin?.value || 0,
-
-      // Marketing
-      blendedMarketingCost: overviewMetrics?.blendedMarketingCost?.value || 0,
-      metaAdSpend: overviewMetrics?.metaAdSpend?.value || 0,
-      metaSpendPercentage: overviewMetrics?.metaSpendPercentage?.value || 0,
-      marketingPercentageOfGross:
-        overviewMetrics?.marketingPercentageOfGross?.value || 0,
-      marketingPercentageOfNet:
-        overviewMetrics?.marketingPercentageOfNet?.value || 0,
-      metaROAS: overviewMetrics?.metaROAS?.value || 0,
-
-      // Growth
-      moMRevenueGrowth: overviewMetrics?.moMRevenueGrowth?.value || 0,
-      calendarMoMRevenueGrowth:
-        overviewMetrics?.calendarMoMRevenueGrowth?.value || 0,
-
-      // Costs
-      cogs: overviewMetrics?.cogs?.value || 0,
-      cogsPercentageOfGross: overviewMetrics?.cogsPercentageOfGross?.value || 0,
-      cogsPercentageOfNet: overviewMetrics?.cogsPercentageOfNet?.value || 0,
-      shippingCosts: overviewMetrics?.shippingCosts?.value || 0,
-      shippingPercentageOfNet:
-        overviewMetrics?.shippingPercentageOfNet?.value || 0,
-      transactionFees: overviewMetrics?.transactionFees?.value || 0,
-      taxesCollected: overviewMetrics?.taxesCollected?.value || 0,
-      taxesPercentageOfRevenue:
-        overviewMetrics?.taxesPercentageOfRevenue?.value || 0,
-
-      // Customers
-      totalCustomers: overviewMetrics?.totalCustomers?.value || 0,
-      newCustomers: overviewMetrics?.newCustomers?.value || 0,
-      returningCustomers: overviewMetrics?.returningCustomers?.value || 0,
-      repeatCustomerRate: overviewMetrics?.repeatCustomerRate?.value || 0,
-      abandonedCustomers: overviewMetrics?.abandonedCustomers?.value || 0,
-      abandonedRate: overviewMetrics?.abandonedRate?.value || 0,
-      customerAcquisitionCost:
-        overviewMetrics?.customerAcquisitionCost?.value || 0,
-      cacPercentageOfAOV: overviewMetrics?.cacPercentageOfAOV?.value || 0,
-
-      // Units
-      unitsSold: overviewMetrics?.unitsSold?.value || 0,
-      avgOrderProfit:
-        overviewMetrics?.avgOrderProfit?.value ??
-        (overviewMetrics?.orders?.value && overviewMetrics?.netProfit?.value
-          ? overviewMetrics.netProfit.value /
-            overviewMetrics.orders.value
-          : 0),
-      profitPerOrder: overviewMetrics?.profitPerOrder?.value || 0,
-      profitPerUnit: overviewMetrics?.profitPerUnit?.value || 0,
-
-      // Additional costs for widgets
-      handlingFees: overviewMetrics?.handlingFees?.value || 0,
-      customCosts: overviewMetrics?.customCosts?.value || 0,
-
-      // Widget-specific metrics
-      poas:
-        overviewMetrics?.poas?.value ??
-        (overviewMetrics?.netProfit?.value &&
-        overviewMetrics?.blendedMarketingCost?.value
-          ? overviewMetrics.netProfit.value /
-            overviewMetrics.blendedMarketingCost.value
-          : 0),
-      roasUTM: utmRoas.value,
-      roasUTMChange: utmRoas.change,
-      ncROAS: overviewMetrics?.ncROAS?.value || 0,
-      repurchaseRate: overviewMetrics?.repeatCustomerRate?.value || 0,
-      returnRate: overviewMetrics?.returnRate?.value || 0,
-      adSpendPerOrder:
-        overviewMetrics?.adSpendPerOrder?.value ??
-        (overviewMetrics?.orders?.value &&
-        overviewMetrics?.blendedMarketingCost?.value
-          ? overviewMetrics.blendedMarketingCost.value /
-            overviewMetrics.orders.value
-          : 0),
-      avgOrderCost:
-        overviewMetrics?.avgOrderCost?.value ??
-        (overviewMetrics?.avgOrderValue?.value &&
-        overviewMetrics?.avgOrderProfit?.value
-          ? overviewMetrics.avgOrderValue.value -
-            overviewMetrics.avgOrderProfit.value
-          : 0),
-      // Platform metrics (numbers only)
-      ...(platformNumbers as Record<string, number>),
+    const metrics: Record<string, number> = {
+      ...overviewMetricValues,
+      ...platformNumbers,
     };
-  }, [overviewMetrics, platformMetrics, utmRoas]);
+
+    const repeatRate = overviewMetricValues.repeatCustomerRate ?? 0;
+    metrics.repurchaseRate = repeatRate;
+    metrics.repeatCustomerRate = repeatRate;
+    metrics.repeatRate = repeatRate;
+
+    return metrics;
+  }, [overviewMetricValues, platformMetrics]);
 
   const handleCustomizationApply = useCallback(
     async (kpiItems: string[], widgetItems: string[]) => {

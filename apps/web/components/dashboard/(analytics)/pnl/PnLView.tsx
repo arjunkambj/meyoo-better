@@ -25,6 +25,8 @@ export const PnLView = memo(function PnLView() {
     loadingStates,
     exportData,
     dateRange: analyticsDateRange,
+    primaryCurrency,
+    tableRange,
   } = usePnLAnalytics(pnlRange);
 
   return (
@@ -49,7 +51,11 @@ export const PnLView = memo(function PnLView() {
         }
       />
 
-      <PnLKPICards metrics={metricsData} isLoading={loadingStates.metrics} />
+      <PnLKPICards
+        metrics={metricsData}
+        isLoading={loadingStates.metrics}
+        primaryCurrency={primaryCurrency}
+      />
 
       {/* P&L Table with integrated granularity controls */}
       <PnLTable
@@ -58,6 +64,8 @@ export const PnLView = memo(function PnLView() {
         setGranularity={setGranularity}
         loading={loadingStates.table}
         periods={tablePeriods}
+        primaryCurrency={primaryCurrency}
+        tableRange={tableRange}
       />
     </div>
   );

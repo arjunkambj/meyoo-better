@@ -3,21 +3,22 @@
 import { memo } from "react";
 
 import KPI from "@/components/shared/cards/KPI";
-import { useUser } from "@/hooks";
 import { getCurrencySymbol } from "@/libs/utils/format";
 import type { PnLKPIMetrics } from "@repo/types";
 
 interface PnLKPICardsProps {
   metrics?: PnLKPIMetrics;
   isLoading?: boolean;
+  primaryCurrency?: string;
 }
 
 export const PnLKPICards = memo(function PnLKPICards({
   metrics,
   isLoading = false,
+  primaryCurrency,
 }: PnLKPICardsProps) {
-  const { primaryCurrency } = useUser();
-  const currencySymbol = getCurrencySymbol(primaryCurrency);
+  const currency = primaryCurrency ?? "USD";
+  const currencySymbol = getCurrencySymbol(currency);
 
   const formatCurrency = (value: number) => {
     const safeValue = Number.isNaN(value) ? 0 : value;

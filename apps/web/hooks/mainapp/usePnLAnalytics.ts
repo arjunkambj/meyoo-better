@@ -59,6 +59,18 @@ export function usePnLAnalytics(params?: UsePnLAnalyticsParams) {
 
   const result = analytics?.result as PnLAnalyticsResult | undefined;
   const resolvedDateRange = analytics?.dateRange ?? { startDate, endDate };
+  const primaryCurrency =
+    result?.primaryCurrency ??
+    (typeof analytics?.meta === "object" && analytics?.meta !== null
+      ? (analytics.meta as { primaryCurrency?: string }).primaryCurrency
+      : undefined) ??
+    "USD";
+  const tableRange =
+    result?.tableRange ??
+    (typeof analytics?.meta === "object" && analytics?.meta !== null
+      ? (analytics.meta as { tableRange?: { startDate: string; endDate: string } }).tableRange
+      : undefined) ??
+    resolvedDateRange;
 
   const metricsData: PnLKPIMetrics | undefined = result?.metrics ?? undefined;
   const tablePeriods: PnLTablePeriod[] | undefined = result?.periods ?? undefined;
@@ -77,5 +89,7 @@ export function usePnLAnalytics(params?: UsePnLAnalyticsParams) {
     loadingStates,
     exportData,
     dateRange: resolvedDateRange,
+    primaryCurrency,
+    tableRange,
   };
 }

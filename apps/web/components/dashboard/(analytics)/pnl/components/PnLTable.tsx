@@ -3,7 +3,6 @@
 import { Skeleton, Tab, Tabs } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import React, { useCallback, useMemo } from "react";
-import { useUser } from "@/hooks";
 import type { PnLGranularity, PnLMetrics, PnLTablePeriod } from "@repo/types";
 import { formatCurrency } from "@/libs/utils/format";
 
@@ -13,6 +12,8 @@ interface PnLTableProps {
   setGranularity?: (granularity: PnLGranularity) => void;
   loading?: boolean;
   dateRange: { startDate: string; endDate: string };
+  primaryCurrency?: string;
+  tableRange?: { startDate: string; endDate: string };
 }
 
 const buildZeroMetrics = (): PnLMetrics => ({
@@ -265,8 +266,10 @@ export const PnLTable = React.memo(function PnLTable({
   setGranularity,
   loading,
   dateRange,
+  primaryCurrency,
+  tableRange,
 }: PnLTableProps) {
-  const { primaryCurrency } = useUser();
+  const currency = primaryCurrency ?? "USD";
 
   // Format value with currency or percentage
   const formatValue = useCallback(
@@ -279,7 +282,7 @@ export const PnLTable = React.memo(function PnLTable({
 
       // Format currency with absolute value
       const absValue = Math.abs(value);
-      const formatted = formatCurrency(absValue, primaryCurrency);
+      const formatted = formatCurrency(absValue, currency);
 
       // Add parentheses for negative values (costs/deductions)
       if (addParentheses && value !== 0) {
@@ -293,7 +296,7 @@ export const PnLTable = React.memo(function PnLTable({
 
       return formatted;
     },
-    [primaryCurrency]
+    [currency]
   );
 
   // Determine which metrics should show in parentheses (negative/deductions)
@@ -317,7 +320,8 @@ export const PnLTable = React.memo(function PnLTable({
     const totalPeriod = periods.find((period) => period.isTotal);
     const regularPeriods = periods.filter((period) => !period.isTotal);
 
-    const expectedDefinitions = buildExpectedPeriods(granularity, dateRange);
+    const rangeForDisplay = tableRange ?? dateRange;
+    const expectedDefinitions = buildExpectedPeriods(granularity, rangeForDisplay);
     const periodMap = new Map(regularPeriods.map((period) => [period.date, period]));
     const displayPeriods = expectedDefinitions.length
       ? expectedDefinitions.map((definition) => {
@@ -571,7 +575,7 @@ export const PnLTable = React.memo(function PnLTable({
         </table>
       </div>
     );
-  }, [periods, granularity, dateRange, isDeduction, formatValue]);
+  }, [periods, granularity, dateRange, tableRange, isDeduction, formatValue]);
 
   return (
     <>

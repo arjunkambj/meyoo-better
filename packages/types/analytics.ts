@@ -391,4 +391,9 @@ export interface PnLAnalyticsResult {
   periods: PnLTablePeriod[];
   exportRows: Array<Record<string, string | number>>;
   totals: PnLMetrics;
+  primaryCurrency?: string;
+  tableRange?: {
+    startDate: string;
+    endDate: string;
+  };
 }

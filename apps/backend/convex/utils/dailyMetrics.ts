@@ -551,6 +551,114 @@ function shiftDateString(date: string, deltaDays: number): string {
   return shifted.toISOString().slice(0, 10);
 }
 
+function toIsoDateUtc(date: Date): string {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()))
+    .toISOString()
+    .slice(0, 10);
+}
+
+function startOfWeekMondayUtc(date: Date): Date {
+  const base = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  const day = base.getUTCDay() || 7;
+  if (day !== 1) {
+    base.setUTCDate(base.getUTCDate() - day + 1);
+  }
+  return base;
+}
+
+function deriveTableRangeForGranularity(range: DateRange, granularity: PnLGranularity): DateRange {
+  const endMs = Date.parse(`${range.endDate}T00:00:00.000Z`);
+  if (!Number.isFinite(endMs)) {
+    return range;
+  }
+
+  const endDate = new Date(endMs);
+
+  if (granularity === "weekly") {
+    const endWeekStart = startOfWeekMondayUtc(endDate);
+    const endWeekEnd = new Date(endWeekStart.getTime());
+    endWeekEnd.setUTCDate(endWeekEnd.getUTCDate() + 6);
+    const startWeekStart = new Date(endWeekStart.getTime());
+    startWeekStart.setUTCDate(startWeekStart.getUTCDate() - 7 * (6 - 1));
+    return {
+      startDate: toIsoDateUtc(startWeekStart),
+      endDate: toIsoDateUtc(endWeekEnd),
+    };
+  }
+
+  if (granularity === "monthly") {
+    const endMonthStart = new Date(Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth(), 1));
+    const endMonthEnd = new Date(Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth() + 1, 0));
+    const startMonthStart = new Date(
+      Date.UTC(endMonthStart.getUTCFullYear(), endMonthStart.getUTCMonth() - (3 - 1), 1),
+    );
+    return {
+      startDate: toIsoDateUtc(startMonthStart),
+      endDate: toIsoDateUtc(endMonthEnd),
+    };
+  }
+
+  const startDate = new Date(endDate.getTime());
+  startDate.setUTCDate(startDate.getUTCDate() - 6);
+  return {
+    startDate: toIsoDateUtc(startDate),
+    endDate: toIsoDateUtc(endDate),
+  };
+}
+
+type PeriodDefinition = {
+  key: string;
+  label: string;
+  date: string;
+  rangeStartMs: number;
+  rangeEndMs: number;
+};
+
+function buildPeriodDefinitionsForRange(
+  range: DateRange,
+  granularity: PnLGranularity,
+): PeriodDefinition[] {
+  const startMs = Date.parse(`${range.startDate}T00:00:00.000Z`);
+  const endMs = Date.parse(`${range.endDate}T00:00:00.000Z`);
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || startMs > endMs) {
+    return [];
+  }
+
+  const definitions: PeriodDefinition[] = [];
+  const startDateObj = new Date(startMs);
+  const endDateObj = new Date(endMs);
+
+  if (granularity === "daily") {
+    const cursor = new Date(startDateObj.getTime());
+    while (cursor.getTime() <= endMs) {
+      const period = getPnLPeriodKey(cursor, granularity);
+      definitions.push(period);
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
+    return definitions;
+  }
+
+  if (granularity === "weekly") {
+    const cursor = startOfWeekMondayUtc(new Date(startDateObj.getTime()));
+    while (cursor.getTime() <= endMs) {
+      const period = getPnLPeriodKey(cursor, granularity);
+      definitions.push(period);
+      cursor.setUTCDate(cursor.getUTCDate() + 7);
+    }
+    return definitions;
+  }
+
+  const monthCursor = new Date(Date.UTC(startDateObj.getUTCFullYear(), startDateObj.getUTCMonth(), 1));
+  const endMonth = new Date(Date.UTC(endDateObj.getUTCFullYear(), endDateObj.getUTCMonth(), 1));
+  while (monthCursor.getTime() <= endMonth.getTime()) {
+    const period = getPnLPeriodKey(monthCursor, granularity);
+    definitions.push(period);
+    monthCursor.setUTCMonth(monthCursor.getUTCMonth() + 1);
+  }
+
+  return definitions;
+}
+
 function calendarMonthBounds(date: Date): { startDate: string; endDate: string } {
   const year = date.getUTCFullYear();
   const month = date.getUTCMonth();
@@ -2127,12 +2235,16 @@ export interface DailyPnLMeta {
     firstAvailable: string | null;
     lastAvailable: string | null;
     requested: DateRange;
+    tableRange: DateRange;
   };
   availableDays: number;
+  selectedAvailableDays: number;
+  selectedHasData: boolean;
   expectedDays: number | null;
   hasFullCoverage: boolean | null;
   operatingCosts: number;
   marketingCost: number;
+  tableRange: DateRange;
 }
 
 export async function loadPnLAnalyticsFromDailyMetrics(
@@ -2141,41 +2253,59 @@ export async function loadPnLAnalyticsFromDailyMetrics(
   range: DateRange,
   granularity: PnLGranularity,
 ): Promise<{ result: PnLAnalyticsResult; meta: DailyPnLMeta }> {
+  const tableRange = deriveTableRangeForGranularity(range, granularity);
+
   const docs = await ctx.db
     .query("dailyMetrics")
     .withIndex("by_organization_date", (q) =>
       q
         .eq("organizationId", organizationId)
-        .gte("date", range.startDate)
-        .lte("date", range.endDate),
+        .gte("date", tableRange.startDate)
+        .lte("date", tableRange.endDate),
     )
     .order("asc")
     .collect();
 
-  const uniqueDates = Array.from(new Set(docs.map((doc) => doc.date)));
-  const availableDays = uniqueDates.length;
+  const periodDefinitions = buildPeriodDefinitionsForRange(tableRange, granularity);
+  const tableUniqueDates = periodDefinitions.map((definition) => definition.date);
 
-  const coverageStart = uniqueDates[0] ?? null;
-  const coverageEnd = uniqueDates[uniqueDates.length - 1] ?? null;
+  const selectedDocs = docs.filter(
+    (doc) => doc.date >= range.startDate && doc.date <= range.endDate,
+  );
+  const selectedUniqueDates = Array.from(
+    new Set(selectedDocs.map((doc) => doc.date)),
+  );
 
-  const rangeStartMs = getRangeStartMs(range);
-  const rangeEndExclusiveMs = getRangeEndExclusiveMs(range);
-  const rangeEndMs = rangeEndExclusiveMs - 1;
+  const coverageStart = selectedUniqueDates[0] ?? null;
+  const coverageEnd = selectedUniqueDates[selectedUniqueDates.length - 1] ?? null;
+
+  const selectedRangeStartMs = getRangeStartMs(range);
+  const selectedRangeEndExclusiveMs = getRangeEndExclusiveMs(range);
+  const selectedRangeEndMs = selectedRangeEndExclusiveMs - 1;
+  const tableRangeStartMs = getRangeStartMs(tableRange);
+  const tableRangeEndExclusiveMs = getRangeEndExclusiveMs(tableRange);
+  const tableRangeEndMs = tableRangeEndExclusiveMs - 1;
   const coverageStartMs = coverageStart ? Date.parse(`${coverageStart}T00:00:00.000Z`) : null;
   const coverageEndMs = coverageEnd ? Date.parse(`${coverageEnd}T00:00:00.000Z`) : null;
 
-  const expectedDays = Number.isFinite(rangeStartMs) && Number.isFinite(rangeEndExclusiveMs)
-    ? Math.max(1, Math.round((rangeEndExclusiveMs - rangeStartMs) / DAY_MS))
+  const expectedDays = Number.isFinite(selectedRangeStartMs) && Number.isFinite(selectedRangeEndExclusiveMs)
+    ? Math.max(1, Math.round((selectedRangeEndExclusiveMs - selectedRangeStartMs) / DAY_MS))
     : null;
 
   const hasFullCoverage = expectedDays !== null && coverageStartMs !== null && coverageEndMs !== null
-    ? coverageStartMs <= rangeStartMs && coverageEndMs >= (rangeEndExclusiveMs - DAY_MS) && availableDays >= expectedDays
+    && Number.isFinite(selectedRangeStartMs) && Number.isFinite(selectedRangeEndExclusiveMs)
+    ? coverageStartMs <= selectedRangeStartMs! &&
+      coverageEndMs >= (selectedRangeEndExclusiveMs! - DAY_MS) &&
+      selectedUniqueDates.length >= expectedDays
     : null;
 
-  const totals = createEmptyPnLMetrics();
+  const selectedHasData = selectedDocs.length > 0;
+  const tableTotals = createEmptyPnLMetrics();
+  const selectedTotals = createEmptyPnLMetrics();
   let totalOrdersCount = 0;
   let totalUnitsSold = 0;
   let totalRevenue = 0;
+  let selectedRevenue = 0;
   const buckets = new Map<
     string,
     {
@@ -2187,12 +2317,37 @@ export async function loadPnLAnalyticsFromDailyMetrics(
       ordersCount: number;
       unitsSold: number;
       revenue: number;
+      overlapsSelected: boolean;
     }
   >();
 
+  for (const definition of periodDefinitions) {
+    const overlapsSelected =
+      Number.isFinite(selectedRangeStartMs) && Number.isFinite(selectedRangeEndMs)
+        ? definition.rangeEndMs >= selectedRangeStartMs! &&
+          definition.rangeStartMs <= selectedRangeEndMs!
+        : false;
+
+    buckets.set(definition.key, {
+      label: definition.label,
+      date: definition.date,
+      rangeStartMs: definition.rangeStartMs,
+      rangeEndMs: definition.rangeEndMs,
+      metrics: createEmptyPnLMetrics(),
+      ordersCount: 0,
+      unitsSold: 0,
+      revenue: 0,
+      overlapsSelected,
+    });
+  }
+
   for (const doc of docs) {
     const metrics = metricsFromDailyMetricDoc(doc);
-    accumulatePnLMetrics(totals, metrics);
+    accumulatePnLMetrics(tableTotals, metrics);
+    const isSelected = doc.date >= range.startDate && doc.date <= range.endDate;
+    if (isSelected) {
+      accumulatePnLMetrics(selectedTotals, metrics);
+    }
 
     const docOrders = toNumber(doc.totalOrders);
     const docUnits = toNumber(doc.unitsSold);
@@ -2200,6 +2355,9 @@ export async function loadPnLAnalyticsFromDailyMetrics(
     totalOrdersCount += docOrders;
     totalUnitsSold += docUnits;
     totalRevenue += docRevenue;
+    if (isSelected) {
+      selectedRevenue += docRevenue;
+    }
 
     const parsed = Date.parse(`${doc.date}T00:00:00.000Z`);
     if (!Number.isFinite(parsed)) {
@@ -2209,6 +2367,11 @@ export async function loadPnLAnalyticsFromDailyMetrics(
     const period = getPnLPeriodKey(new Date(parsed), granularity);
     let bucket = buckets.get(period.key);
     if (!bucket) {
+      const overlapsSelected =
+        Number.isFinite(selectedRangeStartMs) && Number.isFinite(selectedRangeEndMs)
+          ? period.rangeEndMs >= selectedRangeStartMs! &&
+            period.rangeStartMs <= selectedRangeEndMs!
+          : false;
       bucket = {
         label: period.label,
         date: period.date,
@@ -2218,6 +2381,7 @@ export async function loadPnLAnalyticsFromDailyMetrics(
         ordersCount: 0,
         unitsSold: 0,
         revenue: 0,
+        overlapsSelected,
       };
       buckets.set(period.key, bucket);
     }
@@ -2228,9 +2392,11 @@ export async function loadPnLAnalyticsFromDailyMetrics(
     bucket.revenue += docRevenue;
   }
 
-  const hasData = availableDays > 0;
+  const hasData = docs.length > 0;
+  const hasAnyPeriod = periodDefinitions.length > 0;
 
   let totalOperationalCost = 0;
+  let selectedOperationalCost = 0;
   let costDocs: OperationalCostDoc[] = [];
   if (hasData) {
     const organizationCosts = await ctx.db
@@ -2252,13 +2418,15 @@ export async function loadPnLAnalyticsFromDailyMetrics(
         bucketAllocations.set(key, 0);
       }
 
-      const contextEndMs = Number.isFinite(rangeEndMs) ? rangeEndMs : rangeEndExclusiveMs - 1;
+      const contextEndMs = Number.isFinite(tableRangeEndMs)
+        ? tableRangeEndMs
+        : tableRangeEndExclusiveMs - 1;
       const totalsContext: CostComputationContext = {
         ordersCount: totalOrdersCount,
         unitsSold: totalUnitsSold,
         revenue: totalRevenue,
-        rangeStartMs: Number.isFinite(rangeStartMs) ? rangeStartMs : 0,
-        rangeEndMs: Number.isFinite(contextEndMs) ? contextEndMs : rangeEndExclusiveMs - 1,
+        rangeStartMs: Number.isFinite(tableRangeStartMs) ? tableRangeStartMs : 0,
+        rangeEndMs: Number.isFinite(contextEndMs) ? contextEndMs : tableRangeEndExclusiveMs - 1,
       };
 
       for (const cost of costDocs) {
@@ -2336,11 +2504,18 @@ export async function loadPnLAnalyticsFromDailyMetrics(
         bucket.metrics.customCosts += allocation;
         bucket.metrics.netProfit -= allocation;
         totalOperationalCost += allocation;
+        if (bucket.overlapsSelected) {
+          selectedOperationalCost += allocation;
+        }
       }
 
       if (totalOperationalCost !== 0) {
-        totals.customCosts += totalOperationalCost;
-        totals.netProfit -= totalOperationalCost;
+        tableTotals.customCosts += totalOperationalCost;
+        tableTotals.netProfit -= totalOperationalCost;
+      }
+      if (selectedOperationalCost !== 0) {
+        selectedTotals.customCosts += selectedOperationalCost;
+        selectedTotals.netProfit -= selectedOperationalCost;
       }
     }
   }
@@ -2351,10 +2526,16 @@ export async function loadPnLAnalyticsFromDailyMetrics(
     .collect()) as AnyRecord[];
 
   const totalsManualRate = resolveManualReturnRate(manualReturnRateDocs, {
-    start: Number.isFinite(rangeStartMs) ? rangeStartMs : 0,
-    end: Number.isFinite(rangeEndMs) ? rangeEndMs : rangeEndExclusiveMs - 1,
+    start: Number.isFinite(tableRangeStartMs) ? tableRangeStartMs : 0,
+    end: Number.isFinite(tableRangeEndMs) ? tableRangeEndMs : tableRangeEndExclusiveMs - 1,
   });
-  applyManualReturnRateToPnLMetrics(totals, totalRevenue, totalsManualRate);
+  applyManualReturnRateToPnLMetrics(tableTotals, totalRevenue, totalsManualRate);
+
+  const selectedManualRate = resolveManualReturnRate(manualReturnRateDocs, {
+    start: Number.isFinite(selectedRangeStartMs) ? selectedRangeStartMs : 0,
+    end: Number.isFinite(selectedRangeEndMs) ? selectedRangeEndMs : selectedRangeEndExclusiveMs - 1,
+  });
+  applyManualReturnRateToPnLMetrics(selectedTotals, selectedRevenue, selectedManualRate);
 
   for (const bucket of buckets.values()) {
     const bucketManualRate = resolveManualReturnRate(manualReturnRateDocs, {
@@ -2364,7 +2545,8 @@ export async function loadPnLAnalyticsFromDailyMetrics(
     applyManualReturnRateToPnLMetrics(bucket.metrics, bucket.revenue, bucketManualRate);
   }
 
-  const totalsFinal = finalizePnLMetrics(totals);
+  const tableTotalsFinal = finalizePnLMetrics(tableTotals);
+  const selectedTotalsFinal = finalizePnLMetrics(selectedTotals);
 
   let previousTotalsFinal: PnLMetrics | null = null;
   const previousRange = derivePreviousRange(range);
@@ -2387,7 +2569,7 @@ export async function loadPnLAnalyticsFromDailyMetrics(
     }
   }
 
-  const periods: PnLTablePeriod[] = hasData
+  const periods: PnLTablePeriod[] = hasAnyPeriod
     ? Array.from(buckets.values())
         .sort((a, b) => a.rangeStartMs - b.rangeStartMs)
         .map((bucket) => ({
@@ -2411,22 +2593,17 @@ export async function loadPnLAnalyticsFromDailyMetrics(
     }
   }
 
-  if (hasData && periods.length > 0) {
+  if (hasAnyPeriod && periods.length > 0) {
     periods.push({
       label: "Total",
-      date: range.endDate,
-      metrics: totalsFinal,
-      growth: previousTotalsFinal
-        ? {
-            revenue: percentageChange(totalsFinal.revenue, previousTotalsFinal.revenue),
-            netProfit: percentageChange(totalsFinal.netProfit, previousTotalsFinal.netProfit),
-          }
-        : null,
+      date: tableRange.endDate,
+      metrics: tableTotalsFinal,
+      growth: null,
       isTotal: true,
     });
   }
 
-  const exportRows = hasData
+  const exportRows = hasAnyPeriod
     ? periods
         .filter((period) => !period.isTotal)
         .map((period) => ({
@@ -2447,14 +2624,15 @@ export async function loadPnLAnalyticsFromDailyMetrics(
         }))
     : [];
 
-  const metrics = hasData ? buildPnLKpisFromTotals(totalsFinal, previousTotalsFinal) : null;
+  const metrics = buildPnLKpisFromTotals(selectedTotalsFinal, previousTotalsFinal);
 
   return {
     result: {
       metrics,
       periods,
       exportRows,
-      totals: totalsFinal,
+      totals: selectedTotalsFinal,
+      tableRange,
     },
     meta: {
       hasData,
@@ -2462,12 +2640,16 @@ export async function loadPnLAnalyticsFromDailyMetrics(
         firstAvailable: coverageStart,
         lastAvailable: coverageEnd,
         requested: range,
+        tableRange,
       },
-      availableDays,
+      availableDays: tableUniqueDates.length,
+      selectedAvailableDays: selectedUniqueDates.length,
+      selectedHasData,
       expectedDays,
       hasFullCoverage,
-      operatingCosts: totalsFinal.customCosts,
-      marketingCost: totalsFinal.totalAdSpend,
+      operatingCosts: selectedTotalsFinal.customCosts,
+      marketingCost: selectedTotalsFinal.totalAdSpend,
+      tableRange,
     },
   };
 }

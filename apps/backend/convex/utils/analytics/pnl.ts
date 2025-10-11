@@ -519,6 +519,10 @@ export function computePnLAnalytics(
     periods,
     exportRows,
     totals: totalComputation.metrics,
+    primaryCurrency:
+      typeof (response as AnyRecord)?.meta?.primaryCurrency === "string"
+        ? String((response as AnyRecord).meta.primaryCurrency)
+        : undefined,
   } satisfies PnLAnalyticsResult;
 }
 

@@ -45,31 +45,9 @@ function clampDateRangeForGranularity(
   const endInput = parseIsoDate(range.endDate);
   const today = parseIsoDate(todayIso);
   const end = endInput.getTime() > today.getTime() ? today : endInput;
-  const currentStart = parseIsoDate(range.startDate);
-
-  if (granularity === "daily") {
-    const minStart = new Date(end.getTime());
-    // Always return exactly 8 days ending on end (inclusive)
-    minStart.setUTCDate(minStart.getUTCDate() - 7);
-    return { startDate: toIsoDate(minStart), endDate: toIsoDate(end) };
-  }
-
-  if (granularity === "weekly") {
-    // Force exactly 8 full weeks ending with the week containing endDate
-    const endWeekStart = startOfWeekMonday(end);
-    const minWeekStart = new Date(endWeekStart.getTime());
-    minWeekStart.setUTCDate(minWeekStart.getUTCDate() - 7 * 7); // 8 weeks => start is 7 weeks before end's week start
-    return { startDate: toIsoDate(minWeekStart), endDate: toIsoDate(end) };
-  }
-
-  if (granularity === "monthly") {
-    // Force a 3-month window ending with the month containing endDate
-    const endMonthStart = startOfMonth(end);
-    const minMonthStart = new Date(
-      Date.UTC(endMonthStart.getUTCFullYear(), endMonthStart.getUTCMonth() - 2, 1),
-    );
-    return { startDate: toIsoDate(minMonthStart), endDate: toIsoDate(end) };
-  }
+  const providedStart = parseIsoDate(range.startDate);
+  const currentStart =
+    providedStart.getTime() > end.getTime() ? end : providedStart;
 
   return { startDate: toIsoDate(currentStart), endDate: toIsoDate(end) };
 }
@@ -98,6 +76,11 @@ export const getAnalytics = query({
     const clamped = clampDateRangeForGranularity(args.dateRange, granularity);
     const range = validateDateRange(clamped);
     const organizationId = auth.orgId as Id<"organizations">;
+    const organization = await ctx.db.get(organizationId);
+    const primaryCurrency =
+      (organization && typeof organization.primaryCurrency === "string"
+        ? organization.primaryCurrency
+        : null) ?? "USD";
 
     const dailyMetrics = await loadPnLAnalyticsFromDailyMetrics(
       ctx,
@@ -110,12 +93,16 @@ export const getAnalytics = query({
       strategy: "dailyMetrics",
       status: dailyMetrics.meta.hasData ? "ready" : "pending",
       ...dailyMetrics.meta,
+      primaryCurrency,
     };
 
     return {
       dateRange: range,
       organizationId: auth.orgId as string,
-      result: dailyMetrics.result,
+      result: {
+        ...dailyMetrics.result,
+        primaryCurrency,
+      } satisfies PnLAnalyticsResult,
       meta,
     } satisfies {
       dateRange: { startDate: string; endDate: string };

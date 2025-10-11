@@ -18,15 +18,6 @@ interface InventoryMetrics {
   averageSalePrice: number;
   averageProfit: number;
   stockTurnoverRate: number;
-  changes: {
-    totalValue: number;
-    totalCOGS: number;
-    totalSKUs: number;
-    stockCoverage: number;
-    totalSales: number;
-    unitsSold: number;
-    stockTurnoverRate: number;
-  };
 }
 
 interface InventoryOverviewCardsProps {
@@ -53,7 +44,6 @@ export function InventoryOverviewCards({
     {
       title: "Inventory Value",
       value: `${currencySymbol}${formatNumber(metrics.totalValue)}`,
-      change: metrics.changes.totalValue,
       icon: "solar:box-bold-duotone",
       iconColor: "text-default-500",
       subtitle: `Total value across ${metrics.totalSKUs} SKUs`,
@@ -61,7 +51,6 @@ export function InventoryOverviewCards({
     {
       title: "Average Order Value",
       value: `${currencySymbol}${metrics.averageSalePrice.toFixed(2)}`,
-      change: 0,
       icon: "solar:tag-price-bold-duotone",
       iconColor: "text-default-500",
       subtitle: "Per order in range",
@@ -69,7 +58,6 @@ export function InventoryOverviewCards({
     {
       title: "Stock Coverage",
       value: `${metrics.stockCoverageDays} days`,
-      change: metrics.changes.stockCoverage,
       icon: "solar:clock-circle-bold-duotone",
       iconColor: "text-default-500",
       subtitle: "Days of inventory remaining",
@@ -77,7 +65,6 @@ export function InventoryOverviewCards({
     {
       title: "Dead Stock",
       value: formatNumber(metrics.deadStock),
-      change: 0,
       icon: "solar:trash-bin-trash-bold-duotone",
       iconColor: "text-default-500",
       subtitle: "Items not sold in 90+ days",
@@ -85,7 +72,6 @@ export function InventoryOverviewCards({
     {
       title: "COGS Value",
       value: `${currencySymbol}${formatNumber(metrics.totalCOGS)}`,
-      change: metrics.changes.totalCOGS,
       icon: "solar:wallet-money-bold-duotone",
       iconColor: "text-default-500",
       subtitle: "Cost of goods for active range",
@@ -97,7 +83,6 @@ export function InventoryOverviewCards({
       {cards.map((card) => (
         <KPI
           key={card.title}
-          change={card.change}
           icon={card.icon}
           iconColor={card.iconColor}
           subtitle={card.subtitle}

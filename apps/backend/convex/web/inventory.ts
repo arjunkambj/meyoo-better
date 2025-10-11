@@ -486,16 +486,6 @@ export const getInventoryOverview = query({
       unitsSold: v.number(),
       averageSalePrice: v.number(),
       averageProfit: v.number(),
-      changes: v.object({
-        totalValue: v.number(),
-        totalCOGS: v.number(),
-        totalSKUs: v.number(),
-        turnoverRate: v.number(),
-        healthScore: v.number(),
-        stockCoverage: v.number(),
-        totalSales: v.number(),
-        unitsSold: v.number(),
-      }),
     }),
   ),
   handler: async (ctx, args) => {
@@ -650,52 +640,6 @@ export const getInventoryOverview = query({
     const averageSalePrice = orders.length > 0 ? totalSales / orders.length : 0;
     const averageProfit = totalSales > 0 ? (totalProfit / totalSales) * 100 : 0;
 
-    const periodDuration = analysisWindowMs;
-    const prevEndDate = new Date(start.getTime() - 1);
-    const prevStartDate = new Date(prevEndDate.getTime() - periodDuration);
-
-    const { orderItems: prevOrderItems } = await fetchOrdersWithItems(
-      ctx,
-      _orgId,
-      prevStartDate,
-      prevEndDate,
-    );
-    const prevTotals = computeSalesTotals(prevOrderItems, variantMap);
-    const prevAnalysisDays = Math.max(1, Math.ceil(periodDuration / MS_IN_DAY));
-    const prevAnnualizationFactor = 365 / prevAnalysisDays;
-    const prevTurnoverRate =
-      totalCOGS > 0
-        ? Math.round(
-            ((prevTotals.cogs * prevAnnualizationFactor) / totalCOGS) * 10,
-          ) /
-            10
-        : 0;
-    const prevAvgDailyUnitsSold = prevTotals.units / prevAnalysisDays;
-    const prevStockCoverageDays =
-      prevAvgDailyUnitsSold > 0
-        ? Math.round(totalUnitsInStock / prevAvgDailyUnitsSold)
-        : stockCoverageDays;
-
-    // Calculate percentage changes
-    const calculateChange = (current: number, previous: number): number => {
-      if (previous === 0) return current > 0 ? 100 : 0;
-
-      return (
-        Math.round(((current - previous) / Math.abs(previous)) * 100 * 10) / 10
-      );
-    };
-
-    const changes = {
-      totalValue: 0,
-      totalCOGS: 0,
-      totalSKUs: 0,
-      turnoverRate: calculateChange(avgTurnoverRate, prevTurnoverRate),
-      healthScore: 0,
-      stockCoverage: calculateChange(stockCoverageDays, prevStockCoverageDays),
-      totalSales: calculateChange(totalSales, prevTotals.revenue),
-      unitsSold: calculateChange(unitsSold, prevTotals.units),
-    };
-
     return {
       totalValue,
       totalCOGS,
@@ -711,7 +655,6 @@ export const getInventoryOverview = query({
       unitsSold,
       averageSalePrice,
       averageProfit,
-      changes,
     };
   },
 });
@@ -1530,12 +1473,10 @@ export const getStockMovement = query({
       )
       .collect();
 
-    const orderItems = await ctx.db
-      .query("shopifyOrderItems")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", orgId),
-      )
-      .collect();
+    // Fetch order items only for orders in the date range
+    const orderIds = orders.map((order) => order._id);
+    const orderItems =
+      orderIds.length > 0 ? await fetchOrderItemsForOrders(ctx, orderIds) : [];
 
     const inventory = await ctx.db
       .query("shopifyInventoryTotals")

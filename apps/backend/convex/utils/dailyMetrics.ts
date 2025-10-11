@@ -156,6 +156,9 @@ export type AggregatedDailyMetrics = {
   otherOrders: number;
   cancelledOrders: number;
   returnedOrders: number;
+  sessions: number;
+  visitors: number;
+  conversions: number;
 };
 
 const EMPTY_AGGREGATES: AggregatedDailyMetrics = {
@@ -186,6 +189,9 @@ const EMPTY_AGGREGATES: AggregatedDailyMetrics = {
   otherOrders: 0,
   cancelledOrders: 0,
   returnedOrders: 0,
+  sessions: 0,
+  visitors: 0,
+  conversions: 0,
 };
 
 
@@ -660,9 +666,10 @@ function toNumber(value: unknown): number {
 function mergeDailyMetrics(docs: DailyMetricDoc[]): AggregatedDailyMetrics {
   return docs.reduce<AggregatedDailyMetrics>((acc, doc) => {
     const revenue = toNumber(doc.totalRevenue);
-    const discounts = 'totalDiscounts' in doc ? toNumber((doc as Record<string, unknown>).totalDiscounts) : 0;
+    const discounts = toNumber(doc.totalDiscounts);
+    const grossSales = toNumber(doc.grossSales);
     acc.revenue += revenue;
-    acc.grossSales += revenue + discounts;
+    acc.grossSales += grossSales > 0 ? grossSales : revenue + discounts;
     acc.discounts += discounts;
     acc.refundsAmount += 0;
     acc.orders += toNumber(doc.totalOrders);
@@ -697,6 +704,9 @@ function mergeDailyMetrics(docs: DailyMetricDoc[]): AggregatedDailyMetrics {
 
     acc.cancelledOrders += toNumber(doc.cancelledOrders);
     acc.returnedOrders += toNumber(doc.returnedOrders);
+    acc.sessions += toNumber(doc.sessions);
+    acc.visitors += toNumber(doc.visitors);
+    acc.conversions += toNumber(doc.conversions);
 
     return acc;
   }, { ...EMPTY_AGGREGATES });

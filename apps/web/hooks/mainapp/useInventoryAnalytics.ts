@@ -87,15 +87,6 @@ export interface UseInventoryAnalyticsReturn {
     averageSalePrice: number;
     averageProfit: number;
     stockTurnoverRate: number;
-    changes: {
-      totalValue: number;
-      totalCOGS: number;
-      totalSKUs: number;
-      stockCoverage: number;
-      totalSales: number;
-      unitsSold: number;
-      stockTurnoverRate: number;
-    };
   } | null;
   products: {
     data: Product[];
@@ -255,12 +246,6 @@ export function useInventoryAnalytics(
         averageSalePrice: overview.averageSalePrice || 0,
         averageProfit: overview.averageProfit || 0,
         stockTurnoverRate: overview.avgTurnoverRate || 0,
-        changes: {
-          ...overview.changes,
-          totalSales: overview.changes?.totalSales || 0,
-          unitsSold: overview.changes?.unitsSold || 0,
-          stockTurnoverRate: overview.changes?.turnoverRate || 0,
-        },
       }
     : null;
 

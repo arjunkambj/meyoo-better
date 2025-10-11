@@ -317,7 +317,7 @@ export const enqueueDailyRebuildRequests = internalMutation({
   returns: v.object({ dates: v.array(v.string()) }),
   handler: async (ctx, args) => {
     const now = Date.now();
-    const debounceWindow = Math.max(0, args.debounceMs ?? 10_000);
+    const debounceWindow = Math.max(0, args.debounceMs ?? 4_000);
     const normalizedDates = new Set<string>();
 
     for (const rawDate of args.dates) {
@@ -1053,9 +1053,13 @@ function buildDailyMetricsFromResponse(
     unitsSold = toSafeNumber(summary?.unitsSold);
   }
 
+  const analytics = (response.data.analytics || []) as GenericRecord[];
+
   const metrics = sanitizeDocument({
     totalOrders: toSafeNumber(summary?.orders),
     totalRevenue: toSafeNumber(summary?.revenue),
+    totalDiscounts: toSafeNumber(summary?.discounts),
+    grossSales: toSafeNumber(summary?.grossSales),
     paidCustomers: uniqueCustomers, // Customers who purchased
     totalCustomers, // All customers in system
     unitsSold, // Total units sold that day
@@ -1069,6 +1073,9 @@ function buildDailyMetricsFromResponse(
     blendedMarketingCost: toSafeNumber(summary?.blendedMarketingCost),
     cancelledOrders,
     returnedOrders,
+    sessions: analytics.reduce((sum, a) => sum + toSafeNumber(a.sessions), 0),
+    visitors: analytics.reduce((sum, a) => sum + toSafeNumber(a.visitors), 0),
+    conversions: analytics.reduce((sum, a) => sum + toSafeNumber(a.conversions), 0),
   });
 
   return {
@@ -1081,6 +1088,8 @@ function buildDailyMetricsFromResponse(
 const dailyMetricsPayload = v.object({
   totalOrders: v.optional(v.number()),
   totalRevenue: v.optional(v.number()),
+  totalDiscounts: v.optional(v.number()),
+  grossSales: v.optional(v.number()),
   paidCustomers: v.optional(v.number()),
   totalCustomers: v.optional(v.number()),
   unitsSold: v.optional(v.number()),
@@ -1094,6 +1103,9 @@ const dailyMetricsPayload = v.object({
   blendedMarketingCost: v.optional(v.number()),
   cancelledOrders: v.optional(v.number()),
   returnedOrders: v.optional(v.number()),
+  sessions: v.optional(v.number()),
+  visitors: v.optional(v.number()),
+  conversions: v.optional(v.number()),
   paymentBreakdown: v.optional(
     v.object({
       prepaidOrders: v.optional(v.number()),

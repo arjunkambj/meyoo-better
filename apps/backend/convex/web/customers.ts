@@ -5,7 +5,6 @@ import { query } from "../_generated/server";
 import {
   validateDateRange,
   toTimestampRange,
-  type DateRange,
 } from "../utils/analyticsSource";
 import { getUserAndOrg } from "../utils/auth";
 import { loadCustomerOverviewFromDailyMetrics } from "../utils/dailyMetrics";
@@ -14,9 +13,6 @@ import { dateRangeValidator, defaultDateRange } from "./analyticsShared";
 const MAX_CUSTOMER_PAGE_SIZE = 50;
 const DEFAULT_CUSTOMER_PAGE_SIZE = 50;
 const END_CURSOR = "__END__";
-const MAX_CUSTOMER_FETCH_ROUNDS = 5;
-const MAX_CUSTOMERS_TO_SCAN = MAX_CUSTOMER_FETCH_ROUNDS * DEFAULT_CUSTOMER_PAGE_SIZE;
-const MAX_ORDERS_PER_CUSTOMER = 250;
 const MAX_CUSTOMER_RANGE_DAYS = 365;
 
 const ZERO_CUSTOMER_OVERVIEW = {
@@ -157,74 +153,6 @@ type CustomerListEntry = {
   periodRevenue: number;
   isReturning: boolean;
 };
-
-type CustomersCursorState = {
-  lastCreatedAt: number | null;
-  lastId: string | null;
-  done: boolean;
-  key: string;
-};
-
-function buildCustomersCursorKey(args: {
-  dateRange: DateRange;
-  status?: string;
-  segment?: string;
-  searchTerm?: string;
-  sortBy?: string;
-  sortOrder?: "asc" | "desc";
-  pageSize: number;
-}): string {
-  return JSON.stringify({
-    dateRange: args.dateRange,
-    status: args.status ?? null,
-    segment: args.segment ?? null,
-    search: args.searchTerm ?? null,
-    sortBy: args.sortBy ?? null,
-    sortOrder: args.sortOrder ?? null,
-    pageSize: args.pageSize,
-  });
-}
-
-function encodeCustomersCursor(state: CustomersCursorState): string {
-  if (state.done) {
-    return END_CURSOR;
-  }
-
-  return JSON.stringify({
-    lastCreatedAt: state.lastCreatedAt,
-    lastId: state.lastId,
-    done: state.done,
-    key: state.key,
-  });
-}
-
-function decodeCustomersCursor(cursor: string | null): CustomersCursorState | null {
-  if (!cursor || cursor === END_CURSOR) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(cursor) as Partial<CustomersCursorState>;
-
-    const lastCreatedAt =
-      typeof parsed.lastCreatedAt === "number" && Number.isFinite(parsed.lastCreatedAt)
-        ? parsed.lastCreatedAt
-        : null;
-    const lastId = typeof parsed.lastId === "string" ? parsed.lastId : null;
-    const done = typeof parsed.done === "boolean" ? parsed.done : false;
-    const key = typeof parsed.key === "string" ? parsed.key : "";
-
-    return {
-      lastCreatedAt,
-      lastId,
-      done,
-      key,
-    } satisfies CustomersCursorState;
-  } catch (error) {
-    console.warn("Failed to decode customers cursor", error);
-    return null;
-  }
-}
 
 function sortCustomerEntries(
   entries: CustomerListEntry[],
@@ -380,221 +308,199 @@ export const getCustomerList = query({
     }
     const timestamps = toTimestampRange(range);
 
-    const cursorKey = buildCustomersCursorKey({
-      dateRange: range,
-      status: args.status,
-      segment: args.segment,
-      searchTerm: args.searchTerm,
-      sortBy: args.sortBy,
-      sortOrder: args.sortOrder,
-      pageSize: requestedItems,
-    });
-
-    const decodedState = decodeCustomersCursor(args.paginationOpts?.cursor ?? null);
-    const initialState = decodedState && decodedState.key === cursorKey ? decodedState : null;
-
     const sortBy = args.sortBy ?? "lastOrderDate";
     const sortOrder = args.sortOrder ?? "desc";
     const statusFilter = args.status ?? "all";
     const segmentFilter = args.segment && args.segment !== "all" ? args.segment : null;
     const searchTerm = args.searchTerm?.trim().toLowerCase() ?? null;
 
-    const entries: CustomerListEntry[] = [];
-    const seenIds = new Set<string>();
+    // Step 1: Fetch orders in date range using the efficient index
+    const orders = await ctx.db
+      .query("shopifyOrders")
+      .withIndex("by_organization_and_created", (q) =>
+        q
+          .eq("organizationId", auth.orgId as Id<"organizations">)
+          .gte("shopifyCreatedAt", timestamps.start)
+          .lte("shopifyCreatedAt", timestamps.end),
+      )
+      .collect();
 
-    let lastCreatedAt = initialState?.lastCreatedAt ?? null;
-    let lastId = initialState?.lastId ?? null;
-    let done = initialState?.done ?? false;
+    // Step 2: Group orders by customerId and calculate metrics
+    interface CustomerMetrics {
+      orders: typeof orders;
+      validOrders: typeof orders;
+      lifetimeValue: number;
+      orderCount: number;
+      avgOrderValue: number;
+      firstOrderTimestamp: number | null;
+      lastOrderTimestamp: number | null;
+      isReturning: boolean;
+    }
 
-    const batchSize = Math.max(1, Math.min(requestedItems, MAX_CUSTOMER_PAGE_SIZE));
-    let rounds = 0;
-    let scannedCustomers = 0;
-    let truncatedByScanLimit = false;
+    const customerMetricsMap = new Map<string, CustomerMetrics>();
 
-    while (entries.length < requestedItems && !done && rounds < MAX_CUSTOMER_FETCH_ROUNDS && scannedCustomers < MAX_CUSTOMERS_TO_SCAN) {
-      rounds += 1;
+    for (const order of orders) {
+      if (!order.customerId) continue;
 
-      let baseQuery = ctx.db
-        .query("shopifyCustomers")
-        .withIndex("by_organization_and_created", (q) =>
-          q.eq("organizationId", auth.orgId as Id<"organizations">),
-        )
-        .order("desc");
+      const customerId = order.customerId as string;
+      const isCancelled = order.financialStatus === "cancelled";
 
-      if (lastCreatedAt !== null && lastId) {
-        const cursorCreatedAt = lastCreatedAt;
-        const cursorId = lastId;
-        baseQuery = baseQuery.filter((q) =>
-          q.or(
-            q.lt(q.field("shopifyCreatedAt"), cursorCreatedAt),
-            q.and(
-              q.eq(q.field("shopifyCreatedAt"), cursorCreatedAt),
-              q.lt(q.field("_id"), cursorId as Id<"shopifyCustomers">),
-            ),
-          ),
-        );
+      if (!customerMetricsMap.has(customerId)) {
+        customerMetricsMap.set(customerId, {
+          orders: [],
+          validOrders: [],
+          lifetimeValue: 0,
+          orderCount: 0,
+          avgOrderValue: 0,
+          firstOrderTimestamp: null,
+          lastOrderTimestamp: null,
+          isReturning: false,
+        });
       }
 
-      const chunk = await baseQuery.take(batchSize);
-      if (chunk.length === 0) {
-        done = true;
-        break;
-      }
+      const metrics = customerMetricsMap.get(customerId)!;
+      metrics.orders.push(order);
 
-      scannedCustomers += chunk.length;
+      if (!isCancelled) {
+        metrics.validOrders.push(order);
+        metrics.lifetimeValue += order.totalPrice;
+        metrics.orderCount += 1;
 
-      let hitCapacity = false;
-
-      for (const customer of chunk) {
-        lastCreatedAt = customer.shopifyCreatedAt;
-        lastId = customer._id as string;
-
-        if (seenIds.has(customer._id as string)) {
-          continue;
+        if (metrics.firstOrderTimestamp === null || order.shopifyCreatedAt < metrics.firstOrderTimestamp) {
+          metrics.firstOrderTimestamp = order.shopifyCreatedAt;
         }
-
-        const name = `${customer.firstName ?? ""} ${customer.lastName ?? ""}`.trim() || "Anonymous";
-        const normalizedEmail = (customer.email ?? "").toLowerCase();
-        const normalizedName = name.toLowerCase();
-
-        if (searchTerm && !normalizedName.includes(searchTerm) && !normalizedEmail.includes(searchTerm)) {
-          continue;
+        if (metrics.lastOrderTimestamp === null || order.shopifyCreatedAt > metrics.lastOrderTimestamp) {
+          metrics.lastOrderTimestamp = order.shopifyCreatedAt;
         }
-
-        const orders = await ctx.db
-          .query("shopifyOrders")
-          .withIndex("by_customer", (q) =>
-            q.eq("customerId", customer._id as Id<"shopifyCustomers">),
-          )
-          .filter((q) =>
-            q.and(
-              q.gte(q.field("shopifyCreatedAt"), timestamps.start),
-              q.lte(q.field("shopifyCreatedAt"), timestamps.end),
-            ),
-          )
-          .order("desc")
-          .take(MAX_ORDERS_PER_CUSTOMER);
-
-        const validOrders = orders.filter((order) => order.financialStatus !== "cancelled");
-
-        const lifetimeValue = validOrders.reduce((sum, order) => sum + order.totalPrice, 0);
-        const orderCount = validOrders.length;
-        const avgOrderValue = orderCount > 0 ? lifetimeValue / orderCount : 0;
-
-        const orderTimestamps = validOrders
-          .map((order) => order.shopifyCreatedAt)
-          .sort((a, b) => a - b);
-
-        const firstOrderTimestamp = orderTimestamps[0];
-        const lastOrderTimestamp = orderTimestamps[orderTimestamps.length - 1];
-
-        const firstOrderDate = firstOrderTimestamp
-          ? new Date(firstOrderTimestamp).toISOString()
-          : new Date(timestamps.start).toISOString();
-        const lastOrderDate = lastOrderTimestamp
-          ? new Date(lastOrderTimestamp).toISOString()
-          : new Date(timestamps.start).toISOString();
-
-        const shopifyCreatedAtIso = new Date(
-          customer.shopifyCreatedAt ?? customer.syncedAt ?? Date.now(),
-        ).toISOString();
-        const shopifyUpdatedAtIso = customer.shopifyUpdatedAt
-          ? new Date(customer.shopifyUpdatedAt).toISOString()
-          : undefined;
-
-        let segment = "prospect";
-        if (orderCount === 1) {
-          segment = "new";
-        } else if (orderCount >= 2 && lifetimeValue < 500) {
-          segment = "regular";
-        } else if (orderCount >= 2 && lifetimeValue >= 500 && lifetimeValue < 1000) {
-          segment = "vip";
-        } else if (orderCount >= 2 && lifetimeValue >= 1000) {
-          segment = "champion";
-        }
-
-        if (segmentFilter && segment !== segmentFilter) {
-          continue;
-        }
-
-        const convertedStatus = orderCount > 0 ? "converted" : "abandoned_cart";
-        if (statusFilter === "converted" && convertedStatus !== "converted") {
-          continue;
-        }
-        if (statusFilter === "abandoned_cart" && convertedStatus !== "abandoned_cart") {
-          continue;
-        }
-
-        const entry: CustomerListEntry = {
-          id: customer._id as string,
-          name,
-          email: customer.email ?? "",
-          avatar: undefined,
-          status: convertedStatus,
-          lifetimeValue,
-          orders: orderCount,
-          avgOrderValue,
-          lastOrderDate,
-          firstOrderDate,
-          shopifyCreatedAt: shopifyCreatedAtIso,
-          shopifyUpdatedAt: shopifyUpdatedAtIso,
-          segment,
-          city: customer.defaultAddress?.city,
-          country: customer.defaultAddress?.country,
-          periodOrders: orderCount,
-          periodRevenue: lifetimeValue,
-          isReturning: orderCount > 1,
-        } satisfies CustomerListEntry;
-
-        entries.push(entry);
-        seenIds.add(entry.id);
-
-        if (entries.length >= requestedItems) {
-          hitCapacity = true;
-          break;
-        }
-      }
-
-      if (hitCapacity) {
-        done = false;
-        break;
-      }
-
-      if (chunk.length < batchSize) {
-        done = true;
-      }
-
-      if (scannedCustomers >= MAX_CUSTOMERS_TO_SCAN) {
-        truncatedByScanLimit = true;
-        done = false;
-        break;
       }
     }
 
-    const sortedEntries = sortCustomerEntries(entries, sortBy, sortOrder);
-    const pageEntries = sortedEntries.slice(0, requestedItems);
+    // Calculate avg order values and isReturning
+    for (const metrics of customerMetricsMap.values()) {
+      metrics.avgOrderValue = metrics.orderCount > 0 ? metrics.lifetimeValue / metrics.orderCount : 0;
+      metrics.isReturning = metrics.orderCount > 1;
+    }
 
-    const hasMore = truncatedByScanLimit || !done;
+    // Step 3: Fetch customer details for customers with orders in the period
+    const customerIds = Array.from(customerMetricsMap.keys());
+    const customerDocs = await Promise.all(
+      customerIds.map((id) => ctx.db.get(id as Id<"shopifyCustomers">)),
+    );
 
-    const continueCursor = hasMore && lastCreatedAt !== null && lastId
-      ? encodeCustomersCursor({
-          lastCreatedAt,
-          lastId,
-          done: false,
-          key: cursorKey,
-        })
-      : END_CURSOR;
+    // Step 4: Build customer entries
+    const allEntries: CustomerListEntry[] = [];
+
+    for (const customer of customerDocs) {
+      if (!customer) continue;
+
+      const metrics = customerMetricsMap.get(customer._id as string);
+      if (!metrics) continue;
+
+      const name = `${customer.firstName ?? ""} ${customer.lastName ?? ""}`.trim() || "Anonymous";
+      const normalizedEmail = (customer.email ?? "").toLowerCase();
+      const normalizedName = name.toLowerCase();
+
+      // Apply search filter
+      if (searchTerm && !normalizedName.includes(searchTerm) && !normalizedEmail.includes(searchTerm)) {
+        continue;
+      }
+
+      // Determine segment
+      const orderCount = metrics.orderCount;
+      const lifetimeValue = metrics.lifetimeValue;
+      let segment = "prospect";
+      if (orderCount === 1) {
+        segment = "new";
+      } else if (orderCount >= 2 && lifetimeValue < 500) {
+        segment = "regular";
+      } else if (orderCount >= 2 && lifetimeValue >= 500 && lifetimeValue < 1000) {
+        segment = "vip";
+      } else if (orderCount >= 2 && lifetimeValue >= 1000) {
+        segment = "champion";
+      }
+
+      // Apply segment filter
+      if (segmentFilter && segment !== segmentFilter) {
+        continue;
+      }
+
+      // Determine status
+      const convertedStatus = orderCount > 0 ? "converted" : "abandoned_cart";
+
+      // Apply status filter
+      if (statusFilter === "converted" && convertedStatus !== "converted") {
+        continue;
+      }
+      if (statusFilter === "abandoned_cart" && convertedStatus !== "abandoned_cart") {
+        continue;
+      }
+
+      const firstOrderDate = metrics.firstOrderTimestamp
+        ? new Date(metrics.firstOrderTimestamp).toISOString()
+        : new Date(timestamps.start).toISOString();
+      const lastOrderDate = metrics.lastOrderTimestamp
+        ? new Date(metrics.lastOrderTimestamp).toISOString()
+        : new Date(timestamps.start).toISOString();
+
+      const shopifyCreatedAtIso = new Date(
+        customer.shopifyCreatedAt ?? customer.syncedAt ?? Date.now(),
+      ).toISOString();
+      const shopifyUpdatedAtIso = customer.shopifyUpdatedAt
+        ? new Date(customer.shopifyUpdatedAt).toISOString()
+        : undefined;
+
+      const entry: CustomerListEntry = {
+        id: customer._id as string,
+        name,
+        email: customer.email ?? "",
+        avatar: undefined,
+        status: convertedStatus,
+        lifetimeValue: metrics.lifetimeValue,
+        orders: metrics.orderCount,
+        avgOrderValue: metrics.avgOrderValue,
+        lastOrderDate,
+        firstOrderDate,
+        shopifyCreatedAt: shopifyCreatedAtIso,
+        shopifyUpdatedAt: shopifyUpdatedAtIso,
+        segment,
+        city: customer.defaultAddress?.city,
+        country: customer.defaultAddress?.country,
+        periodOrders: metrics.orderCount,
+        periodRevenue: metrics.lifetimeValue,
+        isReturning: metrics.isReturning,
+      } satisfies CustomerListEntry;
+
+      allEntries.push(entry);
+    }
+
+    // Step 5: Sort entries
+    const sortedEntries = sortCustomerEntries(allEntries, sortBy, sortOrder);
+
+    // Step 6: Paginate
+    const page = fallbackPage;
+    const startIndex = (page - 1) * requestedItems;
+    const endIndex = startIndex + requestedItems;
+    const pageEntries = sortedEntries.slice(startIndex, endIndex);
+
+    const total = sortedEntries.length;
+    const totalPages = Math.max(1, Math.ceil(total / requestedItems));
+    const hasMore = page < totalPages;
 
     return {
       page: pageEntries,
-      continueCursor,
+      continueCursor: hasMore ? `page_${page + 1}` : END_CURSOR,
       isDone: !hasMore,
       data: pageEntries,
+      pagination: {
+        page,
+        pageSize: requestedItems,
+        total,
+        totalPages,
+      },
       info: {
         pageSize: requestedItems,
         returned: pageEntries.length,
         hasMore,
-        ...(truncatedByScanLimit ? { truncated: true } : {}),
       },
     };
   },

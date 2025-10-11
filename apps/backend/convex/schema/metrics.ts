@@ -21,6 +21,8 @@ export const dailyMetrics = defineTable({
 
   totalOrders: v.optional(v.number()),
   totalRevenue: v.optional(v.number()),
+  totalDiscounts: v.optional(v.number()),
+  grossSales: v.optional(v.number()),
   paidCustomers: v.optional(v.number()), // Customers who PURCHASED (paid customers)
   totalCustomers: v.optional(v.number()), // ALL customers in system (purchased + didn't purchase)
   unitsSold: v.optional(v.number()), // Total units sold that day
@@ -34,6 +36,11 @@ export const dailyMetrics = defineTable({
   blendedMarketingCost: v.optional(v.number()),
   cancelledOrders: v.optional(v.number()),
   returnedOrders: v.optional(v.number()),
+
+  // Session and analytics data
+  sessions: v.optional(v.number()),
+  visitors: v.optional(v.number()),
+  conversions: v.optional(v.number()),
 
   paymentBreakdown: v.optional(paymentBreakdown),
   customerBreakdown: v.optional(customerBreakdown),

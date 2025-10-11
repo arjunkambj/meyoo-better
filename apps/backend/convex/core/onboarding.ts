@@ -9,8 +9,14 @@ import { normalizeShopDomain } from "../utils/shop";
 import { getUserAndOrg, requireUserAndOrg } from "../utils/auth";
 import { buildDateSpan } from "../utils/date";
 import { optionalEnv } from "../utils/env";
+import { onboardingStatusValidator } from "../utils/onboardingValidators";
 import { isIanaTimeZone } from "@repo/time";
-import { ONBOARDING_STEPS } from "@repo/types";
+import {
+  ONBOARDING_STEP_KEYS,
+  ONBOARDING_STEPS,
+  type OnboardingStepKey,
+  type OnboardingStepNumber,
+} from "@repo/types";
 
 /**
  * Onboarding flow management
@@ -28,6 +34,15 @@ const ACTIVE_SYNC_STATUSES = new Set<SyncSessionStatus>([
   "processing",
   "syncing",
 ]);
+
+const ONBOARDING_STEP_NUMBER_VALUES = Object.values(ONBOARDING_STEPS) as OnboardingStepNumber[];
+const ONBOARDING_STEP_KEY_VALUES = Object.values(ONBOARDING_STEP_KEYS) as OnboardingStepKey[];
+
+const isOnboardingStepNumber = (value: number): value is OnboardingStepNumber =>
+  ONBOARDING_STEP_NUMBER_VALUES.includes(value as OnboardingStepNumber);
+
+const isOnboardingStepKey = (value: unknown): value is OnboardingStepKey =>
+  typeof value === "string" && ONBOARDING_STEP_KEY_VALUES.includes(value as OnboardingStepKey);
 
 const isInitialSyncSession = (session: Doc<"syncSessions">): boolean =>
   session.type === "initial" || session.metadata?.isInitialSync === true;
@@ -109,67 +124,7 @@ const deriveOverallState = (sessions: Doc<"syncSessions">[]): OverallState => {
  */
 export const getOnboardingStatus = query({
   args: {},
-  returns: v.union(
-    v.null(),
-    v.object({
-      completed: v.boolean(),
-      currentStep: v.number(),
-      completedSteps: v.array(v.string()),
-      connections: v.object({
-        shopify: v.boolean(),
-        meta: v.boolean(),
-      }),
-      hasShopifySubscription: v.boolean(),
-      isProductCostSetup: v.boolean(),
-      isExtraCostSetup: v.boolean(),
-      isInitialSyncComplete: v.boolean(),
-      pendingSyncPlatforms: v.optional(v.array(v.string())),
-      analyticsTriggeredAt: v.optional(v.number()),
-      lastSyncCheckAt: v.optional(v.number()),
-      syncCheckAttempts: v.optional(v.number()),
-      syncStatus: v.object({
-        shopify: v.optional(
-          v.object({
-            status: v.string(),
-            overallState: v.optional(
-              v.union(
-                v.literal("unsynced"),
-                v.literal("syncing"),
-                v.literal("complete"),
-                v.literal("failed"),
-              ),
-            ),
-            stages: v.object({
-              products: v.boolean(),
-              inventory: v.boolean(),
-              customers: v.boolean(),
-              orders: v.boolean(),
-            }),
-            startedAt: v.optional(v.number()),
-            completedAt: v.optional(v.number()),
-            lastError: v.optional(v.string()),
-          }),
-        ),
-        meta: v.optional(
-          v.object({
-            status: v.string(),
-            overallState: v.optional(
-              v.union(
-                v.literal("unsynced"),
-                v.literal("syncing"),
-                v.literal("complete"),
-                v.literal("failed"),
-              ),
-            ),
-            recordsProcessed: v.optional(v.number()),
-            startedAt: v.optional(v.number()),
-            completedAt: v.optional(v.number()),
-            lastError: v.optional(v.string()),
-          }),
-        ),
-      }),
-    }),
-  ),
+  returns: onboardingStatusValidator,
   handler: async (ctx) => {
     const auth = await getUserAndOrg(ctx);
     if (!auth) return null;
@@ -252,10 +207,18 @@ export const getOnboardingStatus = query({
     const shopifyOverall = deriveOverallState(shopifySessionsForStatus);
     const metaOverall = deriveOverallState(metaSessions);
 
+    const rawCurrentStep = onboarding.onboardingStep ?? ONBOARDING_STEPS.SHOPIFY;
+    const currentStep: OnboardingStepNumber = isOnboardingStepNumber(rawCurrentStep)
+      ? rawCurrentStep
+      : ONBOARDING_STEPS.SHOPIFY;
+
+    const completedStepsRaw = onboarding.onboardingData?.completedSteps ?? [];
+    const completedSteps: OnboardingStepKey[] = completedStepsRaw.filter(isOnboardingStepKey);
+
     return {
       completed: onboarding.isCompleted || false,
-      currentStep: onboarding.onboardingStep || 1,
-      completedSteps: onboarding.onboardingData?.completedSteps || [],
+      currentStep,
+      completedSteps,
       connections,
       hasShopifySubscription: onboarding.hasShopifySubscription || false,
       isProductCostSetup: onboarding.isProductCostSetup || false,

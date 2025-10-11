@@ -296,8 +296,8 @@ function buildOverviewMetrics(
     },
     roasUTM: {
       label: "UTM ROAS",
-      value: metricMap.roasUTM?.value ?? summary.metaROAS || 0,
-      change: metricMap.roasUTM?.change ?? summary.metaROASChange || 0,
+      value: metricMap.roasUTM?.value ?? summary.metaROAS ?? 0,
+      change: metricMap.roasUTM?.change ?? summary.metaROASChange ?? 0,
       decimal: 2,
     },
     cogs: {

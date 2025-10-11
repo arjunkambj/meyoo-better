@@ -23,6 +23,7 @@ import type {
   OnboardingStatus,
 } from "@repo/types";
 import { DEFAULT_DASHBOARD_CONFIG } from "@repo/types";
+import { onboardingStatusValidator } from "../utils/onboardingValidators";
 import { getUserAndOrg } from "../utils/auth";
 import { resolveDashboardConfig } from "../utils/dashboardConfig";
 import { computeIntegrationStatus, integrationStatusValidator } from "../utils/integrationStatus";
@@ -76,68 +77,6 @@ function mergePlatformMetrics(
     ...(supplemental ?? {}),
   } as PlatformMetrics;
 }
-
-const onboardingStatusValidator = v.union(
-  v.null(),
-  v.object({
-    completed: v.boolean(),
-    currentStep: v.number(),
-    completedSteps: v.array(v.string()),
-    connections: v.object({
-      shopify: v.boolean(),
-      meta: v.boolean(),
-    }),
-    hasShopifySubscription: v.boolean(),
-    isProductCostSetup: v.boolean(),
-    isExtraCostSetup: v.boolean(),
-    isInitialSyncComplete: v.boolean(),
-    pendingSyncPlatforms: v.optional(v.array(v.string())),
-    analyticsTriggeredAt: v.optional(v.number()),
-    lastSyncCheckAt: v.optional(v.number()),
-    syncCheckAttempts: v.optional(v.number()),
-    syncStatus: v.object({
-      shopify: v.optional(
-        v.object({
-          status: v.string(),
-          overallState: v.optional(
-            v.union(
-              v.literal("unsynced"),
-              v.literal("syncing"),
-              v.literal("complete"),
-              v.literal("failed"),
-            ),
-          ),
-          stages: v.object({
-            products: v.boolean(),
-            inventory: v.boolean(),
-            customers: v.boolean(),
-            orders: v.boolean(),
-          }),
-          startedAt: v.optional(v.number()),
-          completedAt: v.optional(v.number()),
-          lastError: v.optional(v.string()),
-        }),
-      ),
-      meta: v.optional(
-        v.object({
-          status: v.string(),
-          overallState: v.optional(
-            v.union(
-              v.literal("unsynced"),
-              v.literal("syncing"),
-              v.literal("complete"),
-              v.literal("failed"),
-            ),
-          ),
-          recordsProcessed: v.optional(v.number()),
-          startedAt: v.optional(v.number()),
-          completedAt: v.optional(v.number()),
-          lastError: v.optional(v.string()),
-        }),
-      ),
-    }),
-  }),
-);
 
 function cloneOverview(overview: OverviewComputation | null): OverviewComputation | null {
   if (!overview) return null;

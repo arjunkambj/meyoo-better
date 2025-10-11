@@ -926,45 +926,53 @@ export const productsInventoryTool = createTool<
     const page = args.page && args.page > 0 ? args.page : 1;
     const pageSize = args.pageSize && args.pageSize > 0 ? Math.min(args.pageSize, 200) : 50;
 
-    type ProductListResult = {
-      data: Array<{
-        id: string;
-        name: string;
-        sku: string;
-        image?: string;
-        category: string;
-        vendor: string;
-        stock: number;
-        reserved: number;
-        available: number;
-        reorderPoint: number;
-        stockStatus: 'healthy' | 'low' | 'critical' | 'out';
-        price: number;
-        cost: number;
-        margin: number;
-        turnoverRate: number;
-        unitsSold?: number;
-        lastSold?: string;
-        abcCategory: 'A' | 'B' | 'C';
-        variants?: Array<{
+    const result: {
+      overview: {
+        totalValue: number;
+        totalCOGS: number;
+        totalSKUs: number;
+        stockCoverageDays: number;
+        deadStock: number;
+      };
+      products: {
+        data: Array<{
           id: string;
+          name: string;
           sku: string;
-          title: string;
-          price: number;
+          image?: string;
+          category: string;
+          vendor: string;
           stock: number;
           reserved: number;
           available: number;
+          reorderPoint: number;
+          stockStatus: 'healthy' | 'low' | 'critical' | 'out';
+          price: number;
+          cost: number;
+          margin: number;
+          turnoverRate: number;
+          unitsSold?: number;
+          lastSold?: string;
+          abcCategory: 'A' | 'B' | 'C';
+          variants?: Array<{
+            id: string;
+            sku: string;
+            title: string;
+            price: number;
+            stock: number;
+            reserved: number;
+            available: number;
+          }>;
         }>;
-      }>;
-      pagination: {
-        page: number;
-        pageSize: number;
-        total: number;
-        totalPages: number;
+        pagination: {
+          page: number;
+          pageSize: number;
+          total: number;
+          totalPages: number;
+        };
+        hasMore: boolean;
       };
-    };
-
-    const result: ProductListResult = await ctx.runQuery(api.web.inventory.getProductsList, {
+    } = await ctx.runQuery(api.web.inventory.getInventoryAnalytics, {
       page,
       pageSize,
       stockLevel: args.stockLevel && args.stockLevel !== "all" ? args.stockLevel : undefined,
@@ -973,7 +981,7 @@ export const productsInventoryTool = createTool<
       sortOrder: args.sortOrder as any,
     });
 
-    const items = result.data.map((p: any) => ({
+    const items = result.products.data.map((p: any) => ({
       id: String(p.id),
       name: String(p.name ?? ""),
       sku: String(p.sku ?? ""),
@@ -1004,14 +1012,14 @@ export const productsInventoryTool = createTool<
         : undefined,
     }));
 
-    const summary = `Found ${result.pagination.total} products (${result.pagination.totalPages} pages). Page ${result.pagination.page} of ${result.pagination.totalPages}.`;
+    const summary = `Found ${result.products.pagination.total} products (${result.products.pagination.totalPages} pages). Page ${result.products.pagination.page} of ${result.products.pagination.totalPages}.`;
 
     return {
       summary,
-      page: result.pagination.page,
-      pageSize: result.pagination.pageSize,
-      total: result.pagination.total,
-      totalPages: result.pagination.totalPages,
+      page: result.products.pagination.page,
+      pageSize: result.products.pagination.pageSize,
+      total: result.products.pagination.total,
+      totalPages: result.products.pagination.totalPages,
       items,
     };
   },

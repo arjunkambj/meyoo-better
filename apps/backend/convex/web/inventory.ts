@@ -99,11 +99,6 @@ const DEFAULT_ANALYSIS_DAYS = 30;
 const DEFAULT_LEAD_TIME_DAYS = 7;
 const SAFETY_STOCK_DAYS = 3;
 
-const INVENTORY_END_CURSOR = "__end__";
-
-const encodeInventoryCursor = (state: { page: number }): string =>
-  JSON.stringify({ page: Math.max(1, Math.floor(state.page)) });
-
 const decodeInventoryCursor = (
   rawCursor: string | null | undefined,
 ): { page: number } => {
@@ -461,198 +456,9 @@ const assignABCCategories = (
 };
 
 /**
- * Get inventory overview metrics
+ * Get consolidated inventory analytics including overview metrics and product list.
  */
-export const getInventoryOverview = query({
-  args: {},
-  returns: v.union(
-    v.null(),
-    v.object({
-      totalValue: v.number(),
-      totalCOGS: v.number(),
-      totalSKUs: v.number(),
-      totalProducts: v.number(),
-      lowStockItems: v.number(),
-      outOfStockItems: v.number(),
-      avgTurnoverRate: v.number(),
-      stockCoverageDays: v.number(),
-      deadStock: v.number(),
-      healthScore: v.number(),
-      totalSales: v.number(),
-      unitsSold: v.number(),
-      averageProfit: v.number(),
-    }),
-  ),
-  handler: async (ctx) => {
-    const auth = await getUserAndOrg(ctx);
-    if (!auth) return null;
-    const { user } = auth;
-    const _orgId = auth.orgId as Id<"organizations">;
-
-    await primeVariantCostComponents(ctx, _orgId);
-
-    const products = await ctx.db
-      .query("shopifyProducts")
-      .withIndex("by_organization", (q) => q.eq("organizationId", _orgId))
-      .collect();
-
-    const variants = await ctx.db
-      .query("shopifyProductVariants")
-      .withIndex("by_organization", (q) => q.eq("organizationId", _orgId))
-      .collect();
-
-    const inventory = await ctx.db
-      .query("shopifyInventoryTotals")
-      .withIndex("by_organization", (q) => q.eq("organizationId", _orgId))
-      .collect();
-
-    const inventoryTotals = aggregateInventoryLevels(inventory, variants);
-
-    const { start, end } = normalizeDateRange(
-      undefined,
-      DEFAULT_ANALYSIS_DAYS,
-    );
-    const analysisWindowMs = Math.max(1, end.getTime() - start.getTime());
-    const analysisDays = Math.max(1, Math.ceil(analysisWindowMs / MS_IN_DAY));
-
-    // Calculate metrics
-    const totalProducts = products.length;
-    const totalSKUs = variants.length;
-
-    // Calculate total inventory value, COGS, and stock distribution
-    let totalValue = 0;
-    let totalCOGS = 0;
-    let lowStockItems = 0;
-    let outOfStockItems = 0;
-    let healthyItems = 0;
-    let totalUnitsInStock = 0;
-
-    variants.forEach((variant) => {
-      const totals = inventoryTotals.get(variant._id);
-      const available = totals?.available ?? 0;
-      const price = variant.price || 0;
-      const cost = getVariantCost(variant);
-
-      totalValue += available * price;
-      totalCOGS += available * cost;
-      totalUnitsInStock += available;
-
-      if (available === 0) {
-        outOfStockItems++;
-      } else if (available < 10) {
-        // Low stock threshold
-        lowStockItems++;
-      } else {
-        healthyItems++;
-      }
-    });
-
-    // Calculate health score (percentage of healthy items)
-    const healthScore =
-      totalSKUs > 0 ? Math.round((healthyItems / totalSKUs) * 100) : 0;
-
-    // Calculate dead stock (products not sold in 90+ days)
-    const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
-
-    // Get order items from last 90 days to check what's been sold
-    const recentOrdersInRange = await ctx.db
-      .query("shopifyOrders")
-      .withIndex("by_organization_and_created", (q) =>
-        q
-          .eq("organizationId", user.organizationId as Id<"organizations">)
-          .gt("shopifyCreatedAt", ninetyDaysAgo),
-      )
-      .collect();
-
-    const recentOrderIds = recentOrdersInRange.map((order) => order._id);
-    const recentOrderItems =
-      recentOrderIds.length > 0
-        ? await fetchOrderItemsForOrders(ctx, recentOrderIds)
-        : [];
-
-    const soldVariantIds = new Set<Id<"shopifyProductVariants">>();
-    recentOrderItems.forEach((item) => {
-      if (item.variantId) {
-        soldVariantIds.add(item.variantId);
-      }
-    });
-
-    // Count variants that haven't been sold and have stock
-    let deadStock = 0;
-
-    variants.forEach((variant) => {
-      const totals = inventoryTotals.get(variant._id);
-      const hasStock = (totals?.available ?? 0) > 0;
-      const notSold = !soldVariantIds.has(variant._id);
-
-      if (hasStock && notSold) {
-        deadStock++;
-      }
-    });
-
-    const variantMap = new Map<
-      Id<"shopifyProductVariants">,
-      Doc<"shopifyProductVariants">
-    >();
-    variants.forEach((variant) => {
-      variantMap.set(variant._id, variant);
-    });
-
-    const { orderItems } = await fetchOrdersWithItems(
-      ctx,
-      _orgId,
-      start,
-      end,
-    );
-
-    const salesTotals = computeSalesTotals(orderItems, variantMap);
-    const totalSales = salesTotals.revenue;
-    const unitsSold = salesTotals.units;
-    const totalCOGSSold = salesTotals.cogs;
-    const totalProfit = totalSales - totalCOGSSold;
-
-    const avgDailyUnitsSold = unitsSold / analysisDays;
-
-    const annualizationFactor = 365 / analysisDays;
-    const avgTurnoverRate =
-      totalCOGS > 0
-        ? Math.round(
-            ((totalCOGSSold * annualizationFactor) / totalCOGS) * 10,
-          ) /
-            10
-        : 0;
-
-    const stockCoverageDays =
-      avgDailyUnitsSold > 0
-        ? Math.round(totalUnitsInStock / avgDailyUnitsSold)
-        : totalUnitsInStock > 0
-          ? 90
-          : 0;
-
-    const averageProfit = totalSales > 0 ? (totalProfit / totalSales) * 100 : 0;
-
-    return {
-      totalValue,
-      totalCOGS,
-      totalSKUs,
-      totalProducts,
-      lowStockItems,
-      outOfStockItems,
-      avgTurnoverRate,
-      stockCoverageDays,
-      deadStock,
-      healthScore,
-      totalSales,
-      unitsSold,
-      averageProfit,
-    };
-  },
-});
-
-/**
- * Get paginated products list with inventory data
- */
-export const getProductsList = query({
+export const getInventoryAnalytics = query({
   args: {
     paginationOpts: v.optional(paginationOptsValidator),
     page: v.optional(v.number()),
@@ -664,48 +470,15 @@ export const getProductsList = query({
     sortOrder: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
   },
   returns: v.object({
-    page: v.array(
-      v.object({
-        id: v.string(),
-        name: v.string(),
-        sku: v.string(),
-        image: v.optional(v.string()),
-        category: v.string(),
-        vendor: v.string(),
-        stock: v.number(),
-        reserved: v.number(),
-        available: v.number(),
-        reorderPoint: v.number(),
-        stockStatus: v.union(
-          v.literal("healthy"),
-          v.literal("low"),
-          v.literal("critical"),
-          v.literal("out"),
-        ),
-        price: v.number(),
-        cost: v.number(),
-        margin: v.number(),
-        turnoverRate: v.number(),
-        unitsSold: v.optional(v.number()),
-        lastSold: v.optional(v.string()),
-        variants: v.optional(
-          v.array(
-            v.object({
-              id: v.string(),
-              sku: v.string(),
-              title: v.string(),
-              price: v.number(),
-              stock: v.number(),
-              reserved: v.number(),
-              available: v.number(),
-            }),
-          ),
-        ),
-        abcCategory: v.union(v.literal("A"), v.literal("B"), v.literal("C")),
-      }),
-    ),
-    data: v.optional(
-      v.array(
+    overview: v.object({
+      totalValue: v.number(),
+      totalCOGS: v.number(),
+      totalSKUs: v.number(),
+      stockCoverageDays: v.number(),
+      deadStock: v.number(),
+    }),
+    products: v.object({
+      data: v.array(
         v.object({
           id: v.string(),
           name: v.string(),
@@ -745,19 +518,13 @@ export const getProductsList = query({
           abcCategory: v.union(v.literal("A"), v.literal("B"), v.literal("C")),
         }),
       ),
-    ),
-    continueCursor: v.string(),
-    isDone: v.boolean(),
-    info: v.object({
-      pageSize: v.number(),
-      returned: v.number(),
+      pagination: v.object({
+        page: v.number(),
+        pageSize: v.number(),
+        total: v.number(),
+        totalPages: v.number(),
+      }),
       hasMore: v.boolean(),
-    }),
-    pagination: v.object({
-      page: v.number(),
-      pageSize: v.number(),
-      total: v.number(),
-      totalPages: v.number(),
     }),
   }),
   handler: async (ctx, args) => {
@@ -767,24 +534,27 @@ export const getProductsList = query({
       Math.floor(args.paginationOpts?.numItems ?? args.pageSize ?? 50),
     );
 
-    if (!auth)
+    if (!auth) {
       return {
-        page: [],
-        data: [],
-        continueCursor: INVENTORY_END_CURSOR,
-        isDone: true,
-        info: {
-          pageSize: fallbackPageSize,
-          returned: 0,
+        overview: {
+          totalValue: 0,
+          totalCOGS: 0,
+          totalSKUs: 0,
+          stockCoverageDays: 0,
+          deadStock: 0,
+        },
+        products: {
+          data: [],
+          pagination: {
+            page: 1,
+            pageSize: fallbackPageSize,
+            total: 0,
+            totalPages: 0,
+          },
           hasMore: false,
         },
-        pagination: {
-          page: 1,
-          pageSize: fallbackPageSize,
-          total: 0,
-          totalPages: 0,
-        },
       };
+    }
     const orgId = auth.orgId as Id<"organizations">;
 
     await primeVariantCostComponents(ctx, orgId);
@@ -815,6 +585,23 @@ export const getProductsList = query({
     ]);
 
     const inventoryTotals = aggregateInventoryLevels(inventory, variants);
+
+    const totalSKUs = variants.length;
+
+    let totalValue = 0;
+    let totalCOGS = 0;
+    let totalUnitsInStock = 0;
+
+    variants.forEach((variant) => {
+      const totals = inventoryTotals.get(variant._id);
+      const available = totals?.available ?? 0;
+      const price = variant.price || 0;
+      const cost = getVariantCost(variant);
+
+      totalValue += available * price;
+      totalCOGS += available * cost;
+      totalUnitsInStock += available;
+    });
 
     const { start, end } = normalizeDateRange(
       undefined,
@@ -961,7 +748,8 @@ export const getProductsList = query({
 
     if (args.category && args.category !== "all") {
       filteredProducts = filteredProducts.filter(
-        (product) => product.abcCategory === args.category,
+        (product) =>
+          product.category.toLowerCase() === args.category!.toLowerCase(),
       );
     }
 
@@ -1000,25 +788,66 @@ export const getProductsList = query({
     );
 
     const hasMore = totalPages > 0 && safePage < totalPages;
-    const continueCursor = hasMore
-      ? encodeInventoryCursor({ page: safePage + 1 })
-      : INVENTORY_END_CURSOR;
+
+    const { units: unitsSold } = computeSalesTotals(orderItems, variantMap);
+    const avgDailyUnitsSold = unitsSold / analysisDays;
+
+    const stockCoverageDays =
+      avgDailyUnitsSold > 0
+        ? Math.round(totalUnitsInStock / avgDailyUnitsSold)
+        : totalUnitsInStock > 0
+          ? 90
+          : 0;
+
+    const ninetyDaysAgo = Date.now() - 90 * MS_IN_DAY;
+    const recentOrdersInRange = await ctx.db
+      .query("shopifyOrders")
+      .withIndex("by_organization_and_created", (q) =>
+        q.eq("organizationId", orgId).gt("shopifyCreatedAt", ninetyDaysAgo),
+      )
+      .collect();
+
+    const recentOrderItems =
+      recentOrdersInRange.length > 0
+        ? await fetchOrderItemsForOrders(
+            ctx,
+            recentOrdersInRange.map((order) => order._id),
+          )
+        : [];
+
+    const soldVariantIds = new Set<Id<"shopifyProductVariants">>();
+    recentOrderItems.forEach((item) => {
+      if (item.variantId) {
+        soldVariantIds.add(item.variantId);
+      }
+    });
+
+    let deadStock = 0;
+    variants.forEach((variant) => {
+      const totals = inventoryTotals.get(variant._id);
+      const hasStock = (totals?.available ?? 0) > 0;
+      if (hasStock && !soldVariantIds.has(variant._id)) {
+        deadStock++;
+      }
+    });
 
     return {
-      page: paginatedData,
-      data: paginatedData,
-      continueCursor,
-      isDone: !hasMore,
-      info: {
-        pageSize,
-        returned: paginatedData.length,
-        hasMore,
+      overview: {
+        totalValue,
+        totalCOGS,
+        totalSKUs,
+        stockCoverageDays,
+        deadStock,
       },
-      pagination: {
-        page: totalPages === 0 ? 1 : safePage,
-        pageSize,
-        total,
-        totalPages,
+      products: {
+        data: paginatedData,
+        pagination: {
+          page: totalPages === 0 ? 1 : safePage,
+          pageSize,
+          total,
+          totalPages,
+        },
+        hasMore,
       },
     };
   },

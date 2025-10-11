@@ -8,12 +8,8 @@ interface InventoryMetrics {
   totalValue: number;
   totalCOGS: number;
   totalSKUs: number;
-  totalProducts: number;
-  lowStockItems: number;
-  outOfStockItems: number;
   stockCoverageDays: number;
   deadStock: number;
-  stockTurnoverRate: number;
 }
 
 interface InventoryOverviewCardsProps {

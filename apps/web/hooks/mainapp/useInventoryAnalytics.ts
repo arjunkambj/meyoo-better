@@ -16,15 +16,8 @@ export interface InventoryOverview {
   totalValue: number;
   totalCOGS: number;
   totalSKUs: number;
-  totalProducts: number;
-  lowStockItems: number;
-  outOfStockItems: number;
   stockCoverageDays: number;
   deadStock: number;
-  totalSales: number;
-  unitsSold: number;
-  averageProfit: number;
-  stockTurnoverRate: number;
 }
 
 export interface UseInventoryAnalyticsReturn {
@@ -37,6 +30,7 @@ export interface UseInventoryAnalyticsReturn {
       total: number;
       totalPages: number;
     };
+    hasMore: boolean;
   } | null;
   isLoading: boolean;
   exportData: () => Promise<Record<string, unknown>[]>;
@@ -47,7 +41,7 @@ export function useInventoryAnalytics(
 ): UseInventoryAnalyticsReturn {
   const { stockLevel, category, searchTerm, page = 1, pageSize = 50 } = params;
 
-  const productsArgs = useMemo(
+  const analyticsArgs = useMemo(
     () => ({
       page,
       pageSize,
@@ -58,15 +52,17 @@ export function useInventoryAnalytics(
     [page, pageSize, stockLevel, category, searchTerm],
   );
 
-  const overview = useQuery(api.web.inventory.getInventoryOverview);
-  const products = useQuery(api.web.inventory.getProductsList, productsArgs);
+  const analytics = useQuery(
+    api.web.inventory.getInventoryAnalytics,
+    analyticsArgs,
+  );
 
-  const isLoading = overview === undefined || products === undefined;
+  const isLoading = analytics === undefined;
 
   const exportData = async () => {
-    if (!products) return [];
+    if (!analytics) return [];
 
-    const csvData = products.data.map((product) => ({
+    const csvData = analytics.products.data.map((product) => ({
       Name: product.name,
       SKU: product.sku,
       Category: product.category,
@@ -107,26 +103,19 @@ export function useInventoryAnalytics(
     return csvData;
   };
 
-  const transformedOverview: InventoryOverview | null = overview
+  const transformedOverview: InventoryOverview | null = analytics
     ? {
-        totalValue: overview.totalValue,
-        totalCOGS: overview.totalCOGS,
-        totalSKUs: overview.totalSKUs,
-        totalProducts: overview.totalProducts,
-        lowStockItems: overview.lowStockItems,
-        outOfStockItems: overview.outOfStockItems,
-        stockCoverageDays: overview.stockCoverageDays,
-        deadStock: overview.deadStock,
-        totalSales: overview.totalSales ?? 0,
-        unitsSold: overview.unitsSold ?? 0,
-        averageProfit: overview.averageProfit ?? 0,
-        stockTurnoverRate: overview.avgTurnoverRate ?? 0,
+        totalValue: analytics.overview.totalValue,
+        totalCOGS: analytics.overview.totalCOGS,
+        totalSKUs: analytics.overview.totalSKUs,
+        stockCoverageDays: analytics.overview.stockCoverageDays,
+        deadStock: analytics.overview.deadStock,
       }
     : null;
 
   return {
     overview: transformedOverview,
-    products: products ?? null,
+    products: analytics ? analytics.products : null,
     isLoading,
     exportData,
   };

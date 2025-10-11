@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAction } from "convex/react";
 
 import { api } from "@/libs/convexApi";
@@ -22,6 +22,7 @@ export function useShopifyTime() {
     isLoading: true,
     error: null,
   });
+  const hasFetchedInitialRef = useRef(false);
 
   const fetchInfo = useCallback(
     async (shouldAbort?: () => boolean) => {
@@ -59,9 +60,19 @@ export function useShopifyTime() {
 
   useEffect(() => {
     let cancelled = false;
-    void fetchInfo(() => cancelled);
+    let initiatedFetch = false;
+
+    if (!hasFetchedInitialRef.current) {
+      hasFetchedInitialRef.current = true;
+      initiatedFetch = true;
+      void fetchInfo(() => cancelled);
+    }
+
     return () => {
       cancelled = true;
+      if (initiatedFetch) {
+        hasFetchedInitialRef.current = false;
+      }
     };
   }, [fetchInfo]);
 

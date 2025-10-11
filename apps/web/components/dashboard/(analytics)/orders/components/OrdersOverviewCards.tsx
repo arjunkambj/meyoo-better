@@ -18,13 +18,7 @@ export const OrdersOverviewCards = memo(function OrdersOverviewCards({
   const currencySymbol = getCurrencySymbol(primaryCurrency);
 
   if (!metrics) {
-    return (
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        {[1, 2, 3, 4, 5].map((i) => (
-          <KPI key={i} loading title="Loading..." value="-" />
-        ))}
-      </div>
-    );
+    return null;
   }
 
   const formatCurrency = (value: number) => {

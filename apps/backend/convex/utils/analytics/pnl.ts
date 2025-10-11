@@ -10,6 +10,7 @@ import type {
 
 import type { AnyRecord } from './shared';
 import {
+  clampPercentage,
   computeCostOverlap,
   ensureDataset,
   filterAccountLevelMetaInsights,
@@ -106,6 +107,34 @@ function finalisePnLMetrics(metrics: PnLMetrics): PnLMetrics {
     ...metrics,
     netProfitMargin: netMargin,
   };
+}
+
+function computeCostRetentionFactor({
+  revenue,
+  refunds,
+  rtoRevenueLost,
+  manualReturnRatePercent,
+}: {
+  revenue: number;
+  refunds: number;
+  rtoRevenueLost: number;
+  manualReturnRatePercent: number;
+}): number {
+  const baseRevenue = Math.max(revenue, 0);
+  const manualRatio = clampPercentage(manualReturnRatePercent) / 100;
+
+  if (baseRevenue <= 0) {
+    return Math.max(0, 1 - manualRatio);
+  }
+
+  const normalizedRefunds = Math.max(refunds, 0);
+  const normalizedRtoLoss = Math.max(rtoRevenueLost, 0);
+
+  const refundRatio = Math.min(normalizedRefunds / baseRevenue, 1);
+  const rtoRatio = Math.min(normalizedRtoLoss / baseRevenue, 1);
+  const combinedRatio = Math.min(refundRatio + rtoRatio, 1);
+
+  return Math.max(0, 1 - combinedRatio);
 }
 
 type CostComputationContext = {
@@ -262,9 +291,27 @@ function calculatePnLMetricsForRange({
       )
     : 0;
 
-  const netRevenue = revenue - refunds - rtoRevenueLost;
-  const grossProfit = netRevenue - cogs;
-  const netProfit = grossProfit - (shippingCosts + transactionFees + handlingFees + taxesCollected + customCosts + totalAdSpend);
+  const costRetentionFactor = computeCostRetentionFactor({
+    revenue,
+    refunds,
+    rtoRevenueLost,
+    manualReturnRatePercent,
+  });
+
+  const adjustedCogs = cogs * costRetentionFactor;
+  const adjustedHandlingFees = handlingFees * costRetentionFactor;
+  const adjustedTaxesCollected = taxesCollected * costRetentionFactor;
+
+  const netRevenue = Math.max(revenue - refunds - rtoRevenueLost, 0);
+  const grossProfit = netRevenue - adjustedCogs;
+  const netProfit = grossProfit - (
+    shippingCosts +
+    transactionFees +
+    adjustedHandlingFees +
+    adjustedTaxesCollected +
+    customCosts +
+    totalAdSpend
+  );
 
   const metrics = finalisePnLMetrics({
     grossSales,
@@ -272,12 +319,12 @@ function calculatePnLMetricsForRange({
     refunds,
     rtoRevenueLost,
     revenue: netRevenue,
-    cogs,
+    cogs: adjustedCogs,
     shippingCosts,
     transactionFees,
-    handlingFees,
+    handlingFees: adjustedHandlingFees,
     grossProfit,
-    taxesCollected,
+    taxesCollected: adjustedTaxesCollected,
     customCosts,
     totalAdSpend,
     netProfit,

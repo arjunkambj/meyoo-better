@@ -23,7 +23,7 @@ export const CustomersView = memo(function CustomersView() {
     calendarRange: customersCalendarRange,
     preset: customersPreset,
     updateRange: updateCustomersRange,
-  } = useAnalyticsDateRange('dashboard-customers', { defaultPreset: 'today' });
+  } = useAnalyticsDateRange('dashboard-customers', { defaultPreset: 'today', sharedKey: null });
   const [statusFilter, setStatusFilter] = useState<"all" | "converted" | "abandoned_cart">("all");
   const [currentPage, setCurrentPage] = useState(1);
 

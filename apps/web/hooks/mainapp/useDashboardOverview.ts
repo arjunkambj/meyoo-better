@@ -230,12 +230,6 @@ function buildOverviewMetrics(
       change: summary.metaAdSpendChange || 0,
       prefix: currencySymbol,
     },
-    googleAdSpend: {
-      label: "Google Ad Spend",
-      value: summary.googleAdSpend || 0,
-      change: summary.googleAdSpendChange || 0,
-      prefix: currencySymbol,
-    },
     metaSpendPercentage: {
       label: "Meta % of Ad Spend",
       value: summary.metaSpendPercentage || 0,

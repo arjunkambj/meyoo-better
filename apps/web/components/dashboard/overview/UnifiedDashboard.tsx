@@ -60,7 +60,7 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
     calendarRange: overviewCalendarRange,
     preset: overviewPreset,
     updateRange: updateOverviewRange,
-  } = useAnalyticsDateRange('dashboard-overview', { defaultPreset: 'today' });
+  } = useAnalyticsDateRange('dashboard-overview', { defaultPreset: 'today', sharedKey: null });
   const devToolsVisible = useAtomValue(devToolsVisibleAtom);
   const { role } = useUser();
   const canViewDevTools = role === 'StoreOwner';
@@ -94,7 +94,7 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
     }
 
     const paidChannels = channels.filter((channel) =>
-      ["Meta Ads", "Google Ads"].includes(channel.name),
+      ["Meta Ads"].includes(channel.name),
     );
 
     const currentRevenue = paidChannels.reduce((sum, channel) => sum + (channel.revenue || 0), 0);
@@ -108,17 +108,12 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
     const metaAdSpendMetric =
       (overviewMetrics?.metaAdSpend as OverviewMetricView | undefined) ||
       undefined;
-    const googleAdSpendMetric =
-      (overviewMetrics?.googleAdSpend as OverviewMetricView | undefined) ||
-      undefined;
 
     const currentMetaAdSpend = metaAdSpendMetric?.value || 0;
-    const currentGoogleAdSpend = googleAdSpendMetric?.value || 0;
-    const currentAdSpend = currentMetaAdSpend + currentGoogleAdSpend;
+    const currentAdSpend = currentMetaAdSpend;
 
     const previousAdSpend =
-      derivePreviousValue(currentMetaAdSpend, metaAdSpendMetric?.change) +
-      derivePreviousValue(currentGoogleAdSpend, googleAdSpendMetric?.change);
+      derivePreviousValue(currentMetaAdSpend, metaAdSpendMetric?.change);
 
     const currentRoas =
       currentAdSpend > 0 ? currentRevenue / currentAdSpend : 0;

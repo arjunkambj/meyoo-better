@@ -598,7 +598,7 @@ export const getInventoryOverview = query({
       variantMap.set(variant._id, variant);
     });
 
-    const { orders, orderItems } = await fetchOrdersWithItems(
+    const { orderItems } = await fetchOrdersWithItems(
       ctx,
       _orgId,
       start,

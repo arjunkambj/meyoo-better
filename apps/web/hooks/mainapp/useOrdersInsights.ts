@@ -1,7 +1,7 @@
 "use client";
 
-import { useAction } from "convex/react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
+import { useQuery } from "convex-helpers/react/cache/hooks";
 
 import { api } from "@/libs/convexApi";
 import { dateRangeToUtcWithShopPreference } from "@/libs/dateRange";
@@ -112,7 +112,6 @@ export function useOrdersInsights(
   params: UseOrdersInsightsParams = {},
 ): OrdersInsightsResult {
   const { offsetMinutes } = useShopifyTime();
-  const fetchMetrics = useAction(api.web.orders.getOrdersMetrics);
 
   const { dateRange } = params;
 
@@ -144,60 +143,42 @@ export function useOrdersInsights(
     } as const;
   }, [effectiveRange, offsetMinutes]);
 
-  const [loading, setLoading] = useState(true);
-  const [overview, setOverview] = useState<OrdersOverviewMetrics | null>(null);
-  const [journey, setJourney] = useState<JourneyStage[]>([]);
-  const [fulfillment, setFulfillment] = useState<OrdersFulfillmentMetrics | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    if (!normalizedRange) {
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-
-    fetchMetrics({
-      dateRange: normalizedRange,
-    })
-      .then((result) => {
-        if (cancelled || !result) {
-          if (!cancelled) setLoading(false);
-          return;
-        }
-
-        if (result.overview?.metrics) {
-          setOverview(result.overview.metrics as OrdersOverviewMetrics);
-        } else {
-          setOverview(null);
-        }
-
-        setFulfillment(result.fulfillment ?? null);
-        setJourney(normalizeJourneyStages(result.journey as RawJourneyStage[] | undefined));
-        setLoading(false);
-      })
-      .catch((error) => {
-        console.error("Failed to load order insights metrics:", error);
-        if (!cancelled) {
-          setOverview(null);
-          setFulfillment(null);
-          setJourney([]);
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
+  const queryArgs = useMemo(() => {
+    if (!normalizedRange) return "skip" as const;
+    return { dateRange: normalizedRange } as const;
   }, [
-    fetchMetrics,
     normalizedRange?.startDate,
     normalizedRange?.endDate,
     normalizedRange?.startDateTimeUtc,
     normalizedRange?.endDateTimeUtcExclusive,
   ]);
+
+  const overviewResult = useQuery(
+    api.web.orders.getOrdersOverviewMetrics,
+    queryArgs,
+  ) as ({ metrics: OrdersOverviewMetrics } | null | undefined);
+
+  const fulfillmentResult = useQuery(
+    api.web.orders.getFulfillmentMetrics,
+    queryArgs,
+  ) as OrdersFulfillmentMetrics | null | undefined;
+
+  const journeyRaw = useQuery(
+    (api.web.customers as Record<string, any>).getCustomerJourney,
+    queryArgs,
+  ) as RawJourneyStage[] | undefined;
+
+  const overview = overviewResult?.metrics ?? null;
+  const fulfillment = fulfillmentResult ?? null;
+  const journey = useMemo(
+    () => normalizeJourneyStages(journeyRaw),
+    [journeyRaw],
+  );
+
+  const overviewLoading = queryArgs !== "skip" && overviewResult === undefined;
+  const fulfillmentLoading = queryArgs !== "skip" && fulfillmentResult === undefined;
+  const journeyLoading = queryArgs !== "skip" && journeyRaw === undefined;
+  const loading = queryArgs !== "skip" && (overviewLoading || fulfillmentLoading || journeyLoading);
 
   const kpis = useMemo(() => buildKpis(overview), [overview]);
 

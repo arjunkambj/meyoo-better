@@ -85,8 +85,6 @@ export interface OverviewSummary {
   blendedMarketingCostChange: number;
   metaAdSpend: number;
   metaAdSpendChange: number;
-  googleAdSpend: number;
-  googleAdSpendChange: number;
   metaSpendPercentage: number;
   metaSpendPercentageChange: number;
   marketingPercentageOfGross: number;

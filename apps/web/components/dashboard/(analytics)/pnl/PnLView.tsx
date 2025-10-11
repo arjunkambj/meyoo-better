@@ -15,7 +15,7 @@ export const PnLView = memo(function PnLView() {
     calendarRange: pnlCalendarRange,
     preset: pnlPreset,
     updateRange: updatePnlRange,
-  } = useAnalyticsDateRange('dashboard-pnl', { defaultPreset: 'today' });
+  } = useAnalyticsDateRange('dashboard-pnl', { defaultPreset: 'today', sharedKey: null });
 
   const {
     metricsData,

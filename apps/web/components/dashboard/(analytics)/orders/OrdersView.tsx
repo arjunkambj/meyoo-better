@@ -1,19 +1,14 @@
 "use client";
 
 import { Skeleton, Spacer } from "@heroui/react";
-import { lazy, memo, Suspense, useCallback, useEffect, useState } from "react";
+import { memo, useCallback, useEffect, useState } from "react";
 import { AnalyticsHeader } from "@/components/shared/AnalyticsHeader";
 import { ExportButton } from "@/components/shared/actions/ExportButton";
 import { FilterBar } from "@/components/shared/filters/FilterBar";
 import GlobalDateRangePicker from "@/components/shared/GlobalDateRangePicker";
 import { useAnalyticsDateRange, useOrdersAnalytics } from "@/hooks";
 import { OrdersTable } from "./components/OrdersTable";
-
-const OrdersOverviewCards = lazy(() =>
-  import("./components/OrdersOverviewCards").then((mod) => ({
-    default: mod.OrdersOverviewCards,
-  }))
-);
+import { OrdersOverviewCards } from "./components/OrdersOverviewCards";
 
 export const OrdersView = memo(function OrdersView() {
   const {
@@ -21,7 +16,7 @@ export const OrdersView = memo(function OrdersView() {
     calendarRange: ordersCalendarRange,
     preset: ordersPreset,
     updateRange: updateOrdersRange,
-  } = useAnalyticsDateRange('dashboard-orders', { defaultPreset: 'today' });
+  } = useAnalyticsDateRange('dashboard-orders', { defaultPreset: 'today', sharedKey: null });
   const [selectedStatus, setSelectedStatus] = useState<string | undefined>();
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -111,25 +106,15 @@ export const OrdersView = memo(function OrdersView() {
       />
 
       {/* Overview Cards */}
-      <Suspense
-        fallback={
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {[1, 2, 3, 4].map((i) => (
-              <Skeleton key={i} className="h-32 rounded-lg" />
-            ))}
-          </div>
-        }
-      >
-        {loadingStates.overview ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {[1, 2, 3, 4].map((i) => (
-              <Skeleton key={i} className="h-32 rounded-lg" />
-            ))}
-          </div>
-        ) : (
-          <OrdersOverviewCards metrics={overview} />
-        )}
-      </Suspense>
+      {loadingStates.overview ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-32 rounded-lg" />
+          ))}
+        </div>
+      ) : (
+        <OrdersOverviewCards metrics={overview} />
+      )}
 
       {/* Orders Table with Pagination */}
       <OrdersTable

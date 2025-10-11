@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "convex-helpers/react/cache/hooks";
-import { useAction } from "convex/react";
 
 import { api } from "@/libs/convexApi";
 import { dateRangeToUtcWithShopPreference } from "@/libs/dateRange";
@@ -101,48 +100,27 @@ export function useOrdersAnalytics(params: UseOrdersAnalyticsParams = {}) {
     } as const;
   }, [effectiveRange.endDate, effectiveRange.startDate, rangeStrings]);
 
-  // Use consolidated action for overview and fulfillment metrics
-  const [metricsData, setMetricsData] = useState<any>(null);
-  const [isLoadingMetrics, setIsLoadingMetrics] = useState(true);
-  const fetchMetrics = useAction(api.web.orders.getOrdersMetrics);
-
-  useEffect(() => {
-    if (!normalizedRange) {
-      setIsLoadingMetrics(false);
-      return;
-    }
-
-    let cancelled = false;
-    setIsLoadingMetrics(true);
-
-    fetchMetrics({
-      dateRange: normalizedRange,
-    })
-      .then((result) => {
-        if (!cancelled) {
-          setMetricsData(result);
-          setIsLoadingMetrics(false);
-        }
-      })
-      .catch((error) => {
-        console.error("Failed to load orders metrics:", error);
-        if (!cancelled) {
-          setIsLoadingMetrics(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
+  const metricsArgs = useMemo(() => {
+    if (!normalizedRange) return "skip" as const;
+    return { dateRange: normalizedRange } as const;
   }, [
-    fetchMetrics,
     normalizedRange?.startDate,
     normalizedRange?.endDate,
     normalizedRange?.startDateTimeUtc,
     normalizedRange?.endDateTimeUtcExclusive,
   ]);
 
-  const overview: OrdersOverviewMetrics | null = metricsData?.overview?.metrics ?? null;
+  const overviewResult = useQuery(
+    api.web.orders.getOrdersOverviewMetrics,
+    metricsArgs,
+  ) as ({ metrics: OrdersOverviewMetrics } | null | undefined);
+
+  const fulfillmentResult = useQuery(
+    api.web.orders.getFulfillmentMetrics,
+    metricsArgs,
+  ) as OrdersFulfillmentMetrics | null | undefined;
+
+  const overview: OrdersOverviewMetrics | null = overviewResult?.metrics ?? null;
 
   const cursorKey = useMemo(() => {
     if (!normalizedRange) return null;
@@ -401,10 +379,8 @@ export function useOrdersAnalytics(params: UseOrdersAnalyticsParams = {}) {
     };
   }, [ordersPageSnapshot, estimatedTotal, effectivePage, pageSize]);
 
-  const fulfillmentMetrics: OrdersFulfillmentMetrics | undefined = useMemo(() => {
-    if (isLoadingMetrics) return undefined;
-    return metricsData?.fulfillment ?? undefined;
-  }, [isLoadingMetrics, metricsData]);
+  const fulfillmentMetrics: OrdersFulfillmentMetrics | undefined =
+    fulfillmentResult ?? undefined;
 
   const exportData: OrdersAnalyticsExportRow[] = useMemo(() => {
     if (!ordersPageSnapshot) return [];
@@ -429,9 +405,9 @@ export function useOrdersAnalytics(params: UseOrdersAnalyticsParams = {}) {
     }));
   }, [ordersPageSnapshot]);
 
-  const overviewLoading = isLoadingMetrics;
+  const overviewLoading = metricsArgs !== "skip" && overviewResult === undefined;
   const ordersLoading = ordersQueryArgs !== "skip" && ordersPageSnapshot === undefined;
-  const fulfillmentLoading = isLoadingMetrics;
+  const fulfillmentLoading = metricsArgs !== "skip" && fulfillmentResult === undefined;
 
   const loadingStates = {
     overview: overviewLoading,
@@ -439,7 +415,7 @@ export function useOrdersAnalytics(params: UseOrdersAnalyticsParams = {}) {
     fulfillment: fulfillmentLoading,
   };
 
-  const isLoading = isLoadingMetrics || ordersLoading;
+  const isLoading = overviewLoading || fulfillmentLoading || ordersLoading;
   const isInitialLoading = ordersLoading && effectivePage === 1;
 
   return {

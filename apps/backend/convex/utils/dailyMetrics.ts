@@ -432,23 +432,50 @@ function applyManualReturnRateToPnLMetrics(
   grossRevenue: number,
   manualRatePercent: number,
 ): PnLMetrics {
-  const rate = clampPercentage(manualRatePercent);
-  if (rate <= 0 || grossRevenue <= 0) {
-    metrics.rtoRevenueLost = 0;
-    metrics.netProfitMargin = metrics.revenue > 0 ? (metrics.netProfit / metrics.revenue) * 100 : 0;
-    return metrics;
-  }
+  const baseRevenue = Math.max(grossRevenue, 0);
+  const normalizedRate = clampPercentage(manualRatePercent) / 100;
+  const refunds = Math.max(metrics.refunds ?? 0, 0);
 
-  const rtoRevenueLost = Math.min(
-    (grossRevenue * rate) / 100,
-    Math.max(grossRevenue, 0),
+  const rtoRevenueLost = baseRevenue > 0
+    ? Math.min(baseRevenue * normalizedRate, baseRevenue)
+    : 0;
+
+  const refundRatio = baseRevenue > 0 ? Math.min(refunds / baseRevenue, 1) : 0;
+  const rtoRatio = baseRevenue > 0 ? Math.min(rtoRevenueLost / baseRevenue, 1) : normalizedRate;
+  const combinedReturnRatio = Math.min(refundRatio + rtoRatio, 1);
+  const retentionFactor = Math.max(0, 1 - combinedReturnRatio);
+
+  const originalCogs = metrics.cogs;
+  const originalHandlingFees = metrics.handlingFees;
+  const originalTaxesCollected = metrics.taxesCollected;
+  const shippingCosts = metrics.shippingCosts;
+  const transactionFees = metrics.transactionFees;
+  const customCosts = metrics.customCosts;
+  const adSpend = metrics.totalAdSpend;
+
+  const adjustedCogs = originalCogs * retentionFactor;
+  const adjustedHandlingFees = originalHandlingFees * retentionFactor;
+  const adjustedTaxesCollected = originalTaxesCollected * retentionFactor;
+
+  const netRevenue = Math.max(baseRevenue - refunds - rtoRevenueLost, 0);
+  const grossProfit = netRevenue - adjustedCogs;
+  const netProfit = grossProfit - (
+    shippingCosts +
+    transactionFees +
+    adjustedHandlingFees +
+    adjustedTaxesCollected +
+    customCosts +
+    adSpend
   );
 
   metrics.rtoRevenueLost = rtoRevenueLost;
-  metrics.revenue = Math.max(metrics.revenue - rtoRevenueLost, 0);
-  metrics.grossProfit -= rtoRevenueLost;
-  metrics.netProfit -= rtoRevenueLost;
-  metrics.netProfitMargin = metrics.revenue > 0 ? (metrics.netProfit / metrics.revenue) * 100 : 0;
+  metrics.revenue = netRevenue;
+  metrics.cogs = adjustedCogs;
+  metrics.handlingFees = adjustedHandlingFees;
+  metrics.taxesCollected = adjustedTaxesCollected;
+  metrics.grossProfit = grossProfit;
+  metrics.netProfit = netProfit;
+  metrics.netProfitMargin = netRevenue > 0 ? (netProfit / netRevenue) * 100 : 0;
 
   return metrics;
 }
@@ -940,8 +967,6 @@ function buildOverviewFromAggregates(
     blendedMarketingCostChange: percentageChange(marketingCost, prevMarketingCost),
     metaAdSpend: 0,
     metaAdSpendChange: 0,
-    googleAdSpend: 0,
-    googleAdSpendChange: 0,
     metaSpendPercentage: 0,
     metaSpendPercentageChange: 0,
     marketingPercentageOfGross,
@@ -1248,7 +1273,7 @@ function finalizePnLMetrics(metrics: PnLMetrics): PnLMetrics {
 
 function aggregatedToPnLMetrics(aggregates: AggregatedDailyMetrics): PnLMetrics {
   const revenue = aggregates.revenue;
-  const grossSales = Math.max(aggregates.grossSales, revenue);
+  const grossSales = Math.max(aggregates.grossSales, revenue + aggregates.discounts);
   const discounts = aggregates.discounts;
   const refunds = aggregates.refundsAmount;
   const rtoRevenueLost = aggregates.rtoRevenueLost;
@@ -1259,26 +1284,47 @@ function aggregatedToPnLMetrics(aggregates: AggregatedDailyMetrics): PnLMetrics 
   const taxesCollected = aggregates.taxesCollected;
   const customCosts = aggregates.customCosts;
   const marketingCost = aggregates.marketingCost;
+  const manualRatePercent = aggregates.manualReturnRatePercent ?? 0;
 
-  const netRevenue = revenue - refunds - rtoRevenueLost;
-  const grossProfit = netRevenue - cogs;
-  const totalCostsWithoutAds =
-    cogs + shippingCosts + transactionFees + handlingFees + customCosts + taxesCollected;
-  const netProfit = revenue - totalCostsWithoutAds - marketingCost - refunds - rtoRevenueLost;
+  const baseRevenue = Math.max(revenue, 0);
+  const normalizedRefunds = Math.max(refunds, 0);
+  const normalizedRto = Math.max(rtoRevenueLost, 0);
+
+  const refundRatio = baseRevenue > 0 ? Math.min(normalizedRefunds / baseRevenue, 1) : 0;
+  const rtoRatio = baseRevenue > 0
+    ? Math.min(normalizedRto / baseRevenue, 1)
+    : clampPercentage(manualRatePercent) / 100;
+  const combinedReturnRatio = Math.min(refundRatio + rtoRatio, 1);
+  const retentionFactor = Math.max(0, 1 - combinedReturnRatio);
+
+  const adjustedCogs = cogs * retentionFactor;
+  const adjustedHandlingFees = handlingFees * retentionFactor;
+  const adjustedTaxesCollected = taxesCollected * retentionFactor;
+
+  const netRevenue = Math.max(baseRevenue - normalizedRefunds - normalizedRto, 0);
+  const grossProfit = netRevenue - adjustedCogs;
+  const netProfit = grossProfit - (
+    shippingCosts +
+    transactionFees +
+    adjustedHandlingFees +
+    adjustedTaxesCollected +
+    customCosts +
+    marketingCost
+  );
   const netProfitMargin = netRevenue > 0 ? (netProfit / netRevenue) * 100 : 0;
 
   return {
     grossSales,
     discounts,
-    refunds,
-    rtoRevenueLost,
+    refunds: normalizedRefunds,
+    rtoRevenueLost: normalizedRto,
     revenue: netRevenue,
-    cogs,
+    cogs: adjustedCogs,
     shippingCosts,
     transactionFees,
-    handlingFees,
+    handlingFees: adjustedHandlingFees,
     grossProfit,
-    taxesCollected,
+    taxesCollected: adjustedTaxesCollected,
     customCosts,
     totalAdSpend: marketingCost,
     netProfit,

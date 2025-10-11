@@ -16,7 +16,7 @@ export const OrdersInsightsView = memo(function OrdersInsightsView() {
     calendarRange: ordersInsightsCalendarRange,
     preset: ordersInsightsPreset,
     updateRange: updateOrdersInsightsRange,
-  } = useAnalyticsDateRange('dashboard-orders-insights', { defaultPreset: 'today' });
+  } = useAnalyticsDateRange('dashboard-orders-insights', { defaultPreset: 'today', sharedKey: null });
 
   const {
     kpis,

@@ -1,13 +1,11 @@
 "use client";
 
 import { Skeleton, Spacer } from "@heroui/react";
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { AnalyticsHeader } from "@/components/shared/AnalyticsHeader";
 import { ExportButton } from "@/components/shared/actions/ExportButton";
 import { FilterBar } from "@/components/shared/filters/FilterBar";
-import GlobalDateRangePicker from "@/components/shared/GlobalDateRangePicker";
 import { useInventoryAnalytics } from "@/hooks";
-import { useAnalyticsDateRange } from "@/hooks";
 
 import { ProductsTable } from "./components/ProductsTable";
 
@@ -21,17 +19,8 @@ export function InventoryView() {
   const [stockFilter, setStockFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
-  const {
-    analyticsRange: inventoryRange,
-    calendarRange: inventoryCalendarRange,
-    preset: inventoryPreset,
-    updateRange: updateInventoryRange,
-  } = useAnalyticsDateRange("dashboard-inventory", {
-    defaultPreset: "today",
-  });
 
   const { overview, products, isLoading, exportData } = useInventoryAnalytics({
-    dateRange: inventoryRange,
     stockLevel: stockFilter,
     category: categoryFilter,
     page: currentPage,
@@ -44,15 +33,7 @@ export function InventoryView() {
     }
   }, [products?.pagination?.page, currentPage]);
 
-  const handleAnalyticsRangeChange = useCallback(
-    (...args: Parameters<typeof updateInventoryRange>) => {
-      setCurrentPage(1);
-      return updateInventoryRange(...args);
-    },
-    [setCurrentPage, updateInventoryRange],
-  );
-
-  const handleFilterChange = useCallback((key: string, value: unknown) => {
+  const handleFilterChange = (key: string, value: unknown) => {
     if (key === "stock") {
       setStockFilter((value as string) || "all");
       setCurrentPage(1);
@@ -63,7 +44,7 @@ export function InventoryView() {
       setCategoryFilter((value as string) || "all");
       setCurrentPage(1);
     }
-  }, []);
+  };
 
   const categoryOptions = useMemo(
     () =>
@@ -107,12 +88,6 @@ export function InventoryView() {
     <div className="flex flex-col gap-4">
       <h1 className="text-2xl font-semibold leading-tight">Inventory Products</h1>
       <div className="flex flex-wrap items-center gap-2">
-        <GlobalDateRangePicker
-          value={inventoryCalendarRange}
-          preset={inventoryPreset}
-          defaultPreset="today"
-          onAnalyticsChange={handleAnalyticsRangeChange}
-        />
         <FilterBar
           filters={filters}
           values={filterValues}
@@ -122,18 +97,10 @@ export function InventoryView() {
     </div>
   );
 
-  const exportButtonData = useMemo(() => {
-    if (Array.isArray(exportData)) {
-      return (exportData as Record<string, unknown>[]).map((row) => ({ ...row }));
-    }
-    if (typeof exportData === "function") return exportData;
-    return [] as Record<string, unknown>[];
-  }, [exportData]);
-
   const headerRight = (
     <ExportButton
       color="primary"
-      data={exportButtonData}
+      data={exportData}
       filename="inventory-report"
       formats={["csv", "pdf"]}
     />
@@ -165,11 +132,6 @@ export function InventoryView() {
           </div>
         </div>
 
-        {/* Performance Metrics Skeleton */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Skeleton className="h-[400px] rounded-lg" />
-          <Skeleton className="h-[400px] rounded-lg" />
-        </div>
       </div>
     );
   }

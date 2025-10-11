@@ -13,10 +13,6 @@ interface InventoryMetrics {
   outOfStockItems: number;
   stockCoverageDays: number;
   deadStock: number;
-  totalSales: number;
-  unitsSold: number;
-  averageSalePrice: number;
-  averageProfit: number;
   stockTurnoverRate: number;
 }
 
@@ -32,8 +28,8 @@ export function InventoryOverviewCards({
 
   if (!metrics) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        {[1, 2, 3, 4, 5].map((i) => (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {[1, 2, 3, 4].map((i) => (
           <KPI key={i} loading title="Loading..." value="-" />
         ))}
       </div>
@@ -47,13 +43,6 @@ export function InventoryOverviewCards({
       icon: "solar:box-bold-duotone",
       iconColor: "text-default-500",
       subtitle: `Total value across ${metrics.totalSKUs} SKUs`,
-    },
-    {
-      title: "Average Order Value",
-      value: `${currencySymbol}${metrics.averageSalePrice.toFixed(2)}`,
-      icon: "solar:tag-price-bold-duotone",
-      iconColor: "text-default-500",
-      subtitle: "Per order in range",
     },
     {
       title: "Stock Coverage",
@@ -79,7 +68,7 @@ export function InventoryOverviewCards({
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       {cards.map((card) => (
         <KPI
           key={card.title}

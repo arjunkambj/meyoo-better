@@ -1,11 +1,9 @@
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import type { Doc, Id } from "../_generated/dataModel";
-import { action, query } from "../_generated/server";
+import { query } from "../_generated/server";
 import type { QueryCtx } from "../_generated/server";
 import { getUserAndOrg } from "../utils/auth";
-import { api } from "../_generated/api";
-import { dateRangeValidator } from "./analyticsShared";
 
 /**
  * Inventory Management API
@@ -466,9 +464,7 @@ const assignABCCategories = (
  * Get inventory overview metrics
  */
 export const getInventoryOverview = query({
-  args: {
-    dateRange: v.optional(dateRangeValidator),
-  },
+  args: {},
   returns: v.union(
     v.null(),
     v.object({
@@ -484,11 +480,10 @@ export const getInventoryOverview = query({
       healthScore: v.number(),
       totalSales: v.number(),
       unitsSold: v.number(),
-      averageSalePrice: v.number(),
       averageProfit: v.number(),
     }),
   ),
-  handler: async (ctx, args) => {
+  handler: async (ctx) => {
     const auth = await getUserAndOrg(ctx);
     if (!auth) return null;
     const { user } = auth;
@@ -496,19 +491,16 @@ export const getInventoryOverview = query({
 
     await primeVariantCostComponents(ctx, _orgId);
 
-    // Get all products
     const products = await ctx.db
       .query("shopifyProducts")
       .withIndex("by_organization", (q) => q.eq("organizationId", _orgId))
       .collect();
 
-    // Get all variants
     const variants = await ctx.db
       .query("shopifyProductVariants")
       .withIndex("by_organization", (q) => q.eq("organizationId", _orgId))
       .collect();
 
-    // Get inventory levels
     const inventory = await ctx.db
       .query("shopifyInventoryTotals")
       .withIndex("by_organization", (q) => q.eq("organizationId", _orgId))
@@ -517,7 +509,7 @@ export const getInventoryOverview = query({
     const inventoryTotals = aggregateInventoryLevels(inventory, variants);
 
     const { start, end } = normalizeDateRange(
-      args.dateRange,
+      undefined,
       DEFAULT_ANALYSIS_DAYS,
     );
     const analysisWindowMs = Math.max(1, end.getTime() - start.getTime());
@@ -637,7 +629,6 @@ export const getInventoryOverview = query({
           ? 90
           : 0;
 
-    const averageSalePrice = orders.length > 0 ? totalSales / orders.length : 0;
     const averageProfit = totalSales > 0 ? (totalProfit / totalSales) * 100 : 0;
 
     return {
@@ -653,7 +644,6 @@ export const getInventoryOverview = query({
       healthScore,
       totalSales,
       unitsSold,
-      averageSalePrice,
       averageProfit,
     };
   },
@@ -672,7 +662,6 @@ export const getProductsList = query({
     searchTerm: v.optional(v.string()),
     sortBy: v.optional(v.string()),
     sortOrder: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
-    dateRange: v.optional(dateRangeValidator),
   },
   returns: v.object({
     page: v.array(
@@ -828,7 +817,7 @@ export const getProductsList = query({
     const inventoryTotals = aggregateInventoryLevels(inventory, variants);
 
     const { start, end } = normalizeDateRange(
-      args.dateRange,
+      undefined,
       DEFAULT_ANALYSIS_DAYS,
     );
     const analysisWindowMs = Math.max(1, end.getTime() - start.getTime());
@@ -1255,361 +1244,5 @@ export const getStockAlerts = query({
 
     const limit = args.limit || 10;
     return alerts.slice(0, limit);
-  },
-});
-
-/**
- * Get top performing products
- */
-export const getTopPerformers = query({
-  args: {
-    dateRange: v.optional(dateRangeValidator),
-    limit: v.optional(v.number()),
-  },
-  returns: v.object({
-    best: v.array(
-      v.object({
-        id: v.string(),
-        name: v.string(),
-        sku: v.string(),
-        image: v.optional(v.string()),
-        metric: v.number(),
-        change: v.number(),
-        units: v.number(),
-        revenue: v.number(),
-        trend: v.union(v.literal("up"), v.literal("down"), v.literal("stable")),
-      }),
-    ),
-    worst: v.array(
-      v.object({
-        id: v.string(),
-        name: v.string(),
-        sku: v.string(),
-        image: v.optional(v.string()),
-        metric: v.number(),
-        change: v.number(),
-        units: v.number(),
-        revenue: v.number(),
-        trend: v.union(v.literal("up"), v.literal("down"), v.literal("stable")),
-      }),
-    ),
-    trending: v.array(
-      v.object({
-        id: v.string(),
-        name: v.string(),
-        sku: v.string(),
-        image: v.optional(v.string()),
-        metric: v.number(),
-        change: v.number(),
-        units: v.number(),
-        revenue: v.number(),
-        trend: v.union(v.literal("up"), v.literal("down"), v.literal("stable")),
-      }),
-    ),
-  }),
-  handler: async (ctx, args) => {
-    const auth = await getUserAndOrg(ctx);
-    if (!auth) return { best: [], worst: [], trending: [] };
-
-    const limit = args.limit || 3;
-
-    const orgId = auth.orgId as Id<'organizations'>;
-
-    await primeVariantCostComponents(ctx, orgId);
-
-    const [products, variants] = await Promise.all([
-      ctx.db
-        .query("shopifyProducts")
-        .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
-        .collect(),
-      ctx.db
-        .query("shopifyProductVariants")
-        .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
-        .collect(),
-    ]);
-
-    const { start, end } = normalizeDateRange(
-      args.dateRange,
-      DEFAULT_ANALYSIS_DAYS,
-    );
-    const periodDurationMs = Math.max(MS_IN_DAY, end.getTime() - start.getTime());
-
-    const { orders, orderItems } = await fetchOrdersWithItems(
-      ctx,
-      orgId,
-      start,
-      end,
-    );
-
-    const prevEnd = new Date(start.getTime() - 1);
-    const prevStart = new Date(prevEnd.getTime() - periodDurationMs);
-    const { orders: prevOrders, orderItems: prevOrderItems } =
-      await fetchOrdersWithItems(ctx, orgId, prevStart, prevEnd);
-
-    const variantMap = new Map<
-      Id<'shopifyProductVariants'>,
-      Doc<'shopifyProductVariants'>
-    >();
-    variants.forEach((variant) => {
-      variantMap.set(variant._id, variant);
-    });
-
-    const currentVariantSales = buildVariantSalesMap(
-      orderItems,
-      orders,
-      variantMap,
-    );
-    const previousVariantSales = buildVariantSalesMap(
-      prevOrderItems,
-      prevOrders,
-      variantMap,
-    );
-
-    const currentProductSales = buildProductSalesMap(
-      currentVariantSales,
-      variants,
-    );
-    const previousProductSales = buildProductSalesMap(
-      previousVariantSales,
-      variants,
-    );
-
-    const performanceData = products.map((product) => {
-      const current = currentProductSales.get(product._id) || {
-        units: 0,
-        revenue: 0,
-        cogs: 0,
-      };
-      const previous = previousProductSales.get(product._id) || {
-        units: 0,
-        revenue: 0,
-        cogs: 0,
-      };
-
-      const variant = variants.find((v) => v.productId === product._id);
-
-      const change =
-        previous.units > 0
-          ? Number(
-              (((current.units - previous.units) / previous.units) * 100).toFixed(1),
-            )
-          : current.units > 0
-            ? 100
-            : 0;
-
-      type Trend = "up" | "down" | "stable";
-      const trend: Trend = change > 0 ? "up" : change < 0 ? "down" : "stable";
-
-      return {
-        id: String(product._id),
-        name: product.title,
-        sku: variant?.sku || product.handle || "N/A",
-        image: product.featuredImage,
-        metric: current.units,
-        change,
-        units: current.units,
-        revenue: current.revenue,
-        trend,
-      };
-    });
-
-    const best = [...performanceData]
-      .sort((a, b) => b.units - a.units)
-      .slice(0, limit);
-
-    const worst = [...performanceData]
-      .sort((a, b) => a.units - b.units)
-      .slice(0, limit);
-
-    const trending = [...performanceData]
-      .sort((a, b) => b.change - a.change)
-      .slice(0, limit);
-
-    return { best, worst, trending };
-  },
-});
-
-/**
- * Get stock movement data (inbound/outbound)
- */
-export const getStockMovement = query({
-  args: {
-    dateRange: v.optional(dateRangeValidator),
-    periods: v.optional(v.number()),
-  },
-  returns: v.array(
-    v.object({
-      period: v.string(),
-      inbound: v.number(),
-      outbound: v.number(),
-      netMovement: v.number(),
-      velocity: v.number(),
-    }),
-  ),
-  handler: async (ctx, args) => {
-    const auth = await getUserAndOrg(ctx);
-    if (!auth) return [];
-
-    const orgId = auth.orgId as Id<'organizations'>;
-
-    await primeVariantCostComponents(ctx, orgId);
-
-    const periods = args.periods || 7;
-    const endDate = args.dateRange?.endDate
-      ? new Date(args.dateRange.endDate)
-      : new Date();
-    const startDate = args.dateRange?.startDate
-      ? new Date(args.dateRange.startDate)
-      : new Date(endDate.getTime() - (periods - 1) * MS_IN_DAY);
-    startDate.setHours(0, 0, 0, 0);
-
-    const orders = await ctx.db
-      .query("shopifyOrders")
-      .withIndex("by_organization_and_created", (q) =>
-        q
-          .eq("organizationId", orgId)
-          .gte("shopifyCreatedAt", startDate.getTime())
-          .lte("shopifyCreatedAt", endDate.getTime()),
-      )
-      .collect();
-
-    // Fetch order items only for orders in the date range
-    const orderIds = orders.map((order) => order._id);
-    const orderItems =
-      orderIds.length > 0 ? await fetchOrderItemsForOrders(ctx, orderIds) : [];
-
-    const inventory = await ctx.db
-      .query("shopifyInventoryTotals")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", orgId),
-      )
-      .collect();
-
-    const itemsByOrder = new Map<string, Array<Doc<'shopifyOrderItems'>>>();
-    orderItems.forEach((item) => {
-      const key = item.orderId.toString();
-      const existing = itemsByOrder.get(key);
-      if (existing) {
-        existing.push(item);
-      } else {
-        itemsByOrder.set(key, [item]);
-      }
-    });
-
-    const periodEntries: Array<{
-      key: string;
-      label: string;
-      start: Date;
-      end: Date;
-    }> = [];
-    const movementData = new Map<
-      string,
-      { label: string; inbound: number; outbound: number; orders: number }
-    >();
-
-    for (let i = 0; i < periods; i++) {
-      const currentDate = new Date(startDate.getTime() + i * MS_IN_DAY);
-      const label = currentDate.toLocaleDateString('en-US', {
-        weekday: 'short',
-      });
-      const keyDate = new Date(currentDate);
-      keyDate.setHours(0, 0, 0, 0);
-      const key = keyDate.toISOString().split('T')[0] as string;
-
-      const endOfDay = new Date(keyDate);
-      endOfDay.setHours(23, 59, 59, 999);
-
-      periodEntries.push({ key, label, start: keyDate, end: endOfDay });
-      movementData.set(key, { label, inbound: 0, outbound: 0, orders: 0 });
-    }
-
-    orders.forEach((order) => {
-      const orderDate = new Date(order.shopifyCreatedAt);
-      orderDate.setHours(0, 0, 0, 0);
-      const key = orderDate.toISOString().split('T')[0] as string;
-      const entry = movementData.get(key);
-      if (!entry) return;
-
-      const items = itemsByOrder.get(order._id.toString()) || [];
-      const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
-
-      entry.outbound += totalQuantity;
-      entry.orders += 1;
-    });
-
-    inventory.forEach((inv) => {
-      if (!inv.incoming || inv.incoming <= 0) return;
-      const updatedAt = inv.updatedAt ?? inv.syncedAt;
-      const updateDate = new Date(updatedAt);
-      updateDate.setHours(0, 0, 0, 0);
-      const key = updateDate.toISOString().split('T')[0] as string;
-      const entry = movementData.get(key);
-      if (!entry) return;
-      entry.inbound += inv.incoming;
-    });
-
-    const results = periodEntries.map(({ key, label }) => {
-      const fallback = { inbound: 0, outbound: 0, orders: 0, label };
-      const data = movementData.get(key) ?? fallback;
-      const velocity =
-        data.orders > 0
-          ? Math.round((data.outbound / Math.max(1, data.orders)) * 10) / 10
-          : 0;
-
-      return {
-        period: label,
-        inbound: data.inbound,
-        outbound: data.outbound,
-        netMovement: data.inbound - data.outbound,
-        velocity,
-      };
-    });
-
-    return results;
-  },
-});
-
-export const getInventoryMetrics = action({
-  args: {
-    dateRange: v.optional(dateRangeValidator),
-  },
-  returns: v.union(
-    v.null(),
-    v.object({
-      overview: v.any(),
-      stockAlerts: v.any(),
-      topPerformers: v.any(),
-      stockMovement: v.any(),
-    }),
-  ),
-  handler: async (ctx, args): Promise<{
-    overview: any;
-    stockAlerts: any;
-    topPerformers: any;
-    stockMovement: any;
-  } | null> => {
-    const [overview, stockAlerts, topPerformers, stockMovement] = await Promise.all([
-      ctx.runQuery(api.web.inventory.getInventoryOverview, {
-        dateRange: args.dateRange,
-      }),
-      ctx.runQuery(api.web.inventory.getStockAlerts, {
-        limit: 10,
-      }),
-      ctx.runQuery(api.web.inventory.getTopPerformers, {
-        dateRange: args.dateRange,
-        limit: 3,
-      }),
-      ctx.runQuery(api.web.inventory.getStockMovement, {
-        dateRange: args.dateRange,
-        periods: 7,
-      }),
-    ]);
-
-    return {
-      overview,
-      stockAlerts,
-      topPerformers,
-      stockMovement,
-    };
   },
 });

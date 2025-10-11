@@ -63,7 +63,7 @@ export default function AgentSidebar({
       )}
       <aside
         className={cn(
-          "h-full bg-default-50 px-1 pb-2",
+          "h-full bg-default-50 dark:bg-default-100 px-1 pb-2",
           "flex flex-col overflow-hidden transition-all duration-300 ease-in-out",
           "border-l border-default-100",
           isMobile

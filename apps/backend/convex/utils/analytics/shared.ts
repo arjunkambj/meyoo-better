@@ -149,8 +149,12 @@ export function ensureDataset<T = AnyRecord>(
   return (response.data ?? {}) as AnalyticsSourceData<T>;
 }
 
-export function defaultMetric(value = 0, change = 0): MetricValue {
-  return { value, change };
+export function defaultMetric(value = 0, change = 0, previousValue?: number): MetricValue {
+  const metric: MetricValue = { value, change };
+  if (typeof previousValue === 'number' && Number.isFinite(previousValue)) {
+    metric.previousValue = previousValue;
+  }
+  return metric;
 }
 
 export function clampPercentage(value: number): number {

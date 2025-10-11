@@ -490,6 +490,18 @@ function computeOverviewBaseline(
   const transactionFees = transactionFeesFromTransactions + paymentCostTotal;
 
   const metaAdSpend = sumBy(accountMetaInsights, (insight) => safeNumber(insight.spend));
+  const metaClicksAccount = sumBy(accountMetaInsights, (insight) => safeNumber(insight.clicks));
+  const metaUniqueClicksAccount = sumBy(
+    accountMetaInsights,
+    (insight) => safeNumber(insight.uniqueClicks ?? insight.clicks),
+  );
+  const metaClicksAny = sumBy(metaInsights, (insight) => safeNumber(insight.clicks));
+  const metaUniqueClicksAny = sumBy(
+    metaInsights,
+    (insight) => safeNumber(insight.uniqueClicks ?? insight.clicks),
+  );
+  const metaClicks = metaClicksAccount > 0 ? metaClicksAccount : metaClicksAny;
+  const metaUniqueClicks = metaUniqueClicksAccount > 0 ? metaUniqueClicksAccount : metaUniqueClicksAny;
   const metaConversionValue = sumBy(
     accountMetaInsights,
     (insight) => safeNumber(insight.conversionValue),
@@ -531,7 +543,6 @@ function computeOverviewBaseline(
   const cogsPercentageOfNet = revenue > 0 ? (cogs / revenue) * 100 : 0;
   const shippingPercentageOfNet = revenue > 0 ? (shippingCosts / revenue) * 100 : 0;
   const taxesPercentageOfRevenue = revenue > 0 ? (taxesCollected / revenue) * 100 : 0;
-  const fulfillmentCostPerOrder = activeOrderCount > 0 ? handlingCostTotal / activeOrderCount : 0;
 
   const returnRate = activeOrderCount > 0 ? (refunds.length / activeOrderCount) * 100 : 0;
   const paidCustomersCount = uniqueCustomerIds.size;
@@ -539,7 +550,7 @@ function computeOverviewBaseline(
   const repeatCustomerRate = paidCustomersCount > 0
     ? (repeatCustomersInPeriod / paidCustomersCount) * 100
     : 0;
-  const customerAcquisitionCost = newCustomers > 0 ? totalAdSpend / newCustomers : 0;
+  const customerAcquisitionCost = adSpendPerOrder;
   const cacPercentageOfAOV = averageOrderValue > 0 ? (customerAcquisitionCost / averageOrderValue) * 100 : 0;
   const operatingCostPercentage = revenue > 0 ? (customCostTotal / revenue) * 100 : 0;
   const abandonedCustomers = Math.max(totalCustomersCount - paidCustomersCount, 0);
@@ -610,7 +621,7 @@ function computeOverviewBaseline(
     profitPerOrderChange: 0,
     profitPerUnit,
     profitPerUnitChange: 0,
-    fulfillmentCostPerOrder,
+    fulfillmentCostPerOrder: 0,
     fulfillmentCostPerOrderChange: 0,
     cogs,
     cogsChange: 0,
@@ -666,14 +677,16 @@ function computeOverviewBaseline(
     contributionMargin: defaultMetric(contributionProfit, 0),
     blendedMarketingCost: defaultMetric(totalAdSpend, 0),
     customerAcquisitionCost: defaultMetric(customerAcquisitionCost, 0),
+    cacPercentageOfAOV: defaultMetric(cacPercentageOfAOV, 0),
     profitPerOrder: defaultMetric(averageOrderProfit, 0),
     rtoRevenueLost: defaultMetric(rtoRevenueLost, 0),
     manualReturnRate: defaultMetric(manualReturnRatePercent, 0),
   };
 
-  const totalSessions = sumBy(analytics, (entry) => safeNumber(entry.sessions ?? entry.visitors ?? entry.visits));
-  const totalConversions = sumBy(analytics, (entry) => safeNumber(entry.conversions ?? entry.orders ?? entry.conversion));
-  const blendedSessionConversionRate = totalSessions > 0 ? (totalConversions / totalSessions) * 100 : 0;
+  const metaClickDenominator = metaUniqueClicks > 0 ? metaUniqueClicks : metaClicks;
+  const blendedSessionConversionRate = metaClickDenominator > 0
+    ? (activeOrderCount / metaClickDenominator) * 100
+    : 0;
   const uniqueVisitors = sumBy(analytics, (entry) => safeNumber(entry.visitors ?? entry.sessions ?? entry.visits));
 
   return {
@@ -708,6 +721,9 @@ function applyMetricChanges(
     const previousMetric = previous[key];
     if (!previousMetric) continue;
     metric.change = percentageChange(metric.value, previousMetric.value);
+    if (typeof previousMetric.value === 'number' && Number.isFinite(previousMetric.value)) {
+      metric.previousValue = previousMetric.value;
+    }
   }
 }
 

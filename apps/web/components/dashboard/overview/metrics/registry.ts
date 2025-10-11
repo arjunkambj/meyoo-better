@@ -26,7 +26,6 @@ export const METRIC_CATEGORIES: Record<string, MetricCategory> = {
     name: "Profit & Cost Stack",
     icon: "solar:dollar-circle-bold-duotone",
     metrics: [
-      "discounts",
       "refunds",
       "returns",
       "returnRate",
@@ -84,7 +83,6 @@ export const METRIC_CATEGORIES: Record<string, MetricCategory> = {
       "metaOutboundClicks",
       "metaLandingPageViews",
       "metaVideoViews",
-      "metaVideo3SecViews",
       "metaCostPerThruPlay",
     ],
   },
@@ -123,7 +121,6 @@ export const METRIC_CATEGORIES: Record<string, MetricCategory> = {
       "avgOrderProfit",
       "profitPerOrder",
       "profitPerUnit",
-      "fulfillmentCostPerOrder",
     ],
   },
   operationalEfficiency: {
@@ -131,7 +128,6 @@ export const METRIC_CATEGORIES: Record<string, MetricCategory> = {
     name: "Operations",
     icon: "solar:settings-bold-duotone",
     metrics: [
-      "inventoryTurnover",
       "returnRate",
       "returnProcessingCost",
       "refundRate",
@@ -213,25 +209,6 @@ export const METRICS: Record<string, MetricDefinition> = {
   },
 
   // Revenue & Margins
-  discounts: {
-    id: "discounts",
-    label: "Discounts",
-    icon: "solar:tag-bold-duotone",
-    category: "revenue",
-    format: "currency",
-    prefix: "$",
-    description: "Total discounts given",
-  },
-  discountRate: {
-    id: "discountRate",
-    label: "Discount Rate",
-    icon: "solar:tag-price-bold-duotone",
-    category: "revenue",
-    format: "percentage",
-    suffix: "%",
-    decimal: 1,
-    description: "Discount percentage of gross",
-  },
   refunds: {
     id: "refunds",
     label: "Refunds",
@@ -328,13 +305,13 @@ export const METRICS: Record<string, MetricDefinition> = {
   },
   blendedSessionConversionRate: {
     id: "blendedSessionConversionRate",
-    label: "Overall Session Conversion",
+    label: "Blended Conv Rate",
     icon: "solar:chart-2-bold-duotone",
     category: "trafficConversion",
     format: "percentage",
     suffix: "%",
     decimal: 2,
-    description: "Blended sessions → purchase rate",
+    description: "Orders ÷ Meta Clicks",
   },
   shopifyAbandonedCarts: {
     id: "shopifyAbandonedCarts",
@@ -598,14 +575,6 @@ export const METRICS: Record<string, MetricDefinition> = {
     format: "number",
     description: "Video views",
   },
-  metaVideo3SecViews: {
-    id: "metaVideo3SecViews",
-    label: "Meta 3-Sec Views",
-    icon: "solar:play-bold-duotone",
-    category: "metaInsights",
-    format: "number",
-    description: "3-second video views",
-  },
   metaCostPerThruPlay: {
     id: "metaCostPerThruPlay",
     label: "Meta Cost/ThruPlay",
@@ -848,28 +817,7 @@ export const METRICS: Record<string, MetricDefinition> = {
     decimal: 2,
     description: "Profit per unit sold",
   },
-  fulfillmentCostPerOrder: {
-    id: "fulfillmentCostPerOrder",
-    label: "Fulfillment/Order",
-    icon: "solar:delivery-bold-duotone",
-    category: "unitEconomics",
-    format: "currency",
-    prefix: "$",
-    decimal: 2,
-    description: "Fulfillment cost per order",
-  },
-
   // Operational Efficiency
-  inventoryTurnover: {
-    id: "inventoryTurnover",
-    label: "Inventory Turnover",
-    icon: "solar:refresh-circle-bold-duotone",
-    category: "operationalEfficiency",
-    format: "decimal",
-    decimal: 1,
-    suffix: "x",
-    description: "Inventory turnover rate",
-  },
   returnProcessingCost: {
     id: "returnProcessingCost",
     label: "Return Cost",

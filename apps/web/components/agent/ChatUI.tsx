@@ -127,7 +127,7 @@ export default function ChatUI() {
       <div className="px-2 py-3 flex items-center gap-2 border-b border-default-200">
         <Button
           size="sm"
-          variant="flat"
+          variant="light"
           isIconOnly
           radius="lg"
           startContent={

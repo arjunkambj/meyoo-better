@@ -10,6 +10,12 @@ import {
   type AnalyticsResponse,
 } from "./analyticsShared";
 import {
+  filterAccountLevelMetaInsights,
+  percentageChange,
+  safeNumber,
+  type AnyRecord,
+} from "../utils/analytics/shared";
+import {
   validateDateRange,
   type AnalyticsSourceKey,
   type DateRange,
@@ -78,6 +84,24 @@ function mergePlatformMetrics(
   } as PlatformMetrics;
 }
 
+function computeMetaSpend(response: AnalyticsResponse | null | undefined): number {
+  if (!response?.data) {
+    return 0;
+  }
+
+  const metaInsights = filterAccountLevelMetaInsights(
+    (response.data.metaInsights ?? []) as AnyRecord[],
+  );
+  if (!metaInsights.length) {
+    return 0;
+  }
+
+  return metaInsights.reduce((total, insight) => {
+    const spend = safeNumber((insight?.spend ?? insight?.amount ?? insight?.cost) as number | string | undefined);
+    return total + spend;
+  }, 0);
+}
+
 function cloneOverview(overview: OverviewComputation | null): OverviewComputation | null {
   if (!overview) return null;
 
@@ -86,6 +110,61 @@ function cloneOverview(overview: OverviewComputation | null): OverviewComputatio
     metrics: { ...(overview.metrics ?? {}) },
     extras: { ...(overview.extras ?? {}) },
   } satisfies OverviewComputation;
+}
+
+function resolvePreviousMetricValue(metric: MetricValue | null | undefined): number {
+  if (!metric) {
+    return 0;
+  }
+
+  const { value, change, previousValue } = metric;
+  if (typeof previousValue === 'number' && Number.isFinite(previousValue)) {
+    return previousValue;
+  }
+  if (!Number.isFinite(value) || !Number.isFinite(change)) {
+    return 0;
+  }
+
+  if (change === 0) {
+    return value;
+  }
+
+  const ratio = change / 100;
+  const computeCandidate = (denominator: number): number | null => {
+    if (denominator === 0) {
+      return null;
+    }
+
+    const candidate = value / denominator;
+    if (!Number.isFinite(candidate)) {
+      return null;
+    }
+
+    const recomputed = percentageChange(value, candidate);
+    if (!Number.isFinite(recomputed)) {
+      return null;
+    }
+
+    return Math.abs(recomputed - change) <= 0.000001 ? candidate : null;
+  };
+
+  // Attempt to reconstruct assuming previous value shared the current sign.
+  const positiveAssumption = computeCandidate(1 + ratio);
+  if (positiveAssumption !== null) {
+    return positiveAssumption;
+  }
+
+  // Fall back to the opposite sign (covers negative baselines).
+  const negativeAssumption = computeCandidate(1 - ratio);
+  if (negativeAssumption !== null) {
+    return negativeAssumption;
+  }
+
+  if (value === 0 && Math.abs(change) === 100) {
+    return change > 0 ? -1 : 1;
+  }
+
+  return 0;
 }
 
 function extractMetaRevenue(
@@ -126,15 +205,347 @@ function applyUtmRoasMetric(
   overview.summary.metaROAS = value;
   overview.summary.metaROASChange = existingChange ?? 0;
 
+  const previousMetaRoasValue = resolvePreviousMetricValue(overview.metrics?.metaROAS);
   const metric: MetricValue = {
     value,
     change: Number.isFinite(existingChange) ? existingChange : 0,
+    previousValue: previousMetaRoasValue,
   } satisfies MetricValue;
 
   overview.metrics = overview.metrics ?? {};
   overview.metrics.metaROAS = metric;
   overview.metrics.roasUTM = { ...metric } satisfies MetricValue;
 }
+
+function applyMetaSpendMetrics(
+  overview: OverviewComputation | null,
+  metaAdSpendInput: number,
+  totalAdSpendInput: number,
+): void {
+  if (!overview?.summary) {
+    return;
+  }
+
+  const summary = overview.summary;
+  const metrics = overview.metrics ?? {};
+  const previousSummary = {
+    blendedMarketingCost: summary.blendedMarketingCost,
+    blendedMarketingCostChange: summary.blendedMarketingCostChange,
+    metaAdSpend: summary.metaAdSpend,
+    metaAdSpendChange: summary.metaAdSpendChange,
+    metaSpendPercentage: summary.metaSpendPercentage,
+    metaSpendPercentageChange: summary.metaSpendPercentageChange,
+    roas: summary.roas,
+    roasChange: summary.roasChange,
+    metaROAS: summary.metaROAS,
+    metaROASChange: summary.metaROASChange,
+    customerAcquisitionCost: summary.customerAcquisitionCost,
+    customerAcquisitionCostChange: summary.customerAcquisitionCostChange,
+    cacPercentageOfAOV: summary.cacPercentageOfAOV,
+    cacPercentageOfAOVChange: summary.cacPercentageOfAOVChange,
+    adSpendPerOrder: summary.adSpendPerOrder,
+    adSpendPerOrderChange: summary.adSpendPerOrderChange,
+    marketingPercentageOfGross: summary.marketingPercentageOfGross,
+    marketingPercentageOfGrossChange: summary.marketingPercentageOfGrossChange,
+    marketingPercentageOfNet: summary.marketingPercentageOfNet,
+    marketingPercentageOfNetChange: summary.marketingPercentageOfNetChange,
+    profit: summary.profit,
+    profitChange: summary.profitChange,
+    profitMargin: summary.profitMargin,
+    profitMarginChange: summary.profitMarginChange,
+    poas: summary.poas,
+    poasChange: summary.poasChange,
+    profitPerOrder: summary.profitPerOrder,
+    profitPerOrderChange: summary.profitPerOrderChange,
+    avgOrderProfit: summary.avgOrderProfit ?? summary.profitPerOrder,
+    avgOrderProfitChange: summary.avgOrderProfitChange,
+  };
+  const toMetricValue = (
+    value: number | null | undefined,
+    change: number | null | undefined,
+  ): MetricValue | null => {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      return null;
+    }
+    if (typeof change !== 'number' || !Number.isFinite(change)) {
+      return null;
+    }
+    return { value, change } satisfies MetricValue;
+  };
+  const resolvePrevious = (
+    metric: MetricValue | null | undefined,
+    value: number | null | undefined,
+    change: number | null | undefined,
+  ): number => resolvePreviousMetricValue(metric ?? toMetricValue(value, change));
+
+  const resolvedTotalAdSpend = totalAdSpendInput > 0 ? totalAdSpendInput : metaAdSpendInput;
+  const resolvedMetaAdSpend = metaAdSpendInput > 0 ? metaAdSpendInput : 0;
+
+  if (resolvedTotalAdSpend <= 0) {
+    return;
+  }
+
+  const previousBlendedMarketingCost = resolvePrevious(
+    metrics.blendedMarketingCost,
+    previousSummary.blendedMarketingCost ?? null,
+    previousSummary.blendedMarketingCostChange ?? null,
+  );
+  const blendedMarketingCostChange = percentageChange(resolvedTotalAdSpend, previousBlendedMarketingCost);
+  summary.blendedMarketingCost = resolvedTotalAdSpend;
+  summary.blendedMarketingCostChange = blendedMarketingCostChange;
+
+  const previousMetaAdSpend = resolvePrevious(
+    metrics.metaAdSpend,
+    previousSummary.metaAdSpend ?? null,
+    previousSummary.metaAdSpendChange ?? null,
+  );
+  const metaAdSpendChange = percentageChange(resolvedMetaAdSpend, previousMetaAdSpend);
+  summary.metaAdSpend = resolvedMetaAdSpend;
+  summary.metaAdSpendChange = metaAdSpendChange;
+
+  const metaSpendPercentage = resolvedTotalAdSpend > 0
+    ? (resolvedMetaAdSpend / resolvedTotalAdSpend) * 100
+    : resolvedMetaAdSpend > 0
+      ? 100
+      : 0;
+  summary.metaSpendPercentage = metaSpendPercentage;
+  const previousMetaSpendPercentage = resolvePrevious(
+    metrics.metaSpendPercentage,
+    previousSummary.metaSpendPercentage ?? null,
+    previousSummary.metaSpendPercentageChange ?? null,
+  );
+  const metaSpendPercentageChange = percentageChange(metaSpendPercentage, previousMetaSpendPercentage);
+  summary.metaSpendPercentageChange = metaSpendPercentageChange;
+
+  const revenue = summary.revenue ?? 0;
+  const orders = summary.orders ?? 0;
+  const avgOrderValue = summary.avgOrderValue ?? 0;
+
+  const blendedRoas = resolvedTotalAdSpend > 0 ? revenue / resolvedTotalAdSpend : 0;
+  const metaRoas = resolvedMetaAdSpend > 0 ? revenue / resolvedMetaAdSpend : 0;
+  summary.roas = blendedRoas;
+  summary.metaROAS = metaRoas;
+  const previousRoas = resolvePrevious(
+    metrics.roas,
+    previousSummary.roas ?? null,
+    previousSummary.roasChange ?? null,
+  );
+  const previousMetaRoas = resolvePrevious(
+    metrics.metaROAS,
+    previousSummary.metaROAS ?? null,
+    previousSummary.metaROASChange ?? null,
+  );
+  const roasChange = percentageChange(blendedRoas, previousRoas);
+  const metaRoasChange = percentageChange(metaRoas, previousMetaRoas);
+  summary.roasChange = roasChange;
+  summary.metaROASChange = metaRoasChange;
+
+  const customerAcquisitionCost = orders > 0 ? resolvedTotalAdSpend / orders : 0;
+  summary.customerAcquisitionCost = customerAcquisitionCost;
+  const previousCustomerAcquisitionCost = resolvePrevious(
+    metrics.customerAcquisitionCost,
+    previousSummary.customerAcquisitionCost ?? null,
+    previousSummary.customerAcquisitionCostChange ?? null,
+  );
+  const customerAcquisitionCostChange = percentageChange(customerAcquisitionCost, previousCustomerAcquisitionCost);
+  summary.customerAcquisitionCostChange = customerAcquisitionCostChange;
+
+  const customerCount = summary.customers ?? 0;
+  const lifetimeValue = customerCount > 0 ? revenue / customerCount : 0;
+  const previousLtvToCac = resolvePreviousMetricValue(metrics.ltvToCACRatio);
+  const ltvToCacRatio = customerAcquisitionCost > 0 ? lifetimeValue / customerAcquisitionCost : 0;
+  const ltvToCacRatioChange = percentageChange(ltvToCacRatio, previousLtvToCac);
+
+  const cacPercentageOfAOV = avgOrderValue > 0
+    ? (customerAcquisitionCost / avgOrderValue) * 100
+    : 0;
+  summary.cacPercentageOfAOV = cacPercentageOfAOV;
+  const previousCacPercentageOfAOV = resolvePrevious(
+    metrics.cacPercentageOfAOV,
+    previousSummary.cacPercentageOfAOV ?? null,
+    previousSummary.cacPercentageOfAOVChange ?? null,
+  );
+  const cacPercentageOfAOVChange = percentageChange(cacPercentageOfAOV, previousCacPercentageOfAOV);
+  summary.cacPercentageOfAOVChange = cacPercentageOfAOVChange;
+
+  const adSpendPerOrder = orders > 0 ? resolvedTotalAdSpend / orders : 0;
+  summary.adSpendPerOrder = adSpendPerOrder;
+  const previousAdSpendPerOrder = resolvePrevious(
+    metrics.adSpendPerOrder,
+    previousSummary.adSpendPerOrder ?? null,
+    previousSummary.adSpendPerOrderChange ?? null,
+  );
+  const adSpendPerOrderChange = percentageChange(adSpendPerOrder, previousAdSpendPerOrder);
+  summary.adSpendPerOrderChange = adSpendPerOrderChange;
+
+  const grossSales = summary.grossSales ?? revenue;
+  const marketingPercentageOfGross = grossSales > 0 ? (resolvedTotalAdSpend / grossSales) * 100 : 0;
+  const marketingPercentageOfNet = revenue > 0 ? (resolvedTotalAdSpend / revenue) * 100 : 0;
+  const previousMarketingPercentageOfGross = resolvePrevious(
+    metrics.marketingPercentageOfGross,
+    previousSummary.marketingPercentageOfGross ?? null,
+    previousSummary.marketingPercentageOfGrossChange ?? null,
+  );
+  const previousMarketingPercentageOfNet = resolvePrevious(
+    metrics.marketingPercentageOfNet,
+    previousSummary.marketingPercentageOfNet ?? null,
+    previousSummary.marketingPercentageOfNetChange ?? null,
+  );
+  const marketingPercentageOfGrossChange = percentageChange(
+    marketingPercentageOfGross,
+    previousMarketingPercentageOfGross,
+  );
+  const marketingPercentageOfNetChange = percentageChange(
+    marketingPercentageOfNet,
+    previousMarketingPercentageOfNet,
+  );
+  summary.marketingPercentageOfGross = marketingPercentageOfGross;
+  summary.marketingPercentageOfNet = marketingPercentageOfNet;
+  summary.marketingPercentageOfGrossChange = marketingPercentageOfGrossChange;
+  summary.marketingPercentageOfNetChange = marketingPercentageOfNetChange;
+
+  const cogs = summary.cogs ?? 0;
+  const shippingCosts = summary.shippingCosts ?? 0;
+  const transactionFees = summary.transactionFees ?? 0;
+  const handlingFees = summary.handlingFees ?? 0;
+  const taxesCollected = summary.taxesCollected ?? 0;
+  const customCosts = summary.customCosts ?? 0;
+  const refunds = summary.refunds ?? 0;
+  const rtoRevenueLost = summary.rtoRevenueLost ?? 0;
+
+  const totalCostsWithoutAds = cogs + shippingCosts + transactionFees + handlingFees + taxesCollected + customCosts;
+  const totalReturnImpact = refunds + rtoRevenueLost;
+  const netProfit = revenue - totalCostsWithoutAds - resolvedTotalAdSpend - totalReturnImpact;
+  const profitMargin = revenue > 0 ? (netProfit / revenue) * 100 : 0;
+
+  summary.profit = netProfit;
+  summary.profitMargin = profitMargin;
+  const previousProfit = resolvePrevious(
+    metrics.profit,
+    previousSummary.profit ?? null,
+    previousSummary.profitChange ?? null,
+  );
+  const previousProfitMargin = resolvePrevious(
+    metrics.profitMargin,
+    previousSummary.profitMargin ?? null,
+    previousSummary.profitMarginChange ?? null,
+  );
+  const profitChange = percentageChange(netProfit, previousProfit);
+  const profitMarginChange = percentageChange(profitMargin, previousProfitMargin);
+  summary.profitChange = profitChange;
+  summary.profitMarginChange = profitMarginChange;
+
+  const poas = resolvedTotalAdSpend > 0 ? netProfit / resolvedTotalAdSpend : 0;
+  summary.poas = poas;
+  const previousPoas = resolvePrevious(
+    metrics.poas,
+    previousSummary.poas ?? null,
+    previousSummary.poasChange ?? null,
+  );
+  const poasChange = percentageChange(poas, previousPoas);
+  summary.poasChange = poasChange;
+
+  const profitPerOrder = orders > 0 ? netProfit / orders : 0;
+  summary.profitPerOrder = profitPerOrder;
+  summary.avgOrderProfit = profitPerOrder;
+  const previousProfitPerOrder = resolvePrevious(
+    metrics.profitPerOrder,
+    previousSummary.profitPerOrder ?? null,
+    previousSummary.profitPerOrderChange ?? null,
+  );
+  const previousAvgOrderProfit = resolvePrevious(
+    metrics.avgOrderProfit,
+    previousSummary.avgOrderProfit ?? null,
+    previousSummary.avgOrderProfitChange ?? null,
+  );
+  const profitPerOrderChange = percentageChange(profitPerOrder, previousProfitPerOrder);
+  const avgOrderProfitChange = percentageChange(profitPerOrder, previousAvgOrderProfit);
+  summary.profitPerOrderChange = profitPerOrderChange;
+  summary.avgOrderProfitChange = avgOrderProfitChange;
+
+  overview.metrics = metrics;
+  overview.metrics.metaAdSpend = {
+    value: resolvedMetaAdSpend,
+    change: metaAdSpendChange,
+    previousValue: previousMetaAdSpend,
+  } satisfies MetricValue;
+  overview.metrics.metaSpendPercentage = {
+    value: metaSpendPercentage,
+    change: metaSpendPercentageChange,
+    previousValue: previousMetaSpendPercentage,
+  } satisfies MetricValue;
+  overview.metrics.blendedMarketingCost = {
+    value: resolvedTotalAdSpend,
+    change: blendedMarketingCostChange,
+    previousValue: previousBlendedMarketingCost,
+  } satisfies MetricValue;
+  overview.metrics.roas = {
+    value: blendedRoas,
+    change: roasChange,
+    previousValue: previousRoas,
+  } satisfies MetricValue;
+  overview.metrics.metaROAS = {
+    value: metaRoas,
+    change: metaRoasChange,
+    previousValue: previousMetaRoas,
+  } satisfies MetricValue;
+  overview.metrics.customerAcquisitionCost = {
+    value: customerAcquisitionCost,
+    change: customerAcquisitionCostChange,
+    previousValue: previousCustomerAcquisitionCost,
+  } satisfies MetricValue;
+  overview.metrics.ltvToCACRatio = {
+    value: ltvToCacRatio,
+    change: ltvToCacRatioChange,
+    previousValue: previousLtvToCac,
+  } satisfies MetricValue;
+  overview.metrics.cacPercentageOfAOV = {
+    value: cacPercentageOfAOV,
+    change: cacPercentageOfAOVChange,
+    previousValue: previousCacPercentageOfAOV,
+  } satisfies MetricValue;
+  overview.metrics.adSpendPerOrder = {
+    value: adSpendPerOrder,
+    change: adSpendPerOrderChange,
+    previousValue: previousAdSpendPerOrder,
+  } satisfies MetricValue;
+  overview.metrics.marketingPercentageOfGross = {
+    value: marketingPercentageOfGross,
+    change: marketingPercentageOfGrossChange,
+    previousValue: previousMarketingPercentageOfGross,
+  } satisfies MetricValue;
+  overview.metrics.marketingPercentageOfNet = {
+    value: marketingPercentageOfNet,
+    change: marketingPercentageOfNetChange,
+    previousValue: previousMarketingPercentageOfNet,
+  } satisfies MetricValue;
+  overview.metrics.profit = {
+    value: netProfit,
+    change: profitChange,
+    previousValue: previousProfit,
+  } satisfies MetricValue;
+  overview.metrics.profitMargin = {
+    value: profitMargin,
+    change: profitMarginChange,
+    previousValue: previousProfitMargin,
+  } satisfies MetricValue;
+  overview.metrics.poas = {
+    value: poas,
+    change: poasChange,
+    previousValue: previousPoas,
+  } satisfies MetricValue;
+  overview.metrics.profitPerOrder = {
+    value: profitPerOrder,
+    change: profitPerOrderChange,
+    previousValue: previousProfitPerOrder,
+  } satisfies MetricValue;
+  overview.metrics.avgOrderProfit = {
+    value: profitPerOrder,
+    change: avgOrderProfitChange,
+    previousValue: previousAvgOrderProfit,
+  } satisfies MetricValue;
+}
+
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -278,6 +689,13 @@ export const getOverviewData = query({
 
       const channelRevenue = computeChannelRevenue(analyticsResponse);
       applyUtmRoasMetric(overview, channelRevenue);
+      const metaAdSpendFromInsights = computeMetaSpend(analyticsResponse);
+      const existingTotalAdSpend = overview?.summary?.blendedMarketingCost ?? 0;
+      const fallbackMetaAdSpend = overview?.summary?.metaAdSpend ?? existingTotalAdSpend;
+      const resolvedMetaAdSpend = metaAdSpendFromInsights > 0 ? metaAdSpendFromInsights : fallbackMetaAdSpend;
+      if (overview?.summary && (resolvedMetaAdSpend > 0 || existingTotalAdSpend > 0)) {
+        applyMetaSpendMetrics(overview, resolvedMetaAdSpend, existingTotalAdSpend);
+      }
       const supplementalPlatformMetrics = computePlatformMetrics(analyticsResponse);
       const mergedPlatformMetrics = mergePlatformMetrics(
         dailyOverview.platformMetrics,

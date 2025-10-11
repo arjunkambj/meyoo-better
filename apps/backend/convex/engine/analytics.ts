@@ -1055,9 +1055,12 @@ function buildDailyMetricsFromResponse(
 
   const analytics = (response.data.analytics || []) as GenericRecord[];
 
+  const totalOrders = toSafeNumber(summary?.orders);
+  const totalRevenue = toSafeNumber(summary?.revenue);
+
   const metrics = sanitizeDocument({
-    totalOrders: toSafeNumber(summary?.orders),
-    totalRevenue: toSafeNumber(summary?.revenue),
+    totalOrders,
+    totalRevenue,
     totalDiscounts: toSafeNumber(summary?.discounts),
     grossSales: toSafeNumber(summary?.grossSales),
     paidCustomers: uniqueCustomers, // Customers who purchased

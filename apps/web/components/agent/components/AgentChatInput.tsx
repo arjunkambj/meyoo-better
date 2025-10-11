@@ -45,7 +45,6 @@ export default function AgentChatInput({
         <Textarea
           aria-label="Chat message"
           className="w-full"
-          
           minRows={4}
           maxRows={4}
           isDisabled={disabled}
@@ -55,21 +54,21 @@ export default function AgentChatInput({
           onValueChange={setMessage}
           classNames={{
             inputWrapper: cn(
-              "bg-default-50",
+              "bg-background dark:bg-default-50/70",
               "rounded-2xl",
-              "hover:bg-default-50",
-              "focus-within:bg-background",
-              "data-[hover=true]:bg-default-50",
-              "border-2 border-default-200",
+              "hover:bg-background",
+              "focus-within:bg-background dark:bg-default-50/70",
+              "data-[hover=true]:bg-background dark:bg-default-50/70",
+              "border-1 border-default-200",
               "hover:border-default-300",
-              "focus-within:border-primary",
+              "focus-within:border-default-300",
               "transition-all duration-200",
               "px-3 pt-2"
             ),
             input: cn(
               "bg-transparent text-base leading-relaxed",
               "placeholder:text-default-400",
-              "min-h-[52px]"
+              "min-h-[46px]"
             ),
           }}
           onKeyDown={(e) => {
@@ -90,16 +89,16 @@ export default function AgentChatInput({
           >
             <Button
               isIconOnly
-              size="md"
+              size="sm"
               color="primary"
-              radius="lg"
+              radius="md"
               variant="flat"
               isDisabled={!canSend}
               isLoading={busy}
               onPress={handleSend}
-              className="h-10 w-10 text-base shadow-sm hover:scale-105 transition-transform"
+              className="text-base shadow-sm hover:scale-105 transition-transform"
             >
-              <Icon icon="solar:plain-2-bold-duotone" width={22} />
+              <Icon icon="solar:plain-2-bold-duotone" width={18} />
             </Button>
           </Tooltip>
         </div>

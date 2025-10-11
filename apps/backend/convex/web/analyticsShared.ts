@@ -66,7 +66,7 @@ export function defaultDateRange(daysBack = 30): DateRange {
 
 export function normalizeDateRange(
   range?: { startDate?: string; endDate?: string; daysBack?: number },
-  fallbackDays = 30,
+  fallbackDays = 30
 ): DateRange {
   if (range?.startDate && range?.endDate) {
     return validateDateRange({
@@ -92,8 +92,13 @@ export async function loadAnalytics(
   ctx: QueryCtx,
   organizationId: Id<"organizations">,
   range: DateRange,
-  options?: LoadAnalyticsOptions,
+  options?: LoadAnalyticsOptions
 ): Promise<AnalyticsResponse> {
-  const { data, meta } = await fetchAnalyticsSourceData(ctx, organizationId, range, options);
+  const { data, meta } = await fetchAnalyticsSourceData(
+    ctx,
+    organizationId,
+    range,
+    options
+  );
   return { dateRange: range, organizationId, data, ...(meta ? { meta } : {}) };
 }

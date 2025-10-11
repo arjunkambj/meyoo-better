@@ -50,6 +50,7 @@ export interface AnalyticsCalculationSummary {
 export interface MetricValue {
   value: number;
   change: number;
+  previousValue?: number;
 }
 
 export interface OverviewSummary {

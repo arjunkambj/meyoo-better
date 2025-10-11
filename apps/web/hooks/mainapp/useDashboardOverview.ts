@@ -196,19 +196,6 @@ function buildOverviewMetrics(
       suffix: "%",
       decimal: 1,
     },
-    discounts: {
-      label: "Discounts",
-      value: summary.discounts || 0,
-      change: summary.discountsChange || 0,
-      prefix: currencySymbol,
-    },
-    discountRate: {
-      label: "Discount Rate",
-      value: summary.discountRate || 0,
-      change: summary.discountRateChange || 0,
-      suffix: "%",
-      decimal: 1,
-    },
     rtoRevenueLost: {
       label: "RTO Revenue Lost",
       value: summary.rtoRevenueLost || 0,
@@ -219,6 +206,13 @@ function buildOverviewMetrics(
       label: "Manual Return Rate",
       value: summary.manualReturnRate || 0,
       change: summary.manualReturnRateChange || 0,
+      suffix: "%",
+      decimal: 1,
+    },
+    cancelledOrderRate: {
+      label: "Cancellation Rate",
+      value: metricMap.cancelledOrderRate?.value ?? 0,
+      change: metricMap.cancelledOrderRate?.change ?? 0,
       suffix: "%",
       decimal: 1,
     },
@@ -419,6 +413,12 @@ function buildOverviewMetrics(
       suffix: "%",
       decimal: 1,
     },
+    ltvToCACRatio: {
+      label: "LTV:CAC Ratio",
+      value: metricMap.ltvToCACRatio?.value ?? 0,
+      change: metricMap.ltvToCACRatio?.change ?? 0,
+      decimal: 2,
+    },
     returnRate: {
       label: "Return Rate",
       value: summary.returnRate || 0,
@@ -427,7 +427,7 @@ function buildOverviewMetrics(
       decimal: 1,
     },
     blendedSessionConversionRate: {
-      label: "Overall Session Conversion",
+      label: "Blended Conv Rate",
       value: summaryWithExtras.blendedSessionConversionRate || 0,
       change: summaryWithExtras.blendedSessionConversionRateChange || 0,
       suffix: "%",

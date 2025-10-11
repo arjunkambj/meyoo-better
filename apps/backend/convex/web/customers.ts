@@ -7,6 +7,10 @@ import {
   toTimestampRange,
 } from "../utils/analyticsSource";
 import { getUserAndOrg } from "../utils/auth";
+import {
+  DEFAULT_JOURNEY_STAGES,
+  loadCustomerJourneyStages,
+} from "../utils/customerJourney";
 import { loadCustomerOverviewFromDailyMetrics } from "../utils/dailyMetrics";
 import { dateRangeValidator, defaultDateRange } from "./analyticsShared";
 
@@ -37,62 +41,6 @@ const ZERO_CUSTOMER_OVERVIEW = {
     lifetimeValue: 0,
   },
 } as const;
-
-const DEFAULT_JOURNEY_STAGES = [
-  {
-    stage: "Awareness",
-    customers: 0,
-    percentage: 0,
-    avgDays: 0,
-    conversionRate: 0,
-    icon: "solar:eye-bold-duotone",
-    color: "primary",
-  },
-  {
-    stage: "Interest",
-    customers: 0,
-    percentage: 0,
-    avgDays: 0,
-    conversionRate: 0,
-    icon: "solar:heart-bold-duotone",
-    color: "interest",
-  },
-  {
-    stage: "Consideration",
-    customers: 0,
-    percentage: 0,
-    avgDays: 0,
-    conversionRate: 0,
-    icon: "solar:cart-bold-duotone",
-    color: "warning",
-  },
-  {
-    stage: "Purchase",
-    customers: 0,
-    percentage: 0,
-    avgDays: 0,
-    conversionRate: 0,
-    icon: "solar:bag-bold-duotone",
-    color: "success",
-  },
-  {
-    stage: "Retention",
-    customers: 0,
-    percentage: 0,
-    avgDays: 0,
-    conversionRate: 0,
-    icon: "solar:refresh-circle-bold-duotone",
-    color: "retention",
-  },
-] satisfies Array<{
-  stage: string;
-  customers: number;
-  percentage: number;
-  avgDays: number;
-  conversionRate: number;
-  icon: string;
-  color: string;
-}>;
 
 const customerListEntryValidator = v.object({
   id: v.string(),
@@ -516,155 +464,17 @@ export const getCustomerJourney = query({
   returns: v.array(journeyStageValidator),
   handler: async (ctx, args) => {
     const auth = await getUserAndOrg(ctx);
-    if (!auth) return DEFAULT_JOURNEY_STAGES;
+    if (!auth) return [...DEFAULT_JOURNEY_STAGES];
 
     const rangeInput = args.dateRange ?? defaultDateRange();
     const range = validateDateRange(rangeInput);
 
-    // Load customer overview from daily metrics to get aggregated data
-    const dailyOverview = await loadCustomerOverviewFromDailyMetrics(
+    const journey = await loadCustomerJourneyStages(
       ctx,
       auth.orgId as Id<"organizations">,
       range,
     );
 
-    if (!dailyOverview?.metrics) {
-      return DEFAULT_JOURNEY_STAGES;
-    }
-
-    const metrics = dailyOverview.metrics;
-    const returningCustomers = metrics.returningCustomers || 0;
-
-    // Sum Meta insights incrementally to avoid fetching a giant array
-    let metaTotals = { impressions: 0, clicks: 0, conversions: 0 } as {
-      impressions: number;
-      clicks: number;
-      conversions: number;
-    };
-    let mCursor: string | null = null;
-    const M_PAGE = 250;
-    while (true) {
-      const page = await ctx.db
-        .query("metaInsights")
-        .withIndex("by_org_date", (q) =>
-          q
-            .eq("organizationId", auth.orgId as Id<"organizations">)
-            .gte("date", range.startDate)
-            .lte("date", range.endDate),
-        )
-        .paginate({ numItems: M_PAGE, cursor: mCursor });
-
-      for (const insight of page.page) {
-        if ((insight as any).entityType !== "account") continue;
-        const impressions = typeof (insight as any).impressions === "number" ? (insight as any).impressions : 0;
-        const clicks = typeof (insight as any).clicks === "number" ? (insight as any).clicks : 0;
-        const conversions = typeof (insight as any).conversions === "number" ? (insight as any).conversions : 0;
-        metaTotals = {
-          impressions: metaTotals.impressions + Math.max(impressions, 0),
-          clicks: metaTotals.clicks + Math.max(clicks, 0),
-          conversions: metaTotals.conversions + Math.max(conversions, 0),
-        };
-      }
-
-      if (page.isDone || !page.continueCursor) break;
-      mCursor = page.continueCursor;
-    }
-
-    const roundPercent = (value: number) => {
-      if (!Number.isFinite(value)) {
-        return 0;
-      }
-      const clamped = Math.min(100, Math.max(0, value));
-      return Number.parseFloat(clamped.toFixed(2));
-    };
-
-    const awarenessCustomers = Math.max(metaTotals.impressions, 0);
-    const interestCustomers = Math.max(metaTotals.clicks, 0);
-    const metaConversionRate = interestCustomers > 0
-      ? roundPercent((metaTotals.conversions / interestCustomers) * 100)
-      : 0;
-
-    const considerationCustomers = Math.max(
-      (metrics.abandonedCartCustomers || 0) + (metrics.periodCustomerCount || 0),
-      0,
-    );
-    const purchaseCustomers = Math.max(metrics.periodCustomerCount || 0, 0);
-    const retentionCustomers = Math.max(returningCustomers, 0);
-
-    const baseForPercentage = (() => {
-      if (awarenessCustomers > 0) return awarenessCustomers;
-      if (interestCustomers > 0) return interestCustomers;
-      if (considerationCustomers > 0) return considerationCustomers;
-      if (purchaseCustomers > 0) return purchaseCustomers;
-      if (retentionCustomers > 0) return retentionCustomers;
-      return 1;
-    })();
-
-    const toPercentage = (value: number) =>
-      baseForPercentage > 0
-        ? roundPercent((value / baseForPercentage) * 100)
-        : 0;
-
-    const awarenessToInterest = awarenessCustomers > 0
-      ? roundPercent((interestCustomers / awarenessCustomers) * 100)
-      : 0;
-    const interestToConsideration = interestCustomers > 0
-      ? roundPercent((considerationCustomers / interestCustomers) * 100)
-      : 0;
-    const considerationToPurchase = considerationCustomers > 0
-      ? roundPercent((purchaseCustomers / considerationCustomers) * 100)
-      : 0;
-    const purchaseToRetention = purchaseCustomers > 0
-      ? roundPercent((retentionCustomers / purchaseCustomers) * 100)
-      : 0;
-
-    return [
-      {
-        stage: "Awareness",
-        customers: awarenessCustomers,
-        percentage: awarenessCustomers > 0 ? 100 : toPercentage(awarenessCustomers),
-        avgDays: 0,
-        conversionRate: awarenessToInterest,
-        icon: "solar:eye-bold-duotone",
-        color: "primary",
-      },
-      {
-        stage: "Interest",
-        customers: interestCustomers,
-        percentage: toPercentage(interestCustomers),
-        avgDays: 0,
-        conversionRate: interestToConsideration,
-        icon: "solar:heart-bold-duotone",
-        color: "interest",
-        metaConversionRate,
-      },
-      {
-        stage: "Consideration",
-        customers: considerationCustomers,
-        percentage: toPercentage(considerationCustomers),
-        avgDays: 0,
-        conversionRate: considerationToPurchase,
-        icon: "solar:cart-bold-duotone",
-        color: "warning",
-      },
-      {
-        stage: "Purchase",
-        customers: purchaseCustomers,
-        percentage: toPercentage(purchaseCustomers),
-        avgDays: 0,
-        conversionRate: purchaseToRetention,
-        icon: "solar:bag-bold-duotone",
-        color: "success",
-      },
-      {
-        stage: "Retention",
-        customers: retentionCustomers,
-        percentage: toPercentage(retentionCustomers),
-        avgDays: 0,
-        conversionRate: 0,
-        icon: "solar:refresh-circle-bold-duotone",
-        color: "retention",
-      },
-    ];
+    return journey;
   },
 });

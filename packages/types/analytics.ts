@@ -298,6 +298,38 @@ export interface OrdersFulfillmentMetrics {
   totalOrders?: number;
 }
 
+export interface MetricWithChange {
+  value: number;
+  change: number;
+}
+
+export interface OrdersJourneyStage {
+  stage: string;
+  customers: number;
+  percentage: number;
+  avgDays: number;
+  conversionRate: number;
+  icon: string;
+  color: string;
+  metaConversionRate?: number;
+}
+
+export interface OrdersInsightsKPIs {
+  prepaidRate: MetricWithChange;
+  repeatRate: MetricWithChange;
+  rtoRevenueLoss: MetricWithChange;
+  abandonedCustomers: MetricWithChange;
+  fulfillmentRate: MetricWithChange;
+}
+
+export interface OrdersInsightsPayload {
+  kpis: OrdersInsightsKPIs | null;
+  fulfillment: OrdersFulfillmentMetrics | null;
+  journey: OrdersJourneyStage[];
+  cancelRate: number;
+  returnRate: number;
+}
+
 export interface OrdersAnalyticsExportRow {
   'Order Number': string;
   Customer: string;

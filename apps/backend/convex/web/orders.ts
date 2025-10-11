@@ -11,15 +11,25 @@ import {
   validateDateRange,
 } from "../utils/analyticsSource";
 import { getUserAndOrg } from "../utils/auth";
+import {
+  DEFAULT_JOURNEY_STAGES,
+  loadCustomerJourneyStages,
+} from "../utils/customerJourney";
 import { computeOrdersAnalytics } from "../utils/analyticsAggregations";
 import type {
   AnalyticsOrder,
   OrdersAnalyticsResult,
   OrdersFulfillmentMetrics,
   OrdersOverviewMetrics,
+  MetricWithChange,
+  OrdersInsightsKPIs,
+  OrdersInsightsPayload,
 } from "@repo/types";
 import { loadAnalyticsWithChunks } from "../utils/analyticsLoader";
-import { loadOverviewFromDailyMetrics } from "../utils/dailyMetrics";
+import {
+  loadOverviewFromDailyMetrics,
+  type DailyMetricsOverview,
+} from "../utils/dailyMetrics";
 
 type DateRangeArg = DateRange;
 
@@ -171,6 +181,79 @@ const ZERO_ORDERS_OVERVIEW: OrdersOverviewMetrics = {
   },
 };
 
+const safeNumber = (value: number | null | undefined): number =>
+  typeof value === "number" && Number.isFinite(value) ? value : 0;
+
+function buildInsightsKpis(
+  metrics: OrdersOverviewMetrics | null,
+): OrdersInsightsKPIs | null {
+  if (!metrics) return null;
+
+  const withChange = (value: number | null | undefined, change: number | null | undefined): MetricWithChange => ({
+    value: safeNumber(value),
+    change: safeNumber(change),
+  });
+
+  return {
+    prepaidRate: withChange(metrics.prepaidRate, metrics.changes.prepaidRate),
+    repeatRate: withChange(metrics.repeatRate, metrics.changes.repeatRate),
+    rtoRevenueLoss: withChange(metrics.rtoRevenueLoss, metrics.changes.rtoRevenueLoss),
+    abandonedCustomers: withChange(
+      metrics.abandonedCustomers,
+      metrics.changes.abandonedCustomers,
+    ),
+    fulfillmentRate: withChange(
+      metrics.fulfillmentRate,
+      metrics.changes.fulfillmentRate,
+    ),
+  };
+}
+
+function computeCancelRate(metrics: OrdersOverviewMetrics | null): number {
+  if (!metrics || metrics.totalOrders <= 0) {
+    return 0;
+  }
+  const cancelled = safeNumber(metrics.cancelledOrders);
+  return metrics.totalOrders > 0 ? (cancelled / metrics.totalOrders) * 100 : 0;
+}
+
+function computeFulfillmentMetricsFromOverview(
+  dailyOverview: DailyMetricsOverview | null,
+): OrdersFulfillmentMetrics {
+  if (!dailyOverview) {
+    return { ...ZERO_FULFILLMENT_METRICS };
+  }
+
+  const aggregates = dailyOverview.aggregates;
+  const totalOrders =
+    dailyOverview.ordersOverview?.totalOrders ??
+    aggregates.orders ??
+    0;
+  const fulfillmentRate =
+    dailyOverview.ordersOverview?.fulfillmentRate ?? 0;
+  const returnRate =
+    aggregates.orders > 0
+      ? (aggregates.returnedOrders / aggregates.orders) * 100
+      : 0;
+  const totalFulfillmentCost =
+    aggregates.shippingCosts + aggregates.handlingFees;
+  const avgFulfillmentCost =
+    aggregates.orders > 0
+      ? totalFulfillmentCost / aggregates.orders
+      : 0;
+
+  return {
+    avgProcessingTime: 0,
+    avgShippingTime: 0,
+    avgDeliveryTime: 0,
+    onTimeDeliveryRate: fulfillmentRate,
+    fulfillmentAccuracy: fulfillmentRate,
+    returnRate,
+    avgFulfillmentCost,
+    totalOrders,
+  };
+}
+
 const ordersOverviewValidator = v.object({
   totalOrders: v.number(),
   cancelledOrders: v.optional(v.number()),
@@ -221,6 +304,27 @@ const fulfillmentMetricsValidator = v.object({
   returnRate: v.number(),
   avgFulfillmentCost: v.optional(v.number()),
   totalOrders: v.optional(v.number()),
+});
+
+const metricWithChangeValidator = v.object({
+  value: v.number(),
+  change: v.number(),
+});
+
+const ordersInsightsKpisValidator = v.object({
+  prepaidRate: metricWithChangeValidator,
+  repeatRate: metricWithChangeValidator,
+  rtoRevenueLoss: metricWithChangeValidator,
+  abandonedCustomers: metricWithChangeValidator,
+  fulfillmentRate: metricWithChangeValidator,
+});
+
+const ordersInsightsResponseValidator = v.object({
+  kpis: v.union(v.null(), ordersInsightsKpisValidator),
+  fulfillment: v.union(v.null(), fulfillmentMetricsValidator),
+  journey: v.array(customerJourneyStageValidator),
+  cancelRate: v.number(),
+  returnRate: v.number(),
 });
 
 const ZERO_FULFILLMENT_METRICS: OrdersFulfillmentMetrics = {
@@ -499,26 +603,61 @@ export const getFulfillmentMetrics = query({
     );
 
     if (!dailyOverview) {
-      return ZERO_FULFILLMENT_METRICS;
+      return { ...ZERO_FULFILLMENT_METRICS };
     }
 
-    const aggregates = dailyOverview.aggregates;
-    const totalOrders = dailyOverview.ordersOverview?.totalOrders ?? aggregates.orders ?? 0;
-    const fulfillmentRate = dailyOverview.ordersOverview?.fulfillmentRate ?? 0;
-    const returnRate = aggregates.orders > 0 ? (aggregates.returnedOrders / aggregates.orders) * 100 : 0;
-    const totalFulfillmentCost = aggregates.shippingCosts + aggregates.handlingFees;
-    const avgFulfillmentCost = aggregates.orders > 0 ? totalFulfillmentCost / aggregates.orders : 0;
+    return computeFulfillmentMetricsFromOverview(dailyOverview);
+  },
+});
+
+export const getOrdersInsights = query({
+  args: {
+    dateRange: dateRangeValidator,
+  },
+  returns: ordersInsightsResponseValidator,
+  handler: async (ctx, args) => {
+    const auth = await getUserAndOrg(ctx);
+    if (!auth) {
+      return {
+        kpis: null,
+        fulfillment: null,
+        journey: [...DEFAULT_JOURNEY_STAGES],
+        cancelRate: 0,
+        returnRate: 0,
+      } satisfies OrdersInsightsPayload;
+    }
+
+    const range = validateDateRange(args.dateRange);
+
+    const [dailyOverview, journey] = await Promise.all([
+      loadOverviewFromDailyMetrics(
+        ctx,
+        auth.orgId as Id<"organizations">,
+        range,
+      ),
+      loadCustomerJourneyStages(
+        ctx,
+        auth.orgId as Id<"organizations">,
+        range,
+      ),
+    ]);
+
+    const metrics = dailyOverview?.ordersOverview ?? null;
+    const fulfillmentMetrics = dailyOverview
+      ? computeFulfillmentMetricsFromOverview(dailyOverview)
+      : { ...ZERO_FULFILLMENT_METRICS };
+
+    const kpis = buildInsightsKpis(metrics);
+    const cancelRate = computeCancelRate(metrics);
+    const returnRate = safeNumber(fulfillmentMetrics.returnRate);
 
     return {
-      avgProcessingTime: 0,
-      avgShippingTime: 0,
-      avgDeliveryTime: 0,
-      onTimeDeliveryRate: fulfillmentRate,
-      fulfillmentAccuracy: fulfillmentRate,
+      kpis,
+      fulfillment: fulfillmentMetrics,
+      journey,
+      cancelRate,
       returnRate,
-      avgFulfillmentCost,
-      totalOrders,
-    } satisfies OrdersFulfillmentMetrics;
+    } satisfies OrdersInsightsPayload;
   },
 });
 
@@ -605,61 +744,6 @@ export const getAnalytics = action({
       dateRange: { startDate: string; endDate: string };
       organizationId: string;
       result: OrdersAnalyticsResult;
-    };
-  },
-});
-
-export const getOrdersMetrics = action({
-  args: {
-    dateRange: dateRangeValidator,
-  },
-  returns: v.union(
-    v.null(),
-    v.object({
-      overview: v.union(
-        v.null(),
-        v.object({
-          metrics: ordersOverviewValidator,
-          meta: v.optional(v.any()),
-        }),
-      ),
-      fulfillment: v.union(v.null(), fulfillmentMetricsValidator),
-      journey: v.array(customerJourneyStageValidator),
-    }),
-  ),
-  handler: async (ctx, args): Promise<{
-    overview: {
-      metrics: any;
-      meta?: any;
-    } | null;
-    fulfillment: any;
-    journey: Array<{
-      stage: string;
-      customers: number;
-      percentage: number;
-      avgDays: number;
-      conversionRate: number;
-      icon: string;
-      color: string;
-      metaConversionRate?: number;
-    }>;
-  } | null> => {
-    const [overview, fulfillment, journey] = await Promise.all([
-      ctx.runQuery(api.web.orders.getOrdersOverviewMetrics, {
-        dateRange: args.dateRange,
-      }),
-      ctx.runQuery(api.web.orders.getFulfillmentMetrics, {
-        dateRange: args.dateRange,
-      }),
-      ctx.runQuery(api.web.customers.getCustomerJourney, {
-        dateRange: args.dateRange,
-      }),
-    ]);
-
-    return {
-      overview,
-      fulfillment,
-      journey: journey ?? [],
     };
   },
 });

@@ -5,7 +5,7 @@ import { useMemo } from "react";
 import KPI, { KPISkeleton } from "@/components/shared/cards/KPI";
 import { useUser } from "@/hooks";
 import { getCurrencySymbol, formatNumber } from "@/libs/utils/format";
-import type { OrdersInsightsKPIs } from "@/hooks";
+import type { OrdersInsightsKPIs } from "@repo/types";
 
 interface OrdersInsightsKPICardsProps {
   kpis: OrdersInsightsKPIs | null;
@@ -24,6 +24,12 @@ export function OrdersInsightsKPICards({
 
   const items = useMemo(() => {
     if (!kpis) return [];
+
+    const formatCurrencyValue = (value: number) =>
+      new Intl.NumberFormat("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(value);
 
     return [
       {
@@ -44,7 +50,7 @@ export function OrdersInsightsKPICards({
       },
       {
         title: "Return/RTO Revenue Loss",
-        value: `${currencySymbol}${formatNumber(kpis.rtoRevenueLoss.value)}`,
+        value: `${currencySymbol}${formatCurrencyValue(kpis.rtoRevenueLoss.value)}`,
         change: kpis.rtoRevenueLoss.change,
         icon: "solar:cart-cross-bold-duotone",
         iconColor: "text-danger",

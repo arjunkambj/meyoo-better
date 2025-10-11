@@ -7,31 +7,12 @@ import { api } from "@/libs/convexApi";
 import { dateRangeToUtcWithShopPreference } from "@/libs/dateRange";
 import { useShopifyTime } from "./useShopifyTime";
 import type { JourneyStage } from "@/components/dashboard/(analytics)/orders-insights/components/CustomerJourney";
-import type { OrdersFulfillmentMetrics, OrdersOverviewMetrics } from "@repo/types";
-
-type MetricWithChange = {
-  value: number;
-  change: number;
-};
-
-type RawJourneyStage = {
-  stage: string;
-  customers: number;
-  percentage: number;
-  avgDays: number;
-  conversionRate: number;
-  icon: string;
-  color: string;
-  metaConversionRate?: number;
-};
-
-export interface OrdersInsightsKPIs {
-  prepaidRate: MetricWithChange;
-  repeatRate: MetricWithChange;
-  rtoRevenueLoss: MetricWithChange;
-  abandonedCustomers: MetricWithChange;
-  fulfillmentRate: MetricWithChange;
-}
+import type {
+  OrdersFulfillmentMetrics,
+  OrdersInsightsKPIs,
+  OrdersInsightsPayload,
+  OrdersJourneyStage,
+} from "@repo/types";
 
 interface UseOrdersInsightsParams {
   dateRange?: {
@@ -50,7 +31,7 @@ interface OrdersInsightsResult {
   loading: boolean;
 }
 
-function normalizeJourneyStages(raw: RawJourneyStage[] | undefined): JourneyStage[] {
+function normalizeJourneyStages(raw: OrdersJourneyStage[] | undefined): JourneyStage[] {
   if (!raw) return [];
 
   const colorMap: Record<string, { bg: string; text: string }> = {
@@ -79,33 +60,6 @@ function normalizeJourneyStages(raw: RawJourneyStage[] | undefined): JourneyStag
       textColor: palette.text,
     };
   });
-}
-
-function buildKpis(metrics: OrdersOverviewMetrics | null): OrdersInsightsKPIs | null {
-  if (!metrics) return null;
-
-  return {
-    prepaidRate: {
-      value: metrics.prepaidRate ?? 0,
-      change: metrics.changes.prepaidRate ?? 0,
-    },
-    repeatRate: {
-      value: metrics.repeatRate ?? 0,
-      change: metrics.changes.repeatRate ?? 0,
-    },
-    rtoRevenueLoss: {
-      value: metrics.rtoRevenueLoss ?? 0,
-      change: metrics.changes.rtoRevenueLoss ?? 0,
-    },
-    abandonedCustomers: {
-      value: metrics.abandonedCustomers ?? 0,
-      change: metrics.changes.abandonedCustomers ?? 0,
-    },
-    fulfillmentRate: {
-      value: metrics.fulfillmentRate ?? 0,
-      change: metrics.changes.fulfillmentRate ?? 0,
-    },
-  };
 }
 
 export function useOrdersInsights(
@@ -153,44 +107,24 @@ export function useOrdersInsights(
     normalizedRange?.endDateTimeUtcExclusive,
   ]);
 
-  const overviewResult = useQuery(
-    api.web.orders.getOrdersOverviewMetrics,
+  const insightsResult = useQuery(
+    api.web.orders.getOrdersInsights,
     queryArgs,
-  ) as ({ metrics: OrdersOverviewMetrics } | null | undefined);
+  ) as OrdersInsightsPayload | null | undefined;
 
-  const fulfillmentResult = useQuery(
-    api.web.orders.getFulfillmentMetrics,
-    queryArgs,
-  ) as OrdersFulfillmentMetrics | null | undefined;
+  const loading =
+    queryArgs !== "skip" && insightsResult === undefined;
 
-  const journeyRaw = useQuery(
-    (api.web.customers as Record<string, any>).getCustomerJourney,
-    queryArgs,
-  ) as RawJourneyStage[] | undefined;
-
-  const overview = overviewResult?.metrics ?? null;
-  const fulfillment = fulfillmentResult ?? null;
+  const kpis = insightsResult?.kpis ?? null;
+  const fulfillment = insightsResult?.fulfillment ?? null;
+  const journeyRaw = insightsResult?.journey ?? [];
   const journey = useMemo(
     () => normalizeJourneyStages(journeyRaw),
     [journeyRaw],
   );
 
-  const overviewLoading = queryArgs !== "skip" && overviewResult === undefined;
-  const fulfillmentLoading = queryArgs !== "skip" && fulfillmentResult === undefined;
-  const journeyLoading = queryArgs !== "skip" && journeyRaw === undefined;
-  const loading = queryArgs !== "skip" && (overviewLoading || fulfillmentLoading || journeyLoading);
-
-  const kpis = useMemo(() => buildKpis(overview), [overview]);
-
-  const cancelRate = useMemo(() => {
-    if (!overview || !overview.totalOrders || overview.totalOrders <= 0) {
-      return 0;
-    }
-    const cancelled = overview.cancelledOrders ?? 0;
-    return (cancelled / overview.totalOrders) * 100;
-  }, [overview]);
-
-  const returnRate = fulfillment?.returnRate ?? 0;
+  const cancelRate = insightsResult?.cancelRate ?? 0;
+  const returnRate = insightsResult?.returnRate ?? 0;
 
   const exportData = useMemo(() => {
     if (!kpis) return [] as Record<string, unknown>[];
@@ -208,7 +142,9 @@ export function useOrdersInsights(
       },
       {
         Metric: "Return/RTO Revenue Loss",
-        Value: kpis.rtoRevenueLoss.value,
+        Value: Number.isFinite(kpis.rtoRevenueLoss.value)
+          ? kpis.rtoRevenueLoss.value.toFixed(2)
+          : "0.00",
         Change: `${kpis.rtoRevenueLoss.change.toFixed(2)}%`,
       },
       {

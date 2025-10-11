@@ -514,15 +514,23 @@ export function computePnLAnalytics(
     NetMargin: totalComputation.metrics.netProfitMargin,
   });
 
+  const responseWithMeta = response as unknown as {
+    meta?: {
+      primaryCurrency?: unknown;
+    };
+  } | null | undefined;
+
+  const primaryCurrency =
+    typeof responseWithMeta?.meta?.primaryCurrency === "string"
+      ? String(responseWithMeta.meta.primaryCurrency)
+      : undefined;
+
   return {
     metrics: kpis,
     periods,
     exportRows,
     totals: totalComputation.metrics,
-    primaryCurrency:
-      typeof (response as AnyRecord)?.meta?.primaryCurrency === "string"
-        ? String((response as AnyRecord).meta.primaryCurrency)
-        : undefined,
+    primaryCurrency,
   } satisfies PnLAnalyticsResult;
 }
 

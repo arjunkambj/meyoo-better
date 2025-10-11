@@ -34,9 +34,11 @@ const ORDER_ANALYTICS_DATASETS = [
 ] as const satisfies readonly AnalyticsSourceKey[];
 
 const DEFAULT_ORDERS_PAGE_SIZE = 50;
-const MAX_ORDERS_PAGE_SIZE = 200;
+const MAX_ORDERS_PAGE_SIZE = 50;
+const MAX_ORDERS_FETCH_SIZE = 200;
+const ORDERS_FETCH_MULTIPLIER = 3;
 const MIN_ORDERS_PAGE_SIZE = 1;
-const MAX_CURSOR_CARRY = 100;
+const MAX_CURSOR_CARRY = MAX_ORDERS_FETCH_SIZE;
 const END_CURSOR = "__end__";
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -150,6 +152,10 @@ const ZERO_ORDERS_OVERVIEW: OrdersOverviewMetrics = {
   customerAcquisitionCost: 0,
   grossMargin: 0,
   fulfillmentRate: 0,
+  prepaidRate: 0,
+  repeatRate: 0,
+  rtoRevenueLoss: 0,
+  abandonedCustomers: 0,
   changes: {
     totalOrders: 0,
     revenue: 0,
@@ -158,6 +164,10 @@ const ZERO_ORDERS_OVERVIEW: OrdersOverviewMetrics = {
     cac: 0,
     margin: 0,
     fulfillmentRate: 0,
+    prepaidRate: 0,
+    repeatRate: 0,
+    rtoRevenueLoss: 0,
+    abandonedCustomers: 0,
   },
 };
 
@@ -172,6 +182,10 @@ const ordersOverviewValidator = v.object({
   customerAcquisitionCost: v.number(),
   grossMargin: v.number(),
   fulfillmentRate: v.number(),
+  prepaidRate: v.number(),
+  repeatRate: v.number(),
+  rtoRevenueLoss: v.number(),
+  abandonedCustomers: v.number(),
   changes: v.object({
     totalOrders: v.number(),
     revenue: v.number(),
@@ -180,7 +194,22 @@ const ordersOverviewValidator = v.object({
     cac: v.number(),
     margin: v.number(),
     fulfillmentRate: v.number(),
+    prepaidRate: v.number(),
+    repeatRate: v.number(),
+    rtoRevenueLoss: v.number(),
+    abandonedCustomers: v.number(),
   }),
+});
+
+const customerJourneyStageValidator = v.object({
+  stage: v.string(),
+  customers: v.number(),
+  percentage: v.number(),
+  avgDays: v.number(),
+  conversionRate: v.number(),
+  icon: v.string(),
+  color: v.string(),
+  metaConversionRate: v.optional(v.number()),
 });
 
 const fulfillmentMetricsValidator = v.object({
@@ -366,9 +395,10 @@ export const getOrdersTablePage = query({
     takeFromBuffer(results);
 
     if (results.length < pageSize && !done) {
+      const requestedFetch = pageSize * ORDERS_FETCH_MULTIPLIER;
       const fetchSize = Math.min(
-        MAX_ORDERS_PAGE_SIZE,
-        Math.max(pageSize * 3, DEFAULT_ORDERS_PAGE_SIZE),
+        Math.max(requestedFetch, DEFAULT_ORDERS_PAGE_SIZE),
+        MAX_ORDERS_FETCH_SIZE,
       );
 
       const chunk = await fetchAnalyticsOrderChunk(
@@ -594,6 +624,7 @@ export const getOrdersMetrics = action({
         }),
       ),
       fulfillment: v.union(v.null(), fulfillmentMetricsValidator),
+      journey: v.array(customerJourneyStageValidator),
     }),
   ),
   handler: async (ctx, args): Promise<{
@@ -602,12 +633,25 @@ export const getOrdersMetrics = action({
       meta?: any;
     } | null;
     fulfillment: any;
+    journey: Array<{
+      stage: string;
+      customers: number;
+      percentage: number;
+      avgDays: number;
+      conversionRate: number;
+      icon: string;
+      color: string;
+      metaConversionRate?: number;
+    }>;
   } | null> => {
-    const [overview, fulfillment] = await Promise.all([
+    const [overview, fulfillment, journey] = await Promise.all([
       ctx.runQuery(api.web.orders.getOrdersOverviewMetrics, {
         dateRange: args.dateRange,
       }),
       ctx.runQuery(api.web.orders.getFulfillmentMetrics, {
+        dateRange: args.dateRange,
+      }),
+      ctx.runQuery(api.web.customers.getCustomerJourney, {
         dateRange: args.dateRange,
       }),
     ]);
@@ -615,6 +659,7 @@ export const getOrdersMetrics = action({
     return {
       overview,
       fulfillment,
+      journey: journey ?? [],
     };
   },
 });

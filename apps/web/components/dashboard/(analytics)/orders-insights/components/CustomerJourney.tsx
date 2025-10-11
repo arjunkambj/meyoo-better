@@ -158,104 +158,48 @@ export const CustomerJourney = memo(function CustomerJourney({
               Overall Conversion
             </p>
             <p className="text-xl font-semibold text-default-900">
-              {(() => {
-                const purchasers = purchaseStage?.customers || 0;
-                if (safeVisitors <= 0 || purchasers <= 0) return "0.0%";
-                return `${((purchasers / safeVisitors) * 100).toFixed(1)}%`;
-              })()}
+              {formatPercentValue(
+                retentionStage?.conversionRate ?? purchaseStage?.conversionRate ?? 0,
+              )}
+              %
             </p>
-            <p className="text-xs text-default-400 mt-1">
-              Visitor to customer · Meta conv {formatPercentValue(metaConversionRateValue)}%
+            <p className="text-xs text-default-500 mt-1">
+              From awareness to purchase
             </p>
           </div>
           <div className="rounded-xl p-4 border bg-background border-default-50">
             <p className="text-xs font-medium text-default-600 mb-2">
-              Repeat Rate
+              Meta Conversion
             </p>
             <p className="text-xl font-semibold text-default-900">
-              {(() => {
-                const purchasers = purchaseStage?.customers || 0;
-                const repeat = retentionStage?.customers || 0;
-                if (purchasers <= 0) return "0%";
-                return `${((repeat / purchasers) * 100).toFixed(0)}%`;
-              })()}
+              {formatPercentValue(metaConversionRateValue)}%
             </p>
-            <p className="text-xs text-default-400 mt-1">Buy again</p>
+            <p className="text-xs text-default-500 mt-1">
+              Landing page conversion from ads
+            </p>
           </div>
-
           <div className="rounded-xl p-4 border bg-background border-default-50">
             <p className="text-xs font-medium text-default-600 mb-2">
               Cancel Rate
             </p>
             <p className="text-xl font-semibold text-default-900">
-              {safeCancelRate.toFixed(1)}%
+              {formatPercentValue(safeCancelRate)}%
             </p>
-            <p className="text-xs text-default-400 mt-1">Orders cancelled</p>
+            <p className="text-xs text-default-500 mt-1">
+              Orders cancelled before fulfillment
+            </p>
           </div>
           <div className="rounded-xl p-4 border bg-background border-default-50">
             <p className="text-xs font-medium text-default-600 mb-2">
-              Return Rate
+              Return / RTO Rate
             </p>
             <p className="text-xl font-semibold text-default-900">
-              {safeReturnRate.toFixed(1)}%
+              {formatPercentValue(safeReturnRate)}%
             </p>
-            <p className="text-xs text-default-400 mt-1">Products returned</p>
+            <p className="text-xs text-default-500 mt-1">
+              Deliveries that resulted in returns or RTO
+            </p>
           </div>
-        </div>
-
-        {/* Conversion Breakdown */}
-        <div className="rounded-xl p-5 border bg-background border-default-50">
-          <p className="text-sm font-medium text-default-900 mb-4">
-            Stage Progression
-          </p>
-          {hasJourneyData ? (
-            <div className="space-y-3">
-              {journeyData.slice(0, -1).map((stage, index) => {
-                const nextStage = journeyData[index + 1] ?? {
-                  stage: "",
-                  customers: 0,
-                };
-                const conversionRate =
-                  ((nextStage.customers || 0) / (stage.customers || 1)) * 100;
-
-                // Simple color based on conversion rate
-                const getProgressBarClass = () => {
-                  if (conversionRate >= 70) return "bg-success";
-                  if (conversionRate >= 50) return "bg-primary";
-                  if (conversionRate >= 30) return "bg-warning";
-                  return "bg-danger";
-                };
-
-                return (
-                  <div key={`${stage.stage}-conversion`}>
-                    <div className="flex items-center justify-between text-sm mb-1.5">
-                      <span className="text-default-600">
-                        {stage.stage} → {nextStage.stage}
-                      </span>
-                      <span className="font-medium text-default-900">
-                        {conversionRate.toFixed(1)}%
-                      </span>
-                    </div>
-                    <div className="h-1.5 bg-default-200/70 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full ${getProgressBarClass()}`}
-                        style={{
-                          width: `${Math.max(
-                            0,
-                            Math.min(conversionRate, 100)
-                          )}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <p className="text-sm text-default-500">
-              We need more customer activity to show stage-by-stage conversions.
-            </p>
-          )}
         </div>
       </div>
     </Card>

@@ -5,17 +5,11 @@ import type { OnboardingStatus } from "@repo/types";
 import { createContext, useContext, useMemo } from "react";
 import type { ReactNode } from "react";
 
-/**
- * Onboarding Flow Management Hooks
- */
-
-// Use key-based helpers derived from ONBOARDING_STEPS; no separate numeric mapping.
-
 function useOnboardingInternal() {
   const rawStatus = useQuery(api.core.onboarding.getOnboardingStatus);
   const status = rawStatus as OnboardingStatus | null | undefined;
   const integrationStatus = useQuery(api.core.status.getIntegrationStatus);
-  type Overall = 'unsynced' | 'syncing' | 'complete' | 'failed';
+  type Overall = "unsynced" | "syncing" | "complete" | "failed";
   const syncStatus = status?.syncStatus;
   const updateStateMutation = useMutation(
     api.core.onboarding.updateOnboardingState
@@ -25,27 +19,28 @@ function useOnboardingInternal() {
   );
   const completeMutation = useMutation(api.core.onboarding.completeOnboarding);
 
-  const shopifyOverall = syncStatus?.shopify?.overallState as Overall | undefined;
+  const shopifyOverall = syncStatus?.shopify?.overallState as
+    | Overall
+    | undefined;
   const shopifySyncStatus = syncStatus?.shopify?.status ?? null;
   const shopifyExpectedOrders =
-    integrationStatus?.shopify?.expectedOrders ??
-    null;
+    integrationStatus?.shopify?.expectedOrders ?? null;
   const shopifyOrdersInDb = integrationStatus?.shopify?.ordersInDb ?? null;
   const isInitialSyncComplete = status?.isInitialSyncComplete || false;
   const isShopifySynced =
     integrationStatus?.shopify?.initialSynced === true ||
-    shopifyOverall === 'complete' ||
+    shopifyOverall === "complete" ||
     isInitialSyncComplete ||
     shopifySyncStatus === "completed";
   const isShopifySyncing = integrationStatus?.shopify?.initialSynced
     ? false
     : shopifyOverall
-      ? shopifyOverall === 'syncing'
+      ? shopifyOverall === "syncing"
       : shopifySyncStatus
         ? ["pending", "syncing", "processing"].includes(shopifySyncStatus)
         : false;
   const hasShopifySyncError = shopifyOverall
-    ? shopifyOverall === 'failed'
+    ? shopifyOverall === "failed"
     : shopifySyncStatus === "failed";
   const shopifyStages = syncStatus?.shopify?.stages ?? null;
   const shopifySyncProgress = {
@@ -55,14 +50,10 @@ function useOnboardingInternal() {
     lastError: syncStatus?.shopify?.lastError ?? null,
     stages: shopifyStages,
   } as const;
-  const isShopifyProductsSynced =
-    Boolean(shopifyStages?.products);
-  const isShopifyInventorySynced =
-    Boolean(shopifyStages?.inventory);
-  const isShopifyCustomersSynced =
-    Boolean(shopifyStages?.customers);
-  const isShopifyOrdersSynced =
-    Boolean(shopifyStages?.orders);
+  const isShopifyProductsSynced = Boolean(shopifyStages?.products);
+  const isShopifyInventorySynced = Boolean(shopifyStages?.inventory);
+  const isShopifyCustomersSynced = Boolean(shopifyStages?.customers);
+  const isShopifyOrdersSynced = Boolean(shopifyStages?.orders);
 
   // Next step navigation
   const nextStep = async () => {
@@ -195,7 +186,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       value.integrationStatus,
       value.shopifyExpectedOrders,
       value.shopifyOrdersInDb,
-    ],
+    ]
   );
 
   return (
@@ -217,16 +208,6 @@ export function useOnboarding(): OnboardingContextValue {
 
   return useOnboardingInternal();
 }
-
-/**
- * Get current onboarding step
- */
-// Removed unused: useOnboardingStep
-
-/**
- * Update business profile during onboarding
- */
-// Removed unused: useUpdateBusinessProfile
 
 /**
  * Update onboarding state
@@ -263,36 +244,3 @@ export function useUpdateOnboardingState() {
     }
   };
 }
-
-/**
- * Complete onboarding and trigger initial sync
- */
-// Removed unused: useCompleteOnboarding
-
-/**
- * Skip onboarding step
- */
-// Removed unused: useSkipStep
-
-/**
- * Check if a specific step is completed
- */
-/**
- * Get progress percentage
- */
-// Removed unused: useOnboardingProgress
-
-/**
- * Navigate to next onboarding step
- */
-// Removed unused: useNextOnboardingStep
-
-/**
- * Navigate to previous onboarding step
- */
-// Removed unused: usePreviousOnboardingStep
-
-/**
- * Check if user can proceed to next step
- */
-// Removed unused: useCanProceedToNextStep

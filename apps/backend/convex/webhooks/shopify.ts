@@ -331,6 +331,8 @@ async function handleTopicInline(
                 firstName: toOptionalString(order.customer.first_name),
                 lastName: toOptionalString(order.customer.last_name),
                 phone: toOptionalString(order.customer.phone),
+                shopifyCreatedAt: toTs(order.customer.created_at),
+                shopifyUpdatedAt: toTs(order.customer.updated_at),
               }
             : undefined,
           email: toOptionalString(order.email),

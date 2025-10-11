@@ -1,23 +1,14 @@
 "use client";
 
 import { Skeleton, Spacer } from "@heroui/react";
-import { lazy, memo, Suspense, useCallback, useMemo } from "react";
+import { memo, useCallback, useMemo } from "react";
 import { AnalyticsHeader } from "@/components/shared/AnalyticsHeader";
 import { ExportButton } from "@/components/shared/actions/ExportButton";
 import GlobalDateRangePicker from "@/components/shared/GlobalDateRangePicker";
-import { useAnalyticsDateRange, useCustomerAnalytics, useOrdersAnalytics } from "@/hooks";
-import { OrdersOverviewCards } from "../orders/components/OrdersOverviewCards";
-
-// Lazy load heavy chart components
-const CohortAnalysis = lazy(() =>
-  import("./components/CohortAnalysis").then(mod => ({ default: mod.CohortAnalysis }))
-);
-const FulfillmentAnalysis = lazy(() =>
-  import("./components/FulfillmentAnalysis").then(mod => ({ default: mod.FulfillmentAnalysis }))
-);
-const GeographicDistribution = lazy(() =>
-  import("./components/GeographicDistribution").then(mod => ({ default: mod.GeographicDistribution }))
-);
+import { useAnalyticsDateRange, useOrdersInsights } from "@/hooks";
+import { OrdersInsightsKPICards } from "./components/OrdersInsightsKPICards";
+import { CustomerJourney } from "./components/CustomerJourney";
+import { FulfillmentAnalysis } from "./components/FulfillmentAnalysis";
 
 export const OrdersInsightsView = memo(function OrdersInsightsView() {
   const {
@@ -28,29 +19,22 @@ export const OrdersInsightsView = memo(function OrdersInsightsView() {
   } = useAnalyticsDateRange('dashboard-orders-insights', { defaultPreset: 'today' });
 
   const {
-    overview,
-    fulfillmentMetrics,
+    kpis,
+    fulfillment,
+    journey,
+    cancelRate,
+    returnRate,
     exportData,
-    loadingStates: ordersLoading,
-  } = useOrdersAnalytics({
+    loading,
+  } = useOrdersInsights({
     dateRange: ordersInsightsRange,
   });
-
-  const {
-    cohorts,
-    geographic,
-    loadingStates: customerLoading,
-  } = useCustomerAnalytics({ dateRange: ordersInsightsRange });
 
   const handleAnalyticsRangeChange = useCallback(updateOrdersInsightsRange, [updateOrdersInsightsRange]);
 
   const isExportDisabled = useMemo(
-    () =>
-      ordersLoading.overview ||
-      ordersLoading.fulfillment ||
-      customerLoading.cohorts ||
-      customerLoading.geographic,
-    [customerLoading.cohorts, customerLoading.geographic, ordersLoading.fulfillment, ordersLoading.overview],
+    () => loading || exportData.length === 0,
+    [loading, exportData],
   );
 
   return (
@@ -75,40 +59,19 @@ export const OrdersInsightsView = memo(function OrdersInsightsView() {
         }
       />
 
-      {ordersLoading.overview ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((index) => (
-            <Skeleton key={`orders-overview-skeleton-${index}`} className="h-32 rounded-lg" />
-          ))}
-        </div>
+      <OrdersInsightsKPICards kpis={kpis} loading={loading} />
+
+      {loading ? (
+        <Skeleton className="h-[360px] rounded-2xl" />
       ) : (
-        <OrdersOverviewCards metrics={overview} />
+        <CustomerJourney cancelRate={cancelRate} data={journey} returnRate={returnRate} />
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Suspense fallback={<Skeleton className="h-96 rounded-lg" />}>
-          {customerLoading.geographic ? (
-            <Skeleton className="h-96 rounded-lg" />
-          ) : (
-            <GeographicDistribution data={geographic} />
-          )}
-        </Suspense>
-        <Suspense fallback={<Skeleton className="h-96 rounded-lg" />}>
-          {customerLoading.cohorts ? (
-            <Skeleton className="h-96 rounded-lg" />
-          ) : (
-            <CohortAnalysis cohorts={cohorts} />
-          )}
-        </Suspense>
-      </div>
-
-      <Suspense fallback={<Skeleton className="h-[350px] rounded-lg" />}>
-        {ordersLoading.fulfillment ? (
-          <Skeleton className="h-[350px] rounded-lg" />
-        ) : (
-          <FulfillmentAnalysis metrics={fulfillmentMetrics} />
-        )}
-      </Suspense>
+      {loading ? (
+        <Skeleton className="h-[360px] rounded-2xl" />
+      ) : (
+        <FulfillmentAnalysis metrics={fulfillment ?? undefined} />
+      )}
     </div>
   );
 });

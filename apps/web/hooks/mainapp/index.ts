@@ -26,6 +26,7 @@ export * from './useInvoices';
 export * from './useAnalyticsDateRange';
 export * from './useInitialSyncStatus';
 export * from './useOrdersAnalytics';
+export * from './useOrdersInsights';
 export * from './useOrganization';
 export * from './useDashboardOverview';
 export * from './usePnLAnalytics';

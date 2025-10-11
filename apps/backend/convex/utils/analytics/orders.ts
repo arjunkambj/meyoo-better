@@ -594,6 +594,10 @@ type OrdersAggregateSummary = {
   fulfillmentRate: number;
   avgFulfillmentCost: number;
   returnRate: number;
+  prepaidRate: number;
+  repeatRate: number;
+  rtoRevenueLoss: number;
+  abandonedCustomers: number;
 };
 
 function aggregateOrdersMetrics(
@@ -634,6 +638,10 @@ function aggregateOrdersMetrics(
   const fulfillmentRate = totalOrders > 0 ? (fulfilledCount / totalOrders) * 100 : 0;
   const avgFulfillmentCost = totalOrders > 0 ? shippingTotal / totalOrders : 0;
   const returnRate = totalOrders > 0 ? (returnCount / totalOrders) * 100 : 0;
+  const prepaidRate = 0;
+  const repeatRate = 0;
+  const rtoRevenueLoss = 0;
+  const abandonedCustomers = 0;
 
   return {
     totalOrders,
@@ -646,6 +654,10 @@ function aggregateOrdersMetrics(
     fulfillmentRate,
     avgFulfillmentCost,
     returnRate,
+    prepaidRate,
+    repeatRate,
+    rtoRevenueLoss,
+    abandonedCustomers,
   } satisfies OrdersAggregateSummary;
 }
 
@@ -713,6 +725,10 @@ export function computeOrdersAnalytics(
     customerAcquisitionCost: 0,
     grossMargin: aggregates.grossMargin,
     fulfillmentRate: aggregates.fulfillmentRate,
+    prepaidRate: aggregates.prepaidRate,
+    repeatRate: aggregates.repeatRate,
+    rtoRevenueLoss: aggregates.rtoRevenueLoss,
+    abandonedCustomers: aggregates.abandonedCustomers,
     changes: {
       totalOrders: percentageChange(
         aggregates.totalOrders,
@@ -738,6 +754,22 @@ export function computeOrdersAnalytics(
       fulfillmentRate: percentageChange(
         aggregates.fulfillmentRate,
         previousAggregates?.fulfillmentRate ?? 0,
+      ),
+      prepaidRate: percentageChange(
+        aggregates.prepaidRate,
+        previousAggregates?.prepaidRate ?? 0,
+      ),
+      repeatRate: percentageChange(
+        aggregates.repeatRate,
+        previousAggregates?.repeatRate ?? 0,
+      ),
+      rtoRevenueLoss: percentageChange(
+        aggregates.rtoRevenueLoss,
+        previousAggregates?.rtoRevenueLoss ?? 0,
+      ),
+      abandonedCustomers: percentageChange(
+        aggregates.abandonedCustomers,
+        previousAggregates?.abandonedCustomers ?? 0,
       ),
     },
   };
@@ -788,4 +820,3 @@ export function computeOrdersAnalytics(
     exportRows,
   } satisfies OrdersAnalyticsResult;
 }
-

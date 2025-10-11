@@ -148,6 +148,8 @@ export interface ShopifyCustomer {
   // Metadata
   tags?: string[];
   note?: string;
+  shopifyCreatedAt?: string;
+  shopifyUpdatedAt?: string;
   createdAt: string;
   updatedAt: string;
   syncedAt: string;

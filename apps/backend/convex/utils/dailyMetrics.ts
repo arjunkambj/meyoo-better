@@ -1121,6 +1121,16 @@ function buildOrdersOverviewFromAggregates(
     : 0;
   const fulfilledOrders = Math.max(0, totalOrders - aggregates.cancelledOrders);
   const fulfillmentRate = totalOrders > 0 ? (fulfilledOrders / totalOrders) * 100 : 0;
+  const prepaidOrders = Math.max(aggregates.prepaidOrders, 0);
+  const prepaidRate = totalOrders > 0 ? (prepaidOrders / totalOrders) * 100 : 0;
+  const totalCustomers = Math.max(aggregates.totalCustomers, 0);
+  const repeatCustomers = Math.max(aggregates.repeatCustomers, 0);
+  const repeatRate = totalCustomers > 0 ? (repeatCustomers / totalCustomers) * 100 : 0;
+  const abandonedCustomers = Math.max(
+    0,
+    totalCustomers - Math.max(aggregates.paidCustomers, 0),
+  );
+  const rtoRevenueLoss = Math.max(rtoRevenueLost, 0);
 
   const prev = previous ?? null;
   const prevTotalOrders = prev?.orders ?? 0;
@@ -1156,6 +1166,19 @@ function buildOrdersOverviewFromAggregates(
   const prevFulfillmentRate = prevTotalOrders > 0
     ? (prevFulfilledOrders / prevTotalOrders) * 100
     : 0;
+  const prevPrepaidOrders = Math.max(prev?.prepaidOrders ?? 0, 0);
+  const prevPrepaidRate = prevTotalOrders > 0
+    ? (prevPrepaidOrders / prevTotalOrders) * 100
+    : 0;
+  const prevTotalCustomers = Math.max(prev?.totalCustomers ?? 0, 0);
+  const prevRepeatCustomers = Math.max(prev?.repeatCustomers ?? 0, 0);
+  const prevRepeatRate = prevTotalCustomers > 0
+    ? (prevRepeatCustomers / prevTotalCustomers) * 100
+    : 0;
+  const prevAbandonedCustomers = Math.max(
+    0,
+    prevTotalCustomers - Math.max(prev?.paidCustomers ?? 0, 0),
+  );
 
   return {
     totalOrders,
@@ -1168,6 +1191,10 @@ function buildOrdersOverviewFromAggregates(
     customerAcquisitionCost,
     grossMargin,
     fulfillmentRate,
+    prepaidRate,
+    repeatRate,
+    rtoRevenueLoss,
+    abandonedCustomers,
     changes: {
       totalOrders: percentageChange(totalOrders, prevTotalOrders),
       revenue: percentageChange(totalRevenue, prevTotalRevenue),
@@ -1176,6 +1203,10 @@ function buildOrdersOverviewFromAggregates(
       cac: percentageChange(customerAcquisitionCost, prevCustomerAcquisitionCost),
       margin: percentageChange(grossMargin, prevGrossMargin),
       fulfillmentRate: percentageChange(fulfillmentRate, prevFulfillmentRate),
+      prepaidRate: percentageChange(prepaidRate, prevPrepaidRate),
+      repeatRate: percentageChange(repeatRate, prevRepeatRate),
+      rtoRevenueLoss: percentageChange(rtoRevenueLoss, prevRtoRevenueLost),
+      abandonedCustomers: percentageChange(abandonedCustomers, prevAbandonedCustomers),
     },
   } satisfies OrdersOverviewMetrics;
 }

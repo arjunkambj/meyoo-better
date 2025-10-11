@@ -226,6 +226,10 @@ export interface OrdersOverviewMetrics {
   customerAcquisitionCost: number;
   grossMargin: number;
   fulfillmentRate: number;
+  prepaidRate: number;
+  repeatRate: number;
+  rtoRevenueLoss: number;
+  abandonedCustomers: number;
   changes: {
     totalOrders: number;
     revenue: number;
@@ -234,6 +238,10 @@ export interface OrdersOverviewMetrics {
     cac: number;
     margin: number;
     fulfillmentRate: number;
+    prepaidRate: number;
+    repeatRate: number;
+    rtoRevenueLoss: number;
+    abandonedCustomers: number;
   };
 }
 

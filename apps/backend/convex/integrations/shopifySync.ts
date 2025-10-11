@@ -156,6 +156,8 @@ type ShopifyOrderNode = {
     firstName?: string;
     lastName?: string;
     phone?: string;
+    createdAt?: string;
+    updatedAt?: string;
   };
   lineItems?: { edges?: Array<{ node: ShopifyLineItem }> };
   transactions?: Array<ShopifyTransaction>;
@@ -248,6 +250,8 @@ type ShopifyOrderInput = {
     firstName?: string;
     lastName?: string;
     phone?: string;
+    shopifyCreatedAt?: number;
+    shopifyUpdatedAt?: number;
   };
   lineItems: ShopifyOrderLineItemInput[];
   syncedAt?: number;
@@ -353,6 +357,12 @@ function mapOrderNodeToPersistence(
           firstName: toOptional(order.customer.firstName),
           lastName: toOptional(order.customer.lastName),
           phone: toOptional(order.customer.phone),
+          shopifyCreatedAt: order.customer.createdAt
+            ? Date.parse(String(order.customer.createdAt))
+            : undefined,
+          shopifyUpdatedAt: order.customer.updatedAt
+            ? Date.parse(String(order.customer.updatedAt))
+            : undefined,
         }
       : undefined,
     lineItems:

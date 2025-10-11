@@ -1,11 +1,23 @@
+import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
-import type { Doc, Id } from "../_generated/dataModel";
-import { action, query } from "../_generated/server";
-import { api } from "../_generated/api";
-import { validateDateRange, toTimestampRange } from "../utils/analyticsSource";
+import type { Id } from "../_generated/dataModel";
+import { query } from "../_generated/server";
+import {
+  validateDateRange,
+  toTimestampRange,
+  type DateRange,
+} from "../utils/analyticsSource";
 import { getUserAndOrg } from "../utils/auth";
 import { loadCustomerOverviewFromDailyMetrics } from "../utils/dailyMetrics";
 import { dateRangeValidator, defaultDateRange } from "./analyticsShared";
+
+const MAX_CUSTOMER_PAGE_SIZE = 50;
+const DEFAULT_CUSTOMER_PAGE_SIZE = 50;
+const END_CURSOR = "__END__";
+const MAX_CUSTOMER_FETCH_ROUNDS = 5;
+const MAX_CUSTOMERS_TO_SCAN = MAX_CUSTOMER_FETCH_ROUNDS * DEFAULT_CUSTOMER_PAGE_SIZE;
+const MAX_ORDERS_PER_CUSTOMER = 250;
+const MAX_CUSTOMER_RANGE_DAYS = 365;
 
 const ZERO_CUSTOMER_OVERVIEW = {
   totalCustomers: 0,
@@ -97,12 +109,14 @@ const customerListEntryValidator = v.object({
   avgOrderValue: v.number(),
   lastOrderDate: v.string(),
   firstOrderDate: v.string(),
+  shopifyCreatedAt: v.string(),
+  shopifyUpdatedAt: v.optional(v.string()),
   segment: v.string(),
   city: v.optional(v.string()),
   country: v.optional(v.string()),
-  periodOrders: v.optional(v.number()),
-  periodRevenue: v.optional(v.number()),
-  isReturning: v.optional(v.boolean()),
+  periodOrders: v.number(),
+  periodRevenue: v.number(),
+  isReturning: v.boolean(),
 });
 
 const customerListPaginationValidator = v.object({
@@ -110,67 +124,6 @@ const customerListPaginationValidator = v.object({
   pageSize: v.number(),
   total: v.number(),
   totalPages: v.number(),
-});
-
-const customerListResultValidator = v.object({
-  data: v.array(customerListEntryValidator),
-  pagination: customerListPaginationValidator,
-  continueCursor: v.string(),
-  info: v.optional(
-    v.object({
-      pageSize: v.number(),
-      returned: v.number(),
-      hasMore: v.boolean(),
-    }),
-  ),
-});
-
-const cohortValidator = v.object({
-  cohort: v.string(),
-  cohortSize: v.number(),
-  periods: v.array(
-    v.object({
-      period: v.number(),
-      retained: v.number(),
-      percentage: v.number(),
-      revenue: v.number(),
-    }),
-  ),
-});
-
-const geographicValidator = v.object({
-  countries: v.array(
-    v.object({
-      country: v.string(),
-      customers: v.number(),
-      revenue: v.number(),
-      orders: v.number(),
-      avgOrderValue: v.number(),
-      zipCodes: v.array(
-        v.object({
-          zipCode: v.string(),
-          city: v.optional(v.string()),
-          customers: v.number(),
-          revenue: v.number(),
-        }),
-      ),
-    }),
-  ),
-  cities: v.array(
-    v.object({
-      city: v.string(),
-      country: v.string(),
-      customers: v.number(),
-      revenue: v.number(),
-    }),
-  ),
-  heatmapData: v.array(
-    v.object({
-      lat: v.number(),
-      lng: v.number(),
-      value: v.number(),
-    }),
-  ),
 });
 
 const journeyStageValidator = v.object({
@@ -184,40 +137,6 @@ const journeyStageValidator = v.object({
   metaConversionRate: v.optional(v.number()),
 });
 
-const overviewValidator = v.union(
-  v.null(),
-  v.object({
-    totalCustomers: v.number(),
-    newCustomers: v.number(),
-    returningCustomers: v.number(),
-    activeCustomers: v.number(),
-    churnedCustomers: v.number(),
-    avgLifetimeValue: v.number(),
-    avgOrderValue: v.number(),
-    avgOrdersPerCustomer: v.number(),
-    customerAcquisitionCost: v.number(),
-    churnRate: v.number(),
-    repeatPurchaseRate: v.number(),
-    periodCustomerCount: v.number(),
-    prepaidRate: v.number(),
-    abandonedCartCustomers: v.number(),
-    abandonedRate: v.number(),
-    changes: v.object({
-      totalCustomers: v.number(),
-      newCustomers: v.number(),
-      lifetimeValue: v.number(),
-    }),
-  }),
-);
-
-const customerAnalyticsResultValidator = v.object({
-  overview: overviewValidator,
-  cohorts: v.array(cohortValidator),
-  customerList: v.union(v.null(), customerListResultValidator),
-  geographic: v.union(v.null(), geographicValidator),
-  journey: v.array(journeyStageValidator),
-});
-
 type CustomerListEntry = {
   id: string;
   name: string;
@@ -229,6 +148,8 @@ type CustomerListEntry = {
   avgOrderValue: number;
   lastOrderDate: string;
   firstOrderDate: string;
+  shopifyCreatedAt: string;
+  shopifyUpdatedAt?: string;
   segment: string;
   city?: string;
   country?: string;
@@ -237,88 +158,105 @@ type CustomerListEntry = {
   isReturning: boolean;
 };
 
-type CustomerListPagination = {
-  page: number;
+type CustomersCursorState = {
+  lastCreatedAt: number | null;
+  lastId: string | null;
+  done: boolean;
+  key: string;
+};
+
+function buildCustomersCursorKey(args: {
+  dateRange: DateRange;
+  status?: string;
+  segment?: string;
+  searchTerm?: string;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
   pageSize: number;
-  total: number;
-  totalPages: number;
-};
+}): string {
+  return JSON.stringify({
+    dateRange: args.dateRange,
+    status: args.status ?? null,
+    segment: args.segment ?? null,
+    search: args.searchTerm ?? null,
+    sortBy: args.sortBy ?? null,
+    sortOrder: args.sortOrder ?? null,
+    pageSize: args.pageSize,
+  });
+}
 
-type CustomerAnalyticsResult = {
-  overview: {
-    totalCustomers: number;
-    newCustomers: number;
-    returningCustomers: number;
-    activeCustomers: number;
-    churnedCustomers: number;
-    avgLifetimeValue: number;
-    avgOrderValue: number;
-    avgOrdersPerCustomer: number;
-    customerAcquisitionCost: number;
-    churnRate: number;
-    repeatPurchaseRate: number;
-    periodCustomerCount: number;
-    prepaidRate: number;
-    abandonedCartCustomers: number;
-    abandonedRate: number;
-    changes: {
-      totalCustomers: number;
-      newCustomers: number;
-      lifetimeValue: number;
-    };
-  } | null;
-  cohorts: Array<{
-    cohort: string;
-    cohortSize: number;
-    periods: Array<{
-      period: number;
-      retained: number;
-      percentage: number;
-      revenue: number;
-    }>;
-  }>;
-  customerList: {
-    data: CustomerListEntry[];
-    pagination: CustomerListPagination;
-    continueCursor: string;
-  } | null;
-  geographic: {
-    countries: Array<{
-      country: string;
-      customers: number;
-      revenue: number;
-      orders: number;
-      avgOrderValue: number;
-      zipCodes: Array<{
-        zipCode: string;
-        city?: string;
-        customers: number;
-        revenue: number;
-      }>;
-    }>;
-    cities: Array<{
-      city: string;
-      country: string;
-      customers: number;
-      revenue: number;
-    }>;
-    heatmapData: Array<{ lat: number; lng: number; value: number }>;
-  } | null;
-  journey: Array<{
-    stage: string;
-    customers: number;
-    percentage: number;
-    avgDays: number;
-    conversionRate: number;
-    icon: string;
-    color: string;
-  }>;
-};
+function encodeCustomersCursor(state: CustomersCursorState): string {
+  if (state.done) {
+    return END_CURSOR;
+  }
 
-/**
- * Customer Analytics API
- * Provides comprehensive customer insights and segmentation
- */
+  return JSON.stringify({
+    lastCreatedAt: state.lastCreatedAt,
+    lastId: state.lastId,
+    done: state.done,
+    key: state.key,
+  });
+}
+
+function decodeCustomersCursor(cursor: string | null): CustomersCursorState | null {
+  if (!cursor || cursor === END_CURSOR) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(cursor) as Partial<CustomersCursorState>;
+
+    const lastCreatedAt =
+      typeof parsed.lastCreatedAt === "number" && Number.isFinite(parsed.lastCreatedAt)
+        ? parsed.lastCreatedAt
+        : null;
+    const lastId = typeof parsed.lastId === "string" ? parsed.lastId : null;
+    const done = typeof parsed.done === "boolean" ? parsed.done : false;
+    const key = typeof parsed.key === "string" ? parsed.key : "";
+
+    return {
+      lastCreatedAt,
+      lastId,
+      done,
+      key,
+    } satisfies CustomersCursorState;
+  } catch (error) {
+    console.warn("Failed to decode customers cursor", error);
+    return null;
+  }
+}
+
+function sortCustomerEntries(
+  entries: CustomerListEntry[],
+  sortBy: string,
+  sortOrder: "asc" | "desc",
+): CustomerListEntry[] {
+  const direction = sortOrder === "asc" ? 1 : -1;
+
+  const compare = (a: CustomerListEntry, b: CustomerListEntry): number => {
+    switch (sortBy) {
+      case "lifetimeValue":
+        return (a.lifetimeValue - b.lifetimeValue) * direction;
+      case "orders":
+        return (a.orders - b.orders) * direction;
+      case "name":
+        return direction === 1 ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
+      case "avgOrderValue":
+        return (a.avgOrderValue - b.avgOrderValue) * direction;
+      case "firstOrderDate":
+        return (
+          (new Date(a.firstOrderDate).getTime() - new Date(b.firstOrderDate).getTime()) *
+          direction
+        );
+      default:
+        return (
+          (new Date(a.lastOrderDate).getTime() - new Date(b.lastOrderDate).getTime()) * direction
+        );
+    }
+  };
+
+  return entries.sort((a, b) => compare(a, b));
+}
 
 /**
  * Get customer overview metrics
@@ -371,385 +309,293 @@ export const getCustomerOverview = query({
     return dailyOverview.metrics ?? { ...ZERO_CUSTOMER_OVERVIEW };
   },
 });
-/**
- * Get cohort analysis data
- */
-export const getCohortAnalysis = query({
+export const getCustomerList = query({
   args: {
     dateRange: v.optional(dateRangeValidator),
-    cohortType: v.optional(v.union(v.literal("monthly"), v.literal("weekly"))),
-  },
-  returns: v.array(
-    v.object({
-      cohort: v.string(),
-      cohortSize: v.number(),
-      periods: v.array(
-        v.object({
-          period: v.number(),
-          retained: v.number(),
-          percentage: v.number(),
-          revenue: v.number(),
-        }),
+    searchTerm: v.optional(v.string()),
+    segment: v.optional(v.string()),
+    paginationOpts: v.optional(paginationOptsValidator),
+    page: v.optional(v.number()),
+    pageSize: v.optional(v.number()),
+    sortBy: v.optional(v.string()),
+    sortOrder: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
+    status: v.optional(
+      v.union(
+        v.literal("all"),
+        v.literal("converted"),
+        v.literal("abandoned_cart"),
       ),
-    }),
-  ),
+    ),
+  },
+  returns: v.object({
+    page: v.array(customerListEntryValidator),
+    continueCursor: v.string(),
+    isDone: v.boolean(),
+    data: v.optional(v.array(customerListEntryValidator)),
+    pagination: v.optional(customerListPaginationValidator),
+    info: v.optional(
+      v.object({
+        pageSize: v.number(),
+        returned: v.number(),
+        hasMore: v.boolean(),
+        truncated: v.optional(v.boolean()),
+      }),
+    ),
+  }),
   handler: async (ctx, args) => {
     const auth = await getUserAndOrg(ctx);
-    if (!auth) return [];
 
-    const rangeInput = args.dateRange ?? defaultDateRange();
-    const range = validateDateRange(rangeInput);
-    const timestamps = toTimestampRange(range);
+    const requestedItems = Math.max(
+      1,
+      Math.min(
+        args.paginationOpts?.numItems ?? args.pageSize ?? DEFAULT_CUSTOMER_PAGE_SIZE,
+        MAX_CUSTOMER_PAGE_SIZE,
+      ),
+    );
+    const fallbackPage = Math.max(1, Math.floor(args.page ?? 1));
 
-    const cohortType = args.cohortType ?? "monthly";
-    const DAY_MS = 24 * 60 * 60 * 1000;
-
-    const toCohortKey = (ms: number): string => {
-      const date = new Date(ms);
-      if (cohortType === "weekly") {
-        const target = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-        const day = target.getUTCDay() || 7;
-        target.setUTCDate(target.getUTCDate() + 4 - day);
-        const yearStart = new Date(Date.UTC(target.getUTCFullYear(), 0, 1));
-        const week = Math.ceil(((target.getTime() - yearStart.getTime()) / DAY_MS + 1) / 7);
-        return `${target.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
-      }
-
-      const year = date.getUTCFullYear();
-      const month = String(date.getUTCMonth() + 1).padStart(2, "0");
-      return `${year}-${month}`;
-    };
-
-    const periodDifference = (startMs: number, currentMs: number): number => {
-      if (currentMs < startMs) {
-        return 0;
-      }
-      if (cohortType === "weekly") {
-        return Math.floor((currentMs - startMs) / (7 * DAY_MS));
-      }
-      const start = new Date(startMs);
-      const current = new Date(currentMs);
-      return (
-        (current.getUTCFullYear() - start.getUTCFullYear()) * 12 +
-        (current.getUTCMonth() - start.getUTCMonth())
-      );
-    };
-
-    const cohortCustomers = new Map<
-      string,
-      { firstOrderMs: number }
-    >();
-
-    const customerIds = new Set<string>();
-    const CUSTOMER_PAGE_SIZE = 200;
-    let customerCursor: string | null = null;
-
-    while (true) {
-      const page = await ctx.db
-        .query("shopifyCustomers")
-        .withIndex("by_organization_and_created", (q) =>
-          q
-            .eq("organizationId", auth.orgId as Id<"organizations">)
-            .gte("shopifyCreatedAt", timestamps.start)
-            .lte("shopifyCreatedAt", timestamps.end),
-        )
-        .paginate({ numItems: CUSTOMER_PAGE_SIZE, cursor: customerCursor });
-
-      for (const customer of page.page) {
-        const id = customer._id as string;
-        cohortCustomers.set(id, { firstOrderMs: customer.shopifyCreatedAt });
-        customerIds.add(id);
-      }
-
-      if (page.isDone || !page.continueCursor) {
-        break;
-      }
-
-      customerCursor = page.continueCursor;
-    }
-
-    if (cohortCustomers.size === 0) {
-      return [];
-    }
-
-    const ordersByCustomer = new Map<
-      string,
-      Array<{ date: number; amount: number }>
-    >();
-
-    const ORDER_PAGE_SIZE = 200;
-    let orderCursor: string | null = null;
-
-    while (true) {
-      const page = await ctx.db
-        .query("shopifyOrders")
-        .withIndex("by_organization_and_created", (q) =>
-          q
-            .eq("organizationId", auth.orgId as Id<"organizations">)
-            .gte("shopifyCreatedAt", timestamps.start)
-            .lte("shopifyCreatedAt", timestamps.end),
-        )
-        .paginate({ numItems: ORDER_PAGE_SIZE, cursor: orderCursor });
-
-      for (const order of page.page) {
-        if (!order.customerId) continue;
-        const customerId = order.customerId as string;
-        if (!customerIds.has(customerId)) continue;
-        if (order.financialStatus === "cancelled") continue;
-
-        const bucket = ordersByCustomer.get(customerId) ?? [];
-        bucket.push({
-          date: order.shopifyCreatedAt,
-          amount: Number(order.totalPrice) || 0,
-        });
-        ordersByCustomer.set(customerId, bucket);
-      }
-
-      if (page.isDone || !page.continueCursor) {
-        break;
-      }
-
-      orderCursor = page.continueCursor;
-    }
-
-    const cohorts = new Map<
-      string,
-      {
-        customers: Set<string>;
-        ordersByPeriod: Map<number, { customers: Set<string>; revenue: number }>;
-      }
-    >();
-
-    for (const [customerId, meta] of cohortCustomers.entries()) {
-      const cohortKey = toCohortKey(meta.firstOrderMs);
-      if (!cohorts.has(cohortKey)) {
-        cohorts.set(cohortKey, {
-          customers: new Set(),
-          ordersByPeriod: new Map(),
-        });
-      }
-
-      const cohortBucket = cohorts.get(cohortKey)!;
-      cohortBucket.customers.add(customerId);
-
-      const orders = (ordersByCustomer.get(customerId) ?? []).sort(
-        (a, b) => a.date - b.date,
-      );
-
-      for (const order of orders) {
-        const period = Math.max(0, periodDifference(meta.firstOrderMs, order.date));
-        if (!cohortBucket.ordersByPeriod.has(period)) {
-          cohortBucket.ordersByPeriod.set(period, {
-            customers: new Set(),
-            revenue: 0,
-          });
-        }
-        const periodBucket = cohortBucket.ordersByPeriod.get(period)!;
-        periodBucket.customers.add(customerId);
-        periodBucket.revenue += order.amount;
-      }
-    }
-
-    const cohortResults = Array.from(cohorts.entries())
-      .map(([cohortKey, cohortData]) => {
-        const cohortSize = cohortData.customers.size;
-        if (cohortSize === 0) {
-          return null;
-        }
-
-        const periods = Array.from(cohortData.ordersByPeriod.entries())
-          .sort(([a], [b]) => a - b)
-          .slice(0, 12)
-          .map(([period, data]) => ({
-            period,
-            retained: data.customers.size,
-            percentage: cohortSize > 0 ? (data.customers.size / cohortSize) * 100 : 0,
-            revenue: data.revenue,
-          }));
-
-        return {
-          cohort: cohortKey,
-          cohortSize,
-          periods,
-        };
-      })
-      .filter((entry): entry is { cohort: string; cohortSize: number; periods: { period: number; retained: number; percentage: number; revenue: number; }[] } => Boolean(entry))
-      .sort((a, b) => b.cohort.localeCompare(a.cohort))
-      .slice(0, 12);
-
-    return cohortResults;
-  },
-});
-/**
- * Get geographic distribution
- */
-export const getGeographicDistribution = query({
-  args: {
-    dateRange: v.optional(dateRangeValidator),
-  },
-  returns: geographicValidator,
-  handler: async (ctx, args) => {
-    const auth = await getUserAndOrg(ctx);
     if (!auth) {
       return {
-        countries: [],
-        cities: [],
-        heatmapData: [],
+        page: [],
+        continueCursor: END_CURSOR,
+        isDone: true,
+        data: [],
+        pagination: {
+          page: fallbackPage,
+          pageSize: requestedItems,
+          total: 0,
+          totalPages: 0,
+        },
+        info: {
+          pageSize: requestedItems,
+          returned: 0,
+          hasMore: false,
+        },
       };
     }
 
-    const rangeInput = args.dateRange ?? defaultDateRange();
-    const range = validateDateRange(rangeInput);
+    const range = validateDateRange(args.dateRange ?? defaultDateRange());
+    if (range.dayCount && range.dayCount > MAX_CUSTOMER_RANGE_DAYS) {
+      throw new Error(`Date range too large. Please select ${MAX_CUSTOMER_RANGE_DAYS} days or fewer.`);
+    }
     const timestamps = toTimestampRange(range);
 
-    // Stream orders in the date range to limit memory and bandwidth
-    const orders: Array<Doc<"shopifyOrders">> = [];
-    let cursor: string | null = null;
-    const PAGE = 200;
-    while (true) {
-      const page = await ctx.db
-        .query("shopifyOrders")
+    const cursorKey = buildCustomersCursorKey({
+      dateRange: range,
+      status: args.status,
+      segment: args.segment,
+      searchTerm: args.searchTerm,
+      sortBy: args.sortBy,
+      sortOrder: args.sortOrder,
+      pageSize: requestedItems,
+    });
+
+    const decodedState = decodeCustomersCursor(args.paginationOpts?.cursor ?? null);
+    const initialState = decodedState && decodedState.key === cursorKey ? decodedState : null;
+
+    const sortBy = args.sortBy ?? "lastOrderDate";
+    const sortOrder = args.sortOrder ?? "desc";
+    const statusFilter = args.status ?? "all";
+    const segmentFilter = args.segment && args.segment !== "all" ? args.segment : null;
+    const searchTerm = args.searchTerm?.trim().toLowerCase() ?? null;
+
+    const entries: CustomerListEntry[] = [];
+    const seenIds = new Set<string>();
+
+    let lastCreatedAt = initialState?.lastCreatedAt ?? null;
+    let lastId = initialState?.lastId ?? null;
+    let done = initialState?.done ?? false;
+
+    const batchSize = Math.max(1, Math.min(requestedItems, MAX_CUSTOMER_PAGE_SIZE));
+    let rounds = 0;
+    let scannedCustomers = 0;
+    let truncatedByScanLimit = false;
+
+    while (entries.length < requestedItems && !done && rounds < MAX_CUSTOMER_FETCH_ROUNDS && scannedCustomers < MAX_CUSTOMERS_TO_SCAN) {
+      rounds += 1;
+
+      let baseQuery = ctx.db
+        .query("shopifyCustomers")
         .withIndex("by_organization_and_created", (q) =>
-          q
-            .eq("organizationId", auth.orgId as Id<"organizations">)
-            .gte("shopifyCreatedAt", timestamps.start)
-            .lte("shopifyCreatedAt", timestamps.end),
+          q.eq("organizationId", auth.orgId as Id<"organizations">),
         )
-        .paginate({ numItems: PAGE, cursor });
+        .order("desc");
 
-      for (const o of page.page) {
-        if (o.financialStatus !== "cancelled") orders.push(o);
+      if (lastCreatedAt !== null && lastId) {
+        const cursorCreatedAt = lastCreatedAt;
+        const cursorId = lastId;
+        baseQuery = baseQuery.filter((q) =>
+          q.or(
+            q.lt(q.field("shopifyCreatedAt"), cursorCreatedAt),
+            q.and(
+              q.eq(q.field("shopifyCreatedAt"), cursorCreatedAt),
+              q.lt(q.field("_id"), cursorId as Id<"shopifyCustomers">),
+            ),
+          ),
+        );
       }
 
-      if (page.isDone || !page.continueCursor) break;
-      cursor = page.continueCursor;
-    }
-
-    // Get unique customer IDs from orders
-    const customerIds = new Set<string>();
-    for (const order of orders) {
-      if (order.customerId) {
-        customerIds.add(order.customerId);
-      }
-    }
-
-    // Load only customers referenced by orders to minimize reads
-    const customers: Doc<"shopifyCustomers">[] = [];
-    const custIds = Array.from(customerIds);
-    const C_BATCH = 50;
-    for (let i = 0; i < custIds.length; i += C_BATCH) {
-      const slice = custIds.slice(i, i + C_BATCH);
-      const fetched = await Promise.all(
-        slice.map((id) => ctx.db.get(id as Id<"shopifyCustomers">)),
-      );
-      for (const c of fetched) {
-        if (c) customers.push(c);
-      }
-    }
-
-    // Build geographic aggregations
-    const countryMap = new Map<
-      string,
-      {
-        customers: Set<string>;
-        revenue: number;
-        orders: number;
-        cities: Map<string, { customers: Set<string>; revenue: number }>;
-        zipCodes: Map<string, { customers: Set<string>; revenue: number; city?: string }>;
-      }
-    >();
-
-    for (const customer of customers) {
-      if (!customerIds.has(customer._id)) continue;
-      if (!customer.defaultAddress?.country) continue;
-
-      const country = customer.defaultAddress.country;
-      const city = customer.defaultAddress.city;
-      const zip = customer.defaultAddress.zip;
-
-      if (!countryMap.has(country)) {
-        countryMap.set(country, {
-          customers: new Set(),
-          revenue: 0,
-          orders: 0,
-          cities: new Map(),
-          zipCodes: new Map(),
-        });
+      const chunk = await baseQuery.take(batchSize);
+      if (chunk.length === 0) {
+        done = true;
+        break;
       }
 
-      const countryData = countryMap.get(country)!;
-      countryData.customers.add(customer._id);
+      scannedCustomers += chunk.length;
 
-      // Add city data
-      if (city) {
-        if (!countryData.cities.has(city)) {
-          countryData.cities.set(city, { customers: new Set(), revenue: 0 });
-        }
-        countryData.cities.get(city)!.customers.add(customer._id);
-      }
+      let hitCapacity = false;
 
-      // Add zip data
-      if (zip) {
-        if (!countryData.zipCodes.has(zip)) {
-          countryData.zipCodes.set(zip, { customers: new Set(), revenue: 0, city });
-        }
-        countryData.zipCodes.get(zip)!.customers.add(customer._id);
-      }
-    }
+      for (const customer of chunk) {
+        lastCreatedAt = customer.shopifyCreatedAt;
+        lastId = customer._id as string;
 
-    // Aggregate revenue from orders
-    for (const order of orders) {
-      if (!order.customerId) continue;
-      if (!order.shippingAddress?.country) continue;
-
-      const country = order.shippingAddress.country;
-      if (countryMap.has(country)) {
-        const countryData = countryMap.get(country)!;
-        countryData.revenue += order.totalPrice;
-        countryData.orders += 1;
-
-        // Add to city revenue
-        const city = order.shippingAddress.city;
-        if (city && countryData.cities.has(city)) {
-          countryData.cities.get(city)!.revenue += order.totalPrice;
+        if (seenIds.has(customer._id as string)) {
+          continue;
         }
 
-        // Add to zip revenue
-        const zip = order.shippingAddress.zip;
-        if (zip && countryData.zipCodes.has(zip)) {
-          countryData.zipCodes.get(zip)!.revenue += order.totalPrice;
+        const name = `${customer.firstName ?? ""} ${customer.lastName ?? ""}`.trim() || "Anonymous";
+        const normalizedEmail = (customer.email ?? "").toLowerCase();
+        const normalizedName = name.toLowerCase();
+
+        if (searchTerm && !normalizedName.includes(searchTerm) && !normalizedEmail.includes(searchTerm)) {
+          continue;
         }
+
+        const orders = await ctx.db
+          .query("shopifyOrders")
+          .withIndex("by_customer", (q) =>
+            q.eq("customerId", customer._id as Id<"shopifyCustomers">),
+          )
+          .filter((q) =>
+            q.and(
+              q.gte(q.field("shopifyCreatedAt"), timestamps.start),
+              q.lte(q.field("shopifyCreatedAt"), timestamps.end),
+            ),
+          )
+          .order("desc")
+          .take(MAX_ORDERS_PER_CUSTOMER);
+
+        const validOrders = orders.filter((order) => order.financialStatus !== "cancelled");
+
+        const lifetimeValue = validOrders.reduce((sum, order) => sum + order.totalPrice, 0);
+        const orderCount = validOrders.length;
+        const avgOrderValue = orderCount > 0 ? lifetimeValue / orderCount : 0;
+
+        const orderTimestamps = validOrders
+          .map((order) => order.shopifyCreatedAt)
+          .sort((a, b) => a - b);
+
+        const firstOrderTimestamp = orderTimestamps[0];
+        const lastOrderTimestamp = orderTimestamps[orderTimestamps.length - 1];
+
+        const firstOrderDate = firstOrderTimestamp
+          ? new Date(firstOrderTimestamp).toISOString()
+          : new Date(timestamps.start).toISOString();
+        const lastOrderDate = lastOrderTimestamp
+          ? new Date(lastOrderTimestamp).toISOString()
+          : new Date(timestamps.start).toISOString();
+
+        const shopifyCreatedAtIso = new Date(
+          customer.shopifyCreatedAt ?? customer.syncedAt ?? Date.now(),
+        ).toISOString();
+        const shopifyUpdatedAtIso = customer.shopifyUpdatedAt
+          ? new Date(customer.shopifyUpdatedAt).toISOString()
+          : undefined;
+
+        let segment = "prospect";
+        if (orderCount === 1) {
+          segment = "new";
+        } else if (orderCount >= 2 && lifetimeValue < 500) {
+          segment = "regular";
+        } else if (orderCount >= 2 && lifetimeValue >= 500 && lifetimeValue < 1000) {
+          segment = "vip";
+        } else if (orderCount >= 2 && lifetimeValue >= 1000) {
+          segment = "champion";
+        }
+
+        if (segmentFilter && segment !== segmentFilter) {
+          continue;
+        }
+
+        const convertedStatus = orderCount > 0 ? "converted" : "abandoned_cart";
+        if (statusFilter === "converted" && convertedStatus !== "converted") {
+          continue;
+        }
+        if (statusFilter === "abandoned_cart" && convertedStatus !== "abandoned_cart") {
+          continue;
+        }
+
+        const entry: CustomerListEntry = {
+          id: customer._id as string,
+          name,
+          email: customer.email ?? "",
+          avatar: undefined,
+          status: convertedStatus,
+          lifetimeValue,
+          orders: orderCount,
+          avgOrderValue,
+          lastOrderDate,
+          firstOrderDate,
+          shopifyCreatedAt: shopifyCreatedAtIso,
+          shopifyUpdatedAt: shopifyUpdatedAtIso,
+          segment,
+          city: customer.defaultAddress?.city,
+          country: customer.defaultAddress?.country,
+          periodOrders: orderCount,
+          periodRevenue: lifetimeValue,
+          isReturning: orderCount > 1,
+        } satisfies CustomerListEntry;
+
+        entries.push(entry);
+        seenIds.add(entry.id);
+
+        if (entries.length >= requestedItems) {
+          hitCapacity = true;
+          break;
+        }
+      }
+
+      if (hitCapacity) {
+        done = false;
+        break;
+      }
+
+      if (chunk.length < batchSize) {
+        done = true;
+      }
+
+      if (scannedCustomers >= MAX_CUSTOMERS_TO_SCAN) {
+        truncatedByScanLimit = true;
+        done = false;
+        break;
       }
     }
 
-    // Build result arrays
-    const countries = Array.from(countryMap.entries()).map(([country, data]) => ({
-      country,
-      customers: data.customers.size,
-      revenue: data.revenue,
-      orders: data.orders,
-      avgOrderValue: data.orders > 0 ? data.revenue / data.orders : 0,
-      zipCodes: Array.from(data.zipCodes.entries()).map(([zipCode, zipData]) => ({
-        zipCode,
-        city: zipData.city,
-        customers: zipData.customers.size,
-        revenue: zipData.revenue,
-      })),
-    }));
+    const sortedEntries = sortCustomerEntries(entries, sortBy, sortOrder);
+    const pageEntries = sortedEntries.slice(0, requestedItems);
 
-    const cities = Array.from(countryMap.entries()).flatMap(([country, data]) =>
-      Array.from(data.cities.entries()).map(([city, cityData]) => ({
-        city,
-        country,
-        customers: cityData.customers.size,
-        revenue: cityData.revenue,
-      })),
-    );
+    const hasMore = truncatedByScanLimit || !done;
+
+    const continueCursor = hasMore && lastCreatedAt !== null && lastId
+      ? encodeCustomersCursor({
+          lastCreatedAt,
+          lastId,
+          done: false,
+          key: cursorKey,
+        })
+      : END_CURSOR;
 
     return {
-      countries,
-      cities,
-      heatmapData: [], // TODO: Implement heatmap coordinates
+      page: pageEntries,
+      continueCursor,
+      isDone: !hasMore,
+      data: pageEntries,
+      info: {
+        pageSize: requestedItems,
+        returned: pageEntries.length,
+        hasMore,
+        ...(truncatedByScanLimit ? { truncated: true } : {}),
+      },
     };
   },
 });
@@ -914,79 +760,5 @@ export const getCustomerJourney = query({
         color: "retention",
       },
     ];
-  },
-});
-
-export const getAnalytics = action({
-  args: {
-    dateRange: dateRangeValidator,
-    page: v.optional(v.number()),
-    pageSize: v.optional(v.number()),
-    searchTerm: v.optional(v.string()),
-    segment: v.optional(v.string()),
-    sortBy: v.optional(v.string()),
-    sortOrder: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
-    status: v.optional(
-      v.union(
-        v.literal("all"),
-        v.literal("converted"),
-        v.literal("abandoned_cart"),
-      ),
-    ),
-  },
-  returns: v.union(
-    v.null(),
-    v.object({
-      dateRange: dateRangeValidator,
-      organizationId: v.string(),
-      result: customerAnalyticsResultValidator,
-    }),
-  ),
-  handler: async (ctx, args): Promise<
-    | {
-        dateRange: { startDate: string; endDate: string };
-        organizationId: string;
-        result: CustomerAnalyticsResult;
-      }
-    | null
-  > => {
-    const auth = await getUserAndOrg(ctx);
-    if (!auth) return null;
-
-    const range = validateDateRange(args.dateRange);
-
-    const [overview, cohorts, geographic, journey] = await Promise.all([
-      ctx.runQuery(api.web.customers.getCustomerOverview, {
-        dateRange: range,
-      }),
-      ctx.runQuery(api.web.customers.getCohortAnalysis, {
-        dateRange: range,
-        cohortType: "monthly",
-      }),
-      ctx.runQuery(api.web.customers.getGeographicDistribution, {
-        dateRange: range,
-      }),
-      ctx.runQuery(api.web.customers.getCustomerJourney, {
-        dateRange: range,
-      }),
-    ]);
-
-    const customerListPayload = null;
-
-    return {
-      dateRange: range,
-      organizationId: auth.orgId,
-      result: {
-        overview: overview ?? null,
-        cohorts: cohorts ?? null,
-        geographic: geographic ?? null,
-        journey: journey ?? null,
-        customerList: customerListPayload,
-      },
-    } satisfies {
-      dateRange: { startDate: string; endDate: string };
-      organizationId: string;
-      result: CustomerAnalyticsResult;
-    };
   },
 });

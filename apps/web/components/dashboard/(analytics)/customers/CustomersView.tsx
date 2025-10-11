@@ -1,7 +1,7 @@
 "use client";
 
-import { Skeleton, Spacer } from "@heroui/react";
-import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Spacer } from "@heroui/react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 
 import { AnalyticsHeader } from "@/components/shared/AnalyticsHeader";
 import GlobalDateRangePicker from "@/components/shared/GlobalDateRangePicker";
@@ -9,13 +9,7 @@ import { FilterBar } from "@/components/shared/filters/FilterBar";
 import { ExportButton } from "@/components/shared/actions/ExportButton";
 import { useAnalyticsDateRange, useCustomerAnalytics } from "@/hooks";
 
-import { CustomerTable } from "../customer-insights/components/CustomerTable";
-
-const CustomerKPICards = lazy(() =>
-  import("./CustomerKPICards").then((mod) => ({
-    default: mod.CustomerKPICards,
-  }))
-);
+import { CustomerTable } from "./components/CustomerTable";
 
 const STATUS_FILTERS = [
   { value: "all", label: "All Customers" },
@@ -33,7 +27,7 @@ export const CustomersView = memo(function CustomersView() {
   const [statusFilter, setStatusFilter] = useState<"all" | "converted" | "abandoned_cart">("all");
   const [currentPage, setCurrentPage] = useState(1);
 
-  const { overview, customers, loadingStates, exportData } = useCustomerAnalytics({
+  const { customers, loadingStates, exportData } = useCustomerAnalytics({
     dateRange: customersRange,
     status: statusFilter,
     page: currentPage,
@@ -80,13 +74,10 @@ export const CustomersView = memo(function CustomersView() {
     }
   }, []);
 
-  const exportButtonData = useMemo(() => {
-    if (Array.isArray(exportData)) {
-      return (exportData as Record<string, unknown>[]).map((row) => ({ ...row }));
-    }
-    if (typeof exportData === "function") return exportData;
-    return [] as Record<string, unknown>[];
-  }, [exportData]);
+  const exportButtonData = useMemo(
+    () => exportData.map((row) => ({ ...row })),
+    [exportData]
+  );
 
   return (
     <div className="flex flex-col space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -116,32 +107,6 @@ export const CustomersView = memo(function CustomersView() {
           />
         }
       />
-
-      <Suspense
-        fallback={
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {[1, 2, 3, 4].map((i) => (
-              <Skeleton key={i} className="h-32 rounded-lg" />
-            ))}
-          </div>
-        }
-      >
-        <CustomerKPICards
-          loading={loadingStates.overview}
-          metrics={
-            overview
-              ? {
-                totalCustomers: overview.totalCustomers,
-                periodCustomerCount: overview.periodCustomerCount,
-                prepaidRate: overview.prepaidRate,
-                repeatRate: overview.repeatPurchaseRate,
-                abandonedCartCustomers: overview.abandonedCartCustomers,
-                abandonedRate: overview.abandonedRate,
-              }
-              : undefined
-          }
-        />
-      </Suspense>
 
       <CustomerTable
         customers={customers?.data || []}

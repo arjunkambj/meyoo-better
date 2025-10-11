@@ -1,38 +1,11 @@
 import { useQuery } from "convex-helpers/react/cache/hooks";
-import { useAction } from "convex/react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { api } from "@/libs/convexApi";
 import { dateRangeToUtcWithShopPreference } from "@/libs/dateRange";
-import { useUser } from "./useUser";
 import { useShopifyTime } from "./useShopifyTime";
-import type { JourneyStage } from "@/components/dashboard/(analytics)/customer-insights/components/CustomerJourney";
-import type { CohortData } from "@/components/dashboard/(analytics)/orders-insights/components/CohortAnalysis";
-import type { GeoData } from "@/components/dashboard/(analytics)/orders-insights/components/GeographicDistribution";
+import { useUser } from "./useUser";
 import { formatCurrency } from "@/libs/utils/format";
-
-interface CustomerOverviewMetrics {
-  totalCustomers: number;
-  newCustomers: number;
-  returningCustomers: number;
-  activeCustomers: number;
-  churnedCustomers: number;
-  avgLTV: number;
-  avgCAC: number;
-  ltvCacRatio: number;
-  avgOrderValue: number;
-  avgOrdersPerCustomer: number;
-  repeatPurchaseRate: number;
-  periodCustomerCount: number;
-  prepaidRate: number;
-  abandonedRate: number;
-  abandonedCartCustomers: number;
-  changes: {
-    totalCustomers: number;
-    newCustomers: number;
-    avgLTV: number;
-  };
-}
 
 interface Customer {
   id: string;
@@ -80,39 +53,8 @@ interface CustomersPageSnapshot {
     pageSize: number;
     returned: number;
     hasMore: boolean;
+    truncated?: boolean;
   };
-}
-
-function buildCustomerCursorKey(args: {
-  dateRange: {
-    startDate: string;
-    endDate: string;
-    startDateTimeUtc: string;
-    endDateTimeUtcExclusive: string;
-    endDateTimeUtc: string;
-    dayCount: number;
-  };
-  status?: string;
-  segment?: string;
-  searchTerm?: string;
-  sortBy?: string;
-  sortOrder?: "asc" | "desc";
-  pageSize: number;
-}): string {
-  const { dateRange, status, segment, searchTerm, sortBy, sortOrder, pageSize } = args;
-  return JSON.stringify({
-    dateRange,
-    status: status ?? null,
-    segment: segment ?? null,
-    search: searchTerm ?? null,
-    sortBy: sortBy ?? null,
-    sortOrder: sortOrder ?? null,
-    pageSize,
-  });
-}
-
-function encodeCustomerCursor(state: { offset: number; key: string }): string {
-  return JSON.stringify(state);
 }
 
 export interface UseCustomerAnalyticsParams {
@@ -130,98 +72,6 @@ export interface UseCustomerAnalyticsParams {
 }
 
 type BackendOverview = {
-  totalCustomers: number;
-  newCustomers: number;
-  returningCustomers: number;
-  activeCustomers: number;
-  churnedCustomers: number;
-  avgLifetimeValue: number;
-  avgOrderValue: number;
-  avgOrdersPerCustomer: number;
-  customerAcquisitionCost: number;
-  repeatPurchaseRate: number;
-  periodCustomerCount: number;
-  prepaidRate: number;
-  abandonedRate: number;
-  abandonedCartCustomers: number;
-  changes: {
-    totalCustomers: number;
-    newCustomers: number;
-    lifetimeValue: number;
-  };
-};
-
-type BackendCohort = {
-  cohort: string;
-  cohortSize: number;
-  periods: Array<{
-    period: number;
-    percentage: number;
-    revenue?: number;
-    retained?: number;
-  }>;
-};
-
-type BackendCustomerList = {
-  data?: Customer[];
-  page?: Customer[];
-  pagination?: {
-    page: number;
-    pageSize: number;
-    total: number;
-    totalPages: number;
-  };
-  continueCursor?: string | null;
-};
-
-type BackendGeoZip = {
-  zipCode: string;
-  city?: string;
-  customers: number;
-  revenue: number;
-};
-
-type BackendGeoCountry = {
-  country: string;
-  customers: number;
-  revenue: number;
-  avgOrderValue: number;
-  orders?: number;
-  zipCodes?: BackendGeoZip[];
-};
-
-type BackendGeographic = {
-  countries: BackendGeoCountry[];
-  cities: Array<{
-    city: string;
-    country: string;
-    customers: number;
-    revenue: number;
-  }>;
-  heatmapData: Array<{ lat: number; lng: number; value: number }>;
-};
-
-type BackendJourneyStage = {
-  stage: string;
-  customers: number;
-  percentage: number;
-  avgDays: number;
-  conversionRate: number;
-  icon: string;
-  color: string;
-  metaConversionRate?: number;
-};
-
-type CustomerAnalyticsResponse = {
-  dateRange: { startDate: string; endDate: string };
-  organizationId: string;
-  result: {
-    overview: BackendOverview | null;
-    cohorts: BackendCohort[];
-    customerList: BackendCustomerList | null;
-    geographic: BackendGeographic | null;
-    journey: BackendJourneyStage[];
-  };
 };
 
 const defaultRange = () => {
@@ -250,6 +100,13 @@ export function useCustomerAnalytics(params: UseCustomerAnalyticsParams = {}) {
   } = params;
 
   const requestedPage = Math.max(1, page);
+
+  const cursorMapRef = useRef<Record<number, string | null>>({ 1: null });
+  const [cursorRevision, setCursorRevision] = useState(0);
+  const [prefetchPage, setPrefetchPage] = useState<number | null>(null);
+  const prefetchInFlightRef = useRef<number | null>(null);
+  const maxKnownPageRef = useRef<number | null>(null);
+  const [maxKnownPageVersion, setMaxKnownPageVersion] = useState(0);
 
   const normalizedSearch = useMemo(() => {
     if (!searchTerm) return undefined;
@@ -292,108 +149,14 @@ export function useCustomerAnalytics(params: UseCustomerAnalyticsParams = {}) {
     } as const;
   }, [effectiveDateRange.endDate, effectiveDateRange.startDate, rangeStrings]);
 
-  // Use consolidated action for overview-related metrics
-  const [analyticsData, setAnalyticsData] =
-    useState<CustomerAnalyticsResponse | null>(null);
-  const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(true);
-  const fetchAnalytics = useAction(api.web.customers.getAnalytics);
-
-  useEffect(() => {
-    if (!normalizedRange) {
-      setIsLoadingAnalytics(false);
-      return;
-    }
-
-    let cancelled = false;
-    setIsLoadingAnalytics(true);
-
-    fetchAnalytics({
-      dateRange: normalizedRange,
-    })
-      .then((result: CustomerAnalyticsResponse | null) => {
-        if (!cancelled) {
-          setAnalyticsData(result);
-          setIsLoadingAnalytics(false);
-        }
-      })
-      .catch((error) => {
-        console.error("Failed to load customer analytics:", error);
-        if (!cancelled) {
-          setIsLoadingAnalytics(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    fetchAnalytics,
-    normalizedRange?.startDate,
-    normalizedRange?.endDate,
-    normalizedRange?.startDateTimeUtc,
-    normalizedRange?.endDateTimeUtcExclusive,
-  ]);
-
-  const overviewQuery = analyticsData?.result?.overview;
-  const cohortsQuery = analyticsData?.result?.cohorts;
-  const geographicQuery = analyticsData?.result?.geographic;
-  const journeyQuery = analyticsData?.result?.journey;
-
-  const overview: CustomerOverviewMetrics | undefined = useMemo(() => {
-    if (!overviewQuery) return undefined;
-
-    const ltv = overviewQuery.avgLifetimeValue;
-    const cac = overviewQuery.customerAcquisitionCost;
-
-    return {
-      totalCustomers: overviewQuery.totalCustomers,
-      newCustomers: overviewQuery.newCustomers,
-      returningCustomers: overviewQuery.returningCustomers,
-      activeCustomers: overviewQuery.activeCustomers,
-      churnedCustomers: overviewQuery.churnedCustomers,
-      avgLTV: ltv,
-      avgCAC: cac,
-      ltvCacRatio: cac > 0 ? ltv / cac : 0,
-      avgOrderValue: overviewQuery.avgOrderValue,
-      avgOrdersPerCustomer: overviewQuery.avgOrdersPerCustomer,
-      repeatPurchaseRate: overviewQuery.repeatPurchaseRate,
-      periodCustomerCount: overviewQuery.periodCustomerCount,
-      prepaidRate: overviewQuery.prepaidRate,
-      abandonedRate:
-        overviewQuery.periodCustomerCount > 0
-          ? (overviewQuery.abandonedCartCustomers / overviewQuery.periodCustomerCount) * 100
-          : 0,
-      abandonedCartCustomers: overviewQuery.abandonedCartCustomers,
-      changes: {
-        totalCustomers: overviewQuery.changes.totalCustomers,
-        newCustomers: overviewQuery.changes.newCustomers,
-        avgLTV: overviewQuery.changes.lifetimeValue,
-      },
-    };
-  }, [overviewQuery]);
-
-  const cohorts: CohortData[] | undefined = useMemo(() => {
-    if (!cohortsQuery) return undefined;
-
-    return cohortsQuery.map((cohort: BackendCohort) => ({
-      cohort: cohort.cohort,
-      size: cohort.cohortSize,
-      months: cohort.periods.map((period: BackendCohort["periods"][number]) => ({
-        month: period.period,
-        retention: period.percentage,
-        revenue: period.revenue,
-      })),
-    }));
-  }, [cohortsQuery]);
-
-  const cursorKey = useMemo(() => {
+  const cursorIdentity = useMemo(() => {
     if (!normalizedRange) return null;
-    return buildCustomerCursorKey({
-      dateRange: normalizedRange,
-      status: status === "all" ? undefined : status,
-      segment: normalizedSegment,
-      searchTerm: normalizedSearch,
-      sortBy,
+    return JSON.stringify({
+      range: normalizedRange,
+      status,
+      segment: normalizedSegment ?? null,
+      search: normalizedSearch ?? null,
+      sortBy: sortBy ?? null,
       sortOrder,
       pageSize,
     });
@@ -402,8 +165,6 @@ export function useCustomerAnalytics(params: UseCustomerAnalyticsParams = {}) {
     normalizedRange?.endDate,
     normalizedRange?.startDateTimeUtc,
     normalizedRange?.endDateTimeUtcExclusive,
-    normalizedRange?.endDateTimeUtc,
-    normalizedRange?.dayCount,
     status,
     normalizedSegment,
     normalizedSearch,
@@ -412,16 +173,35 @@ export function useCustomerAnalytics(params: UseCustomerAnalyticsParams = {}) {
     pageSize,
   ]);
 
-  const cursorForPage = useMemo(() => {
-    if (!cursorKey || requestedPage <= 1) {
-      return null;
+  useEffect(() => {
+    cursorMapRef.current = { 1: null };
+    maxKnownPageRef.current = null;
+    prefetchInFlightRef.current = null;
+    setPrefetchPage(null);
+    setCursorRevision((prev) => prev + 1);
+    setMaxKnownPageVersion(0);
+  }, [cursorIdentity]);
+
+  const effectivePage = useMemo(() => {
+    const maxKnown = maxKnownPageRef.current;
+    if (maxKnown !== null && requestedPage > maxKnown) {
+      return maxKnown;
     }
-    const offset = (requestedPage - 1) * pageSize;
-    return encodeCustomerCursor({ offset, key: cursorKey });
-  }, [cursorKey, requestedPage, pageSize]);
+    return requestedPage;
+  }, [requestedPage, maxKnownPageVersion]);
+
+  const waitingForCursor = useMemo(() => {
+    if (effectivePage <= 1) return false;
+    return !(effectivePage in cursorMapRef.current);
+  }, [effectivePage, cursorRevision]);
+
+  const currentCursor = useMemo(() => {
+    if (effectivePage === 1) return null;
+    return cursorMapRef.current[effectivePage] ?? null;
+  }, [effectivePage, cursorRevision]);
 
   const customersQueryArgs = useMemo(() => {
-    if (!normalizedRange) return "skip" as const;
+    if (!normalizedRange || waitingForCursor) return "skip" as const;
     return {
       dateRange: normalizedRange,
       status: status === "all" ? undefined : status,
@@ -429,10 +209,10 @@ export function useCustomerAnalytics(params: UseCustomerAnalyticsParams = {}) {
       segment: normalizedSegment,
       sortBy,
       sortOrder,
-      page: requestedPage,
+      page: effectivePage,
       pageSize,
       paginationOpts: {
-        cursor: cursorForPage,
+        cursor: currentCursor,
         numItems: pageSize,
       },
     };
@@ -448,24 +228,183 @@ export function useCustomerAnalytics(params: UseCustomerAnalyticsParams = {}) {
     normalizedSegment,
     sortBy,
     sortOrder,
-    requestedPage,
     pageSize,
-    cursorForPage,
+    waitingForCursor,
+    currentCursor,
+    effectivePage,
   ]);
+
+  useEffect(() => {
+    if (!normalizedRange) {
+      return;
+    }
+
+    if (prefetchInFlightRef.current !== null) {
+      return;
+    }
+
+    const targetPage = effectivePage;
+    for (let candidate = 2; candidate <= targetPage; candidate++) {
+      if (!(candidate in cursorMapRef.current)) {
+        const predecessor = candidate - 1;
+        if (predecessor < 1) {
+          break;
+        }
+        if (!(predecessor in cursorMapRef.current)) {
+          continue;
+        }
+        prefetchInFlightRef.current = predecessor;
+        setPrefetchPage(predecessor);
+        return;
+      }
+    }
+
+    if (prefetchPage !== null) {
+      setPrefetchPage(null);
+    }
+  }, [effectivePage, normalizedRange, cursorRevision, prefetchPage]);
+
+  const prefetchQueryArgs = useMemo(() => {
+    if (!normalizedRange || prefetchPage === null) return "skip" as const;
+    if (!(prefetchPage in cursorMapRef.current)) return "skip" as const;
+    const cursor = cursorMapRef.current[prefetchPage];
+    if (prefetchPage > 1 && cursor === null) return "skip" as const;
+
+    return {
+      dateRange: normalizedRange,
+      status: status === "all" ? undefined : status,
+      searchTerm: normalizedSearch,
+      segment: normalizedSegment,
+      sortBy,
+      sortOrder,
+      page: prefetchPage,
+      pageSize,
+      paginationOpts: {
+        cursor,
+        numItems: pageSize,
+      },
+    };
+  }, [
+    normalizedRange?.startDate,
+    normalizedRange?.endDate,
+    normalizedRange?.startDateTimeUtc,
+    normalizedRange?.endDateTimeUtcExclusive,
+    normalizedRange?.endDateTimeUtc,
+    normalizedRange?.dayCount,
+    status,
+    normalizedSearch,
+    normalizedSegment,
+    sortBy,
+    sortOrder,
+    pageSize,
+    prefetchPage,
+    cursorRevision,
+  ]);
+
+  const prefetchSnapshot = useQuery(
+    (api.web.customers as Record<string, any>).getCustomerList,
+    prefetchQueryArgs,
+  ) as CustomersPageSnapshot | undefined;
 
   const customersPageSnapshot = useQuery(
     (api.web.customers as Record<string, any>).getCustomerList,
     customersQueryArgs,
   ) as CustomersPageSnapshot | undefined;
 
+  useEffect(() => {
+    if (!customersPageSnapshot) return;
+
+    const hasMore = customersPageSnapshot.info?.hasMore ??
+      (customersPageSnapshot.continueCursor !== END_CURSOR && !customersPageSnapshot.isDone);
+
+    let cursorMapChanged = false;
+    const nextPageIndex = effectivePage + 1;
+
+    if (!(effectivePage in cursorMapRef.current)) {
+      cursorMapRef.current[effectivePage] = currentCursor ?? null;
+      cursorMapChanged = true;
+    }
+
+    if (hasMore && customersPageSnapshot.continueCursor !== END_CURSOR) {
+      const nextCursor = customersPageSnapshot.continueCursor;
+      if (cursorMapRef.current[nextPageIndex] !== nextCursor) {
+        cursorMapRef.current[nextPageIndex] = nextCursor;
+        cursorMapChanged = true;
+      }
+    } else {
+      if (nextPageIndex in cursorMapRef.current) {
+        delete cursorMapRef.current[nextPageIndex];
+        cursorMapChanged = true;
+      }
+
+      if (customersPageSnapshot.isDone) {
+        const maxPage = effectivePage;
+        if (maxKnownPageRef.current === null || maxKnownPageRef.current < maxPage) {
+          maxKnownPageRef.current = maxPage;
+          setMaxKnownPageVersion((prev) => prev + 1);
+        }
+      }
+    }
+
+    if (cursorMapChanged) {
+      setCursorRevision((prev) => prev + 1);
+    }
+
+    if (prefetchInFlightRef.current === effectivePage) {
+      prefetchInFlightRef.current = null;
+    }
+  }, [customersPageSnapshot, effectivePage, currentCursor]);
+
+  useEffect(() => {
+    const pageBeingPrefetched = prefetchInFlightRef.current;
+    if (!prefetchSnapshot || pageBeingPrefetched === null) {
+      return;
+    }
+
+    const hasMore = prefetchSnapshot.info?.hasMore ??
+      (prefetchSnapshot.continueCursor !== END_CURSOR && !prefetchSnapshot.isDone);
+
+    let cursorMapChanged = false;
+    const nextPageIndex = pageBeingPrefetched + 1;
+
+    if (hasMore && prefetchSnapshot.continueCursor !== END_CURSOR) {
+      const nextCursor = prefetchSnapshot.continueCursor;
+      if (cursorMapRef.current[nextPageIndex] !== nextCursor) {
+        cursorMapRef.current[nextPageIndex] = nextCursor;
+        cursorMapChanged = true;
+      }
+    } else {
+      if (nextPageIndex in cursorMapRef.current) {
+        delete cursorMapRef.current[nextPageIndex];
+        cursorMapChanged = true;
+      }
+
+      if (prefetchSnapshot.isDone) {
+        const maxPage = pageBeingPrefetched;
+        if (maxKnownPageRef.current === null || maxKnownPageRef.current < maxPage) {
+          maxKnownPageRef.current = maxPage;
+          setMaxKnownPageVersion((prev) => prev + 1);
+        }
+      }
+    }
+
+    prefetchInFlightRef.current = null;
+    setPrefetchPage(null);
+
+    if (cursorMapChanged) {
+      setCursorRevision((prev) => prev + 1);
+    }
+  }, [prefetchSnapshot]);
+
   const customersLoading =
-    customersQueryArgs !== "skip" && customersPageSnapshot === undefined;
+    (customersQueryArgs !== "skip" && customersPageSnapshot === undefined) ||
+    waitingForCursor;
 
   const customers: CustomersResult | undefined = useMemo(() => {
     if (!customersPageSnapshot) return undefined;
 
     const paginationSource = customersPageSnapshot.pagination ?? {
-      page: requestedPage,
+      page: effectivePage,
       pageSize,
       total: customersPageSnapshot.page.length,
       totalPages: Math.max(
@@ -488,197 +427,37 @@ export function useCustomerAnalytics(params: UseCustomerAnalyticsParams = {}) {
         hasMore,
       },
     };
-  }, [customersPageSnapshot, pageSize, requestedPage]);
+  }, [customersPageSnapshot, pageSize, effectivePage]);
 
-  const geographicSource = geographicQuery ?? null;
+  const exportData = useMemo(() => {
+    if (!customers) return [] as Array<Record<string, unknown>>;
 
-  const geographicTotals = useMemo(() => {
-    if (!geographicSource) return 0;
-
-    return geographicSource.countries.reduce(
-      (sum: number, country: BackendGeoCountry) => sum + country.customers,
-      0,
-    );
-  }, [geographicSource]);
-
-  const geographic: GeoData[] | undefined = useMemo(() => {
-    if (!geographicSource) return undefined;
-
-    const total = geographicTotals || 1;
-
-    return geographicSource.countries.map((country: BackendGeoCountry) => ({
-      country: country.country,
-      customers: country.customers,
-      revenue: country.revenue,
-      avgOrderValue: country.avgOrderValue,
-      percentage: (country.customers / total) * 100,
-      zipCodes: country.zipCodes?.map((zip: BackendGeoZip) => ({
-        zipCode: zip.zipCode,
-        city: zip.city ?? undefined,
-        customers: zip.customers,
-        revenue: zip.revenue,
-      })),
+    return customers.data.map((c) => ({
+      Name: c.name,
+      Email: c.email,
+      Status: c.status,
+      "Lifetime Value": formatCurrency(c.lifetimeValue, primaryCurrency),
+      Orders: c.orders,
+      "Orders (Range)": c.periodOrders,
+      "Avg Order Value": formatCurrency(c.avgOrderValue, primaryCurrency),
+      "Revenue (Range)": formatCurrency(c.periodRevenue, primaryCurrency),
+      "Last Order": c.lastOrderDate,
+      "First Order": c.firstOrderDate,
+      Segment: c.segment,
+      Returning: c.isReturning ? "Yes" : "No",
+      Location: c.city && c.country ? `${c.city}, ${c.country}` : "Unknown",
     }));
-  }, [geographicSource, geographicTotals]);
-
-  const journey: JourneyStage[] | undefined = useMemo(() => {
-    if (!journeyQuery) return undefined;
-
-    const colorMap: Record<string, { bg: string; text: string }> = {
-      primary: { bg: "bg-primary/10", text: "text-primary" },
-      secondary: { bg: "bg-secondary/10", text: "text-secondary" },
-      success: { bg: "bg-success/10", text: "text-success" },
-      warning: { bg: "bg-warning/10", text: "text-warning" },
-      danger: { bg: "bg-danger/10", text: "text-danger" },
-      info: { bg: "bg-info/10", text: "text-info" },
-      interest: {
-        bg: "bg-sky-100 dark:bg-sky-500/15",
-        text: "text-sky-700 dark:text-sky-200",
-      },
-      retention: {
-        bg: "bg-emerald-100 dark:bg-emerald-500/15",
-        text: "text-emerald-700 dark:text-emerald-200",
-      },
-      default: { bg: "bg-default-100", text: "text-default-500" },
-    };
-
-    return journeyQuery.map((stage: BackendJourneyStage) => ({
-      stage: stage.stage,
-      customers: stage.customers,
-      percentage: stage.percentage,
-      avgDays: stage.avgDays,
-      conversionRate: stage.conversionRate,
-      icon: stage.icon,
-      color: stage.color,
-      bgColor: (colorMap[stage.color] ?? colorMap.default)!.bg,
-      textColor: (colorMap[stage.color] ?? colorMap.default)!.text,
-      metaConversionRate: stage.metaConversionRate,
-    }));
-  }, [journeyQuery]);
-
-  const exportData = async () => {
-    const exportableData = [] as Array<Record<string, unknown>>;
-
-    if (overview) {
-      exportableData.push({
-        section: "Overview",
-        metrics: {
-          "Total Customers": overview.totalCustomers,
-          "New Customers": overview.newCustomers,
-          "Returning Customers": overview.returningCustomers,
-          "Active Customers": overview.activeCustomers,
-          "Churned Customers": overview.churnedCustomers,
-          "Avg Lifetime Value": formatCurrency(
-            overview.avgLTV,
-            primaryCurrency,
-          ),
-          "Avg Order Value": formatCurrency(
-            overview.avgOrderValue,
-            primaryCurrency,
-          ),
-          "Avg Orders per Customer": overview.avgOrdersPerCustomer.toFixed(2),
-          "Customer Acquisition Cost": formatCurrency(
-            overview.avgCAC,
-            primaryCurrency,
-          ),
-          "LTV:CAC Ratio": `${overview.ltvCacRatio.toFixed(1)}x`,
-          "Repeat Purchase Rate": `${overview.repeatPurchaseRate.toFixed(1)}%`,
-        },
-      });
-    }
-
-    if (cohorts) {
-      exportableData.push({
-        section: "Cohort Analysis",
-        data: cohorts.map((c) => ({
-          Cohort: c.cohort,
-          "Cohort Size": c.size,
-          ...c.months.reduce(
-            (
-              acc: Record<string, string>,
-              m: { month: number; retention: number; revenue?: number },
-              idx: number,
-            ) => {
-              acc[`Month ${idx}`] = `${m.retention.toFixed(1)}%`;
-
-              return acc;
-            },
-            {} as Record<string, string>,
-          ),
-        })),
-      });
-    }
-
-    if (customers) {
-      exportableData.push({
-        section: "Customers",
-        data: customers.data.map((c) => ({
-          Name: c.name,
-          Email: c.email,
-          Status: c.status,
-          "Lifetime Value": formatCurrency(c.lifetimeValue, primaryCurrency),
-          Orders: c.orders,
-          "Orders (Range)": c.periodOrders,
-          "Avg Order Value": formatCurrency(c.avgOrderValue, primaryCurrency),
-          "Revenue (Range)": formatCurrency(c.periodRevenue, primaryCurrency),
-          "Last Order": c.lastOrderDate,
-          "First Order": c.firstOrderDate,
-          Segment: c.segment,
-          Returning: c.isReturning ? "Yes" : "No",
-          Location:
-            c.city && c.country ? `${c.city}, ${c.country}` : "Unknown",
-        })),
-      });
-    }
-
-    if (geographic) {
-      exportableData.push({
-        section: "Geographic Distribution",
-        data: geographic.map((g) => ({
-          Country: g.country,
-          Customers: g.customers,
-          Revenue: formatCurrency(g.revenue, primaryCurrency),
-          "Avg Order Value": formatCurrency(g.avgOrderValue, primaryCurrency),
-          Percentage: `${g.percentage.toFixed(1)}%`,
-        })),
-      });
-    }
-
-    if (journey) {
-      exportableData.push({
-        section: "Customer Journey",
-        data: journey.map((j) => ({
-          Stage: j.stage,
-          Customers: j.customers,
-          Percentage: `${j.percentage}%`,
-          "Avg Days": j.avgDays,
-          "Conversion Rate": `${j.conversionRate}%`,
-        })),
-      });
-    }
-
-    return exportableData;
-  };
+  }, [customers, primaryCurrency]);
 
   const loadingStates = {
-    overview: isLoadingAnalytics || overviewQuery === undefined,
-    cohorts: isLoadingAnalytics || cohortsQuery === undefined,
     customers: customersLoading,
-    geographic: isLoadingAnalytics || geographicQuery === undefined,
-    journey: isLoadingAnalytics || journeyQuery === undefined,
   };
 
-  const isLoading = isLoadingAnalytics || customersLoading;
-  const isInitialLoading =
-    (isLoadingAnalytics && !analyticsData) ||
-    (customersLoading && requestedPage === 1);
+  const isLoading = customersLoading;
+  const isInitialLoading = customersLoading && effectivePage === 1;
 
   return {
-    overview,
-    cohorts,
     customers,
-    geographic,
-    journey,
     exportData,
     isLoading,
     isInitialLoading,

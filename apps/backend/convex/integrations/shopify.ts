@@ -2294,6 +2294,8 @@ export const storeOrdersInternal = internalMutation({
             firstName: v.optional(v.string()),
             lastName: v.optional(v.string()),
             phone: v.optional(v.string()),
+            shopifyCreatedAt: v.optional(v.number()),
+            shopifyUpdatedAt: v.optional(v.number()),
           })
         ),
         email: v.optional(v.string()),
@@ -2382,13 +2384,47 @@ export const storeOrdersInternal = internalMutation({
       : undefined;
 
     // Step 1: Collect all unique customers from orders
-    const customerDataMap = new Map();
+    const customerDataMap = new Map<string, {
+      shopifyId: string;
+      email?: string;
+      firstName?: string;
+      lastName?: string;
+      phone?: string;
+      shopifyCreatedAt?: number;
+      shopifyUpdatedAt?: number;
+    }>();
     const changedOrders = new Set<string>();
     const orderCreatedAtMap = new Map<string, number>();
+    const customerEarliestOrderCreatedAt = new Map<string, number>();
 
     for (const order of args.orders) {
       if (order.customer) {
-        customerDataMap.set(order.customer.shopifyId, order.customer);
+        const customerId = order.customer.shopifyId;
+        const existing = customerDataMap.get(customerId);
+        const nextCustomer = { ...order.customer };
+
+        if (existing) {
+          if (nextCustomer.email === undefined) nextCustomer.email = existing.email;
+          if (nextCustomer.firstName === undefined) nextCustomer.firstName = existing.firstName;
+          if (nextCustomer.lastName === undefined) nextCustomer.lastName = existing.lastName;
+          if (nextCustomer.phone === undefined) nextCustomer.phone = existing.phone;
+          if (nextCustomer.shopifyCreatedAt === undefined) {
+            nextCustomer.shopifyCreatedAt = existing.shopifyCreatedAt;
+          }
+          if (nextCustomer.shopifyUpdatedAt === undefined) {
+            nextCustomer.shopifyUpdatedAt = existing.shopifyUpdatedAt;
+          }
+        }
+
+        customerDataMap.set(customerId, nextCustomer);
+
+        const createdAt = order.shopifyCreatedAt;
+        if (typeof createdAt === "number" && Number.isFinite(createdAt)) {
+          const prev = customerEarliestOrderCreatedAt.get(customerId);
+          if (prev === undefined || createdAt < prev) {
+            customerEarliestOrderCreatedAt.set(customerId, createdAt);
+          }
+        }
       }
     }
 
@@ -2424,9 +2460,28 @@ export const storeOrdersInternal = internalMutation({
 
     for (const [shopifyId, customerData] of customerDataMap) {
       const existing = existingCustomers.get(shopifyId);
+      const fallbackCustomerCreatedAt = customerEarliestOrderCreatedAt.get(shopifyId);
+      const normalizedCreatedAtSource =
+        typeof customerData.shopifyCreatedAt === "number" && Number.isFinite(customerData.shopifyCreatedAt)
+          ? customerData.shopifyCreatedAt
+          : fallbackCustomerCreatedAt;
+      const resolvedCreatedAt =
+        typeof normalizedCreatedAtSource === "number" && Number.isFinite(normalizedCreatedAtSource)
+          ? normalizedCreatedAtSource
+          : Date.now();
+
+      const normalizedUpdatedAtSource =
+        typeof customerData.shopifyUpdatedAt === "number" && Number.isFinite(customerData.shopifyUpdatedAt)
+          ? customerData.shopifyUpdatedAt
+          : undefined;
+      const resolvedUpdatedAt = Math.max(
+        resolvedCreatedAt,
+        normalizedUpdatedAtSource ?? fallbackCustomerCreatedAt ?? resolvedCreatedAt,
+      );
 
       if (existing) {
         customerIdMap.set(shopifyId, existing._id);
+
         const candidate = {
           email: Object.prototype.hasOwnProperty.call(customerData, "email")
             ? toOptionalString(customerData.email)
@@ -2442,28 +2497,45 @@ export const storeOrdersInternal = internalMutation({
             : existing.phone,
         };
 
-        if (hasCustomerWebhookChange(existing, candidate)) {
+        let needsPatch = hasCustomerWebhookChange(existing, candidate);
+        const timestampUpdates: Partial<Doc<"shopifyCustomers">> = {};
+
+        if (
+          existing.shopifyCreatedAt === undefined ||
+          Math.abs(existing.shopifyCreatedAt - resolvedCreatedAt) > 500
+        ) {
+          timestampUpdates.shopifyCreatedAt = resolvedCreatedAt;
+          needsPatch = true;
+        }
+
+        const existingUpdatedAt = existing.shopifyUpdatedAt ?? existing.shopifyCreatedAt ?? 0;
+        if (Math.abs(existingUpdatedAt - resolvedUpdatedAt) > 500) {
+          timestampUpdates.shopifyUpdatedAt = resolvedUpdatedAt;
+          needsPatch = true;
+        }
+
+        if (needsPatch) {
           await ctx.db.patch(existing._id, {
             ...candidate,
-            shopifyUpdatedAt: Date.now(),
+            ...timestampUpdates,
             syncedAt: Date.now(),
           });
         }
       } else {
-        // Prepare new customer for insert
+        const now = Date.now();
         const newCustomerId = await ctx.db.insert("shopifyCustomers", {
           organizationId: args.organizationId as Id<"organizations">,
           storeId: store._id,
-          shopifyId: shopifyId,
+          shopifyId,
           email: customerData.email || undefined,
           firstName: customerData.firstName || undefined,
           lastName: customerData.lastName || undefined,
           phone: customerData.phone || undefined,
           totalSpent: 0,
           ordersCount: 0,
-          shopifyCreatedAt: Date.now(),
-          shopifyUpdatedAt: Date.now(),
-          syncedAt: Date.now(),
+          shopifyCreatedAt: resolvedCreatedAt,
+          shopifyUpdatedAt: resolvedUpdatedAt,
+          syncedAt: now,
         });
 
         customerIdMap.set(shopifyId, newCustomerId);

@@ -16,13 +16,6 @@ export const DASHBOARD_SIDEBAR_ITEMS = [
         activeIcon: "solar:graph-new-up-bold",
         label: "Order Insights",
       },
-      {
-        key: "customer-insights",
-        href: "/customer-insights",
-        icon: "solar:users-group-rounded-bold-duotone",
-        activeIcon: "solar:users-group-rounded-bold",
-        label: "Customer Insights",
-      },
     ],
   },
   {

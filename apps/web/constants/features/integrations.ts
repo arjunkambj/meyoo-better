@@ -30,6 +30,23 @@ export const INTEGRATIONS = {
       "Audience insights",
     ],
   },
+  GOOGLE: {
+    id: "google",
+    name: "Google Ads",
+    description: "Monitor your Google Ads campaigns and performance metrics",
+    icon: "logos:google-ads",
+    color: "#4285F4",
+    category: "marketing",
+    required: false,
+    comingSoon: true,
+    releaseDate: "Coming soon",
+    features: [
+      "Campaign analytics",
+      "Keyword performance tracking",
+      "Conversion attribution",
+      "Cost and budget optimization",
+    ],
+  },
 };
 
 export const INTEGRATION_CATEGORIES = {

@@ -52,6 +52,7 @@ import type * as integrations_meta from "../integrations/meta.js";
 import type * as integrations_metaInternal from "../integrations/metaInternal.js";
 import type * as integrations_metaSync from "../integrations/metaSync.js";
 import type * as integrations_metaTokens from "../integrations/metaTokens.js";
+import type * as integrations_overview from "../integrations/overview.js";
 import type * as integrations_resend from "../integrations/resend.js";
 import type * as integrations_shopify from "../integrations/shopify.js";
 import type * as integrations_shopifySync from "../integrations/shopifySync.js";
@@ -170,6 +171,7 @@ declare const fullApi: ApiFromModules<{
   "integrations/metaInternal": typeof integrations_metaInternal;
   "integrations/metaSync": typeof integrations_metaSync;
   "integrations/metaTokens": typeof integrations_metaTokens;
+  "integrations/overview": typeof integrations_overview;
   "integrations/resend": typeof integrations_resend;
   "integrations/shopify": typeof integrations_shopify;
   "integrations/shopifySync": typeof integrations_shopifySync;

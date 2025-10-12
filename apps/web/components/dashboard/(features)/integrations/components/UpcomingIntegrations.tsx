@@ -4,28 +4,13 @@ import { IntegrationCard } from "./IntegrationCard";
 
 export const upcomingIntegrations = [
   {
-    id: "google-ads",
-    name: "Google Ads",
-    description: "Google Ads integration is coming soon to Meyoo.",
-    icon: "logos:google-ads",
-    color: "#4285F4",
-    category: "marketing",
-    releaseDate: "Coming soon",
-    features: [
-      "Campaign metrics",
-      "Keyword performance",
-      "Cost tracking",
-      "Conversion data",
-    ],
-  },
-  {
     id: "amazon",
     name: "Amazon",
     description: "Sync your Amazon seller account for multi-channel analytics",
     icon: "simple-icons:amazon",
     color: "#FF9900",
     category: "ecommerce",
-    releaseDate: "Coming in Q4 2025",
+    releaseDate: "Coming in Q1 2026",
     features: [
       "FBA inventory sync",
       "Sales analytics",
@@ -40,7 +25,7 @@ export const upcomingIntegrations = [
     icon: "streamline-ultimate-color:snapchat-logo",
     color: "#FFFC00",
     category: "marketing",
-    releaseDate: "Coming in Q4 2025",
+    releaseDate: "Coming in Q1 2026",
     features: [
       "Campaign performance tracking",
       "Snap Ads analytics",
@@ -55,7 +40,7 @@ export const upcomingIntegrations = [
     icon: "logos:tiktok-icon",
     color: "#000000",
     category: "ecommerce",
-    releaseDate: "Coming in Q4 2025",
+    releaseDate: "Coming in Q1 2026",
     features: [
       "Shop analytics",
       "Video performance",
@@ -70,7 +55,7 @@ export const upcomingIntegrations = [
     icon: "simple-icons:rocket",
     color: "#7C3AED",
     category: "shipping",
-    releaseDate: "Coming in Q4 2025",
+    releaseDate: "Coming in Q1 2026",
     features: [
       "Shipment tracking",
       "Delivery analytics",

@@ -12,10 +12,8 @@ import { api } from "@/libs/convexApi";
  * Get integration status for all platforms
  */
 export function useIntegration() {
-  const shopifyStore = useQuery(api.integrations.shopify.getStore);
-  const metaAccounts = useQuery(api.integrations.meta.getAdAccounts);
-
-  const loading = shopifyStore === undefined || metaAccounts === undefined;
+  const overview = useQuery(api.integrations.overview.getOverview);
+  const loading = overview === undefined;
 
   const disconnectMeta = async () => {
     try {
@@ -28,28 +26,32 @@ export function useIntegration() {
 
   return {
     shopify: {
-      connected: !!shopifyStore,
-      store: shopifyStore,
-      loading: shopifyStore === undefined,
+      connected: Boolean(overview?.shopify.connected),
+      store: overview?.shopify.store ?? null,
+      loading,
     },
     meta: {
-      connected: !!(metaAccounts && metaAccounts.length > 0),
-      accounts: metaAccounts || [],
-      loading: metaAccounts === undefined,
+      connected: Boolean(overview?.meta.connected),
+      accounts: overview?.meta.accounts ?? [],
+      primaryAccountId: overview?.meta.primaryAccountId ?? null,
+      activeAccountCount: overview?.meta.activeAccountCount ?? 0,
+      loading,
       disconnect: disconnectMeta,
     },
     google: {
-      connected: false,
+      connected: Boolean(overview?.google.connected),
       accounts: [],
-      loading: false,
-      comingSoon: true,
+      loading,
+      comingSoon: Boolean(overview?.google.comingSoon ?? true),
       disconnect: async () => ({
         success: false,
         error: "Google Ads integration is currently unavailable.",
       }),
     },
     loading,
-    hasAnyIntegration: !!shopifyStore || !!metaAccounts?.length,
+    hasAnyIntegration: Boolean(overview?.hasAnyIntegration),
+    connectedIntegrations: overview?.connectedIntegrations ?? [],
+    disconnectedIntegrations: overview?.disconnectedIntegrations ?? [],
   };
 }
 

@@ -9,7 +9,10 @@ import { useIntegration } from "@/hooks";
 
 import { IntegrationCard } from "./components/IntegrationCard";
 import { RequestIntegrationModal } from "./components/RequestIntegrationModal";
-import { UpcomingIntegrations } from "./components/UpcomingIntegrations";
+import {
+  UpcomingIntegrations,
+  upcomingIntegrations,
+} from "./components/UpcomingIntegrations";
 
 type IntegrationItem = {
   id: string;
@@ -22,6 +25,8 @@ type IntegrationItem = {
   features: string[];
   status: unknown;
   isConnected?: boolean;
+  isUpcoming?: boolean;
+  releaseDate?: string;
 };
 
 export function IntegrationsView() {
@@ -29,31 +34,73 @@ export function IntegrationsView() {
   // Settings modal is disabled for now; hide unused state
   const [showRequestModal, setShowRequestModal] = useState(false);
 
-  const { shopify, meta, loading } = useIntegration();
+  const { shopify, meta, google, loading } = useIntegration();
   // const { requests, hasRequestedPlatform } = useIntegrationRequests();
 
-  const connectedIntegrations: IntegrationItem[] = [
-    ...(shopify.connected
-      ? [{ ...INTEGRATIONS.SHOPIFY, status: shopify }]
-      : []),
-    ...(meta.connected ? [{ ...INTEGRATIONS.META, status: meta }] : []),
-  ];
+  const integrationConfigByPlatform = {
+    shopify: INTEGRATIONS.SHOPIFY,
+    meta: INTEGRATIONS.META,
+    google: INTEGRATIONS.GOOGLE,
+  } as const;
 
-  const availableIntegrations: IntegrationItem[] = [
-    ...(!shopify.connected
-      ? [{ ...INTEGRATIONS.SHOPIFY, status: shopify }]
-      : []),
-    ...(!meta.connected ? [{ ...INTEGRATIONS.META, status: meta }] : []),
-  ];
+  const integrationStatusByPlatform = {
+    shopify,
+    meta,
+    google,
+  } as const;
 
-  const allIntegrations: IntegrationItem[] = [
-    {
-      ...INTEGRATIONS.SHOPIFY,
-      status: shopify,
-      isConnected: shopify.connected,
-    },
-    { ...INTEGRATIONS.META, status: meta, isConnected: meta.connected },
-  ];
+  const normalizedIntegrations: IntegrationItem[] = ([
+    "shopify",
+    "meta",
+    "google",
+  ] as const).map((platform) => {
+    const config = integrationConfigByPlatform[platform];
+    const status = integrationStatusByPlatform[platform];
+    const isConnected = Boolean(status?.connected);
+    const configComingSoon =
+      typeof (config as { comingSoon?: boolean }).comingSoon === "boolean"
+        ? Boolean((config as { comingSoon?: boolean }).comingSoon)
+        : false;
+    const statusComingSoon =
+      status && typeof status === "object" && "comingSoon" in status
+        ? Boolean((status as { comingSoon?: boolean }).comingSoon)
+        : false;
+    const isUpcoming = configComingSoon || statusComingSoon;
+    const releaseDate =
+      "releaseDate" in config
+        ? (config as { releaseDate?: string }).releaseDate
+        : undefined;
+
+    return {
+      ...config,
+      status,
+      id: config.id,
+      isConnected,
+      isUpcoming,
+      releaseDate:
+        releaseDate ?? (isUpcoming ? "Coming soon" : undefined),
+    };
+  });
+
+  const upcomingIntegrationItems: IntegrationItem[] = upcomingIntegrations.map(
+    (integration) => ({
+      ...integration,
+      status: null,
+      isConnected: false,
+      isUpcoming: true,
+      releaseDate: integration.releaseDate ?? "Coming soon",
+    }),
+  );
+
+  const connectedIntegrations = normalizedIntegrations.filter(
+    (integration) => integration.isConnected,
+  );
+
+  const availableIntegrations = normalizedIntegrations.filter(
+    (integration) => !integration.isConnected && !integration.isUpcoming,
+  );
+
+  const allIntegrations = [...normalizedIntegrations, ...upcomingIntegrationItems];
 
   const handleConnect = useCallback((platform: string) => {
     // Redirect to OAuth flow
@@ -148,12 +195,22 @@ export function IntegrationsView() {
                     features={integration.features}
                     icon={integration.icon}
                     isConnected={Boolean(integration.isConnected)}
+                    isUpcoming={integration.isUpcoming}
                     name={integration.name}
                     platform={integration.id}
                     required={integration.required}
                     status={integration.status}
-                    onConnect={() => handleConnect(integration.id)}
-                    onDisconnect={() => handleDisconnect(integration.id)}
+                    releaseDate={integration.releaseDate}
+                    onConnect={
+                      !integration.isConnected && !integration.isUpcoming
+                        ? () => handleConnect(integration.id)
+                        : undefined
+                    }
+                    onDisconnect={
+                      integration.isConnected && !integration.isUpcoming
+                        ? () => handleDisconnect(integration.id)
+                        : undefined
+                    }
                     // Settings modal disabled
                   />
                 ))}
@@ -184,10 +241,16 @@ export function IntegrationsView() {
                       features={integration.features}
                       icon={integration.icon}
                       isConnected={true}
+                      isUpcoming={integration.isUpcoming}
                       name={integration.name}
                       platform={integration.id}
                       status={integration.status}
-                      onConnect={() => handleConnect(integration.id)}
+                      releaseDate={integration.releaseDate}
+                      onConnect={
+                        !integration.isUpcoming
+                          ? () => handleConnect(integration.id)
+                          : undefined
+                      }
                       onDisconnect={() => handleDisconnect(integration.id)}
                       // Settings modal disabled
                     />
@@ -238,11 +301,17 @@ export function IntegrationsView() {
                       features={integration.features}
                       icon={integration.icon}
                       isConnected={false}
+                      isUpcoming={integration.isUpcoming}
                       name={integration.name}
                       platform={integration.id}
                       required={integration.required}
                       status={integration.status}
-                      onConnect={() => handleConnect(integration.id)}
+                      releaseDate={integration.releaseDate}
+                      onConnect={
+                        !integration.isUpcoming
+                          ? () => handleConnect(integration.id)
+                          : undefined
+                      }
                     />
                   ))
                 ) : (

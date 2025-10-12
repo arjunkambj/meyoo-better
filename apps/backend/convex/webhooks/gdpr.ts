@@ -1,3 +1,4 @@
+import { internal } from "../_generated/api";
 import { httpAction } from "../_generated/server";
 import { WebhookUtils } from "../integrations/_base";
 import { requireEnv } from "../utils/env";
@@ -78,8 +79,52 @@ export const customerRedact = httpAction(async (ctx, request) => {
       payload = {};
     }
 
-    // Log without PII (GDPR minimization)
     const data = payload as any;
+
+    // Resolve organization/store for downstream processing
+    const store = domain
+      ? await ctx.runQuery(
+          internal.integrations.shopify.getStoreByDomain as any,
+          { shopDomain: domain },
+        )
+      : null;
+    const organizationId = store?.organizationId
+      ? String(store.organizationId)
+      : null;
+
+    if (!organizationId) {
+      console.warn("[GDPR Customer Redact] No store found for domain", {
+        shop: domain,
+        requestId,
+      });
+      return new Response(JSON.stringify({ success: true, requestId, skipped: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    const customer = (data.customer ?? {}) as {
+      id?: unknown;
+      email?: string;
+      phone?: string;
+    };
+    const ordersToRedact = Array.isArray(data.orders_to_redact)
+      ? data.orders_to_redact.map((id: unknown) => String(id))
+      : [];
+
+    await ctx.runMutation(
+      internal.integrations.shopify.handleGDPRRedact as any,
+      {
+        organizationId,
+        shopDomain: domain,
+        customerId: customer?.id ? String(customer.id) : "",
+        customerEmail: customer.email || "",
+        customerPhone: customer.phone || "",
+        ordersToRedact,
+      },
+    );
+
+    // Log without PII (GDPR minimization)
     console.log("[GDPR Customer Redact] Request received", {
       shop: domain,
       shopIdPresent: Boolean(data.shop_id),
@@ -185,8 +230,54 @@ export const customerDataRequest = httpAction(async (ctx, request) => {
       payload = {};
     }
 
-    // Log without PII (GDPR minimization)
     const data = payload as any;
+
+    const store = domain
+      ? await ctx.runQuery(
+          internal.integrations.shopify.getStoreByDomain as any,
+          { shopDomain: domain },
+        )
+      : null;
+    const organizationId = store?.organizationId
+      ? String(store.organizationId)
+      : null;
+
+    if (!organizationId) {
+      console.warn("[GDPR Data Request] No store found for domain", {
+        shop: domain,
+        requestId,
+      });
+      return new Response(JSON.stringify({ success: true, requestId, skipped: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    const customer = (data.customer ?? {}) as {
+      id?: unknown;
+      email?: string;
+      phone?: string;
+    };
+    const ordersRequested = Array.isArray(data.orders_requested)
+      ? data.orders_requested.map((id: unknown) => String(id))
+      : [];
+    const dataRequestId =
+      (data.data_request?.id && String(data.data_request.id)) || "";
+
+    await ctx.runMutation(
+      internal.integrations.shopify.handleGDPRDataRequest as any,
+      {
+        organizationId,
+        shopDomain: domain,
+        customerId: customer?.id ? String(customer.id) : "",
+        customerEmail: customer.email || "",
+        customerPhone: customer.phone || "",
+        ordersRequested,
+        dataRequestId,
+      },
+    );
+
+    // Log without PII (GDPR minimization)
     console.log("[GDPR Data Request] Request received", {
       shop: domain,
       shopIdPresent: Boolean(data.shop_id),
@@ -293,8 +384,41 @@ export const shopRedact = httpAction(async (ctx, request) => {
       payload = {};
     }
 
-    // Log without PII (GDPR minimization)
     const data = payload as any;
+
+    const store = domain
+      ? await ctx.runQuery(
+          internal.integrations.shopify.getStoreByDomain as any,
+          { shopDomain: domain },
+        )
+      : null;
+    const organizationId = store?.organizationId
+      ? String(store.organizationId)
+      : null;
+
+    if (!organizationId) {
+      console.warn("[GDPR Shop Redact] No store found for domain", {
+        shop: domain,
+        requestId,
+      });
+      return new Response(JSON.stringify({ success: true, requestId, skipped: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    const shopId = data.shop_id ? String(data.shop_id) : "";
+
+    await ctx.runMutation(
+      internal.integrations.shopify.handleGDPRShopRedact as any,
+      {
+        organizationId,
+        shopId,
+        shopDomain: domain,
+      },
+    );
+
+    // Log without PII (GDPR minimization)
     console.log("[GDPR Shop Redact] Request received", {
       shop: domain,
       shopIdPresent: Boolean(data.shop_id),

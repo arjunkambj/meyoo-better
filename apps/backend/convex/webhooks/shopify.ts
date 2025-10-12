@@ -508,17 +508,6 @@ async function handleTopicInline(
         internal.integrations.shopify.upsertCustomerFromWebhook,
         { organizationId, storeId, customer: payload },
       );
-      const canSchedule = await hasCompletedInitialShopifySync(ctx as any, organizationId);
-      const dateOptions = await resolveDateOptions();
-      const today = msToDateString(Date.now(), dateOptions);
-      if (canSchedule && today) {
-        await scheduleAnalyticsRebuild(
-          ctx,
-          organizationId,
-          [today],
-          "shopifyWebhook.customerUpsert",
-        );
-      }
       break;
     }
 

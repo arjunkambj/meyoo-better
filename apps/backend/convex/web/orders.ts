@@ -572,6 +572,15 @@ const analyticsOrderValidator = v.object({
   }),
   createdAt: v.string(),
   updatedAt: v.string(),
+  lineItems: v.array(
+    v.object({
+      id: v.string(),
+      name: v.string(),
+      quantity: v.number(),
+      price: v.number(),
+      cost: v.number(),
+    }),
+  ),
 });
 
 const ordersAnalyticsResponseValidator = v.object({

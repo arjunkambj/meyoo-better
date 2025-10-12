@@ -249,32 +249,6 @@ export const updateOrganization = mutation({
 
 // ============ INTERNAL FUNCTIONS ============
 
-// ============ HELPER FUNCTIONS ============
-
-/**
- * Calculate monthly price for plan
- */
-export function getPlanPrice(
-  plan: string,
-  billingCycle: "monthly" | "yearly" = "monthly",
-) {
-  const monthlyPrices: Record<string, number> = {
-    free: 0,
-    starter: 40,
-    growth: 90,
-    business: 160,
-  };
-
-  const price = monthlyPrices[plan] || 0;
-
-  // 10% discount for yearly billing
-  if (billingCycle === "yearly") {
-    return price * 0.9;
-  }
-
-  return price;
-}
-
 // ============ INVOICE QUERIES ============
 
 /**

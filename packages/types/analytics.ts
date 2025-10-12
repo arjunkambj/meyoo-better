@@ -277,7 +277,7 @@ export interface AnalyticsOrder {
   };
   createdAt: string;
   updatedAt: string;
-  lineItems?: AnalyticsOrderLineItem[];
+  lineItems: AnalyticsOrderLineItem[];
 }
 
 export interface OrdersPagination {

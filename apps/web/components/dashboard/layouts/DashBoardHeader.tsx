@@ -48,7 +48,6 @@ export default function DashBoardHeader({ className }: { className?: string }) {
       "/pnl": "P&L Insights",
       "/orders": "Orders",
       "/orders-insights": "Order Insights",
-      "/customers": "Customers",
       "/inventory": "Product & Inventory",
       "/cost-management": "Cost & Expenses",
       "/integrations": "Integrations",

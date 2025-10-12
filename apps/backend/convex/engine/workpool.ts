@@ -290,27 +290,3 @@ export async function createJob(
 
   return jobId;
 }
-
-interface JobStatus {
-  id: string;
-  status: "pending" | "running" | "completed" | "failed";
-  attempts: number;
-  lastError: string | null;
-}
-
-/**
- * Get job status and metadata
- */
-export async function getJobStatus(
-  _ctx: WorkpoolContext,
-  jobId: string,
-): Promise<JobStatus> {
-  // Implementation will depend on workpool internals
-  // This is a placeholder for job monitoring
-  return {
-    id: jobId,
-    status: "pending",
-    attempts: 0,
-    lastError: null,
-  };
-}

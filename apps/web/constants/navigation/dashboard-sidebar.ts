@@ -29,13 +29,6 @@ export const DASHBOARD_SIDEBAR_ITEMS = [
         label: "Orders",
       },
       {
-        key: "customers",
-        href: "/customers",
-        icon: "solar:user-hand-up-bold-duotone",
-        activeIcon: "solar:user-hand-up-bold",
-        label: "Customers",
-      },
-      {
         key: "inventory",
         href: "/inventory",
         icon: "solar:box-bold-duotone",

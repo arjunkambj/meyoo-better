@@ -352,23 +352,6 @@ export const updateBusinessProfile = mutation({
 // ============ INTERNAL QUERIES ============
 
 /**
- * Get users by organization (internal)
- */
-export const getUsersByOrganization = internalQuery({
-  args: {
-    organizationId: v.id("organizations"),
-  },
-  handler: async (ctx, args) => {
-    return await ctx.db
-      .query("users")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId as Id<"organizations">),
-      )
-      .collect();
-  },
-});
-
-/**
  * Internal query to get user by ID
  */
 export const getById = internalQuery({
@@ -381,24 +364,6 @@ export const getById = internalQuery({
 });
 
 // ============ HELPER FUNCTIONS ============
-
-/**
- * Check if user has permission for action
- */
-export function hasPermission(
-  storeRole: Doc<"memberships">["role"] | null | undefined,
-  action: "view" | "edit" | "delete" | "admin",
-): boolean {
-  if (storeRole === "StoreOwner") {
-    return true;
-  }
-
-  if (storeRole === "StoreTeam") {
-    return action === "view" || action === "edit";
-  }
-
-  return false;
-}
 
 /**
  * Check if the current user has a password account

@@ -208,32 +208,6 @@ const buildCustomerSnapshots = (
   return { snapshots, overview };
 };
 
-export const getCustomerSnapshotMetadata = internalQuery({
-  args: {
-    organizationId: v.id("organizations"),
-  },
-  handler: async (ctx, args) => {
-    const latest = await ctx.db
-      .query("customerOverviewSummaries")
-      .withIndex("by_organization", (q) =>
-        q.eq("organizationId", args.organizationId),
-      )
-      .order("desc")
-      .first();
-
-    if (!latest) {
-      return null;
-    }
-
-    return {
-      computedAt: latest.computedAt,
-      analysisWindowDays: latest.analysisWindowDays,
-      windowStartMs: latest.windowStartMs ?? undefined,
-      windowEndMsExclusive: latest.windowEndMsExclusive ?? undefined,
-    };
-  },
-});
-
 export const rebuildCustomerSnapshot = internalMutation({
   args: {
     organizationId: v.id("organizations"),

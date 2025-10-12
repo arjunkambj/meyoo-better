@@ -7,7 +7,6 @@ export * from '../usePassword';
 export * from './useBilling';
 // ============ BUSINESS LOGIC HOOKS ============
 export * from './useCost';
-export * from './useCustomerAnalytics';
 // ============ UTILITY HOOKS ============
 export * from './useDebounce';
 // ============ DEVELOPMENT HOOKS ============

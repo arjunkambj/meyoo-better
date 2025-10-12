@@ -86,7 +86,7 @@ const defaultRange = () => {
 
 export function useCustomerAnalytics(params: UseCustomerAnalyticsParams = {}) {
   const { primaryCurrency } = useUser();
-  const { offsetMinutes } = useShopifyTime();
+  const { offsetMinutes, timezoneIana } = useShopifyTime();
 
   const {
     dateRange,
@@ -130,8 +130,9 @@ export function useCustomerAnalytics(params: UseCustomerAnalyticsParams = {}) {
     return dateRangeToUtcWithShopPreference(
       effectiveDateRange,
       typeof offsetMinutes === "number" ? offsetMinutes : undefined,
+      timezoneIana,
     );
-  }, [effectiveDateRange, offsetMinutes]);
+  }, [effectiveDateRange, offsetMinutes, timezoneIana]);
 
   const normalizedRange = useMemo(() => {
     if (!rangeStrings) return null;

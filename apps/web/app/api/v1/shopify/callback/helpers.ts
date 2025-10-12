@@ -37,7 +37,9 @@ export async function fetchShopData(session: Session): Promise<Record<string, un
         email: shopInfo.email,
         shopName: shopInfo.name,
         currency: shopInfo.currencyCode,
-        timezone: shopInfo.timezoneAbbreviation,
+        timezone: shopInfo.ianaTimezone ?? shopInfo.timezoneAbbreviation,
+        timezoneAbbreviation: shopInfo.timezoneAbbreviation,
+        timezoneOffsetMinutes: shopInfo.timezoneOffsetMinutes,
         country: shopInfo.billingAddress?.country,
       };
     }

@@ -13,7 +13,11 @@ interface UsePnLAnalyticsParams {
 
 export function usePnLAnalytics(params?: UsePnLAnalyticsParams) {
   const [granularity, setGranularity] = useState<PnLGranularity>("daily");
-  const { offsetMinutes, isLoading: isShopTimeLoading } = useShopifyTime();
+  const {
+    offsetMinutes,
+    timezoneIana,
+    isLoading: isShopTimeLoading,
+  } = useShopifyTime();
 
   const defaultDateRange = useMemo<{ startDate: string; endDate: string }>(() => {
     const endDate = new Date();
@@ -36,6 +40,7 @@ export function usePnLAnalytics(params?: UsePnLAnalyticsParams) {
     const utcRange = dateRangeToUtcWithShopPreference(
       baseRange,
       typeof offsetMinutes === "number" ? offsetMinutes : undefined,
+      timezoneIana,
     );
 
     return {
@@ -45,7 +50,7 @@ export function usePnLAnalytics(params?: UsePnLAnalyticsParams) {
       startDate,
       endDate,
     };
-  }, [canRunQueries, startDate, endDate, offsetMinutes]);
+  }, [canRunQueries, startDate, endDate, offsetMinutes, timezoneIana]);
 
   const args = useMemo(() => {
     if (!utcDateRange) return "skip" as const;

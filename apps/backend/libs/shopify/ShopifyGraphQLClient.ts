@@ -1666,6 +1666,7 @@ export class ShopifyGraphQLClient {
             province
             city
           }
+          ianaTimezone
           timezoneAbbreviation
           timezoneOffset
           timezoneOffsetMinutes
@@ -1688,6 +1689,7 @@ export class ShopifyGraphQLClient {
           province: string;
           city: string;
         };
+        ianaTimezone?: string;
         timezoneAbbreviation: string;
         timezoneOffset: string;
         timezoneOffsetMinutes?: number;

@@ -1767,6 +1767,8 @@ export const connectShopifyStore = mutation({
         currency: v.optional(v.string()),
         timezone: v.optional(v.string()),
         country: v.optional(v.string()),
+        timezoneAbbreviation: v.optional(v.string()),
+        timezoneOffsetMinutes: v.optional(v.number()),
       }),
     ),
   },
@@ -1874,7 +1876,7 @@ export const connectShopifyStore = mutation({
       const tz = args.shopData?.timezone;
       if (tz && isIanaTimeZone(tz) && user.organizationId) {
         const org = await ctx.db.get(user.organizationId as Id<"organizations">);
-        if (org && !org.timezone) {
+        if (!org || org.timezone !== tz) {
           await ctx.db.patch(user.organizationId as Id<"organizations">, {
             timezone: tz,
             updatedAt: Date.now(),
@@ -1883,6 +1885,16 @@ export const connectShopifyStore = mutation({
       }
     } catch (e) {
       console.warn("[ONBOARDING] timezone set skipped", e);
+    }
+
+    if (user.organizationId) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.core.time.refreshOrganizationTimezone,
+        {
+          organizationId: user.organizationId as Id<"organizations">,
+        },
+      );
     }
 
     // Update user with primary currency from shop

@@ -54,19 +54,20 @@ export function useCost(
   type?: keyof typeof COST_TYPES,
   dateRange?: { startDate: string; endDate: string },
 ) {
-  const { offsetMinutes } = useShopifyTime();
+  const { offsetMinutes, timezoneIana } = useShopifyTime();
   const normalizedRange = useMemo(() => {
     if (!dateRange) return undefined;
     const utcRange = dateRangeToUtcWithShopPreference(
       dateRange,
       typeof offsetMinutes === "number" ? offsetMinutes : undefined,
+      timezoneIana,
     );
     return {
       ...utcRange,
       startDate: dateRange.startDate,
       endDate: dateRange.endDate,
     } as const;
-  }, [dateRange?.endDate, dateRange?.startDate, offsetMinutes]);
+  }, [dateRange?.endDate, dateRange?.startDate, offsetMinutes, timezoneIana]);
 
   const queryArgs = useMemo(
     () => ({

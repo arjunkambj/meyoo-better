@@ -4,6 +4,7 @@ import { useQuery } from "convex-helpers/react/cache/hooks";
 
 import { api } from "@/libs/convexApi";
 import { getCurrencySymbol } from "@/libs/utils/format";
+import { dateRangeToUtcWithShopPreference } from "@/libs/dateRange";
 import type {
   ChannelRevenueBreakdown,
   OverviewComputation,
@@ -11,6 +12,7 @@ import type {
   PlatformMetrics,
 } from "@repo/types";
 import { DEFAULT_DASHBOARD_CONFIG, type DashboardConfig } from "@repo/types";
+import { useShopifyTime } from "./useShopifyTime";
 
 const EMPTY_PLATFORM_METRICS: PlatformMetrics = {
   shopifyConversionRate: 0,
@@ -478,10 +480,38 @@ function buildOverviewMetrics(
 
 
 export function useDashboardOverview(dateRange: DateRangeArgs) {
-  const queryArgs = useMemo(() => ({
-    startDate: dateRange.startDate,
-    endDate: dateRange.endDate,
-  }), [dateRange.endDate, dateRange.startDate]);
+  const { offsetMinutes, timezoneIana } = useShopifyTime();
+
+  const utcRange = useMemo(
+    () =>
+      dateRangeToUtcWithShopPreference(
+        { startDate: dateRange.startDate, endDate: dateRange.endDate },
+        typeof offsetMinutes === "number" ? offsetMinutes : undefined,
+        timezoneIana,
+      ),
+    [dateRange.endDate, dateRange.startDate, offsetMinutes, timezoneIana],
+  );
+
+  const queryArgs = useMemo(
+    () => ({
+      dateRange: {
+        startDate: dateRange.startDate,
+        endDate: dateRange.endDate,
+        startDateTimeUtc: utcRange.startDateTimeUtc,
+        endDateTimeUtc: utcRange.endDateTimeUtc,
+        endDateTimeUtcExclusive: utcRange.endDateTimeUtcExclusive,
+        dayCount: utcRange.dayCount,
+      },
+    }),
+    [
+      dateRange.endDate,
+      dateRange.startDate,
+      utcRange.dayCount,
+      utcRange.endDateTimeUtc,
+      utcRange.endDateTimeUtcExclusive,
+      utcRange.startDateTimeUtc,
+    ],
+  );
 
   const response = useQuery(api.web.dashboard.getOverviewData, queryArgs);
   const updateLayout = useMutation(api.core.dashboard.updateDashboardLayout);

@@ -2,7 +2,6 @@ import { v } from "convex/values";
 
 import type { Id } from "../_generated/dataModel";
 import { action, query } from "../_generated/server";
-import { api } from "../_generated/api";
 import { dateRangeValidator, type AnalyticsResponse } from "./analyticsShared";
 import {
   fetchAnalyticsOrderChunk,

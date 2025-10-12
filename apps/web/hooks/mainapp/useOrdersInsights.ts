@@ -65,7 +65,7 @@ function normalizeJourneyStages(raw: OrdersJourneyStage[] | undefined): JourneyS
 export function useOrdersInsights(
   params: UseOrdersInsightsParams = {},
 ): OrdersInsightsResult {
-  const { offsetMinutes } = useShopifyTime();
+  const { offsetMinutes, timezoneIana } = useShopifyTime();
 
   const { dateRange } = params;
 
@@ -85,6 +85,7 @@ export function useOrdersInsights(
     const rangeStrings = dateRangeToUtcWithShopPreference(
       effectiveRange,
       typeof offsetMinutes === "number" ? offsetMinutes : undefined,
+      timezoneIana,
     );
 
     if (!rangeStrings) return null;
@@ -95,7 +96,7 @@ export function useOrdersInsights(
       startDateTimeUtc: rangeStrings.startDateTimeUtc,
       endDateTimeUtcExclusive: rangeStrings.endDateTimeUtcExclusive,
     } as const;
-  }, [effectiveRange, offsetMinutes]);
+  }, [effectiveRange, offsetMinutes, timezoneIana]);
 
   const queryArgs = useMemo(() => {
     if (!normalizedRange) return "skip" as const;

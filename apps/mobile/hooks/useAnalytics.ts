@@ -85,8 +85,10 @@ function useDashboardOverviewData() {
 
   const queryArgs = useMemo(
     () => ({
-      startDate: dateRange.start,
-      endDate: dateRange.end,
+      dateRange: {
+        startDate: dateRange.start,
+        endDate: dateRange.end,
+      },
     }),
     [dateRange.end, dateRange.start],
   );
@@ -103,9 +105,9 @@ function useDashboardOverviewData() {
     data: null,
   });
 
-  const currentKey = `${queryArgs.startDate}:${queryArgs.endDate}`;
+  const currentKey = JSON.stringify(queryArgs.dateRange);
   const needsActionLoad = Boolean(
-    response !== undefined &&
+      response !== undefined &&
       response &&
       (response.meta as Record<string, unknown> | undefined)?.needsActionLoad,
   );
@@ -137,8 +139,7 @@ function useDashboardOverviewData() {
     let promise = overviewActionPending.get(currentKey);
     if (!promise) {
       promise = fetchOverviewAction({
-        startDate: queryArgs.startDate,
-        endDate: queryArgs.endDate,
+        dateRange: queryArgs.dateRange,
       })
         .then((result) => {
           const normalized = result ?? null;
@@ -173,8 +174,7 @@ function useDashboardOverviewData() {
     needsActionLoad,
     currentKey,
     fetchOverviewAction,
-    queryArgs.endDate,
-    queryArgs.startDate,
+    queryArgs.dateRange,
     state.key,
     state.loading,
     state.data,

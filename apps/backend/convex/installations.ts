@@ -25,6 +25,8 @@ export const createOrAttachFromShopifyOAuth = mutation({
         currency: v.optional(v.string()),
         timezone: v.optional(v.string()),
         country: v.optional(v.string()),
+        timezoneAbbreviation: v.optional(v.string()),
+        timezoneOffsetMinutes: v.optional(v.number()),
       }),
     ),
   },

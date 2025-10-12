@@ -21,7 +21,11 @@ async function getActiveShopForOrg(
 export async function getShopTimeInfo(
   ctx: GenericActionCtx<DataModel>,
   organizationId: string,
-): Promise<{ offsetMinutes: number; timezoneAbbreviation?: string }> {
+): Promise<{
+  offsetMinutes: number;
+  timezoneAbbreviation?: string;
+  timezoneIana?: string;
+}> {
   const store = await getActiveShopForOrg(ctx, organizationId);
   if (!store) return { offsetMinutes: 0 };
   try {
@@ -30,17 +34,40 @@ export async function getShopTimeInfo(
       accessToken: store.accessToken,
     });
     type ShopInfoResp = {
-      data?: { shop?: { timezoneOffsetMinutes?: number; timezoneAbbreviation?: string; timezoneOffset?: string } };
-      shop?: { timezoneOffsetMinutes?: number; timezoneAbbreviation?: string; timezoneOffset?: string };
+      data?: {
+        shop?: {
+          ianaTimezone?: string;
+          timezoneOffsetMinutes?: number;
+          timezoneAbbreviation?: string;
+          timezoneOffset?: string;
+        };
+      };
+      shop?: {
+        ianaTimezone?: string;
+        timezoneOffsetMinutes?: number;
+        timezoneAbbreviation?: string;
+        timezoneOffset?: string;
+      };
     };
     const res = (await client.getShopInfo()) as unknown as ShopInfoResp;
     const shop = res.data?.shop ?? res.shop;
     const tzMinutes: number | undefined = shop?.timezoneOffsetMinutes;
     const tzAbbr: string | undefined = shop?.timezoneAbbreviation;
-    if (typeof tzMinutes === "number") return { offsetMinutes: tzMinutes, timezoneAbbreviation: tzAbbr };
+    const tzIana: string | undefined = typeof shop?.ianaTimezone === "string" ? shop?.ianaTimezone : undefined;
+    if (typeof tzMinutes === "number") {
+      return {
+        offsetMinutes: tzMinutes,
+        timezoneAbbreviation: tzAbbr,
+        timezoneIana: tzIana,
+      };
+    }
     const tzOffsetStr: string | undefined = shop?.timezoneOffset;
     if (typeof tzOffsetStr === "string") {
-      return { offsetMinutes: offsetStringToMinutes(tzOffsetStr), timezoneAbbreviation: tzAbbr };
+      return {
+        offsetMinutes: offsetStringToMinutes(tzOffsetStr),
+        timezoneAbbreviation: tzAbbr,
+        timezoneIana: tzIana,
+      };
     }
   } catch {
     // ignore

@@ -2,7 +2,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { paginationOptsValidator } from "convex/server";
 import { ConvexError, v } from "convex/values";
 
-import { internalQuery, mutation, query } from "../_generated/server";
+import { internalMutation, internalQuery, mutation, query } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { getUserAndOrg } from "../utils/auth";
 
@@ -25,6 +25,19 @@ export const getOrganizationTimezoneInternal = internalQuery({
     return {
       timezone: organization?.timezone,
     };
+  },
+});
+
+export const setOrganizationTimezoneInternal = internalMutation({
+  args: {
+    organizationId: v.id("organizations"),
+    timezone: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.organizationId, {
+      timezone: args.timezone,
+      updatedAt: Date.now(),
+    });
   },
 });
 
@@ -221,7 +234,10 @@ export const updateOrganization = mutation({
     };
 
     if (args.name !== undefined) orgUpdates.name = args.name;
-    if (args.currency !== undefined) orgUpdates.locale = args.currency; // Map currency to locale
+    if (args.currency !== undefined) {
+      orgUpdates.locale = args.currency; // Legacy consumers expect locale to mirror currency
+      (orgUpdates as { primaryCurrency?: string }).primaryCurrency = args.currency;
+    }
     if (args.timezone !== undefined) orgUpdates.timezone = args.timezone;
 
     // Update the organization record

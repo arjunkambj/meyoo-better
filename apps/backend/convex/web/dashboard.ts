@@ -15,11 +15,7 @@ import {
   safeNumber,
   type AnyRecord,
 } from "../utils/analytics/shared";
-import {
-  validateDateRange,
-  type AnalyticsSourceKey,
-  type DateRange,
-} from "../utils/analyticsSource";
+import { type AnalyticsSourceKey, type DateRange } from "../utils/analyticsSource";
 import { computeOverviewMetrics, computePlatformMetrics, computeChannelRevenue } from "../utils/analyticsAggregations";
 import type {
   OverviewComputation,
@@ -35,6 +31,7 @@ import { resolveDashboardConfig } from "../utils/dashboardConfig";
 import { computeIntegrationStatus, integrationStatusValidator } from "../utils/integrationStatus";
 import { loadAnalyticsWithChunks } from "../utils/analyticsLoader";
 import { loadOverviewFromDailyMetrics } from "../utils/dailyMetrics";
+import { resolveDateRangeForOrganization } from "../utils/orgDateRange";
 
 type IntegrationStatus = Awaited<ReturnType<typeof computeIntegrationStatus>>;
 type OverviewPayload = {
@@ -54,6 +51,7 @@ type OverviewArgs = {
   timeRange?: string;
   startDate?: string;
   endDate?: string;
+  dateRange?: DateRange;
 };
 
 const DASHBOARD_SUMMARY_DATASETS = [
@@ -583,6 +581,7 @@ export const getOverviewData = query({
     timeRange: v.optional(v.string()),
     startDate: v.optional(v.string()),
     endDate: v.optional(v.string()),
+    dateRange: v.optional(dateRangeValidator),
   },
   returns: v.union(
     v.null(),
@@ -606,9 +605,19 @@ export const getOverviewData = query({
     const auth = await getUserAndOrg(ctx);
     if (!auth) return null;
 
-    const range = args.startDate && args.endDate
-      ? validateDateRange({ startDate: args.startDate, endDate: args.endDate })
-      : defaultDateRange(parseTimeRange(args.timeRange));
+    const orgId = auth.orgId as Id<"organizations">;
+
+    const rangeInput =
+      args.dateRange ??
+      (args.startDate && args.endDate
+        ? { startDate: args.startDate, endDate: args.endDate }
+        : defaultDateRange(parseTimeRange(args.timeRange)));
+
+    const range = await resolveDateRangeForOrganization(
+      ctx,
+      orgId,
+      rangeInput,
+    );
 
     const dashboardConfig = await resolveDashboardConfig(
       ctx,
@@ -620,13 +629,13 @@ export const getOverviewData = query({
     // Read cached status via query to avoid recomputation and large reads
     const integrationStatus = await ctx.runQuery(api.core.status.getIntegrationStatus, {});
     const onboardingStatus = await ctx.runQuery(api.core.onboarding.getOnboardingStatus, {});
-    const orgDoc = await ctx.db.get(auth.orgId as Id<"organizations">);
+    const orgDoc = await ctx.db.get(orgId);
     const primaryCurrency = orgDoc?.primaryCurrency ?? "USD";
 
     // ONLY read from dailyMetrics (aggregated data) - no raw order reads
     const dailyOverview = await loadOverviewFromDailyMetrics(
       ctx,
-      auth.orgId as Id<"organizations">,
+      orgId,
       range,
     );
 
@@ -678,14 +687,9 @@ export const getOverviewData = query({
     // Using small dataset to avoid large reads
     const supplementalDatasets = ["orders", "analytics", "metaInsights"] as const;
     try {
-      const analyticsResponse = await loadAnalytics(
-        ctx,
-        auth.orgId as Id<"organizations">,
-        range,
-        {
-          datasets: supplementalDatasets,
-        },
-      );
+      const analyticsResponse = await loadAnalytics(ctx, orgId, range, {
+        datasets: supplementalDatasets,
+      });
 
       const channelRevenue = computeChannelRevenue(analyticsResponse);
       applyUtmRoasMetric(overview, channelRevenue);
@@ -726,6 +730,7 @@ const getOverviewDataActionDefinition = {
     timeRange: v.optional(v.string()),
     startDate: v.optional(v.string()),
     endDate: v.optional(v.string()),
+    dateRange: v.optional(dateRangeValidator),
   },
   returns: v.union(
     v.null(),
@@ -751,13 +756,18 @@ const getOverviewDataActionDefinition = {
     const userRole = auth.membership?.role ?? null;
     const canViewDevTools = userRole === "StoreOwner";
 
-    const range = args.startDate && args.endDate
-      ? validateDateRange({ startDate: args.startDate, endDate: args.endDate })
-      : defaultDateRange(parseTimeRange(args.timeRange));
+    const orgId = auth.orgId as Id<"organizations">;
+    const rangeInput =
+      args.dateRange ??
+      (args.startDate && args.endDate
+        ? { startDate: args.startDate, endDate: args.endDate }
+        : defaultDateRange(parseTimeRange(args.timeRange)));
+
+    const range = await resolveDateRangeForOrganization(ctx, orgId, rangeInput);
 
     const { data, meta } = await loadAnalyticsWithChunks(
       ctx,
-      auth.orgId as Id<"organizations">,
+      orgId,
       range,
       {
         datasets: DASHBOARD_SUMMARY_DATASETS,
@@ -776,17 +786,23 @@ const getOverviewDataActionDefinition = {
 
     if (previousRange) {
       try {
+        const resolvedPreviousRange = await resolveDateRangeForOrganization(
+          ctx,
+          orgId,
+          previousRange,
+        );
+
         const { data: previousData, meta: previousMeta } = await loadAnalyticsWithChunks(
           ctx,
-          auth.orgId as Id<"organizations">,
-          previousRange,
+          orgId,
+          resolvedPreviousRange,
           {
             datasets: DASHBOARD_SUMMARY_DATASETS,
           },
         );
 
         previousAnalyticsResponse = {
-          dateRange: previousRange,
+          dateRange: resolvedPreviousRange,
           organizationId: auth.orgId,
           data: previousData,
           ...(previousMeta ? { meta: previousMeta } : {}),
@@ -809,7 +825,7 @@ const getOverviewDataActionDefinition = {
 
     const primaryCurrency =
       (await ctx.runQuery(api.core.currency.getPrimaryCurrencyForOrg, {
-        orgId: auth.orgId as Id<"organizations">,
+        orgId,
       })) ?? "USD";
 
     const metaPayload: Record<string, unknown> = {

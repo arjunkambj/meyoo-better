@@ -33,6 +33,7 @@ export function useOrganization() {
     name?: string;
     currency?: string;
     fiscalYearStart?: string;
+    timezone?: string;
   }) => {
     return await updateOrganizationMutation(data);
   };

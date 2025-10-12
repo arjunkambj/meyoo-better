@@ -6,6 +6,7 @@ import { api } from "@/libs/convexApi";
 type ShopifyTimeState = {
   offsetMinutes: number | undefined;
   timezoneAbbreviation?: string;
+  timezoneIana?: string;
   isLoading: boolean;
   error: Error | null;
 };
@@ -19,6 +20,7 @@ export function useShopifyTime() {
   const [state, setState] = useState<ShopifyTimeState>({
     offsetMinutes: undefined,
     timezoneAbbreviation: undefined,
+    timezoneIana: undefined,
     isLoading: true,
     error: null,
   });
@@ -40,6 +42,7 @@ export function useShopifyTime() {
           offsetMinutes:
             typeof info?.offsetMinutes === "number" ? info.offsetMinutes : 0,
           timezoneAbbreviation: info?.timezoneAbbreviation ?? undefined,
+          timezoneIana: info?.timezoneIana ?? undefined,
           isLoading: false,
           error: null,
         });
@@ -50,6 +53,7 @@ export function useShopifyTime() {
         setState({
           offsetMinutes: 0,
           timezoneAbbreviation: undefined,
+          timezoneIana: undefined,
           isLoading: false,
           error,
         });
@@ -83,6 +87,7 @@ export function useShopifyTime() {
   return {
     offsetMinutes: state.offsetMinutes,
     timezoneAbbreviation: state.timezoneAbbreviation,
+    timezoneIana: state.timezoneIana,
     isLoading: state.isLoading,
     error: state.error,
     refresh,

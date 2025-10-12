@@ -49,7 +49,19 @@ function clampDateRangeForGranularity(
   const currentStart =
     providedStart.getTime() > end.getTime() ? end : providedStart;
 
-  return { startDate: toIsoDate(currentStart), endDate: toIsoDate(end) };
+  let normalizedStart = currentStart;
+
+  if (granularity === "weekly") {
+    const aligned = startOfWeekMonday(currentStart);
+    normalizedStart =
+      aligned.getTime() > end.getTime() ? startOfWeekMonday(end) : aligned;
+  } else if (granularity === "monthly") {
+    const aligned = startOfMonth(currentStart);
+    normalizedStart =
+      aligned.getTime() > end.getTime() ? startOfMonth(end) : aligned;
+  }
+
+  return { startDate: toIsoDate(normalizedStart), endDate: toIsoDate(end) };
 }
 
 export const getAnalytics = query({

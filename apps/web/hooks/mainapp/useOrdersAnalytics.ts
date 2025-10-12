@@ -48,7 +48,7 @@ interface OrdersPageSnapshot {
 const END_CURSOR = "__end__";
 
 export function useOrdersAnalytics(params: UseOrdersAnalyticsParams = {}) {
-  const { offsetMinutes } = useShopifyTime();
+  const { offsetMinutes, timezoneIana } = useShopifyTime();
 
   const {
     dateRange,
@@ -84,8 +84,9 @@ export function useOrdersAnalytics(params: UseOrdersAnalyticsParams = {}) {
     return dateRangeToUtcWithShopPreference(
       effectiveRange,
       typeof offsetMinutes === "number" ? offsetMinutes : undefined,
+      timezoneIana,
     );
-  }, [effectiveRange, offsetMinutes]);
+  }, [effectiveRange, offsetMinutes, timezoneIana]);
 
   const normalizedRange = useMemo(() => {
     if (!rangeStrings) return null;

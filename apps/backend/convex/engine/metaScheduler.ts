@@ -3,10 +3,9 @@ import { createSimpleLogger } from "../../libs/logging/simple";
 import { internal } from "../_generated/api";
 import { internalAction, internalMutation, internalQuery } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
-import { optionalEnv } from "../utils/env";
+import { optionalEnv, requireEnv } from "../utils/env";
 
-const TICK_MINUTES_ENV = optionalEnv("META_TICK_MINUTES");
-const META_TICK_MINUTES = TICK_MINUTES_ENV ? Number(TICK_MINUTES_ENV) : 6;
+const META_TICK_MINUTES = Number(requireEnv("META_TICK_MINUTES"));
 if (Number.isNaN(META_TICK_MINUTES) || META_TICK_MINUTES <= 0) {
   throw new Error("META_TICK_MINUTES must be a positive number");
 }

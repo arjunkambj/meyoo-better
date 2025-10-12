@@ -27,7 +27,11 @@ export const CustomersView = memo(function CustomersView() {
   const [statusFilter, setStatusFilter] = useState<"all" | "converted" | "abandoned_cart">("all");
   const [currentPage, setCurrentPage] = useState(1);
 
-  const { customers, loadingStates, exportData } = useCustomerAnalytics({
+  const {
+    customers,
+    loadingStates,
+    exportData,
+  } = useCustomerAnalytics({
     dateRange: customersRange,
     status: statusFilter,
     page: currentPage,

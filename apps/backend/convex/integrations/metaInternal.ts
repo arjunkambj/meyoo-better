@@ -1,11 +1,12 @@
 import { v } from "convex/values";
 
 import { createSimpleLogger } from "../../libs/logging/simple";
+import { internal } from "../_generated/api";
 import { internalMutation, internalQuery } from "../_generated/server";
-import { createJob, PRIORITY } from "../engine/workpool";
 import { normalizeDateString } from "../utils/date";
 
 const logger = createSimpleLogger("MetaInternal");
+const ANALYTICS_REBUILD_DEBOUNCE_MS = 10_000;
 
 /**
  * Meta internal queries and mutations
@@ -88,21 +89,12 @@ export const storeInsightsInternal = internalMutation({
 
     if (affectedDates.size > 0) {
       const dates = Array.from(affectedDates);
-      await createJob(
-        ctx,
-        "analytics:rebuildDaily",
-        PRIORITY.LOW,
-        {
-          organizationId: args.organizationId,
-          dates,
-        },
-        {
-          context: {
-            scope: "metaInsights.storeInsights",
-            totalDates: dates.length,
-          },
-        },
-      );
+      await ctx.runMutation(internal.engine.analytics.enqueueDailyRebuildRequests, {
+        organizationId: args.organizationId,
+        dates,
+        debounceMs: ANALYTICS_REBUILD_DEBOUNCE_MS,
+        scope: "metaInsights.storeInsights",
+      });
     }
 
     return null;

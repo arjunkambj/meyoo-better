@@ -18,7 +18,6 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { createIntegration, type SyncResult } from "./_base";
 import { normalizeShopDomain } from "../utils/shop";
 import { msToDateString, type MsToDateOptions } from "../utils/date";
-import { createJob, PRIORITY } from "../engine/workpool";
 import { toStringArray, toMs } from "../utils/shopify";
 import { createNewUserData } from "../authHelpers";
 
@@ -32,6 +31,7 @@ const BULK_OPS = {
 
 const ORDER_WEBHOOK_RETRY_DELAY_MS = 5_000;
 const ORDER_WEBHOOK_MAX_RETRIES = 5;
+const ANALYTICS_REBUILD_DEBOUNCE_MS = 10_000;
 
 function chunkArray<T>(values: T[], chunkSize: number): T[][] {
   if (values.length === 0) return [];
@@ -2821,21 +2821,12 @@ export const storeOrdersInternal = internalMutation({
 
     if (canSchedule && affectedDates.size > 0) {
       const dates = Array.from(affectedDates);
-      await createJob(
-        ctx,
-        "analytics:rebuildDaily",
-        PRIORITY.LOW,
-        {
-          organizationId,
-          dates,
-        },
-        {
-          context: {
-            scope: "shopify.storeOrders",
-            totalDates: dates.length,
-          },
-        },
-      );
+      await ctx.runMutation(internal.engine.analytics.enqueueDailyRebuildRequests, {
+        organizationId,
+        dates,
+        debounceMs: ANALYTICS_REBUILD_DEBOUNCE_MS,
+        scope: "shopify.storeOrders",
+      });
     }
 
     return null;
@@ -3181,21 +3172,12 @@ export const storeTransactionsInternal = internalMutation({
 
       if (canSchedule) {
         const dates = Array.from(affectedDates);
-        await createJob(
-          ctx,
-          "analytics:rebuildDaily",
-          PRIORITY.LOW,
-          {
-            organizationId,
-            dates,
-          },
-          {
-            context: {
-              scope: "shopify.storeTransactions",
-              totalDates: dates.length,
-            },
-          },
-        );
+        await ctx.runMutation(internal.engine.analytics.enqueueDailyRebuildRequests, {
+          organizationId,
+          dates,
+          debounceMs: ANALYTICS_REBUILD_DEBOUNCE_MS,
+          scope: "shopify.storeTransactions",
+        });
       }
     }
 
@@ -3310,21 +3292,12 @@ export const storeRefundsInternal = internalMutation({
 
       if (canSchedule) {
         const dates = Array.from(affectedDates);
-        await createJob(
-          ctx,
-          "analytics:rebuildDaily",
-          PRIORITY.LOW,
-          {
-            organizationId,
-            dates,
-          },
-          {
-            context: {
-              scope: "shopify.storeRefunds",
-              totalDates: dates.length,
-            },
-          },
-        );
+        await ctx.runMutation(internal.engine.analytics.enqueueDailyRebuildRequests, {
+          organizationId,
+          dates,
+          debounceMs: ANALYTICS_REBUILD_DEBOUNCE_MS,
+          scope: "shopify.storeRefunds",
+        });
       }
     }
 

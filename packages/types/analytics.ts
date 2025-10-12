@@ -330,26 +330,6 @@ export interface OrdersInsightsPayload {
   returnRate: number;
 }
 
-export interface OrdersAnalyticsExportRow {
-  orderNumber: string;
-  customerEmail: string;
-  email: string;
-  status: string;
-  fulfillmentStatus: string;
-  financialStatus: string;
-  items: number;
-  revenue: number;
-  costs: number;
-  profit: number;
-  profitMargin: number;
-  shipping: number;
-  tax: number;
-  payment: string;
-  shipTo: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface OrdersAnalyticsResult {
   overview: OrdersOverviewMetrics | null;
   orders: {
@@ -357,7 +337,6 @@ export interface OrdersAnalyticsResult {
     pagination: OrdersPagination;
   } | null;
   fulfillment: OrdersFulfillmentMetrics | null;
-  exportRows: OrdersAnalyticsExportRow[];
 }
 
 export type PnLGranularity = 'daily' | 'weekly' | 'monthly';
@@ -421,7 +400,6 @@ export interface PnLKPIMetrics {
 export interface PnLAnalyticsResult {
   metrics: PnLKPIMetrics | null;
   periods: PnLTablePeriod[];
-  exportRows: Array<Record<string, string | number>>;
   totals: PnLMetrics;
   primaryCurrency?: string;
   tableRange?: {

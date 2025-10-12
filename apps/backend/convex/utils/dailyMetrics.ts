@@ -15,6 +15,7 @@ import type {
   PnLMetrics,
   PnLTablePeriod,
   PlatformMetrics,
+  ChannelRevenueBreakdown,
 } from "@repo/types";
 
 const ZERO_PLATFORM_METRICS: PlatformMetrics = {
@@ -394,9 +395,23 @@ function applyOperationalCostsToAggregates(
     { shipping: 0, payment: 0, operational: 0 },
   );
 
+  const shippingCosts = (() => {
+    const base = aggregates.shippingCosts;
+    const computed = totals.shipping;
+    if (computed <= 0) {
+      return base;
+    }
+    if (base <= 0) {
+      return computed;
+    }
+    // Treat values within 5% (or $1) as effectively identical to avoid double counting
+    const tolerance = Math.max(1, Math.min(Math.abs(base), Math.abs(computed)) * 0.05);
+    return Math.abs(base - computed) <= tolerance ? base : Math.max(base, computed);
+  })();
+
   return {
     ...aggregates,
-    shippingCosts: aggregates.shippingCosts + totals.shipping,
+    shippingCosts,
     transactionFees: aggregates.transactionFees + totals.payment,
     customCosts: aggregates.customCosts + totals.operational,
   } satisfies AggregatedDailyMetrics;
@@ -796,6 +811,55 @@ function toNumber(value: unknown): number {
     return Number.isFinite(parsed) ? parsed : 0;
   }
   return 0;
+}
+
+type ChannelTotals = Map<string, { revenue: number; orders: number }>;
+
+function aggregateChannelRevenueFromDocs(docs: DailyMetricDoc[]): ChannelTotals {
+  const totals: ChannelTotals = new Map();
+
+  for (const doc of docs) {
+    const channels = Array.isArray(doc.channelRevenue) ? doc.channelRevenue : [];
+    for (const entry of channels) {
+      if (!entry || typeof entry !== "object") continue;
+      const rawName = (entry as { name?: unknown }).name;
+      const name = typeof rawName === "string" && rawName.trim() ? rawName.trim() : null;
+      if (!name) continue;
+
+      const current = totals.get(name) ?? { revenue: 0, orders: 0 };
+      current.revenue += toNumber((entry as { revenue?: unknown }).revenue);
+      current.orders += toNumber((entry as { orders?: unknown }).orders);
+      totals.set(name, current);
+    }
+  }
+
+  return totals;
+}
+
+function buildChannelRevenueBreakdown(
+  current: ChannelTotals,
+  previous?: ChannelTotals | null,
+): ChannelRevenueBreakdown | null {
+  if (current.size === 0) {
+    return null;
+  }
+
+  const previousTotals = previous ?? new Map();
+
+  const channels = Array.from(current.entries())
+    .map(([name, stats]) => {
+      const previousStats = previousTotals.get(name);
+      const previousRevenue = previousStats?.revenue ?? 0;
+      return {
+        name,
+        revenue: stats.revenue,
+        orders: stats.orders,
+        change: percentageChange(stats.revenue, previousRevenue),
+      };
+    })
+    .sort((a, b) => b.revenue - a.revenue);
+
+  return { channels };
 }
 
 function mergeDailyMetrics(docs: DailyMetricDoc[]): AggregatedDailyMetrics {
@@ -1642,7 +1706,7 @@ function buildPnLKpisFromTotals(total: PnLMetrics, previous?: PnLMetrics | null)
 
   return {
     grossSales: total.grossSales,
-    discountsReturns: total.discounts + total.refunds + total.rtoRevenueLost,
+    discountsReturns: total.discounts + total.refunds,
     netRevenue: total.revenue,
     grossProfit: total.grossProfit,
     operatingExpenses,
@@ -1655,10 +1719,8 @@ function buildPnLKpisFromTotals(total: PnLMetrics, previous?: PnLMetrics | null)
     changes: {
       grossSales: percentageChange(total.grossSales, previous?.grossSales ?? 0),
       discountsReturns: percentageChange(
-        total.discounts + total.refunds + total.rtoRevenueLost,
-        previous
-          ? previous.discounts + previous.refunds + previous.rtoRevenueLost
-          : 0,
+        total.discounts + total.refunds,
+        previous ? previous.discounts + previous.refunds : 0,
       ),
       netRevenue: percentageChange(total.revenue, previous?.revenue ?? 0),
       grossProfit: percentageChange(total.grossProfit, previous?.grossProfit ?? 0),
@@ -1677,6 +1739,7 @@ export type DailyMetricsOverview = {
   overview: OverviewComputation;
   platformMetrics: PlatformMetrics;
   ordersOverview: OrdersOverviewMetrics;
+  channelRevenue: ChannelRevenueBreakdown | null;
   aggregates: AggregatedDailyMetrics;
   meta: Record<string, unknown>;
   hasFullCoverage: boolean;
@@ -1693,6 +1756,7 @@ export async function loadOverviewFromDailyMetrics(
   }
 
   const aggregates = mergeDailyMetrics(fetched.docs);
+  const channelTotals = aggregateChannelRevenueFromDocs(fetched.docs);
 
   const activeOperationalCostDocs = await ctx.db
     .query("globalCosts")
@@ -1723,6 +1787,7 @@ export async function loadOverviewFromDailyMetrics(
   const previousRange = derivePreviousRange(range);
   let previousAggregatesWithCosts: AggregatedDailyMetrics | null = null;
   let previousMetaClicks = 0;
+  let previousChannelTotals: ChannelTotals | null = null;
 
   if (previousRange) {
     const previousFetched = await fetchDailyMetricsDocs(ctx, organizationId, previousRange);
@@ -1741,6 +1806,7 @@ export async function loadOverviewFromDailyMetrics(
         previousAggregatesWithCosts,
         previousRatePercent,
       );
+      previousChannelTotals = aggregateChannelRevenueFromDocs(previousFetched.docs);
     }
     previousMetaClicks = await sumMetaUniqueClicksForRange(ctx, organizationId, previousRange);
   }
@@ -1762,6 +1828,7 @@ export async function loadOverviewFromDailyMetrics(
     organizationId,
     range,
   );
+  const channelRevenue = buildChannelRevenueBreakdown(channelTotals, previousChannelTotals);
 
   let previousCustomerMetrics: CustomerOverviewMetrics | null = null;
   if (previousRange) {
@@ -1902,6 +1969,7 @@ export async function loadOverviewFromDailyMetrics(
     overview,
     platformMetrics,
     ordersOverview,
+    channelRevenue,
     aggregates: aggregatesAdjusted,
     meta,
     hasFullCoverage: fetched.hasFullCoverage,
@@ -2603,34 +2671,12 @@ export async function loadPnLAnalyticsFromDailyMetrics(
     });
   }
 
-  const exportRows = hasAnyPeriod
-    ? periods
-        .filter((period) => !period.isTotal)
-        .map((period) => ({
-          Period: period.label,
-          NetRevenue: period.metrics.revenue,
-          Discounts: period.metrics.discounts,
-          Returns: period.metrics.refunds,
-          COGS: period.metrics.cogs,
-          Shipping: period.metrics.shippingCosts,
-          TransactionFees: period.metrics.transactionFees,
-          HandlingFees: period.metrics.handlingFees,
-          GrossProfit: period.metrics.grossProfit,
-          Taxes: period.metrics.taxesCollected,
-          OperatingCosts: period.metrics.customCosts,
-          AdSpend: period.metrics.totalAdSpend,
-          NetProfit: period.metrics.netProfit,
-          NetMargin: period.metrics.netProfitMargin,
-        }))
-    : [];
-
   const metrics = buildPnLKpisFromTotals(selectedTotalsFinal, previousTotalsFinal);
 
   return {
     result: {
       metrics,
       periods,
-      exportRows,
       totals: selectedTotalsFinal,
       tableRange,
     },

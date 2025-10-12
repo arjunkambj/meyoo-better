@@ -79,7 +79,6 @@ export function usePnLAnalytics(params?: UsePnLAnalyticsParams) {
 
   const metricsData: PnLKPIMetrics | undefined = result?.metrics ?? undefined;
   const tablePeriods: PnLTablePeriod[] | undefined = result?.periods ?? undefined;
-  const exportData = result?.exportRows ?? [];
 
   const loadingStates = {
     metrics: analytics === undefined,
@@ -92,7 +91,6 @@ export function usePnLAnalytics(params?: UsePnLAnalyticsParams) {
     granularity,
     setGranularity,
     loadingStates,
-    exportData,
     dateRange: resolvedDateRange,
     primaryCurrency,
     tableRange,

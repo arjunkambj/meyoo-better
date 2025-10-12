@@ -216,47 +216,12 @@ export const UnifiedDashboard = React.memo(function UnifiedDashboard() {
     [saveConfig]
   );
 
-  // Prepare export data
-  const prepareExportData = useCallback(async () => {
-    const exportData: Record<string, unknown>[] = [];
-
-    // Export KPI metrics
-    config.kpis.forEach((metricKey: string) => {
-      const metricData = overviewMetrics?.[metricKey as keyof typeof overviewMetrics];
-      if (metricData && typeof metricData === 'object' && 'value' in metricData) {
-        exportData.push({
-          category: "KPI",
-          metric: metricKey,
-          value: metricData.value,
-          change: 'change' in metricData ? metricData.change : undefined,
-          changePercent: 'changePercent' in metricData ? metricData.changePercent : undefined,
-          trend: 'trend' in metricData ? metricData.trend : undefined,
-        });
-      }
-    });
-
-    // Export widget metrics
-    config.widgets.forEach((widgetKey: string) => {
-      const value = allMetricsData[widgetKey as keyof typeof allMetricsData];
-      if (value !== undefined) {
-        exportData.push({
-          category: "Widget",
-          metric: widgetKey,
-          value: value,
-        });
-      }
-    });
-
-    return exportData;
-  }, [config.kpis, config.widgets, overviewMetrics, allMetricsData]);
-
   return (
     <div className="space-y-5">
       {/* Header */}
       <Spacer y={0.5} />
       <DashboardHeader
         onCustomize={() => setIsCustomizing(true)}
-        exportData={prepareExportData}
         onDateRangeChange={updateOverviewRange}
         dateRange={overviewCalendarRange}
         datePreset={overviewPreset}

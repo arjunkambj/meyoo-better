@@ -3,7 +3,6 @@
 import { Skeleton, Spacer } from "@heroui/react";
 import { memo, useCallback, useEffect, useState } from "react";
 import { AnalyticsHeader } from "@/components/shared/AnalyticsHeader";
-import { ExportButton } from "@/components/shared/actions/ExportButton";
 import { FilterBar } from "@/components/shared/filters/FilterBar";
 import GlobalDateRangePicker from "@/components/shared/GlobalDateRangePicker";
 import { useAnalyticsDateRange, useOrdersAnalytics } from "@/hooks";
@@ -20,7 +19,7 @@ export const OrdersView = memo(function OrdersView() {
   const [selectedStatus, setSelectedStatus] = useState<string | undefined>();
   const [currentPage, setCurrentPage] = useState(1);
 
-  const { overview, orders, isInitialLoading, loadingStates, exportData } =
+  const { overview, orders, loadingStates } =
     useOrdersAnalytics({
       dateRange: ordersRange,
       status: selectedStatus,
@@ -94,15 +93,7 @@ export const OrdersView = memo(function OrdersView() {
             />
           </div>
         }
-        rightActions={
-          <ExportButton
-            color="primary"
-            data={exportData.map((row) => ({ ...row }))}
-            disabled={isInitialLoading}
-            filename="orders-report"
-            formats={["csv", "pdf"]}
-          />
-        }
+        rightActions={null}
       />
 
       {/* Overview Cards */}

@@ -3,7 +3,6 @@
 import { Button } from '@heroui/react';
 import { Icon } from '@iconify/react';
 import { AnalyticsHeader } from '@/components/shared/AnalyticsHeader';
-import { ExportButton } from '@/components/shared/actions/ExportButton';
 import GlobalDateRangePicker from '@/components/shared/GlobalDateRangePicker';
 import type { CalendarDateRange, DateRangePresetKey } from '@/libs/dateRangePresets';
 import type { AnalyticsDateRange } from '@repo/types';
@@ -11,7 +10,6 @@ import React from 'react';
 
 interface DashboardHeaderProps {
   onCustomize: () => void;
-  exportData?: Record<string, unknown>[] | (() => Promise<Record<string, unknown>[]>);
   onDateRangeChange?: (range: AnalyticsDateRange) => void;
   dateRange?: CalendarDateRange;
   datePreset?: DateRangePresetKey | null;
@@ -19,7 +17,6 @@ interface DashboardHeaderProps {
 
 export function DashboardHeader({
   onCustomize,
-  exportData,
   onDateRangeChange,
   dateRange,
   datePreset,
@@ -35,15 +32,6 @@ export function DashboardHeader({
       }
       rightActions={
         <div className="flex items-center gap-2">
-          {exportData && (
-            <ExportButton
-              data={exportData}
-              filename="dashboard-overview"
-              formats={['csv', 'pdf']}
-              color="primary"
-              variant="flat"
-            />
-          )}
           <Button
             color="primary"
             startContent={<Icon icon="solar:widget-bold-duotone" width={18} />}

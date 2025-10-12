@@ -6,7 +6,6 @@ import { dateRangeToUtcWithShopPreference } from "@/libs/dateRange";
 import { useShopifyTime } from "./useShopifyTime";
 import type {
   AnalyticsOrder,
-  OrdersAnalyticsExportRow,
   OrdersFulfillmentMetrics,
   OrdersOverviewMetrics,
 } from "@repo/types";
@@ -50,7 +49,6 @@ interface OrdersAnalyticsQueryResult {
       hasMore: boolean;
     };
   };
-  exportRows: OrdersAnalyticsExportRow[];
 }
 
 export function useOrdersAnalytics(params: UseOrdersAnalyticsParams = {}) {
@@ -142,29 +140,6 @@ export function useOrdersAnalytics(params: UseOrdersAnalyticsParams = {}) {
       }
     : undefined;
 
-  const exportRows = analyticsResult?.exportRows ?? [];
-  const exportData = useMemo<Record<string, unknown>[]>(
-    () =>
-      exportRows.map((row) => ({
-        "Order Number": row.orderNumber,
-        "Customer Email": row.customerEmail,
-        Status: row.status,
-        "Fulfillment Status": row.fulfillmentStatus,
-        "Financial Status": row.financialStatus,
-        Items: row.items,
-        Revenue: row.revenue,
-        Costs: row.costs,
-        Profit: row.profit,
-        "Profit Margin": row.profitMargin,
-        Shipping: row.shipping,
-        Tax: row.tax,
-        Payment: row.payment,
-        "Ship To": row.shipTo,
-        "Created At": row.createdAt,
-        "Updated At": row.updatedAt,
-      })),
-    [exportRows],
-  );
   const fulfillmentMetrics: OrdersFulfillmentMetrics | undefined =
     analyticsResult?.fulfillment ?? undefined;
 
@@ -180,7 +155,6 @@ export function useOrdersAnalytics(params: UseOrdersAnalyticsParams = {}) {
     overview,
     orders,
     fulfillmentMetrics,
-    exportData,
     isLoading: baseLoading,
     isInitialLoading,
     loadingStates,

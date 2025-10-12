@@ -1,9 +1,8 @@
 "use client";
 
 import { Skeleton, Spacer } from "@heroui/react";
-import { memo, useCallback, useMemo } from "react";
+import { memo, useCallback } from "react";
 import { AnalyticsHeader } from "@/components/shared/AnalyticsHeader";
-import { ExportButton } from "@/components/shared/actions/ExportButton";
 import GlobalDateRangePicker from "@/components/shared/GlobalDateRangePicker";
 import { useAnalyticsDateRange, useOrdersInsights } from "@/hooks";
 import { OrdersInsightsKPICards } from "./components/OrdersInsightsKPICards";
@@ -24,18 +23,12 @@ export const OrdersInsightsView = memo(function OrdersInsightsView() {
     journey,
     cancelRate,
     returnRate,
-    exportData,
     loading,
   } = useOrdersInsights({
     dateRange: ordersInsightsRange,
   });
 
   const handleAnalyticsRangeChange = useCallback(updateOrdersInsightsRange, [updateOrdersInsightsRange]);
-
-  const isExportDisabled = useMemo(
-    () => loading || exportData.length === 0,
-    [loading, exportData],
-  );
 
   return (
     <div className="flex flex-col space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -48,15 +41,7 @@ export const OrdersInsightsView = memo(function OrdersInsightsView() {
             onAnalyticsChange={handleAnalyticsRangeChange}
           />
         }
-        rightActions={
-          <ExportButton
-            color="primary"
-            data={exportData.map((row) => ({ ...row }))}
-            disabled={isExportDisabled}
-            filename="orders-insights"
-            formats={["csv", "pdf"]}
-          />
-        }
+        rightActions={null}
       />
 
       <OrdersInsightsKPICards kpis={kpis} loading={loading} />

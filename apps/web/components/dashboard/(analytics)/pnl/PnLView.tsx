@@ -3,7 +3,6 @@
 import { Spacer } from "@heroui/react";
 import { memo } from "react";
 import { AnalyticsHeader } from "@/components/shared/AnalyticsHeader";
-import { ExportButton } from "@/components/shared/actions/ExportButton";
 import GlobalDateRangePicker from "@/components/shared/GlobalDateRangePicker";
 import { useAnalyticsDateRange, usePnLAnalytics } from "@/hooks";
 import { PnLKPICards } from "./components/PnLKPICards";
@@ -23,7 +22,6 @@ export const PnLView = memo(function PnLView() {
     granularity,
     setGranularity,
     loadingStates,
-    exportData,
     dateRange: analyticsDateRange,
     primaryCurrency,
     tableRange,
@@ -41,14 +39,7 @@ export const PnLView = memo(function PnLView() {
             onAnalyticsChange={updatePnlRange}
           />
         }
-        rightActions={
-          <ExportButton
-            data={exportData}
-            filename="pnl-report"
-            formats={["csv", "pdf"]}
-            color="primary"
-          />
-        }
+        rightActions={null}
       />
 
       <PnLKPICards

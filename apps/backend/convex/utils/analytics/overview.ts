@@ -518,31 +518,32 @@ function computeOverviewBaseline(
       )
     : 0;
   const totalReturnImpact = refundsAmount + rtoRevenueLost;
-  const netProfit = revenue - totalCostsWithoutAds - totalAdSpend - totalReturnImpact;
-  const operatingProfit = revenue - totalCostsWithoutAds - totalReturnImpact;
-  const grossProfit = revenue - cogs;
-  const contributionProfit = revenue - (cogs + shippingCosts + transactionFees + handlingCostTotal + customCostTotal);
+  const netRevenue = Math.max(revenue - totalReturnImpact, 0);
+  const netProfit = netRevenue - totalCostsWithoutAds - totalAdSpend;
+  const operatingProfit = netRevenue - totalCostsWithoutAds;
+  const grossProfit = netRevenue - cogs;
+  const contributionProfit = netRevenue - (cogs + shippingCosts + transactionFees + handlingCostTotal + customCostTotal);
 
-  const profitMargin = revenue > 0 ? (netProfit / revenue) * 100 : 0;
-  const operatingMargin = revenue > 0 ? (operatingProfit / revenue) * 100 : 0;
-  const grossProfitMargin = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
-  const contributionMarginPercentage = revenue > 0 ? (contributionProfit / revenue) * 100 : 0;
-  const averageOrderValue = activeOrderCount > 0 ? revenue / activeOrderCount : 0;
+  const profitMargin = netRevenue > 0 ? (netProfit / netRevenue) * 100 : 0;
+  const operatingMargin = netRevenue > 0 ? (operatingProfit / netRevenue) * 100 : 0;
+  const grossProfitMargin = netRevenue > 0 ? (grossProfit / netRevenue) * 100 : 0;
+  const contributionMarginPercentage = netRevenue > 0 ? (contributionProfit / netRevenue) * 100 : 0;
+  const averageOrderValue = activeOrderCount > 0 ? netRevenue / activeOrderCount : 0;
   const averageOrderCost = activeOrderCount > 0 ? (totalCostsWithoutAds + totalAdSpend) / activeOrderCount : 0;
   const averageOrderProfit = activeOrderCount > 0 ? netProfit / activeOrderCount : 0;
   const profitPerUnit = unitsSold > 0 ? netProfit / unitsSold : 0;
   const adSpendPerOrder = activeOrderCount > 0 ? totalAdSpend / activeOrderCount : 0;
   const poas = totalAdSpend > 0 ? netProfit / totalAdSpend : 0;
-  const blendedRoas = totalAdSpend > 0 ? revenue / totalAdSpend : 0;
-  const metaRoas = metaAdSpend > 0 ? (metaConversionValue || revenue) / metaAdSpend : 0;
+  const blendedRoas = totalAdSpend > 0 ? netRevenue / totalAdSpend : 0;
+  const metaRoas = metaAdSpend > 0 ? (metaConversionValue || netRevenue) / metaAdSpend : 0;
   const metaSpendPercentage = totalAdSpend > 0 ? (metaAdSpend / totalAdSpend) * 100 : 0;
   const marketingPercentageOfGross = grossSales > 0 ? (totalAdSpend / grossSales) * 100 : 0;
-  const marketingPercentageOfNet = revenue > 0 ? (totalAdSpend / revenue) * 100 : 0;
+  const marketingPercentageOfNet = netRevenue > 0 ? (totalAdSpend / netRevenue) * 100 : 0;
 
   const cogsPercentageOfGross = grossSales > 0 ? (cogs / grossSales) * 100 : 0;
-  const cogsPercentageOfNet = revenue > 0 ? (cogs / revenue) * 100 : 0;
-  const shippingPercentageOfNet = revenue > 0 ? (shippingCosts / revenue) * 100 : 0;
-  const taxesPercentageOfRevenue = revenue > 0 ? (taxesCollected / revenue) * 100 : 0;
+  const cogsPercentageOfNet = netRevenue > 0 ? (cogs / netRevenue) * 100 : 0;
+  const shippingPercentageOfNet = netRevenue > 0 ? (shippingCosts / netRevenue) * 100 : 0;
+  const taxesPercentageOfRevenue = netRevenue > 0 ? (taxesCollected / netRevenue) * 100 : 0;
 
   const returnRate = activeOrderCount > 0 ? (refunds.length / activeOrderCount) * 100 : 0;
   const paidCustomersCount = uniqueCustomerIds.size;
@@ -552,7 +553,7 @@ function computeOverviewBaseline(
     : 0;
   const customerAcquisitionCost = adSpendPerOrder;
   const cacPercentageOfAOV = averageOrderValue > 0 ? (customerAcquisitionCost / averageOrderValue) * 100 : 0;
-  const operatingCostPercentage = revenue > 0 ? (customCostTotal / revenue) * 100 : 0;
+  const operatingCostPercentage = netRevenue > 0 ? (customCostTotal / netRevenue) * 100 : 0;
   const abandonedCustomers = Math.max(totalCustomersCount - paidCustomersCount, 0);
   const abandonedRate = totalCustomersCount > 0
     ? (abandonedCustomers / totalCustomersCount) * 100

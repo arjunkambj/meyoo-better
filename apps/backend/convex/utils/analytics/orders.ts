@@ -2,7 +2,6 @@ import type {
   AnalyticsOrder,
   AnalyticsSourceData,
   AnalyticsSourceResponse,
-  OrdersAnalyticsExportRow,
   OrdersAnalyticsResult,
   OrdersFulfillmentMetrics,
   OrdersOverviewMetrics,
@@ -132,12 +131,14 @@ function deriveOrderDocuments(data: AnalyticsSourceData<any>): {
   };
 }
 
-type DerivedOrders = {
+export type DerivedOrders = {
   orders: AnalyticsOrder[];
   refundedOrderIds: Set<string>;
 };
 
-function deriveAnalyticsOrders(data: AnalyticsSourceData<any>): DerivedOrders {
+export function deriveAnalyticsOrders(
+  data: AnalyticsSourceData<any>,
+): DerivedOrders {
   const { orders, orderItems, transactions, refunds, variantCosts, variants } =
     deriveOrderDocuments(data);
 
@@ -713,7 +714,6 @@ export function computeOrdersAnalytics(
       overview: null,
       orders: null,
       fulfillment: null,
-      exportRows: [],
     } satisfies OrdersAnalyticsResult;
   }
 
@@ -723,7 +723,6 @@ export function computeOrdersAnalytics(
       overview: null,
       orders: null,
       fulfillment: null,
-      exportRows: [],
     } satisfies OrdersAnalyticsResult;
   }
 
@@ -827,26 +826,6 @@ export function computeOrdersAnalytics(
     totalOrders: aggregates.totalOrders,
   };
 
-  const exportRows: OrdersAnalyticsExportRow[] = sorted.map((order) => ({
-    orderNumber: order.orderNumber,
-    customerEmail: order.customer.email,
-    email: order.customer.email,
-    status: order.status,
-    fulfillmentStatus: order.fulfillmentStatus,
-    financialStatus: order.financialStatus,
-    items: order.items,
-    revenue: order.totalPrice,
-    costs: order.totalCost,
-    profit: order.profit,
-    profitMargin: order.profitMargin,
-    shipping: order.shippingCost,
-    tax: order.taxAmount,
-    payment: order.paymentMethod,
-    shipTo: `${order.shippingAddress.city}, ${order.shippingAddress.country}`.trim(),
-    createdAt: order.createdAt,
-    updatedAt: order.updatedAt,
-  }));
-
   return {
     overview,
     orders: {
@@ -859,6 +838,5 @@ export function computeOrdersAnalytics(
       },
     },
     fulfillment,
-    exportRows,
   } satisfies OrdersAnalyticsResult;
 }

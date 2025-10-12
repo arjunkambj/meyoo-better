@@ -3,7 +3,6 @@
 import { Skeleton, Spacer } from "@heroui/react";
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { AnalyticsHeader } from "@/components/shared/AnalyticsHeader";
-import { ExportButton } from "@/components/shared/actions/ExportButton";
 import { FilterBar } from "@/components/shared/filters/FilterBar";
 import { useInventoryAnalytics } from "@/hooks";
 
@@ -20,7 +19,7 @@ export function InventoryView() {
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
 
-  const { overview, products, isLoading, exportData } = useInventoryAnalytics({
+  const { overview, products, isLoading, isRefreshing, metadata } = useInventoryAnalytics({
     stockLevel: stockFilter,
     category: categoryFilter,
     page: currentPage,
@@ -84,9 +83,17 @@ export function InventoryView() {
     category: categoryFilter,
   };
 
+  const lastUpdatedLabel = useMemo(() => {
+    if (!metadata?.computedAt) return "Never";
+    const date = new Date(metadata.computedAt);
+    return date.toLocaleString();
+  }, [metadata?.computedAt]);
+
   const headerLeft = (
     <div className="flex flex-col gap-4">
-      <h1 className="text-2xl font-semibold leading-tight">Inventory Products</h1>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-2xl font-semibold leading-tight">Inventory Products</h1>
+      </div>
       <div className="flex flex-wrap items-center gap-2">
         <FilterBar
           filters={filters}
@@ -97,14 +104,12 @@ export function InventoryView() {
     </div>
   );
 
-  const headerRight = (
-    <ExportButton
-      color="primary"
-      data={exportData}
-      filename="inventory-report"
-      formats={["csv", "pdf"]}
-    />
-  );
+  const headerRight = useMemo(() => (
+    <div className="flex flex-col items-end text-sm text-default-500">
+      <span>Last updated: {lastUpdatedLabel}</span>
+      {isRefreshing && <span className="text-primary-500">Refreshing…</span>}
+    </div>
+  ), [isRefreshing, lastUpdatedLabel]);
 
   if (isLoading) {
     return (
@@ -141,10 +146,7 @@ export function InventoryView() {
       {/* Header */}
       <Spacer y={0.5} />
 
-      <AnalyticsHeader
-        leftActions={headerLeft}
-        rightActions={headerRight}
-      />
+      <AnalyticsHeader leftActions={headerLeft} rightActions={headerRight} />
 
       {/* Overview Cards */}
       <Suspense
@@ -161,7 +163,7 @@ export function InventoryView() {
 
       {/* Products Table */}
       <ProductsTable
-        loading={isLoading}
+        loading={isLoading || isRefreshing}
         pagination={
           products?.pagination
             ? {

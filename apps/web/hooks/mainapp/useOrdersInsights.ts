@@ -27,7 +27,6 @@ interface OrdersInsightsResult {
   journey: JourneyStage[];
   cancelRate: number;
   returnRate: number;
-  exportData: Record<string, unknown>[];
   loading: boolean;
 }
 
@@ -127,47 +126,12 @@ export function useOrdersInsights(
   const cancelRate = insightsResult?.cancelRate ?? 0;
   const returnRate = insightsResult?.returnRate ?? 0;
 
-  const exportData = useMemo(() => {
-    if (!kpis) return [] as Record<string, unknown>[];
-
-    return [
-      {
-        Metric: "Prepaid Rate",
-        Value: `${kpis.prepaidRate.value.toFixed(2)}%`,
-        Change: `${kpis.prepaidRate.change.toFixed(2)}%`,
-      },
-      {
-        Metric: "Repeat Rate",
-        Value: `${kpis.repeatRate.value.toFixed(2)}%`,
-        Change: `${kpis.repeatRate.change.toFixed(2)}%`,
-      },
-      {
-        Metric: "Return/RTO Revenue Loss",
-        Value: Number.isFinite(kpis.rtoRevenueLoss.value)
-          ? kpis.rtoRevenueLoss.value.toFixed(2)
-          : "0.00",
-        Change: `${kpis.rtoRevenueLoss.change.toFixed(2)}%`,
-      },
-      {
-        Metric: "Abandoned Customers",
-        Value: kpis.abandonedCustomers.value,
-        Change: `${kpis.abandonedCustomers.change.toFixed(2)}%`,
-      },
-      {
-        Metric: "Fulfillment Rate",
-        Value: `${kpis.fulfillmentRate.value.toFixed(2)}%`,
-        Change: `${kpis.fulfillmentRate.change.toFixed(2)}%`,
-      },
-    ];
-  }, [kpis]);
-
   return {
     kpis,
     fulfillment,
     journey,
     cancelRate,
     returnRate,
-    exportData,
     loading,
   };
 }

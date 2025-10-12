@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { useAction } from "convex/react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "convex-helpers/react/cache/hooks";
 import type { Product } from "@/components/dashboard/(analytics)/inventory/components/ProductsTable";
 
@@ -33,7 +34,13 @@ export interface UseInventoryAnalyticsReturn {
     hasMore: boolean;
   } | null;
   isLoading: boolean;
-  exportData: () => Promise<Record<string, unknown>[]>;
+  isRefreshing: boolean;
+  metadata: {
+    computedAt?: number;
+    analysisWindowDays?: number;
+    isStale: boolean;
+  } | null;
+  refresh: (options?: { force?: boolean }) => Promise<void>;
 }
 
 export function useInventoryAnalytics(
@@ -57,51 +64,37 @@ export function useInventoryAnalytics(
     analyticsArgs,
   );
 
+  const refreshInventory = useAction(
+    api.web.inventory.refreshInventoryAnalytics,
+  );
+
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const refreshPendingRef = useRef(false);
+
+  const triggerRefresh = useCallback(
+    async (force = false) => {
+      if (refreshPendingRef.current) return;
+      refreshPendingRef.current = true;
+      setIsRefreshing(true);
+      try {
+        await refreshInventory({ force });
+      } catch (error) {
+        console.error("Failed to refresh inventory analytics", error);
+      } finally {
+        refreshPendingRef.current = false;
+        setIsRefreshing(false);
+      }
+    },
+    [refreshInventory],
+  );
+
+  useEffect(() => {
+    if (!analytics) return;
+    if (!analytics.metadata.isStale) return;
+    triggerRefresh(false);
+  }, [analytics?.metadata.isStale, triggerRefresh]);
+
   const isLoading = analytics === undefined;
-
-  const exportData = async () => {
-    if (!analytics) return [];
-
-    const csvData = analytics.products.data.map((product) => ({
-      Name: product.name,
-      SKU: product.sku,
-      Category: product.category,
-      Vendor: product.vendor,
-      Stock: product.stock,
-      Available: product.available,
-      Reserved: product.reserved,
-      "Reorder Point": product.reorderPoint,
-      Status: product.stockStatus,
-      Price: product.price,
-      Cost: product.cost,
-      Margin: product.margin,
-      "Units Sold": product.unitsSold || 0,
-      "Turnover Rate": product.turnoverRate,
-      "Last Sold": product.lastSold || "N/A",
-    }));
-
-    if (csvData.length === 0) return [];
-    const headers = Object.keys(csvData[0]!);
-    const csvContent = [
-      headers.join(","),
-      ...csvData.map((row) =>
-        headers.map((header) => row[header as keyof typeof row]).join(","),
-      ),
-    ].join("\n");
-
-    const blob = new Blob([csvContent], { type: "text/csv" });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-
-    a.href = url;
-    a.download = `inventory-report-${new Date().toISOString().split("T")[0]}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
-
-    return csvData;
-  };
 
   const transformedOverview: InventoryOverview | null = analytics
     ? {
@@ -113,10 +106,27 @@ export function useInventoryAnalytics(
       }
     : null;
 
+  const metadata = analytics
+    ? {
+        computedAt: analytics.metadata.computedAt,
+        analysisWindowDays: analytics.metadata.analysisWindowDays,
+        isStale: analytics.metadata.isStale,
+      }
+    : null;
+
+  const refresh = useCallback(
+    async (options?: { force?: boolean }) => {
+      await triggerRefresh(options?.force ?? true);
+    },
+    [triggerRefresh],
+  );
+
   return {
     overview: transformedOverview,
     products: analytics ? analytics.products : null,
     isLoading,
-    exportData,
+    isRefreshing,
+    metadata,
+    refresh,
   };
 }

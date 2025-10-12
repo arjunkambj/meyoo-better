@@ -90,6 +90,7 @@ const RESET_MAX_BATCH_SIZE = 500;
 const RESET_MEMBER_BATCH_SIZE = 25;
 const RESET_TICKET_BATCH_SIZE = 10;
 const ANALYTICS_REBUILD_CHUNK_SIZE = 5;
+const CUSTOMER_SNAPSHOT_MAX_DAYS = 365;
 
 const ORG_SCOPED_TABLES = [
   "shopifyOrderItems",
@@ -106,6 +107,10 @@ const ORG_SCOPED_TABLES = [
   "shopifySessions",
   "shopifyAnalytics",
   "dailyMetrics",
+  "inventoryProductSummaries",
+  "inventoryOverviewSummaries",
+  "customerMetricsSummaries",
+  "customerOverviewSummaries",
   "integrationSessions",
   "metaAdAccounts",
   "metaInsights",
@@ -768,6 +773,41 @@ export const recalculateAnalytics = action({
     const duration = Date.now() - startedAt;
     const jobCount = jobIds.length;
 
+    const snapshotWindow = Math.max(1, Math.min(daysBack, 90));
+
+    try {
+      await ctx.runMutation(
+        internal.engine.inventory.rebuildInventorySnapshot,
+        {
+          organizationId,
+          analysisWindowDays: snapshotWindow,
+        },
+      );
+    } catch (error) {
+      console.warn(
+        `[DEV_TOOLS] Failed to rebuild inventory snapshot for org ${organizationId}:`,
+        error,
+      );
+    }
+
+    try {
+      await ctx.runMutation(
+        internal.engine.customers.rebuildCustomerSnapshot,
+        {
+          organizationId,
+          analysisWindowDays: Math.max(
+            1,
+            Math.min(daysBack, CUSTOMER_SNAPSHOT_MAX_DAYS),
+          ),
+        },
+      );
+    } catch (error) {
+      console.warn(
+        `[DEV_TOOLS] Failed to rebuild customer snapshot for org ${organizationId}:`,
+        error,
+      );
+    }
+
     // Mark analytics as completed in onboarding so cron stops checking this org
     try {
       const onboardingRecord = await ctx.runQuery(
@@ -830,7 +870,13 @@ export const deleteAnalyticsMetrics = action({
       throw new Error("Cannot delete analytics data in production");
     }
 
-    const tablesToClear: OrgScopedTable[] = ["dailyMetrics"];
+    const tablesToClear: OrgScopedTable[] = [
+      "dailyMetrics",
+      "inventoryProductSummaries",
+      "inventoryOverviewSummaries",
+      "customerMetricsSummaries",
+      "customerOverviewSummaries",
+    ];
     let totalDeleted = 0;
     const perTable: Record<string, number> = {};
 
@@ -886,6 +932,8 @@ export const resetShopifyData = action({
       products: v.number(),
       variants: v.number(),
       inventory: v.number(),
+      inventorySummaries: v.number(),
+      customerSummaries: v.number(),
       customers: v.number(),
       metafields: v.number(),
       webhookLogs: v.number(),
@@ -911,6 +959,8 @@ export const resetShopifyData = action({
       products: number;
       variants: number;
       inventory: number;
+      inventorySummaries: number;
+      customerSummaries: number;
       customers: number;
       integrationSessions: number;
       usersUpdated: number;
@@ -924,6 +974,8 @@ export const resetShopifyData = action({
       products: 0,
       variants: 0,
       inventory: 0,
+      inventorySummaries: 0,
+      customerSummaries: 0,
       customers: 0,
       integrationSessions: 0,
       usersUpdated: 0,
@@ -1027,10 +1079,26 @@ export const resetShopifyData = action({
     await deleteTableWithCount("shopifyFulfillments", "fulfillments");
     await deleteTableWithCount("shopifyInventory", "inventory");
     await deleteTableWithCount("shopifyInventoryTotals", "inventory");
+    await deleteTableWithCount(
+      "inventoryProductSummaries",
+      "inventorySummaries",
+    );
+    await deleteTableWithCount(
+      "inventoryOverviewSummaries",
+      "inventorySummaries",
+    );
     await deleteTableWithCount("shopifyProductVariants", "variants");
     await deleteTableWithCount("shopifyProducts", "products");
     await deleteTableWithCount("shopifyOrders", "orders");
     await deleteTableWithCount("shopifyCustomers", "customers");
+    await deleteTableWithCount(
+      "customerMetricsSummaries",
+      "customerSummaries",
+    );
+    await deleteTableWithCount(
+      "customerOverviewSummaries",
+      "customerSummaries",
+    );
     await deleteTableWithCount("shopifyStores", "stores");
 
     await deleteIntegrationSessions();
@@ -1049,6 +1117,8 @@ export const resetShopifyData = action({
         products: counts.products,
         variants: counts.variants,
         inventory: counts.inventory,
+        inventorySummaries: counts.inventorySummaries,
+        customerSummaries: counts.customerSummaries,
         customers: counts.customers,
         metafields: 0,
         webhookLogs: 0,
@@ -1155,10 +1225,14 @@ export const resetEverything = action({
       "shopifyFulfillments",
       "shopifyInventory",
       "shopifyInventoryTotals",
+      "inventoryProductSummaries",
+      "inventoryOverviewSummaries",
       "shopifyProductVariants",
       "shopifyProducts",
       "shopifyOrders",
       "shopifyCustomers",
+      "customerMetricsSummaries",
+      "customerOverviewSummaries",
       "shopifySessions",
       "shopifyAnalytics",
       "shopifyStores",

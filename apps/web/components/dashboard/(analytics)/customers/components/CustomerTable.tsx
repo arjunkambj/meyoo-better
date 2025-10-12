@@ -223,21 +223,6 @@ export const CustomerTable = React.memo(function CustomerTable({
                 >
                   Send Email
                 </DropdownItem>
-                <DropdownItem
-                  key="export"
-                  startContent={<Icon icon="solar:export-linear" width={16} />}
-                  onClick={() => {
-                    addToast({
-                      title: "Export feature coming soon",
-                      description:
-                        "Customer data export will be available soon",
-                      color: "primary",
-                      timeout: 3000,
-                    });
-                  }}
-                >
-                  Export Data
-                </DropdownItem>
               </DropdownMenu>
             </Dropdown>
           );

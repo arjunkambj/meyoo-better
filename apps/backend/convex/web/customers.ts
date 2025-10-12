@@ -1,17 +1,25 @@
 import { v } from "convex/values";
-import type { QueryCtx } from "../_generated/server";
-import type { Id } from "../_generated/dataModel";
-import { query } from "../_generated/server";
+
+import type { Doc, Id } from "../_generated/dataModel";
+import { action, query, type QueryCtx } from "../_generated/server";
+import { internal } from "../_generated/api";
 import {
+  dateRangeValidator,
+  defaultDateRange,
+} from "./analyticsShared";
+import {
+  getRangeEndExclusiveMs,
+  getRangeStartMs,
   validateDateRange,
-  toTimestampRange,
 } from "../utils/analyticsSource";
 import { getUserAndOrg } from "../utils/auth";
-import { dateRangeValidator, defaultDateRange } from "./analyticsShared";
 
 const MAX_CUSTOMER_PAGE_SIZE = 50;
 const DEFAULT_CUSTOMER_PAGE_SIZE = 50;
 const MAX_CUSTOMER_RANGE_DAYS = 365;
+const SNAPSHOT_TTL_MS = 5 * 60 * 1000;
+const MS_IN_DAY = 24 * 60 * 60 * 1000;
+const DEFAULT_ANALYSIS_DAYS = 30;
 
 const customerListEntryValidator = v.object({
   id: v.string(),
@@ -42,6 +50,14 @@ const customerListPaginationValidator = v.object({
   hasMore: v.boolean(),
 });
 
+const customerSnapshotMetadataValidator = v.object({
+  computedAt: v.optional(v.number()),
+  analysisWindowDays: v.optional(v.number()),
+  windowStartMs: v.optional(v.number()),
+  windowEndMsExclusive: v.optional(v.number()),
+  isStale: v.boolean(),
+});
+
 type CustomerListEntry = {
   id: string;
   name: string;
@@ -63,213 +79,142 @@ type CustomerListEntry = {
   isReturning: boolean;
 };
 
-function sortCustomerEntries(
+type CustomerMetricsDoc = Doc<"customerMetricsSummaries">;
+type CustomerOverviewDoc = Doc<"customerOverviewSummaries">;
+
+type SnapshotLoadResult = {
+  overview: CustomerOverviewDoc | null;
+  rows: CustomerMetricsDoc[];
+};
+
+const clampPageSize = (value: number | undefined): number => {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return DEFAULT_CUSTOMER_PAGE_SIZE;
+  }
+  return Math.max(1, Math.min(Math.floor(value), MAX_CUSTOMER_PAGE_SIZE));
+};
+
+const toIso = (timestamp: number | null | undefined, fallback: number): string => {
+  if (typeof timestamp === "number" && Number.isFinite(timestamp)) {
+    return new Date(timestamp).toISOString();
+  }
+  return new Date(fallback).toISOString();
+};
+
+const sortCustomerEntries = (
   entries: CustomerListEntry[],
   sortBy: string,
   sortOrder: "asc" | "desc",
-): CustomerListEntry[] {
+): CustomerListEntry[] => {
   const direction = sortOrder === "asc" ? 1 : -1;
 
-  const compare = (a: CustomerListEntry, b: CustomerListEntry): number => {
+  const parseDate = (value: string): number => {
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
+  return [...entries].sort((a, b) => {
     switch (sortBy) {
       case "lifetimeValue":
         return (a.lifetimeValue - b.lifetimeValue) * direction;
       case "orders":
         return (a.orders - b.orders) * direction;
       case "name":
-        return direction === 1 ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
+        return direction === 1
+          ? a.name.localeCompare(b.name)
+          : b.name.localeCompare(a.name);
       case "avgOrderValue":
         return (a.avgOrderValue - b.avgOrderValue) * direction;
       case "firstOrderDate":
-        return (
-          (new Date(a.firstOrderDate).getTime() - new Date(b.firstOrderDate).getTime()) *
-          direction
-        );
+        return (parseDate(a.firstOrderDate) - parseDate(b.firstOrderDate)) * direction;
       default:
-        return (
-          (new Date(a.lastOrderDate).getTime() - new Date(b.lastOrderDate).getTime()) * direction
-        );
+        return (parseDate(a.lastOrderDate) - parseDate(b.lastOrderDate)) * direction;
     }
-  };
+  });
+};
 
-  return entries.sort((a, b) => compare(a, b));
-}
+const matchesSearch = (
+  doc: CustomerMetricsDoc,
+  term: string | null,
+): boolean => {
+  if (!term) {
+    return true;
+  }
 
-type CustomerTableResult = {
-  rows: CustomerListEntry[];
-  pagination: {
-    page: number;
-    pageSize: number;
-    total: number;
-    totalPages: number;
-    hasMore: boolean;
+  if (doc.searchName.includes(term)) {
+    return true;
+  }
+
+  if (doc.searchEmail && doc.searchEmail.includes(term)) {
+    return true;
+  }
+
+  return false;
+};
+
+const loadSnapshot = async (
+  ctx: QueryCtx,
+  orgId: Id<"organizations">,
+): Promise<SnapshotLoadResult> => {
+  const db = ctx.db as any;
+
+  const overview = (await db
+    .query("customerOverviewSummaries")
+    .withIndex("by_organization", (q: any) => q.eq("organizationId", orgId))
+    .order("desc")
+    .first()) as CustomerOverviewDoc | null;
+
+  if (!overview) {
+    return { overview: null, rows: [] };
+  }
+
+  const rows = (await db
+    .query("customerMetricsSummaries")
+    .withIndex("by_org_computed", (q: any) =>
+      q.eq("organizationId", orgId).eq("computedAt", overview.computedAt),
+    )
+    .collect()) as CustomerMetricsDoc[];
+
+  return { overview, rows };
+};
+
+const mapCustomer = (doc: CustomerMetricsDoc): CustomerListEntry => {
+  const fallbackCreatedAt = doc.shopifyCreatedAt;
+
+  return {
+    id: doc.customerId.toString(),
+    name: doc.name,
+    email: doc.email ?? "",
+    avatar: undefined,
+    status: doc.status,
+    lifetimeValue: doc.lifetimeValue,
+    orders: doc.lifetimeOrders,
+    avgOrderValue: doc.avgOrderValue,
+    lastOrderDate: toIso(doc.lastOrderAt, fallbackCreatedAt),
+    firstOrderDate: toIso(doc.firstOrderAt, fallbackCreatedAt),
+    shopifyCreatedAt: new Date(doc.shopifyCreatedAt).toISOString(),
+    shopifyUpdatedAt: doc.shopifyUpdatedAt
+      ? new Date(doc.shopifyUpdatedAt).toISOString()
+      : undefined,
+    segment: doc.segment,
+    city: doc.city ?? undefined,
+    country: doc.country ?? undefined,
+    periodOrders: doc.periodOrders,
+    periodRevenue: doc.periodRevenue,
+    isReturning: doc.isReturning,
   };
 };
 
-async function buildCustomerTable(
-  ctx: QueryCtx,
-  orgId: Id<"organizations">,
-  range: ReturnType<typeof toTimestampRange>,
-  args: {
-    page: number;
-    pageSize: number;
-    sortBy: string;
-    sortOrder: "asc" | "desc";
-    statusFilter: "all" | "converted" | "abandoned_cart";
-    segmentFilter: string | null;
-    searchTerm: string | null;
-  },
-): Promise<CustomerTableResult> {
-  const { page, pageSize, sortBy, sortOrder, statusFilter, segmentFilter, searchTerm } = args;
-
-  const orders = await ctx.db
-    .query("shopifyOrders")
-    .withIndex("by_organization_and_created", (q) =>
-      q.eq("organizationId", orgId).gte("shopifyCreatedAt", range.start).lte("shopifyCreatedAt", range.end),
-    )
-    .collect();
-
-  const customerMetricsMap = new Map<
-    string,
-    {
-      periodRevenue: number;
-      periodOrders: number;
-      firstOrderTimestamp: number | null;
-      lastOrderTimestamp: number | null;
-    }
-  >();
-
-  for (const order of orders) {
-    if (!order.customerId) continue;
-
-    const customerId = order.customerId as string;
-    const isCancelled = order.financialStatus === "cancelled";
-
-    if (!customerMetricsMap.has(customerId)) {
-      customerMetricsMap.set(customerId, {
-        periodRevenue: 0,
-        periodOrders: 0,
-        firstOrderTimestamp: null,
-        lastOrderTimestamp: null,
-      });
-    }
-
-    const metrics = customerMetricsMap.get(customerId)!;
-    const orderValue = Math.max(order.totalPrice ?? 0, 0);
-
-    if (!isCancelled) {
-      metrics.periodRevenue += orderValue;
-      metrics.periodOrders += 1;
-
-      if (metrics.firstOrderTimestamp === null || order.shopifyCreatedAt < metrics.firstOrderTimestamp) {
-        metrics.firstOrderTimestamp = order.shopifyCreatedAt;
-      }
-      if (metrics.lastOrderTimestamp === null || order.shopifyCreatedAt > metrics.lastOrderTimestamp) {
-        metrics.lastOrderTimestamp = order.shopifyCreatedAt;
-      }
-    }
+const computeRequestedDays = (range: ReturnType<typeof validateDateRange>): number => {
+  if (range.dayCount && Number.isFinite(range.dayCount)) {
+    return Math.min(MAX_CUSTOMER_RANGE_DAYS, Math.max(1, range.dayCount));
   }
 
-  const customerIds = Array.from(customerMetricsMap.keys());
-  const customerDocs = await Promise.all(
-    customerIds.map((id) => ctx.db.get(id as Id<"shopifyCustomers">)),
-  );
-
-  const allEntries: CustomerListEntry[] = [];
-
-  for (const customer of customerDocs) {
-    if (!customer) continue;
-
-    const metrics = customerMetricsMap.get(customer._id as string);
-    if (!metrics) continue;
-
-    const lifetimeOrders = Math.max(customer.ordersCount ?? 0, 0);
-    const lifetimeValue = Math.max(customer.totalSpent ?? 0, 0);
-    const avgOrderValue = lifetimeOrders > 0 ? lifetimeValue / lifetimeOrders : 0;
-
-    const name = `${customer.firstName ?? ""} ${customer.lastName ?? ""}`.trim() || "Anonymous";
-    const normalizedEmail = (customer.email ?? "").toLowerCase();
-    const normalizedName = name.toLowerCase();
-
-    if (searchTerm && !normalizedName.includes(searchTerm) && !normalizedEmail.includes(searchTerm)) {
-      continue;
-    }
-
-    let segment = "prospect";
-    if (lifetimeOrders === 1) {
-      segment = "new";
-    } else if (lifetimeOrders >= 2 && lifetimeValue < 500) {
-      segment = "regular";
-    } else if (lifetimeOrders >= 2 && lifetimeValue >= 500 && lifetimeValue < 1000) {
-      segment = "vip";
-    } else if (lifetimeOrders >= 2 && lifetimeValue >= 1000) {
-      segment = "champion";
-    }
-
-    if (segmentFilter && segment !== segmentFilter) {
-      continue;
-    }
-
-    const convertedStatus = metrics.periodOrders > 0 ? "converted" : "abandoned_cart";
-    if (statusFilter === "converted" && convertedStatus !== "converted") {
-      continue;
-    }
-    if (statusFilter === "abandoned_cart" && convertedStatus !== "abandoned_cart") {
-      continue;
-    }
-
-    const firstOrderTimestamp = metrics.firstOrderTimestamp ?? customer.shopifyCreatedAt ?? range.start;
-    const lastOrderTimestamp = metrics.lastOrderTimestamp ?? customer.shopifyUpdatedAt ?? firstOrderTimestamp;
-
-    const entry: CustomerListEntry = {
-      id: customer._id as string,
-      name,
-      email: customer.email ?? "",
-      avatar: undefined,
-      status: convertedStatus,
-      lifetimeValue,
-      orders: lifetimeOrders,
-      avgOrderValue,
-      lastOrderDate: new Date(lastOrderTimestamp).toISOString(),
-      firstOrderDate: new Date(firstOrderTimestamp).toISOString(),
-      shopifyCreatedAt: new Date(customer.shopifyCreatedAt ?? firstOrderTimestamp).toISOString(),
-      shopifyUpdatedAt: customer.shopifyUpdatedAt
-        ? new Date(customer.shopifyUpdatedAt).toISOString()
-        : undefined,
-      segment,
-      city: customer.defaultAddress?.city,
-      country: customer.defaultAddress?.country,
-      periodOrders: metrics.periodOrders,
-      periodRevenue: metrics.periodRevenue,
-      isReturning: lifetimeOrders > 1,
-    };
-
-    allEntries.push(entry);
-  }
-
-  const sortedEntries = sortCustomerEntries(allEntries, sortBy, sortOrder);
-
-  const total = sortedEntries.length;
-  const totalPages = total === 0 ? 1 : Math.max(1, Math.ceil(total / pageSize));
-  const effectivePage = total === 0 ? 1 : Math.min(page, totalPages);
-
-  const startIndex = (effectivePage - 1) * pageSize;
-  const endIndex = startIndex + pageSize;
-  const pageEntries = sortedEntries.slice(startIndex, endIndex);
-
-  const hasMore = total === 0 ? false : effectivePage < totalPages;
-
-  return {
-    rows: pageEntries,
-    pagination: {
-      page: effectivePage,
-      pageSize,
-      total,
-      totalPages,
-      hasMore,
-    },
-  };
-}
+  const start = getRangeStartMs(range);
+  const end = getRangeEndExclusiveMs(range);
+  const span = Math.max(1, Math.round((end - start) / MS_IN_DAY));
+  return Math.min(MAX_CUSTOMER_RANGE_DAYS, span);
+};
 
 export const getCustomersPage = query({
   args: {
@@ -291,14 +236,22 @@ export const getCustomersPage = query({
   returns: v.object({
     rows: v.array(customerListEntryValidator),
     pagination: customerListPaginationValidator,
+    metadata: customerSnapshotMetadataValidator,
   }),
   handler: async (ctx, args) => {
     const auth = await getUserAndOrg(ctx);
-    const pageSizeInput = Math.max(
-      1,
-      Math.min(args.pageSize ?? DEFAULT_CUSTOMER_PAGE_SIZE, MAX_CUSTOMER_PAGE_SIZE),
-    );
+    const pageSizeInput = clampPageSize(args.pageSize);
     const page = Math.max(1, Math.floor(args.page ?? 1));
+
+    const range = validateDateRange(args.dateRange ?? defaultDateRange());
+    if (range.dayCount && range.dayCount > MAX_CUSTOMER_RANGE_DAYS) {
+      throw new Error(
+        `Date range too large. Please select ${MAX_CUSTOMER_RANGE_DAYS} days or fewer.`,
+      );
+    }
+    const requestedDays = computeRequestedDays(range);
+    const rangeStartMs = getRangeStartMs(range);
+    const rangeEndExclusiveMs = getRangeEndExclusiveMs(range);
 
     if (!auth) {
       return {
@@ -307,42 +260,194 @@ export const getCustomersPage = query({
           page,
           pageSize: pageSizeInput,
           total: 0,
-          totalPages: 1,
+          totalPages: 0,
           hasMore: false,
+        },
+        metadata: {
+          computedAt: undefined,
+          analysisWindowDays: requestedDays,
+          isStale: true,
         },
       };
     }
 
-    const range = validateDateRange(args.dateRange ?? defaultDateRange());
-    if (range.dayCount && range.dayCount > MAX_CUSTOMER_RANGE_DAYS) {
-      throw new Error(`Date range too large. Please select ${MAX_CUSTOMER_RANGE_DAYS} days or fewer.`);
-    }
-    const timestamps = toTimestampRange(range);
+    const orgId = auth.orgId as Id<"organizations">;
+    const { overview, rows } = await loadSnapshot(ctx, orgId);
 
+    const normalizedSearch = args.searchTerm
+      ? args.searchTerm.trim().toLowerCase()
+      : null;
+    const segmentFilter = args.segment && args.segment !== "all"
+      ? args.segment
+      : null;
     const sortBy = args.sortBy ?? "lastOrderDate";
     const sortOrder = args.sortOrder ?? "desc";
     const statusFilter = args.status ?? "all";
-    const segmentFilter = args.segment && args.segment !== "all" ? args.segment : null;
-    const searchTerm = args.searchTerm?.trim().toLowerCase() ?? null;
 
-    const table = await buildCustomerTable(
-      ctx,
-      auth.orgId as Id<"organizations">,
-      timestamps,
-      {
-        page,
-        pageSize: pageSizeInput,
-        sortBy,
-        sortOrder,
-        statusFilter,
-        segmentFilter,
-        searchTerm,
-      },
-    );
+    const filteredDocs = rows.filter((doc) => {
+      if (!matchesSearch(doc, normalizedSearch)) {
+        return false;
+      }
+
+      if (segmentFilter && doc.segment !== segmentFilter) {
+        return false;
+      }
+
+      if (statusFilter !== "all" && doc.status !== statusFilter) {
+        return false;
+      }
+
+      return true;
+    });
+
+    const mappedEntries = filteredDocs.map(mapCustomer);
+    const sortedEntries = sortCustomerEntries(mappedEntries, sortBy, sortOrder);
+
+    const total = sortedEntries.length;
+    const totalPages = total === 0 ? 0 : Math.max(1, Math.ceil(total / pageSizeInput));
+    const effectivePage = totalPages === 0 ? 1 : Math.min(page, totalPages);
+    const startIndex = (effectivePage - 1) * pageSizeInput;
+    const endIndex = startIndex + pageSizeInput;
+    const pageEntries = sortedEntries.slice(startIndex, endIndex);
+    const hasMore = totalPages > 0 && effectivePage < totalPages;
+
+    const metadata = (() => {
+      if (!overview) {
+        return {
+          computedAt: undefined,
+          analysisWindowDays: requestedDays,
+          windowStartMs: undefined,
+          windowEndMsExclusive: undefined,
+          isStale: true,
+        };
+      }
+
+      const matchesWindow =
+        typeof overview.windowStartMs === "number" &&
+        typeof overview.windowEndMsExclusive === "number" &&
+        overview.windowStartMs === rangeStartMs &&
+        overview.windowEndMsExclusive === rangeEndExclusiveMs;
+
+      const isStale =
+        Date.now() - overview.computedAt > SNAPSHOT_TTL_MS ||
+        overview.analysisWindowDays !== requestedDays ||
+        !matchesWindow;
+
+      return {
+        computedAt: overview.computedAt,
+        analysisWindowDays: overview.analysisWindowDays,
+        windowStartMs: overview.windowStartMs ?? undefined,
+        windowEndMsExclusive: overview.windowEndMsExclusive ?? undefined,
+        isStale,
+      };
+    })();
 
     return {
-      rows: table.rows,
-      pagination: table.pagination,
+      rows: pageEntries,
+      pagination: {
+        page: effectivePage,
+        pageSize: pageSizeInput,
+        total,
+        totalPages,
+        hasMore,
+      },
+      metadata,
+    };
+  },
+});
+
+export const refreshCustomerAnalytics = action({
+  args: {
+    force: v.optional(v.boolean()),
+    analysisWindowDays: v.optional(v.number()),
+    dateRange: v.optional(dateRangeValidator),
+  },
+  returns: v.object({
+    skipped: v.boolean(),
+    computedAt: v.optional(v.number()),
+  }),
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ skipped: boolean; computedAt?: number }> => {
+    const auth = await getUserAndOrg(ctx);
+    if (!auth) {
+      throw new Error("Not authenticated");
+    }
+
+    const orgId = auth.orgId as Id<"organizations">;
+    let windowStartMs: number | undefined;
+    let windowEndExclusiveMs: number | undefined;
+    let requestedWindowDays = Math.floor(args.analysisWindowDays ?? DEFAULT_ANALYSIS_DAYS);
+
+    if (args.dateRange) {
+      const normalizedRange = validateDateRange(args.dateRange);
+      const daysFromRange = computeRequestedDays(normalizedRange);
+      requestedWindowDays = Math.floor(args.analysisWindowDays ?? daysFromRange);
+      windowStartMs = getRangeStartMs(normalizedRange);
+      windowEndExclusiveMs = getRangeEndExclusiveMs(normalizedRange);
+    }
+
+    if (!Number.isFinite(requestedWindowDays)) {
+      requestedWindowDays = DEFAULT_ANALYSIS_DAYS;
+    }
+
+    const analysisWindowDays = Math.max(
+      1,
+      Math.min(requestedWindowDays, MAX_CUSTOMER_RANGE_DAYS),
+    );
+
+    if (!args.force) {
+      const metadata = (await ctx.runQuery(
+        internal.engine.customers.getCustomerSnapshotMetadata,
+        { organizationId: orgId },
+      )) as {
+        computedAt: number;
+        analysisWindowDays: number;
+        windowStartMs?: number;
+        windowEndMsExclusive?: number;
+      } | null;
+
+      if (
+        metadata?.computedAt !== undefined &&
+        Date.now() - metadata.computedAt < SNAPSHOT_TTL_MS &&
+        metadata.analysisWindowDays === analysisWindowDays &&
+        (
+          typeof windowStartMs !== "number" ||
+          (metadata.windowStartMs === windowStartMs &&
+            metadata.windowEndMsExclusive === windowEndExclusiveMs)
+        )
+      ) {
+        return {
+          skipped: true,
+          computedAt: metadata.computedAt,
+        };
+      }
+    }
+
+    const mutationArgs: {
+      organizationId: Id<"organizations">;
+      analysisWindowDays: number;
+      windowStartMs?: number;
+      windowEndMsExclusive?: number;
+    } = {
+      organizationId: orgId,
+      analysisWindowDays,
+    };
+
+    if (typeof windowStartMs === "number" && typeof windowEndExclusiveMs === "number") {
+      mutationArgs.windowStartMs = windowStartMs;
+      mutationArgs.windowEndMsExclusive = windowEndExclusiveMs;
+    }
+
+    const result = (await ctx.runMutation(
+      internal.engine.customers.rebuildCustomerSnapshot,
+      mutationArgs,
+    )) as { computedAt: number };
+
+    return {
+      skipped: false,
+      computedAt: result.computedAt,
     };
   },
 });

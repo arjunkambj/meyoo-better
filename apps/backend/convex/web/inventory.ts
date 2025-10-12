@@ -1,107 +1,152 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
-import type { Doc, Id } from "../_generated/dataModel";
-import { query } from "../_generated/server";
-import type { QueryCtx } from "../_generated/server";
+
+import type { Id } from "../_generated/dataModel";
+import { action, query, type QueryCtx } from "../_generated/server";
+import { internal } from "../_generated/api";
 import { getUserAndOrg } from "../utils/auth";
 
-/**
- * Inventory Management API
- * Provides product inventory data, stock health metrics, and ABC analysis
- */
+const SNAPSHOT_TTL_MS = 5 * 60 * 1000;
 
-type VariantCostSnapshot = {
-  cogsPerUnit?: number;
-  handlingPerUnit?: number;
-  taxPercent?: number;
+const inventoryVariantValidator = v.object({
+  id: v.string(),
+  sku: v.string(),
+  title: v.string(),
+  price: v.number(),
+  stock: v.number(),
+  reserved: v.number(),
+  available: v.number(),
+});
+
+const inventoryProductValidator = v.object({
+  id: v.string(),
+  name: v.string(),
+  sku: v.string(),
+  image: v.optional(v.string()),
+  category: v.string(),
+  vendor: v.string(),
+  stock: v.number(),
+  reserved: v.number(),
+  available: v.number(),
+  reorderPoint: v.number(),
+  stockStatus: v.union(
+    v.literal("healthy"),
+    v.literal("low"),
+    v.literal("critical"),
+    v.literal("out"),
+  ),
+  price: v.number(),
+  cost: v.number(),
+  margin: v.number(),
+  turnoverRate: v.number(),
+  unitsSold: v.optional(v.number()),
+  lastSold: v.optional(v.string()),
+  periodRevenue: v.optional(v.number()),
+  variants: v.optional(v.array(inventoryVariantValidator)),
+  variantCount: v.number(),
+  abcCategory: v.union(v.literal("A"), v.literal("B"), v.literal("C")),
+});
+
+const inventoryOverviewValidator = v.object({
+  totalValue: v.number(),
+  totalCOGS: v.number(),
+  totalSKUs: v.number(),
+  stockCoverageDays: v.number(),
+  deadStock: v.number(),
+});
+
+const paginationValidator = v.object({
+  page: v.number(),
+  pageSize: v.number(),
+  total: v.number(),
+  totalPages: v.number(),
+});
+
+type InventoryProduct = {
+  id: string;
+  name: string;
+  sku: string;
+  image?: string;
+  category: string;
+  vendor: string;
+  stock: number;
+  reserved: number;
+  available: number;
+  reorderPoint: number;
+  stockStatus: "healthy" | "low" | "critical" | "out";
+  price: number;
+  cost: number;
+  margin: number;
+  turnoverRate: number;
+  unitsSold?: number;
+  periodRevenue?: number;
+  lastSold?: string;
+  variants?: Array<{
+    id: string;
+    sku: string;
+    title: string;
+    price: number;
+    stock: number;
+    reserved: number;
+    available: number;
+  }>;
+  variantCount: number;
+  abcCategory: "A" | "B" | "C";
 };
 
-let variantCostCache: Map<string, VariantCostSnapshot> | null = null;
-
-const toCacheKey = (id: Id<"shopifyProductVariants">): string => id.toString();
-
-const primeVariantCostComponents = async (
-  ctx: QueryCtx,
-  orgId: Id<"organizations">,
-): Promise<void> => {
-  const components = await ctx.db
-    .query("variantCosts")
-    .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
-    .collect();
-
-  variantCostCache = new Map();
-  for (const component of components) {
-    variantCostCache.set(toCacheKey(component.variantId), {
-      cogsPerUnit: component.cogsPerUnit,
-      handlingPerUnit: component.handlingPerUnit,
-      taxPercent: component.taxPercent,
-    });
-  }
+type InventoryOverviewRow = {
+  computedAt: number;
+  analysisWindowDays: number;
+  totalValue: number;
+  totalCogs: number;
+  totalSkus: number;
+  stockCoverageDays: number;
+  deadStock: number;
 };
 
-const getCachedComponent = (
-  variantId: Id<"shopifyProductVariants">,
-): VariantCostSnapshot | undefined => {
-  return variantCostCache?.get(toCacheKey(variantId));
+type InventoryProductRow = {
+  productId: unknown;
+  name: string;
+  sku: string;
+  image?: string;
+  category: string;
+  vendor: string;
+  stock: number;
+  reserved: number;
+  available: number;
+  reorderPoint: number;
+  stockStatus: "healthy" | "low" | "critical" | "out";
+  price: number;
+  cost: number;
+  margin: number;
+  turnoverRate: number;
+  unitsSold?: number;
+  periodRevenue?: number;
+  lastSoldAt?: number;
+  variants?: Array<{
+    id: string;
+    sku: string;
+    title: string;
+    price: number;
+    stock: number;
+    reserved: number;
+    available: number;
+  }>;
+  variantCount: number;
+  abcCategory: "A" | "B" | "C";
 };
 
-const aggregateInventoryLevels = (
-  levels: Array<Doc<"shopifyInventoryTotals">>,
-  variants?: Array<Doc<"shopifyProductVariants">>,
-): Map<
-  Id<"shopifyProductVariants">,
-  { available: number; incoming: number; committed: number }
-> => {
-  const totals = new Map<
-    Id<"shopifyProductVariants">,
-    { available: number; incoming: number; committed: number }
-  >();
-
-  for (const level of levels) {
-    const available = typeof level.available === "number" ? level.available : 0;
-    const incoming = typeof level.incoming === "number" ? level.incoming : 0;
-    const committed = typeof level.committed === "number" ? level.committed : 0;
-
-    totals.set(level.variantId, {
-      available,
-      incoming,
-      committed,
-    });
-  }
-
-  if (variants) {
-    for (const variant of variants) {
-      const quantity =
-        typeof variant.inventoryQuantity === "number"
-          ? variant.inventoryQuantity
-          : 0;
-      const existing = totals.get(variant._id);
-
-      if (existing) {
-        if (quantity > existing.available) {
-          existing.available = quantity;
-        }
-      } else {
-        totals.set(variant._id, {
-          available: quantity,
-          incoming: 0,
-          committed: 0,
-        });
-      }
-    }
-  }
-
-  return totals;
+const emptyOverview = {
+  totalValue: 0,
+  totalCOGS: 0,
+  totalSKUs: 0,
+  stockCoverageDays: 0,
+  deadStock: 0,
 };
 
-const MS_IN_DAY = 24 * 60 * 60 * 1000;
-const DEFAULT_ANALYSIS_DAYS = 30;
-const DEFAULT_LEAD_TIME_DAYS = 7;
-const SAFETY_STOCK_DAYS = 3;
-
-const decodeInventoryCursor = (
+function decodeInventoryCursor(
   rawCursor: string | null | undefined,
-): { page: number } => {
+): { page: number } {
   if (!rawCursor) {
     return { page: 1 };
   }
@@ -116,348 +161,167 @@ const decodeInventoryCursor = (
   } catch (_error) {
     return { page: 1 };
   }
-};
+}
 
-const normalizeDateRange = (
-  range: { startDate: string; endDate: string } | undefined,
-  fallbackWindowDays: number,
-): { start: Date; end: Date } => {
-  const now = new Date();
-  const end = range?.endDate ? new Date(range.endDate) : now;
-  const fallbackStart = new Date(end.getTime() - fallbackWindowDays * MS_IN_DAY);
-  const start = range?.startDate
-    ? new Date(range.startDate)
-    : fallbackStart;
-
-  const safeEnd = Number.isNaN(end.getTime()) ? now : end;
-  const safeStart = Number.isNaN(start.getTime()) ? fallbackStart : start;
-
-  if (safeStart.getTime() > safeEnd.getTime()) {
-    return { start: safeEnd, end: safeStart };
+function clampPageSize(value: number | undefined, fallback: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return fallback;
   }
+  return Math.max(1, Math.floor(value));
+}
 
-  return { start: safeStart, end: safeEnd };
-};
+function toIsoString(timestamp: number | undefined): string | undefined {
+  if (timestamp === undefined || !Number.isFinite(timestamp)) {
+    return undefined;
+  }
+  return new Date(timestamp).toISOString();
+}
 
-const ORDER_ITEMS_BATCH_SIZE = 10;
+function matchesSearch(product: InventoryProduct, term: string | null): boolean {
+  if (!term) {
+    return true;
+  }
+  const normalized = term.toLowerCase();
+  return (
+    product.name.toLowerCase().includes(normalized) ||
+    product.sku.toLowerCase().includes(normalized) ||
+    product.vendor.toLowerCase().includes(normalized) ||
+    product.category.toLowerCase().includes(normalized)
+  );
+}
 
-const fetchOrderItemsForOrders = async (
-  ctx: QueryCtx,
-  orderIds: Array<Id<"shopifyOrders">>,
-): Promise<Array<Doc<"shopifyOrderItems">>> => {
-  const items: Array<Doc<"shopifyOrderItems">> = [];
+function filterByStockLevel(
+  product: InventoryProduct,
+  stockLevel: string | null,
+): boolean {
+  if (!stockLevel || stockLevel === "all") {
+    return true;
+  }
+  return product.stockStatus === stockLevel;
+}
 
-  for (let i = 0; i < orderIds.length; i += ORDER_ITEMS_BATCH_SIZE) {
-    const batch = orderIds.slice(i, i + ORDER_ITEMS_BATCH_SIZE);
-    const batchResults = await Promise.all(
-      batch.map((orderId) =>
-        ctx.db
-          .query("shopifyOrderItems")
-          .withIndex("by_order", (q) => q.eq("orderId", orderId))
-          .collect(),
-      ),
-    );
+function sortProducts(
+  products: InventoryProduct[],
+  sortBy: string,
+  sortOrder: "asc" | "desc",
+): InventoryProduct[] {
+  const direction = sortOrder === "asc" ? 1 : -1;
 
-    for (const batchItems of batchResults) {
-      if (batchItems.length > 0) {
-        items.push(...batchItems);
-      }
+  const score = (product: InventoryProduct): number => {
+    switch (sortBy) {
+      case "price":
+        return product.price;
+      case "cost":
+        return product.cost;
+      case "margin":
+        return product.margin;
+      case "unitsSold":
+        return product.unitsSold ?? 0;
+      case "turnoverRate":
+        return product.turnoverRate;
+      case "reorderPoint":
+        return product.reorderPoint;
+      case "available":
+      case "stock":
+        return product.available;
+      case "periodRevenue":
+        return product.periodRevenue ?? 0;
+      case "name":
+        return Number.NaN;
+      default:
+        return product.available;
     }
-  }
+  };
 
-  return items;
-};
+  const needsAlpha = sortBy === "name";
 
-const fetchOrdersWithItems = async (
+  const sorted = [...products].sort((a, b) => {
+    if (needsAlpha) {
+      return direction === 1
+        ? a.name.localeCompare(b.name)
+        : b.name.localeCompare(a.name);
+    }
+
+    const aScore = score(a);
+    const bScore = score(b);
+    if (Number.isNaN(aScore) || Number.isNaN(bScore)) {
+      return direction === 1
+        ? a.name.localeCompare(b.name)
+        : b.name.localeCompare(a.name);
+    }
+    if (aScore === bScore) {
+      return a.name.localeCompare(b.name);
+    }
+    return aScore > bScore ? direction : -direction;
+  });
+
+  return sorted;
+}
+
+async function loadSnapshot(
   ctx: QueryCtx,
   orgId: Id<"organizations">,
-  start?: Date,
-  end?: Date,
-): Promise<{
-  orders: Array<Doc<"shopifyOrders">>;
-  orderItems: Array<Doc<"shopifyOrderItems">>;
-}> => {
-  const orders = await ctx.db
-    .query("shopifyOrders")
-    .withIndex("by_organization_and_created", (q) => {
-      if (start && end) {
-        return q
-          .eq("organizationId", orgId)
-          .gte("shopifyCreatedAt", start.getTime())
-          .lte("shopifyCreatedAt", end.getTime());
-      }
+): Promise<{ overview: InventoryOverviewRow | null; products: InventoryProductRow[] }> {
+  const db = ctx.db as any;
+  const overview = (await db
+    .query("inventoryOverviewSummaries")
+    .withIndex("by_organization", (q: any) => q.eq("organizationId", orgId))
+    .order("desc")
+    .first()) as (InventoryOverviewRow & { computedAt: number }) | null;
 
-      if (start) {
-        return q
-          .eq("organizationId", orgId)
-          .gte("shopifyCreatedAt", start.getTime());
-      }
-
-      if (end) {
-        return q
-          .eq("organizationId", orgId)
-          .lte("shopifyCreatedAt", end.getTime());
-      }
-
-      return q.eq("organizationId", orgId);
-    })
-    .collect();
-  if (orders.length === 0) {
-    return { orders, orderItems: [] };
+  if (!overview) {
+    return { overview: null, products: [] };
   }
 
-  const orderItems = await fetchOrderItemsForOrders(
-    ctx,
-    orders.map((order) => order._id),
-  );
+  const products = (await db
+    .query("inventoryProductSummaries")
+    .withIndex("by_org_computed", (q: any) =>
+      q.eq("organizationId", orgId).eq("computedAt", overview.computedAt),
+    )
+    .collect()) as InventoryProductRow[];
 
-  return { orders, orderItems };
-};
+  return { overview, products };
+}
 
-const getVariantCost = (variant: Doc<"shopifyProductVariants">): number => {
-  const snapshot = getCachedComponent(variant._id);
-  if (snapshot && typeof snapshot.cogsPerUnit === "number") {
-    return snapshot.cogsPerUnit;
-  }
+function mapProduct(doc: InventoryProductRow): InventoryProduct {
+  const productId =
+    typeof doc.productId === "string"
+      ? doc.productId
+      : doc.productId
+      ? String(doc.productId)
+      : "unknown";
 
-  const price = typeof variant.price === "number" ? variant.price : 0;
+  return {
+    id: productId,
+    name: doc.name,
+    sku: doc.sku,
+    image: doc.image ?? undefined,
+    category: doc.category,
+    vendor: doc.vendor,
+    stock: doc.stock,
+    reserved: doc.reserved,
+    available: doc.available,
+    reorderPoint: doc.reorderPoint,
+    stockStatus: doc.stockStatus,
+    price: doc.price,
+    cost: doc.cost,
+    margin: doc.margin,
+    turnoverRate: doc.turnoverRate,
+    unitsSold: doc.unitsSold ?? undefined,
+    periodRevenue: doc.periodRevenue ?? undefined,
+    lastSold: toIsoString(doc.lastSoldAt ?? undefined),
+    variants: doc.variants
+      ? doc.variants.map((variant) => ({
+          ...variant,
+          sku: variant.sku ?? "N/A",
+          title: variant.title ?? "Default",
+        }))
+      : undefined,
+    variantCount: doc.variantCount,
+    abcCategory: doc.abcCategory,
+  };
+}
 
-  if (variant.compareAtPrice && variant.compareAtPrice < price) {
-    return variant.compareAtPrice;
-  }
-
-  // Fall back to a conservative estimate when cost is unknown.
-  return price * 0.6;
-};
-
-type VariantSalesStats = {
-  units: number;
-  revenue: number;
-  cogs: number;
-  lastSoldAt?: number;
-};
-
-const buildVariantSalesMap = (
-  orderItems: Array<Doc<"shopifyOrderItems">>,
-  orders: Array<Doc<"shopifyOrders">>,
-  variantMap: Map<Id<"shopifyProductVariants">, Doc<"shopifyProductVariants">>,
-): Map<Id<"shopifyProductVariants">, VariantSalesStats> => {
-  const orderById = new Map<string, Doc<"shopifyOrders">>();
-  orders.forEach((order) => {
-    orderById.set(order._id.toString(), order);
-  });
-
-  const sales = new Map<Id<"shopifyProductVariants">, VariantSalesStats>();
-
-  orderItems.forEach((item) => {
-    if (!item.variantId) return;
-    const variant = variantMap.get(item.variantId);
-    if (!variant) return;
-
-    const order = orderById.get(item.orderId.toString());
-    const unitPrice =
-      typeof item.price === "number" ? item.price : variant.price || 0;
-    const discount =
-      typeof item.totalDiscount === "number" ? item.totalDiscount : 0;
-    const quantity = typeof item.quantity === "number" ? item.quantity : 0;
-    const lineRevenue = Math.max(0, unitPrice * quantity - discount);
-    const cost = getVariantCost(variant);
-
-    const current = sales.get(item.variantId) || {
-      units: 0,
-      revenue: 0,
-      cogs: 0,
-    };
-
-    current.units += quantity;
-    current.revenue += lineRevenue;
-    current.cogs += quantity * cost;
-
-    if (order) {
-      const soldAt = order.shopifyCreatedAt;
-      if (!current.lastSoldAt || soldAt > current.lastSoldAt) {
-        current.lastSoldAt = soldAt;
-      }
-    }
-
-    sales.set(item.variantId, current);
-  });
-
-  return sales;
-};
-
-type ProductSalesStats = {
-  units: number;
-  revenue: number;
-  cogs: number;
-  lastSoldAt?: number;
-};
-
-const buildProductSalesMap = (
-  variantSales: Map<Id<"shopifyProductVariants">, VariantSalesStats>,
-  variants: Array<Doc<"shopifyProductVariants">>,
-): Map<Id<"shopifyProducts">, ProductSalesStats> => {
-  const productSales = new Map<Id<"shopifyProducts">, ProductSalesStats>();
-
-  variants.forEach((variant) => {
-    const stats = variantSales.get(variant._id);
-    if (!stats) return;
-
-    const current = productSales.get(variant.productId) || {
-      units: 0,
-      revenue: 0,
-      cogs: 0,
-    };
-
-    current.units += stats.units;
-    current.revenue += stats.revenue;
-    current.cogs += stats.cogs;
-
-    if (stats.lastSoldAt) {
-      if (!current.lastSoldAt || stats.lastSoldAt > current.lastSoldAt) {
-        current.lastSoldAt = stats.lastSoldAt;
-      }
-    }
-
-    productSales.set(variant.productId, current);
-  });
-
-  return productSales;
-};
-
-const groupVariantsByProduct = (
-  variants: Array<Doc<"shopifyProductVariants">>,
-): Map<Id<"shopifyProducts">, Array<Doc<"shopifyProductVariants">>> => {
-  const grouped = new Map<
-    Id<"shopifyProducts">,
-    Array<Doc<"shopifyProductVariants">>
-  >();
-
-  variants.forEach((variant) => {
-    const existing = grouped.get(variant.productId);
-    if (existing) {
-      existing.push(variant);
-    } else {
-      grouped.set(variant.productId, [variant]);
-    }
-  });
-
-  return grouped;
-};
-
-type SalesTotals = {
-  units: number;
-  revenue: number;
-  cogs: number;
-};
-
-const computeSalesTotals = (
-  items: Array<Doc<"shopifyOrderItems">>,
-  variantLookup: Map<Id<"shopifyProductVariants">, Doc<"shopifyProductVariants">>,
-): SalesTotals => {
-  let units = 0;
-  let revenue = 0;
-  let cogs = 0;
-
-  for (const item of items) {
-    const quantity = typeof item.quantity === "number" ? item.quantity : 0;
-    units += quantity;
-
-    const variant = item.variantId ? variantLookup.get(item.variantId) : undefined;
-    const unitPrice =
-      typeof item.price === "number"
-        ? item.price
-        : variant?.price ?? 0;
-    const discount =
-      typeof item.totalDiscount === "number" ? item.totalDiscount : 0;
-    const lineRevenue = Math.max(0, unitPrice * quantity - discount);
-    revenue += lineRevenue;
-
-    const unitCost = variant ? getVariantCost(variant) : unitPrice * 0.6;
-    cogs += unitCost * quantity;
-  }
-
-  return { units, revenue, cogs };
-};
-
-const assignABCCategories = (
-  products: Array<Doc<"shopifyProducts">>,
-  productSales: Map<Id<"shopifyProducts">, ProductSalesStats>,
-): Map<Id<"shopifyProducts">, "A" | "B" | "C"> => {
-  const distribution = products.map((product) => {
-    const stats = productSales.get(product._id);
-    return {
-      id: product._id,
-      revenue: stats?.revenue ?? 0,
-      units: stats?.units ?? 0,
-    };
-  });
-
-  const totalRevenue = distribution.reduce((sum, item) => sum + item.revenue, 0);
-  const totalUnits = distribution.reduce((sum, item) => sum + item.units, 0);
-
-  if (totalRevenue > 0) {
-    distribution.sort((a, b) => b.revenue - a.revenue);
-    let cumulativeRevenue = 0;
-    return distribution.reduce((map, item) => {
-      cumulativeRevenue += item.revenue;
-      const share = cumulativeRevenue / totalRevenue;
-      let category: "A" | "B" | "C";
-      if (share <= 0.8) {
-        category = "A";
-      } else if (share <= 0.95) {
-        category = "B";
-      } else {
-        category = "C";
-      }
-      map.set(item.id, category);
-      return map;
-    }, new Map<Id<"shopifyProducts">, "A" | "B" | "C">());
-  }
-
-  if (totalUnits > 0) {
-    distribution.sort((a, b) => b.units - a.units);
-    let cumulativeUnits = 0;
-    return distribution.reduce((map, item) => {
-      cumulativeUnits += item.units;
-      const share = cumulativeUnits / totalUnits;
-      let category: "A" | "B" | "C";
-      if (share <= 0.8) {
-        category = "A";
-      } else if (share <= 0.95) {
-        category = "B";
-      } else {
-        category = "C";
-      }
-      map.set(item.id, category);
-      return map;
-    }, new Map<Id<"shopifyProducts">, "A" | "B" | "C">());
-  }
-
-  // If there is no sales data yet, fall back to an even distribution by count.
-  const fallback = new Map<Id<"shopifyProducts">, "A" | "B" | "C">();
-  const totalCount = Math.max(distribution.length, 1);
-  distribution
-    .sort((a, b) => a.id.localeCompare(b.id))
-    .forEach((item, index) => {
-      const positionRatio = (index + 1) / totalCount;
-      let category: "A" | "B" | "C";
-      if (positionRatio <= 0.2) {
-        category = "A";
-      } else if (positionRatio <= 0.5) {
-        category = "B";
-      } else {
-        category = "C";
-      }
-      fallback.set(item.id, category);
-    });
-
-  return fallback;
-};
-
-/**
- * Get consolidated inventory analytics including overview metrics and product list.
- */
 export const getInventoryAnalytics = query({
   args: {
     paginationOpts: v.optional(paginationOptsValidator),
@@ -470,79 +334,25 @@ export const getInventoryAnalytics = query({
     sortOrder: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
   },
   returns: v.object({
-    overview: v.object({
-      totalValue: v.number(),
-      totalCOGS: v.number(),
-      totalSKUs: v.number(),
-      stockCoverageDays: v.number(),
-      deadStock: v.number(),
-    }),
+    overview: inventoryOverviewValidator,
     products: v.object({
-      data: v.array(
-        v.object({
-          id: v.string(),
-          name: v.string(),
-          sku: v.string(),
-          image: v.optional(v.string()),
-          category: v.string(),
-          vendor: v.string(),
-          stock: v.number(),
-          reserved: v.number(),
-          available: v.number(),
-          reorderPoint: v.number(),
-          stockStatus: v.union(
-            v.literal("healthy"),
-            v.literal("low"),
-            v.literal("critical"),
-            v.literal("out"),
-          ),
-          price: v.number(),
-          cost: v.number(),
-          margin: v.number(),
-          turnoverRate: v.number(),
-          unitsSold: v.optional(v.number()),
-          lastSold: v.optional(v.string()),
-          variants: v.optional(
-            v.array(
-              v.object({
-                id: v.string(),
-                sku: v.string(),
-                title: v.string(),
-                price: v.number(),
-                stock: v.number(),
-                reserved: v.number(),
-                available: v.number(),
-              }),
-            ),
-          ),
-          abcCategory: v.union(v.literal("A"), v.literal("B"), v.literal("C")),
-        }),
-      ),
-      pagination: v.object({
-        page: v.number(),
-        pageSize: v.number(),
-        total: v.number(),
-        totalPages: v.number(),
-      }),
+      data: v.array(inventoryProductValidator),
+      pagination: paginationValidator,
       hasMore: v.boolean(),
+    }),
+    metadata: v.object({
+      computedAt: v.optional(v.number()),
+      analysisWindowDays: v.optional(v.number()),
+      isStale: v.boolean(),
     }),
   }),
   handler: async (ctx, args) => {
     const auth = await getUserAndOrg(ctx);
-    const fallbackPageSize = Math.max(
-      1,
-      Math.floor(args.paginationOpts?.numItems ?? args.pageSize ?? 50),
-    );
+    const fallbackPageSize = clampPageSize(args.pageSize, 50);
 
     if (!auth) {
       return {
-        overview: {
-          totalValue: 0,
-          totalCOGS: 0,
-          totalSKUs: 0,
-          stockCoverageDays: 0,
-          deadStock: 0,
-        },
+        overview: emptyOverview,
         products: {
           data: [],
           pagination: {
@@ -553,308 +363,124 @@ export const getInventoryAnalytics = query({
           },
           hasMore: false,
         },
+        metadata: {
+          computedAt: undefined,
+          analysisWindowDays: undefined,
+          isStale: true,
+        },
       };
     }
-    const orgId = auth.orgId as Id<"organizations">;
 
-    await primeVariantCostComponents(ctx, orgId);
+    const orgId = auth.orgId as Id<"organizations">;
+    const { overview, products } = await loadSnapshot(ctx, orgId);
+
+    if (!overview) {
+      return {
+        overview: emptyOverview,
+        products: {
+          data: [],
+          pagination: {
+            page: 1,
+            pageSize: fallbackPageSize,
+            total: 0,
+            totalPages: 0,
+          },
+          hasMore: false,
+        },
+        metadata: {
+          computedAt: undefined,
+          analysisWindowDays: undefined,
+          isStale: true,
+        },
+      };
+    }
 
     const cursorState = decodeInventoryCursor(args.paginationOpts?.cursor);
     const legacyPage = args.page ?? 1;
-    const pageSize = Math.max(
-      1,
-      Math.floor(args.paginationOpts?.numItems ?? args.pageSize ?? 50),
+    const pageSize = clampPageSize(
+      args.paginationOpts?.numItems ?? args.pageSize,
+      fallbackPageSize,
     );
     const requestedPage = args.paginationOpts
       ? cursorState.page
       : Math.max(1, Math.floor(legacyPage));
 
-    const [products, variants, inventory] = await Promise.all([
-      ctx.db
-        .query("shopifyProducts")
-        .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
-        .collect(),
-      ctx.db
-        .query("shopifyProductVariants")
-        .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
-        .collect(),
-      ctx.db
-        .query("shopifyInventoryTotals")
-        .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
-        .collect(),
-    ]);
+    const normalizedSearch = args.searchTerm
+      ? args.searchTerm.trim().toLowerCase()
+      : null;
+    const normalizedCategory = args.category && args.category !== "all"
+      ? args.category.trim().toLowerCase()
+      : null;
+    const stockLevel = args.stockLevel ?? "all";
+    const sortBy = args.sortBy ?? "available";
+    const sortOrder = args.sortOrder ?? "desc";
 
-    const inventoryTotals = aggregateInventoryLevels(inventory, variants);
+    const mappedProducts = products.map(mapProduct);
 
-    const totalSKUs = variants.length;
-
-    let totalValue = 0;
-    let totalCOGS = 0;
-    let totalUnitsInStock = 0;
-
-    variants.forEach((variant) => {
-      const totals = inventoryTotals.get(variant._id);
-      const available = totals?.available ?? 0;
-      const price = variant.price || 0;
-      const cost = getVariantCost(variant);
-
-      totalValue += available * price;
-      totalCOGS += available * cost;
-      totalUnitsInStock += available;
-    });
-
-    const { start, end } = normalizeDateRange(
-      undefined,
-      DEFAULT_ANALYSIS_DAYS,
-    );
-    const analysisWindowMs = Math.max(1, end.getTime() - start.getTime());
-    const analysisDays = Math.max(1, Math.ceil(analysisWindowMs / MS_IN_DAY));
-
-    const { orders, orderItems } = await fetchOrdersWithItems(
-      ctx,
-      orgId,
-      start,
-      end,
-    );
-
-    const variantMap = new Map<
-      Id<"shopifyProductVariants">,
-      Doc<"shopifyProductVariants">
-    >();
-    variants.forEach((variant) => {
-      variantMap.set(variant._id, variant);
-    });
-
-    const variantsByProduct = groupVariantsByProduct(variants);
-
-    const variantSales = buildVariantSalesMap(orderItems, orders, variantMap);
-    const productSales = buildProductSalesMap(variantSales, variants);
-    const abcCategories = assignABCCategories(products, productSales);
-
-    const productsWithInventory = products.map((product) => {
-      const productVariants = variantsByProduct.get(product._id) ?? [];
-      let totalAvailable = 0;
-      let totalReserved = 0;
-      let weightedCostSum = 0;
-      let weightedCostWeight = 0;
-
-      const variantInventory = productVariants.map((variant) => {
-        const totals = inventoryTotals.get(variant._id);
-        const available = totals?.available ?? 0;
-        const committed = totals?.committed ?? 0;
-        const stock = available + committed;
-        const weight = available > 0 ? available : 1;
-
-        totalAvailable += available;
-        totalReserved += committed;
-        weightedCostSum += getVariantCost(variant) * weight;
-        weightedCostWeight += weight;
-
-        return {
-          id: variant._id,
-          sku: variant.sku || "N/A",
-          title: variant.title || "Default",
-          price: variant.price || 0,
-          stock,
-          reserved: committed,
-          available,
-        };
-      });
-
-      const totalStock = totalAvailable + totalReserved;
-
-      const salesStats = productSales.get(product._id);
-      const unitsSold = salesStats?.units ?? 0;
-      const avgDailySales = unitsSold / analysisDays;
-
-      const reorderPoint =
-        avgDailySales > 0
-          ? Math.max(
-              1,
-              Math.round(
-                avgDailySales * (DEFAULT_LEAD_TIME_DAYS + SAFETY_STOCK_DAYS),
-              ),
-            )
-          : 0;
-
-      const stockStatus = (() => {
-        if (totalAvailable <= 0) return "out" as const;
-        if (avgDailySales > 0) {
-          const coverageDays = totalAvailable / avgDailySales;
-          if (coverageDays <= SAFETY_STOCK_DAYS) return "critical" as const;
-          if (coverageDays <= DEFAULT_LEAD_TIME_DAYS + SAFETY_STOCK_DAYS)
-            return "low" as const;
-        } else {
-          if (totalAvailable < 5) return "critical" as const;
-          if (totalAvailable < 20) return "low" as const;
-        }
-        return "healthy" as const;
-      })();
-
-      const defaultVariant = productVariants[0];
-      const price = defaultVariant?.price ?? 0;
-      const cost =
-        weightedCostWeight > 0
-          ? weightedCostSum / weightedCostWeight
-          : defaultVariant
-            ? getVariantCost(defaultVariant)
-            : 0;
-      const margin = price > 0 ? ((price - cost) / price) * 100 : 0;
-
-      const annualizationFactor = 365 / analysisDays;
-      const turnoverRate =
-        totalAvailable > 0
-          ? Math.round(
-              ((unitsSold * annualizationFactor) / totalAvailable) * 10,
-            ) /
-            10
-          : 0;
-
-      const lastSold =
-        salesStats?.lastSoldAt != null
-          ? new Date(salesStats.lastSoldAt).toISOString()
-          : undefined;
-
-      return {
-        id: product._id,
-        name: product.title,
-        sku: defaultVariant?.sku || product.handle || "N/A",
-        image: product.featuredImage,
-        category: product.productType || "Uncategorized",
-        vendor: product.vendor || "Unknown",
-        stock: totalStock,
-        reserved: totalReserved,
-        available: totalAvailable,
-        reorderPoint,
-        stockStatus,
-        price,
-        cost,
-        margin,
-        turnoverRate,
-        unitsSold,
-        lastSold,
-        variants: variantInventory.length > 1 ? variantInventory : undefined,
-        abcCategory: abcCategories.get(product._id) ?? "C",
-      };
-    });
-
-    let filteredProducts = [...productsWithInventory];
-
-    if (args.stockLevel) {
-      filteredProducts = filteredProducts.filter(
-        (product) => product.stockStatus === args.stockLevel,
-      );
-    }
-
-    if (args.category && args.category !== "all") {
-      filteredProducts = filteredProducts.filter(
-        (product) =>
-          product.category.toLowerCase() === args.category!.toLowerCase(),
-      );
-    }
-
-    if (args.searchTerm) {
-      const term = args.searchTerm.toLowerCase();
-      filteredProducts = filteredProducts.filter((product) => {
-        return (
-          product.name.toLowerCase().includes(term) ||
-          product.sku.toLowerCase().includes(term) ||
-          product.vendor.toLowerCase().includes(term) ||
-          product.category.toLowerCase().includes(term)
-        );
-      });
-    }
-
-    if (args.sortBy) {
-      filteredProducts.sort((a, b) => {
-        const sortKey = args.sortBy as keyof typeof a;
-        const aVal = a[sortKey];
-        const bVal = b[sortKey];
-        if (aVal === undefined || bVal === undefined) {
-          return 0;
-        }
-        const order = args.sortOrder === "desc" ? -1 : 1;
-        return aVal > bVal ? order : aVal < bVal ? -order : 0;
-      });
-    }
-
-    const total = filteredProducts.length;
-    const totalPages = total > 0 ? Math.ceil(total / pageSize) : 0;
-    const safePage = totalPages > 0 ? Math.min(requestedPage, totalPages) : 1;
-    const startIndex = (safePage - 1) * pageSize;
-    const paginatedData = filteredProducts.slice(
-      startIndex,
-      startIndex + pageSize,
-    );
-
-    const hasMore = totalPages > 0 && safePage < totalPages;
-
-    const { units: unitsSold } = computeSalesTotals(orderItems, variantMap);
-    const avgDailyUnitsSold = unitsSold / analysisDays;
-
-    const stockCoverageDays =
-      avgDailyUnitsSold > 0
-        ? Math.round(totalUnitsInStock / avgDailyUnitsSold)
-        : totalUnitsInStock > 0
-          ? 90
-          : 0;
-
-    const ninetyDaysAgo = Date.now() - 90 * MS_IN_DAY;
-    const recentOrdersInRange = await ctx.db
-      .query("shopifyOrders")
-      .withIndex("by_organization_and_created", (q) =>
-        q.eq("organizationId", orgId).gt("shopifyCreatedAt", ninetyDaysAgo),
-      )
-      .collect();
-
-    const recentOrderItems =
-      recentOrdersInRange.length > 0
-        ? await fetchOrderItemsForOrders(
-            ctx,
-            recentOrdersInRange.map((order) => order._id),
-          )
-        : [];
-
-    const soldVariantIds = new Set<Id<"shopifyProductVariants">>();
-    recentOrderItems.forEach((item) => {
-      if (item.variantId) {
-        soldVariantIds.add(item.variantId);
+    const filtered = mappedProducts.filter((product) => {
+      if (!matchesSearch(product, normalizedSearch)) {
+        return false;
       }
+      if (
+        normalizedCategory &&
+        product.category.toLowerCase() !== normalizedCategory
+      ) {
+        return false;
+      }
+      if (!filterByStockLevel(product, stockLevel)) {
+        return false;
+      }
+      return true;
     });
 
-    let deadStock = 0;
-    variants.forEach((variant) => {
-      const totals = inventoryTotals.get(variant._id);
-      const hasStock = (totals?.available ?? 0) > 0;
-      if (hasStock && !soldVariantIds.has(variant._id)) {
-        deadStock++;
-      }
-    });
+    const sorted = sortProducts(filtered, sortBy, sortOrder);
+
+    const total = sorted.length;
+    const totalPages = total === 0 ? 0 : Math.max(1, Math.ceil(total / pageSize));
+    const effectivePage = totalPages === 0 ? 1 : Math.min(requestedPage, totalPages);
+    const startIndex = (effectivePage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    const pageEntries = sorted.slice(startIndex, endIndex);
+    const hasMore = totalPages > 0 && effectivePage < totalPages;
+
+    const convertedOverview = {
+      totalValue: overview.totalValue,
+      totalCOGS: overview.totalCogs,
+      totalSKUs: overview.totalSkus,
+      stockCoverageDays: overview.stockCoverageDays,
+      deadStock: overview.deadStock,
+    };
+
+    const isStale = Date.now() - overview.computedAt > SNAPSHOT_TTL_MS;
 
     return {
-      overview: {
-        totalValue,
-        totalCOGS,
-        totalSKUs,
-        stockCoverageDays,
-        deadStock,
-      },
+      overview: convertedOverview,
       products: {
-        data: paginatedData,
+        data: pageEntries,
         pagination: {
-          page: totalPages === 0 ? 1 : safePage,
+          page: effectivePage,
           pageSize,
           total,
           totalPages,
         },
         hasMore,
       },
+      metadata: {
+        computedAt: overview.computedAt,
+        analysisWindowDays: overview.analysisWindowDays,
+        isStale,
+      },
     };
   },
 });
-/**
- * Get stock alerts
- */
+
+const severityRank: Record<"critical" | "low" | "reorder" | "overstock", number> = {
+  critical: 0,
+  low: 1,
+  reorder: 2,
+  overstock: 3,
+};
+
 export const getStockAlerts = query({
   args: {
     limit: v.optional(v.number()),
@@ -881,53 +507,17 @@ export const getStockAlerts = query({
   ),
   handler: async (ctx, args) => {
     const auth = await getUserAndOrg(ctx);
-    if (!auth) return null;
-    const orgId = auth.orgId as Id<'organizations'>;
+    if (!auth) {
+      return null;
+    }
 
-    await primeVariantCostComponents(ctx, orgId);
+    const orgId = auth.orgId as Id<"organizations">;
+    const snapshot = await loadSnapshot(ctx, orgId);
+    if (!snapshot.overview) {
+      return null;
+    }
 
-    const [products, variants, inventory] = await Promise.all([
-      ctx.db
-        .query("shopifyProducts")
-        .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
-        .collect(),
-      ctx.db
-        .query("shopifyProductVariants")
-        .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
-        .collect(),
-      ctx.db
-        .query("shopifyInventoryTotals")
-        .withIndex("by_organization", (q) => q.eq("organizationId", orgId))
-        .collect(),
-    ]);
-
-    const inventoryTotals = aggregateInventoryLevels(inventory, variants);
-
-    const { start, end } = normalizeDateRange(undefined, DEFAULT_ANALYSIS_DAYS);
-    const analysisWindowMs = Math.max(1, end.getTime() - start.getTime());
-    const analysisDays = Math.max(1, Math.ceil(analysisWindowMs / MS_IN_DAY));
-
-    const { orders, orderItems } = await fetchOrdersWithItems(
-      ctx,
-      orgId,
-      start,
-      end,
-    );
-
-    const variantMap = new Map<
-      Id<'shopifyProductVariants'>,
-      Doc<'shopifyProductVariants'>
-    >();
-    variants.forEach((variant) => {
-      variantMap.set(variant._id, variant);
-    });
-
-    const variantSales = buildVariantSalesMap(orderItems, orders, variantMap);
-    const productMap = new Map<Id<'shopifyProducts'>, Doc<'shopifyProducts'>>();
-    products.forEach((product) => {
-      productMap.set(product._id, product);
-    });
-
+    const windowDays = snapshot.overview.analysisWindowDays || 30;
     const alerts: Array<{
       id: string;
       type: "critical" | "low" | "reorder" | "overstock";
@@ -939,128 +529,71 @@ export const getStockAlerts = query({
       message: string;
     }> = [];
 
-    variants.forEach((variant) => {
-      const totals = inventoryTotals.get(variant._id);
-      const available = totals?.available ?? 0;
-      const product = productMap.get(variant.productId);
-      const productName = product?.title || variant.title || "Unnamed Product";
-      const sku = variant.sku || product?.handle || "N/A";
-      const salesStats = variantSales.get(variant._id);
-      const unitsSold = salesStats?.units ?? 0;
-      const avgDailySales = unitsSold / analysisDays;
-      const reorderPoint =
-        avgDailySales > 0
-          ? Math.max(
-              1,
-              Math.round(
-                avgDailySales * (DEFAULT_LEAD_TIME_DAYS + SAFETY_STOCK_DAYS),
-              ),
-            )
-          : 0;
-      const coverageDays = avgDailySales > 0 ? available / avgDailySales : Infinity;
+    for (const productRow of snapshot.products) {
+      const product = mapProduct(productRow);
+      const sku = product.variants?.[0]?.sku ?? product.sku ?? "N/A";
+      const avgDailySales = windowDays > 0 ? (product.unitsSold ?? 0) / windowDays : 0;
       const daysUntilStockout =
         avgDailySales > 0
-          ? Number(Math.max(0, coverageDays).toFixed(1))
+          ? Number(Math.max(0, product.available / avgDailySales).toFixed(1))
           : undefined;
 
-      if (available <= 0) {
+      const pushAlert = (
+        type: "critical" | "low" | "reorder" | "overstock",
+        message: string,
+      ) => {
         alerts.push({
-          id: `${variant._id}-out`,
-          type: "critical",
-          productName,
+          id: `${product.id}-${type}`,
+          type,
+          productName: product.name,
           sku,
-          currentStock: 0,
-          reorderPoint,
-          daysUntilStockout: 0,
-          message: "Product is out of stock. Immediate reorder required.",
+          currentStock: product.available,
+          reorderPoint: product.reorderPoint,
+          daysUntilStockout,
+          message,
         });
-        return;
+      };
+
+      if (product.available <= 0 || product.stockStatus === "out") {
+        pushAlert("critical", "Product is out of stock. Immediate reorder required.");
+        continue;
       }
 
-      if (avgDailySales > 0) {
-        if (coverageDays <= SAFETY_STOCK_DAYS) {
-          alerts.push({
-            id: `${variant._id}-critical`,
-            type: "critical",
-            productName,
-            sku,
-            currentStock: available,
-            reorderPoint,
-            daysUntilStockout,
-            message: `Projected stockout in ${daysUntilStockout} days at current velocity.`,
-          });
-          return;
-        }
-
-        if (coverageDays <= DEFAULT_LEAD_TIME_DAYS + SAFETY_STOCK_DAYS) {
-          alerts.push({
-            id: `${variant._id}-low`,
-            type: "low",
-            productName,
-            sku,
-            currentStock: available,
-            reorderPoint,
-            daysUntilStockout,
-            message: `Inventory covers approximately ${daysUntilStockout} days. Plan a restock.`,
-          });
-          return;
-        }
-
-        if (available <= reorderPoint) {
-          alerts.push({
-            id: `${variant._id}-reorder`,
-            type: "reorder",
-            productName,
-            sku,
-            currentStock: available,
-            reorderPoint,
-            daysUntilStockout,
-            message: `Available units (${available}) are below the reorder point (${reorderPoint}).`,
-          });
-          return;
-        }
-
-        const generousCover =
-          (DEFAULT_LEAD_TIME_DAYS + SAFETY_STOCK_DAYS) * 3;
-        if (coverageDays >= generousCover) {
-          alerts.push({
-            id: `${variant._id}-overstock`,
-            type: "overstock",
-            productName,
-            sku,
-            currentStock: available,
-            reorderPoint,
-            daysUntilStockout,
-            message: `Stock covers roughly ${daysUntilStockout} days of demand. Consider slowing replenishment.`,
-          });
-        }
-
-        return;
+      if (product.stockStatus === "critical") {
+        pushAlert(
+          "critical",
+          daysUntilStockout !== undefined
+            ? `Projected stockout in ${daysUntilStockout} days at current velocity.`
+            : "Inventory is critically low. Reorder now.",
+        );
+        continue;
       }
 
-      // No sales in the analysis window
-      if (available >= 50) {
-        alerts.push({
-          id: `${variant._id}-idle`,
-          type: "overstock",
-          productName,
-          sku,
-          currentStock: available,
-          reorderPoint,
-          message: "No recent sales detected but inventory remains high. Evaluate for markdown or promotions.",
-        });
+      if (product.stockStatus === "low") {
+        pushAlert(
+          "low",
+          daysUntilStockout !== undefined
+            ? `Inventory covers approximately ${daysUntilStockout} days of demand.`
+            : "Inventory is trending low. Review replenishment plan.",
+        );
+        continue;
       }
-    });
 
-    const severityRank: Record<
-      "critical" | "low" | "reorder" | "overstock",
-      number
-    > = {
-      critical: 0,
-      low: 1,
-      reorder: 2,
-      overstock: 3,
-    };
+      if (product.available <= product.reorderPoint) {
+        pushAlert(
+          "reorder",
+          `Available units (${product.available}) are at or below the reorder point (${product.reorderPoint}).`,
+        );
+        continue;
+      }
+
+      if (avgDailySales === 0 && product.available >= 50) {
+        pushAlert(
+          "overstock",
+          "No recent sales detected but inventory remains high. Consider promotions or markdowns.",
+        );
+      }
+    }
 
     alerts.sort((a, b) => {
       const severityDiff = severityRank[a.type] - severityRank[b.type];
@@ -1071,7 +604,56 @@ export const getStockAlerts = query({
       return aDays - bDays;
     });
 
-    const limit = args.limit || 10;
+    const limit = args.limit ?? 10;
     return alerts.slice(0, limit);
+  },
+});
+
+export const refreshInventoryAnalytics = action({
+  args: {
+    force: v.optional(v.boolean()),
+    analysisWindowDays: v.optional(v.number()),
+  },
+  returns: v.object({
+    skipped: v.boolean(),
+    computedAt: v.optional(v.number()),
+  }),
+  handler: async (ctx, args) => {
+    const auth = await getUserAndOrg(ctx);
+    if (!auth) {
+      throw new ConvexError("Not authenticated");
+    }
+
+    const orgId = auth.orgId as Id<"organizations">;
+
+    if (!args.force) {
+      const metadata = (await ctx.runQuery(
+        internal.engine.inventory.getInventorySnapshotMetadata,
+        { organizationId: orgId },
+      )) as { computedAt: number; analysisWindowDays: number } | null;
+
+      if (
+        metadata?.computedAt !== undefined &&
+        Date.now() - metadata.computedAt < SNAPSHOT_TTL_MS
+      ) {
+        return {
+          skipped: true,
+          computedAt: metadata.computedAt,
+        };
+      }
+    }
+
+    const result = (await ctx.runMutation(
+      internal.engine.inventory.rebuildInventorySnapshot,
+      {
+        organizationId: orgId,
+        analysisWindowDays: args.analysisWindowDays,
+      },
+    )) as { computedAt: number };
+
+    return {
+      skipped: false,
+      computedAt: result.computedAt,
+    };
   },
 });

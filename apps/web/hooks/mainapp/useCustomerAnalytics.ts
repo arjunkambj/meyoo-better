@@ -1,11 +1,10 @@
+import { useAction } from "convex/react";
 import { useQuery } from "convex-helpers/react/cache/hooks";
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { api } from "@/libs/convexApi";
 import { dateRangeToUtcWithShopPreference } from "@/libs/dateRange";
-import { formatCurrency } from "@/libs/utils/format";
 import { useShopifyTime } from "./useShopifyTime";
-import { useUser } from "./useUser";
 
 interface Customer {
   id: string;
@@ -36,12 +35,24 @@ interface CustomersPagination {
   hasMore: boolean;
 }
 
+interface CustomersMetadata {
+  computedAt?: number;
+  analysisWindowDays?: number;
+  windowStartMs?: number;
+  windowEndMsExclusive?: number;
+  isStale: boolean;
+}
+
 interface CustomersQueryResult {
   rows: Customer[];
   pagination: CustomersPagination;
+  metadata: CustomersMetadata;
 }
 
 const DEFAULT_PAGE_SIZE = 50;
+const DEFAULT_ANALYSIS_DAYS = 30;
+const MS_IN_DAY = 24 * 60 * 60 * 1000;
+const CUSTOMER_SNAPSHOT_MAX_DAYS = 365;
 
 export interface UseCustomerAnalyticsParams {
   dateRange?: {
@@ -57,6 +68,23 @@ export interface UseCustomerAnalyticsParams {
   sortOrder?: "asc" | "desc";
 }
 
+interface UseCustomerAnalyticsReturn {
+  customers:
+    | {
+        data: Customer[];
+        pagination: CustomersPagination;
+      }
+    | undefined;
+  metadata: CustomersMetadata | null;
+  isLoading: boolean;
+  isInitialLoading: boolean;
+  isRefreshing: boolean;
+  loadingStates: {
+    customers: boolean;
+  };
+  refresh: (options?: { force?: boolean }) => Promise<void>;
+}
+
 const defaultRange = () => {
   const end = new Date();
   const start = new Date();
@@ -67,8 +95,30 @@ const defaultRange = () => {
   };
 };
 
-export function useCustomerAnalytics(params: UseCustomerAnalyticsParams = {}) {
-  const { primaryCurrency } = useUser();
+const computeRequestedDays = (range: {
+  startDate: string;
+  endDate: string;
+  dayCount?: number;
+}): number => {
+  if (typeof range.dayCount === "number" && Number.isFinite(range.dayCount)) {
+    return Math.max(1, Math.min(Math.floor(range.dayCount), CUSTOMER_SNAPSHOT_MAX_DAYS));
+  }
+
+  const start = Date.parse(`${range.startDate}T00:00:00.000Z`);
+  const end = Date.parse(`${range.endDate}T23:59:59.999Z`);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+    return DEFAULT_ANALYSIS_DAYS;
+  }
+
+  return Math.max(
+    1,
+    Math.min(Math.round((end - start) / MS_IN_DAY), CUSTOMER_SNAPSHOT_MAX_DAYS),
+  );
+};
+
+export function useCustomerAnalytics(
+  params: UseCustomerAnalyticsParams = {},
+): UseCustomerAnalyticsReturn {
   const { offsetMinutes, timezoneIana } = useShopifyTime();
 
   const {
@@ -81,6 +131,12 @@ export function useCustomerAnalytics(params: UseCustomerAnalyticsParams = {}) {
     sortBy,
     sortOrder = "desc",
   } = params;
+
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const refreshPendingRef = useRef(false);
+  const refreshAnalytics = useAction(
+    api.web.customers.refreshCustomerAnalytics,
+  );
 
   const normalizedSearch = useMemo(() => {
     if (!searchTerm) return undefined;
@@ -124,6 +180,13 @@ export function useCustomerAnalytics(params: UseCustomerAnalyticsParams = {}) {
     } as const;
   }, [effectiveDateRange.endDate, effectiveDateRange.startDate, rangeStrings]);
 
+  const requestedDays = useMemo(() => {
+    if (!normalizedRange) {
+      return DEFAULT_ANALYSIS_DAYS;
+    }
+    return Math.max(1, computeRequestedDays(normalizedRange));
+  }, [normalizedRange]);
+
   const queryArgs = useMemo(() => {
     if (!normalizedRange) return "skip" as const;
     return {
@@ -152,7 +215,52 @@ export function useCustomerAnalytics(params: UseCustomerAnalyticsParams = {}) {
     queryArgs,
   ) as CustomersQueryResult | undefined;
 
+  const metadata = result?.metadata ?? null;
   const customersLoading = queryArgs !== "skip" && result === undefined;
+
+  const triggerRefresh = useCallback(
+    async (force = false) => {
+      if (refreshPendingRef.current) return;
+      if (!normalizedRange) return;
+
+      refreshPendingRef.current = true;
+      setIsRefreshing(true);
+      try {
+        await refreshAnalytics({
+          force,
+          analysisWindowDays: requestedDays,
+          dateRange: normalizedRange,
+        });
+      } catch (error) {
+        console.error("Failed to refresh customer analytics", error);
+      } finally {
+        refreshPendingRef.current = false;
+        setIsRefreshing(false);
+      }
+    },
+    [normalizedRange, refreshAnalytics, requestedDays],
+  );
+
+  useEffect(() => {
+    if (!normalizedRange) return;
+    if (!metadata) return;
+    if (!metadata.isStale) return;
+    triggerRefresh(false);
+  }, [
+    metadata?.isStale,
+    metadata?.analysisWindowDays,
+    metadata?.windowStartMs,
+    metadata?.windowEndMsExclusive,
+    normalizedRange,
+    triggerRefresh,
+  ]);
+
+  const refresh = useCallback(
+    async (options?: { force?: boolean }) => {
+      await triggerRefresh(options?.force ?? true);
+    },
+    [triggerRefresh],
+  );
 
   const customers = useMemo(() => {
     if (!result) return undefined;
@@ -163,35 +271,17 @@ export function useCustomerAnalytics(params: UseCustomerAnalyticsParams = {}) {
     };
   }, [result]);
 
-  const exportData = useMemo(() => {
-    if (!customers) return [] as Array<Record<string, unknown>>;
-
-    return customers.data.map((c) => ({
-      Name: c.name,
-      Email: c.email,
-      Status: c.status,
-      "Lifetime Value": formatCurrency(c.lifetimeValue, primaryCurrency),
-      "Lifetime Orders": c.orders,
-      "Orders (Range)": c.periodOrders,
-      "Avg Order Value": formatCurrency(c.avgOrderValue, primaryCurrency),
-      "Revenue (Range)": formatCurrency(c.periodRevenue, primaryCurrency),
-      "Last Order": c.lastOrderDate,
-      "First Order": c.firstOrderDate,
-      Segment: c.segment,
-      Returning: c.isReturning ? "Yes" : "No",
-      Location: c.city && c.country ? `${c.city}, ${c.country}` : "Unknown",
-    }));
-  }, [customers, primaryCurrency]);
-
   const loadingStates = {
     customers: customersLoading,
   };
 
   return {
     customers,
-    exportData,
+    metadata,
     isLoading: customersLoading,
     isInitialLoading: customersLoading && page === 1,
+    isRefreshing,
     loadingStates,
+    refresh,
   };
 }

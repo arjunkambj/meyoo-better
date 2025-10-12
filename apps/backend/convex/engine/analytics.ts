@@ -18,7 +18,7 @@ import {
   toTimestampRange,
   validateDateRange,
 } from "../utils/analyticsSource";
-import { computeOverviewMetrics, computePlatformMetrics } from "../utils/analyticsAggregations";
+import { computeOverviewMetrics, computePlatformMetrics, computeChannelRevenue } from "../utils/analyticsAggregations";
 import { msToDateString, normalizeDateString } from "../utils/date";
 import { loadAnalyticsWithChunks } from "../utils/analyticsLoader";
 import type { AnalyticsResponse } from "../web/analyticsShared";
@@ -918,6 +918,7 @@ function buildDailyMetricsFromResponse(
 ): DailyMetricsPayload {
   const overview = computeOverviewMetrics(response);
   const platformMetrics = computePlatformMetrics(response);
+  const channelRevenue = computeChannelRevenue(response);
   const summary = overview?.summary;
 
   const orders = (response.data.orders ?? []) as GenericRecord[];
@@ -1058,6 +1059,14 @@ function buildDailyMetricsFromResponse(
   const totalOrders = toSafeNumber(summary?.orders);
   const totalRevenue = toSafeNumber(summary?.revenue);
 
+  const channelRevenueEntries = channelRevenue.channels
+    .filter((channel) => channel.revenue > 0 || channel.orders > 0)
+    .map((channel) => ({
+      name: channel.name,
+      revenue: toSafeNumber(channel.revenue),
+      orders: toSafeNumber(channel.orders),
+    }));
+
   const metrics = sanitizeDocument({
     totalOrders,
     totalRevenue,
@@ -1085,6 +1094,7 @@ function buildDailyMetricsFromResponse(
     ...metrics,
     paymentBreakdown: paymentBreakdown ?? undefined,
     customerBreakdown: customerBreakdown ?? undefined,
+    channelRevenue: channelRevenueEntries.length ? channelRevenueEntries : undefined,
   } as DailyMetricsPayload;
 }
 
@@ -1122,6 +1132,15 @@ const dailyMetricsPayload = v.object({
       returningCustomers: v.optional(v.number()),
       repeatCustomers: v.optional(v.number()),
     }),
+  ),
+  channelRevenue: v.optional(
+    v.array(
+      v.object({
+        name: v.string(),
+        revenue: v.number(),
+        orders: v.number(),
+      }),
+    ),
   ),
 });
 

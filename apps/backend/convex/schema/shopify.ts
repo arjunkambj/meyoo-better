@@ -105,6 +105,11 @@ export const shopifyOrders = defineTable({
   .index("by_store", ["storeId"])
   .index("by_shopify_id", ["shopifyId"])
   .index("by_customer", ["customerId"])
+  .index("by_org_customer_created", [
+    "organizationId",
+    "customerId",
+    "shopifyCreatedAt",
+  ])
   .index("by_created", ["shopifyCreatedAt"])
   .index("by_financial_status", ["financialStatus"])
   .index("by_fulfillment_status", ["fulfillmentStatus"])

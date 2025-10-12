@@ -6,7 +6,6 @@ import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { AnalyticsHeader } from "@/components/shared/AnalyticsHeader";
 import GlobalDateRangePicker from "@/components/shared/GlobalDateRangePicker";
 import { FilterBar } from "@/components/shared/filters/FilterBar";
-import { ExportButton } from "@/components/shared/actions/ExportButton";
 import { useAnalyticsDateRange, useCustomerAnalytics } from "@/hooks";
 
 import { CustomerTable } from "./components/CustomerTable";
@@ -27,11 +26,7 @@ export const CustomersView = memo(function CustomersView() {
   const [statusFilter, setStatusFilter] = useState<"all" | "converted" | "abandoned_cart">("all");
   const [currentPage, setCurrentPage] = useState(1);
 
-  const {
-    customers,
-    loadingStates,
-    exportData,
-  } = useCustomerAnalytics({
+  const { customers, metadata, isLoading, isRefreshing } = useCustomerAnalytics({
     dateRange: customersRange,
     status: statusFilter,
     page: currentPage,
@@ -78,9 +73,19 @@ export const CustomersView = memo(function CustomersView() {
     }
   }, []);
 
-  const exportButtonData = useMemo(
-    () => exportData.map((row) => ({ ...row })),
-    [exportData]
+  const lastUpdatedLabel = useMemo(() => {
+    if (!metadata?.computedAt) {
+      return "Never";
+    }
+    const date = new Date(metadata.computedAt);
+    return date.toLocaleString();
+  }, [metadata?.computedAt]);
+
+  const headerRight = (
+    <div className="flex flex-col items-end text-sm text-default-500">
+      <span>Last updated: {lastUpdatedLabel}</span>
+      {isRefreshing && <span className="text-primary-500">Refreshing…</span>}
+    </div>
   );
 
   return (
@@ -101,20 +106,12 @@ export const CustomersView = memo(function CustomersView() {
             />
           </div>
         }
-        rightActions={
-          <ExportButton
-            color="primary"
-            data={exportButtonData}
-            disabled={loadingStates.customers}
-            filename="customers-database"
-            formats={["csv", "pdf"]}
-          />
-        }
+        rightActions={headerRight}
       />
 
       <CustomerTable
         customers={customers?.data || []}
-        loading={loadingStates.customers}
+        loading={isLoading || isRefreshing}
         pagination={
           customers?.pagination
             ? {

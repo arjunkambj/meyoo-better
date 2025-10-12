@@ -346,7 +346,7 @@ function buildPnLKPIs(total: PnLMetrics, marketingCost: number): PnLKPIMetrics {
 
   return {
     grossSales: total.grossSales,
-    discountsReturns: total.discounts + total.refunds + total.rtoRevenueLost,
+    discountsReturns: total.discounts + total.refunds,
     netRevenue,
     grossProfit: total.grossProfit,
     operatingExpenses,
@@ -378,12 +378,12 @@ export function computePnLAnalytics(
 ): PnLAnalyticsResult {
   const emptyTotals = finalisePnLMetrics(aggregatePnLMetrics([]));
   if (!response) {
-    return { metrics: null, periods: [], exportRows: [], totals: emptyTotals } satisfies PnLAnalyticsResult;
+    return { metrics: null, periods: [], totals: emptyTotals } satisfies PnLAnalyticsResult;
   }
 
   const data = ensureDataset(response);
   if (!data) {
-    return { metrics: null, periods: [], exportRows: [], totals: emptyTotals } satisfies PnLAnalyticsResult;
+    return { metrics: null, periods: [], totals: emptyTotals } satisfies PnLAnalyticsResult;
   }
 
   const orders = (data.orders || []) as AnyRecord[];
@@ -479,41 +479,6 @@ export function computePnLAnalytics(
 
   const kpis = buildPnLKPIs(totalComputation.metrics, totalComputation.metrics.totalAdSpend);
 
-  const regularPeriods = periods.filter((period) => !period.isTotal);
-  const exportRows = regularPeriods.map((period) => ({
-    Period: period.label,
-    NetRevenue: period.metrics.revenue,
-    Discounts: period.metrics.discounts,
-    Returns: period.metrics.refunds,
-    COGS: period.metrics.cogs,
-    Shipping: period.metrics.shippingCosts,
-    TransactionFees: period.metrics.transactionFees,
-    HandlingFees: period.metrics.handlingFees,
-    GrossProfit: period.metrics.grossProfit,
-    Taxes: period.metrics.taxesCollected,
-    OperatingCosts: period.metrics.customCosts,
-    AdSpend: period.metrics.totalAdSpend,
-    NetProfit: period.metrics.netProfit,
-    NetMargin: period.metrics.netProfitMargin,
-  }));
-
-  exportRows.push({
-    Period: "TOTAL",
-    NetRevenue: totalComputation.metrics.revenue,
-    Discounts: totalComputation.metrics.discounts,
-    Returns: totalComputation.metrics.refunds,
-    COGS: totalComputation.metrics.cogs,
-    Shipping: totalComputation.metrics.shippingCosts,
-    TransactionFees: totalComputation.metrics.transactionFees,
-    HandlingFees: totalComputation.metrics.handlingFees,
-    GrossProfit: totalComputation.metrics.grossProfit,
-    Taxes: totalComputation.metrics.taxesCollected,
-    OperatingCosts: totalComputation.metrics.customCosts,
-    AdSpend: totalComputation.metrics.totalAdSpend,
-    NetProfit: totalComputation.metrics.netProfit,
-    NetMargin: totalComputation.metrics.netProfitMargin,
-  });
-
   const responseWithMeta = response as unknown as {
     meta?: {
       primaryCurrency?: unknown;
@@ -528,7 +493,6 @@ export function computePnLAnalytics(
   return {
     metrics: kpis,
     periods,
-    exportRows,
     totals: totalComputation.metrics,
     primaryCurrency,
   } satisfies PnLAnalyticsResult;

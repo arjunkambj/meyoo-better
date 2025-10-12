@@ -126,6 +126,7 @@ export const OrdersView = memo(function OrdersView() {
                 page: orders.pagination.page,
                 setPage: setCurrentPage,
                 total: orders.pagination.total,
+                estimatedTotal: orders.pagination.estimatedTotal,
                 pageSize: orders.pagination.pageSize,
               }
             : undefined

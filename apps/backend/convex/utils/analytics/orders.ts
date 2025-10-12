@@ -500,10 +500,34 @@ function deriveAnalyticsOrders(data: AnalyticsSourceData<any>): DerivedOrders {
     const profitMargin = revenue > 0 ? (profit / revenue) * 100 : 0;
     const itemCount = lineItems.reduce((total, item) => total + item.quantity, 0);
 
-    const shippingAddress =
+    const shippingAddressRaw =
       (orderRaw.shippingAddress as AnyRecord | undefined) ??
       (orderRaw.shipping_address as AnyRecord | undefined) ??
       {};
+    const billingAddressRaw =
+      (orderRaw.billingAddress as AnyRecord | undefined) ??
+      (orderRaw.billing_address as AnyRecord | undefined) ??
+      {};
+
+    const extractName = (record: AnyRecord | undefined): string => {
+      if (!record || typeof record !== "object") return "";
+      const nameCandidates: Array<unknown> = [
+        record.name,
+        record.displayName,
+        record.display_name,
+        [record.firstName ?? record.first_name ?? "", record.lastName ?? record.last_name ?? ""].join(" "),
+      ];
+      for (const candidate of nameCandidates) {
+        if (typeof candidate !== "string") continue;
+        const trimmed = candidate.trim();
+        if (trimmed.length > 0) {
+          return trimmed;
+        }
+      }
+      return "";
+    };
+
+    const shippingAddress = shippingAddressRaw ?? {};
 
     const tagsArray = Array.isArray(orderRaw.tags)
       ? (orderRaw.tags as string[])
@@ -515,16 +539,34 @@ function deriveAnalyticsOrders(data: AnalyticsSourceData<any>): DerivedOrders {
         : [];
 
     const customerRecord = orderRaw.customer as AnyRecord | undefined;
-    const customerNameCandidate = orderRaw.customerName ?? customerRecord?.name;
-    const fallbackCustomerName = `${customerRecord?.firstName ?? ""} ${customerRecord?.lastName ?? ""}`.trim();
-    const resolvedCustomerName =
-      typeof customerNameCandidate === "string" && customerNameCandidate.trim().length > 0
-        ? customerNameCandidate
-        : fallbackCustomerName.length > 0
-          ? fallbackCustomerName
-          : "Customer";
+    const customerNameCandidates: Array<unknown> = [
+      orderRaw.customerName,
+      customerRecord?.displayName,
+      customerRecord?.display_name,
+      customerRecord?.name,
+      [customerRecord?.firstName ?? customerRecord?.first_name ?? "", customerRecord?.lastName ?? customerRecord?.last_name ?? ""].join(" "),
+      extractName(shippingAddressRaw),
+      extractName(billingAddressRaw),
+      orderRaw.contactName,
+      orderRaw.contact_name,
+    ];
+
+    let resolvedCustomerName = customerNameCandidates
+      .map((candidate) => (typeof candidate === "string" ? candidate.trim() : ""))
+      .find((candidate) => candidate.length > 0);
+
+    if (!resolvedCustomerName) {
+      resolvedCustomerName = "Guest Checkout";
+    }
+
     const resolvedCustomerEmail = (() => {
-      const emailCandidate = orderRaw.email ?? customerRecord?.email;
+      const emailCandidate =
+        orderRaw.email ??
+        customerRecord?.email ??
+        shippingAddressRaw?.email ??
+        billingAddressRaw?.email ??
+        orderRaw.contactEmail ??
+        orderRaw.contact_email;
       return typeof emailCandidate === "string" ? emailCandidate : "";
     })();
 
@@ -786,23 +828,23 @@ export function computeOrdersAnalytics(
   };
 
   const exportRows: OrdersAnalyticsExportRow[] = sorted.map((order) => ({
-    "Order Number": order.orderNumber,
-    Customer: order.customer.name,
-    Email: order.customer.email,
-    Status: order.status,
-    "Fulfillment Status": order.fulfillmentStatus,
-    "Financial Status": order.financialStatus,
-    Items: order.items,
-    Revenue: order.totalPrice,
-    Costs: order.totalCost,
-    Profit: order.profit,
-    "Profit Margin": order.profitMargin,
-    Shipping: order.shippingCost,
-    Tax: order.taxAmount,
-    Payment: order.paymentMethod,
-    "Ship To": `${order.shippingAddress.city}, ${order.shippingAddress.country}`.trim(),
-    "Created At": order.createdAt,
-    "Updated At": order.updatedAt,
+    orderNumber: order.orderNumber,
+    customerEmail: order.customer.email,
+    email: order.customer.email,
+    status: order.status,
+    fulfillmentStatus: order.fulfillmentStatus,
+    financialStatus: order.financialStatus,
+    items: order.items,
+    revenue: order.totalPrice,
+    costs: order.totalCost,
+    profit: order.profit,
+    profitMargin: order.profitMargin,
+    shipping: order.shippingCost,
+    tax: order.taxAmount,
+    payment: order.paymentMethod,
+    shipTo: `${order.shippingAddress.city}, ${order.shippingAddress.country}`.trim(),
+    createdAt: order.createdAt,
+    updatedAt: order.updatedAt,
   }));
 
   return {

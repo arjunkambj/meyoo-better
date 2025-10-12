@@ -331,23 +331,23 @@ export interface OrdersInsightsPayload {
 }
 
 export interface OrdersAnalyticsExportRow {
-  'Order Number': string;
-  Customer: string;
-  Email: string;
-  Status: string;
-  'Fulfillment Status': string;
-  'Financial Status': string;
-  Items: number;
-  Revenue: number;
-  Costs: number;
-  Profit: number;
-  'Profit Margin': number;
-  Shipping: number;
-  Tax: number;
-  Payment: string;
-  'Ship To': string;
-  'Created At': string;
-  'Updated At': string;
+  orderNumber: string;
+  customerEmail: string;
+  email: string;
+  status: string;
+  fulfillmentStatus: string;
+  financialStatus: string;
+  items: number;
+  revenue: number;
+  costs: number;
+  profit: number;
+  profitMargin: number;
+  shipping: number;
+  tax: number;
+  payment: string;
+  shipTo: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface OrdersAnalyticsResult {

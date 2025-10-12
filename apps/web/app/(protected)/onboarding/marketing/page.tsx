@@ -1,6 +1,4 @@
-import { Suspense } from "react";
 import MarketingIntegrationsClient from "@/components/onboarding/client/MarketingIntegrationsClient";
-import StepLoadingState from "@/components/onboarding/StepLoadingState";
 
 export default function MarketingIntegrationsPage() {
   return (
@@ -17,13 +15,7 @@ export default function MarketingIntegrationsPage() {
 
       {/* Main Content */}
       <div className="space-y-8">
-        <Suspense
-          fallback={
-            <StepLoadingState message="Loading marketing integrations..." />
-          }
-        >
-          <MarketingIntegrationsClient />
-        </Suspense>
+        <MarketingIntegrationsClient />
       </div>
     </>
   );

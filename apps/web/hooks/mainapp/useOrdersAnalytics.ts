@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo } from "react";
 import { useQuery } from "convex-helpers/react/cache/hooks";
 
 import { api } from "@/libs/convexApi";
@@ -31,21 +31,27 @@ interface OrdersResult {
     total: number;
     pageSize: number;
     totalPages: number;
+    estimatedTotal?: number;
+    hasMore?: boolean;
   };
 }
 
-interface OrdersPageSnapshot {
-  page: AnalyticsOrder[];
-  continueCursor: string;
-  isDone: boolean;
-  info: {
-    pageSize: number;
-    returned: number;
-    hasMore: boolean;
+interface OrdersAnalyticsQueryResult {
+  overview: OrdersOverviewMetrics | null;
+  fulfillment: OrdersFulfillmentMetrics;
+  orders: {
+    data: AnalyticsOrder[];
+    pagination: {
+      page: number;
+      pageSize: number;
+      total: number;
+      totalPages: number;
+      estimatedTotal: number;
+      hasMore: boolean;
+    };
   };
+  exportRows: OrdersAnalyticsExportRow[];
 }
-
-const END_CURSOR = "__end__";
 
 export function useOrdersAnalytics(params: UseOrdersAnalyticsParams = {}) {
   const { offsetMinutes, timezoneIana } = useShopifyTime();
@@ -99,332 +105,83 @@ export function useOrdersAnalytics(params: UseOrdersAnalyticsParams = {}) {
       endDateTimeUtcExclusive: rangeStrings.endDateTimeUtcExclusive,
       dayCount: rangeStrings.dayCount,
     } as const;
-  }, [effectiveRange.endDate, effectiveRange.startDate, rangeStrings]);
+  }, [effectiveRange, rangeStrings]);
 
-  const metricsArgs = useMemo(() => {
+  const queryArgs = useMemo(() => {
     if (!normalizedRange) return "skip" as const;
-    return { dateRange: normalizedRange } as const;
-  }, [
-    normalizedRange?.startDate,
-    normalizedRange?.endDate,
-    normalizedRange?.startDateTimeUtc,
-    normalizedRange?.endDateTimeUtcExclusive,
-  ]);
-
-  const overviewResult = useQuery(
-    api.web.orders.getOrdersOverviewMetrics,
-    metricsArgs,
-  ) as ({ metrics: OrdersOverviewMetrics } | null | undefined);
-
-  const fulfillmentResult = useQuery(
-    api.web.orders.getFulfillmentMetrics,
-    metricsArgs,
-  ) as OrdersFulfillmentMetrics | null | undefined;
-
-  const overview: OrdersOverviewMetrics | null = overviewResult?.metrics ?? null;
-
-  const cursorKey = useMemo(() => {
-    if (!normalizedRange) return null;
-    return JSON.stringify({
-      start: normalizedRange.startDate,
-      end: normalizedRange.endDate,
-      startUtc: normalizedRange.startDateTimeUtc,
-      endUtc: normalizedRange.endDateTimeUtcExclusive,
-      status: status ?? null,
-      search: normalizedSearch ?? null,
-      sortBy: sortBy ?? null,
+    return {
+      dateRange: normalizedRange,
+      status,
+      searchTerm: normalizedSearch,
+      sortBy,
       sortOrder,
+      page: requestedPage,
       pageSize,
-    });
-  }, [
-    normalizedRange?.startDate,
-    normalizedRange?.endDate,
-    normalizedRange?.startDateTimeUtc,
-    normalizedRange?.endDateTimeUtcExclusive,
-    status,
-    normalizedSearch,
-    sortBy,
-    sortOrder,
-    pageSize,
-  ]);
+    } as const;
+  }, [normalizedRange, status, normalizedSearch, sortBy, sortOrder, requestedPage, pageSize]);
 
-  const cursorMapRef = useRef<Record<number, string | null>>({ 1: null });
-  const lastCursorKeyRef = useRef<string | null>(null);
-  const highestPageRef = useRef(1);
-  const [estimatedTotal, setEstimatedTotal] = useState(0);
-  const [cursorRevision, setCursorRevision] = useState(0);
-  const maxKnownPageRef = useRef<number | null>(null);
-  const [maxKnownPageVersion, setMaxKnownPageVersion] = useState(0);
-  const prefetchInFlightRef = useRef<number | null>(null);
-  const [prefetchPage, setPrefetchPage] = useState<number | null>(null);
+  const analyticsResult = useQuery(
+    api.web.orders.getOrdersAnalytics,
+    queryArgs,
+  ) as OrdersAnalyticsQueryResult | undefined;
 
-  useEffect(() => {
-    if (!cursorKey || lastCursorKeyRef.current === cursorKey) {
-      return;
-    }
-    lastCursorKeyRef.current = cursorKey;
-    cursorMapRef.current = { 1: null };
-    highestPageRef.current = 1;
-    setEstimatedTotal(0);
-    prefetchInFlightRef.current = null;
-    setPrefetchPage(null);
-    maxKnownPageRef.current = null;
-    setCursorRevision((prev) => prev + 1);
-    setMaxKnownPageVersion((prev) => prev + 1);
-  }, [cursorKey]);
+  const baseLoading = queryArgs !== "skip" && analyticsResult === undefined;
 
-  const effectivePage = useMemo(() => {
-    const maxKnown = maxKnownPageRef.current;
-    if (typeof maxKnown === "number" && maxKnown >= 1 && requestedPage > maxKnown) {
-      return maxKnown;
-    }
-    return requestedPage;
-  }, [requestedPage, maxKnownPageVersion]);
-
-  const waitingForCursor = useMemo(() => {
-    if (effectivePage <= 1) return false;
-    return !(effectivePage in cursorMapRef.current);
-  }, [effectivePage, cursorRevision]);
-
-  const currentCursor = useMemo(() => {
-    if (effectivePage === 1) return null;
-    return cursorMapRef.current[effectivePage] ?? null;
-  }, [effectivePage, cursorRevision]);
-
-  const ordersQueryArgs = useMemo(() => {
-    if (!normalizedRange || waitingForCursor) return "skip" as const;
-    return {
-      dateRange: normalizedRange,
-      status,
-      searchTerm: normalizedSearch,
-      sortBy,
-      sortOrder,
-      paginationOpts: {
-        cursor: currentCursor,
-        numItems: pageSize,
-      },
-    };
-  }, [normalizedRange, status, normalizedSearch, sortBy, sortOrder, currentCursor, pageSize, waitingForCursor]);
-
-  const ordersPageSnapshot = useQuery(
-    (api.web.orders as Record<string, any>).getOrdersTablePage,
-    ordersQueryArgs,
-  ) as OrdersPageSnapshot | undefined;
-
-  useEffect(() => {
-    if (!normalizedRange) {
-      return;
-    }
-
-    if (prefetchInFlightRef.current !== null) {
-      return;
-    }
-
-    const targetPage = effectivePage;
-    for (let candidate = 2; candidate <= targetPage; candidate++) {
-      if (!(candidate in cursorMapRef.current)) {
-        const predecessor = candidate - 1;
-        if (predecessor <= 1) {
-          break;
-        }
-        if (!(predecessor in cursorMapRef.current)) {
-          continue;
-        }
-        prefetchInFlightRef.current = predecessor;
-        setPrefetchPage(predecessor);
-        return;
+  const overview = analyticsResult?.overview ?? undefined;
+  const orders: OrdersResult | undefined = analyticsResult
+    ? {
+        data: analyticsResult.orders.data,
+        pagination: {
+          page: analyticsResult.orders.pagination.page,
+          total: analyticsResult.orders.pagination.total,
+          pageSize: analyticsResult.orders.pagination.pageSize,
+          totalPages: analyticsResult.orders.pagination.totalPages,
+          estimatedTotal: analyticsResult.orders.pagination.estimatedTotal,
+          hasMore: analyticsResult.orders.pagination.hasMore,
+        },
       }
-    }
+    : undefined;
 
-    if (prefetchPage !== null) {
-      setPrefetchPage(null);
-    }
-  }, [effectivePage, normalizedRange, cursorRevision, prefetchPage]);
-
-  const prefetchQueryArgs = useMemo(() => {
-    if (!normalizedRange || prefetchPage === null) return "skip" as const;
-    if (!(prefetchPage in cursorMapRef.current)) return "skip" as const;
-    const cursor = cursorMapRef.current[prefetchPage];
-    if (prefetchPage > 1 && cursor === null) return "skip" as const;
-
-    return {
-      dateRange: normalizedRange,
-      status,
-      searchTerm: normalizedSearch,
-      sortBy,
-      sortOrder,
-      paginationOpts: {
-        cursor,
-        numItems: pageSize,
-      },
-    };
-  }, [normalizedRange, status, normalizedSearch, sortBy, sortOrder, prefetchPage, pageSize, cursorRevision]);
-
-  const prefetchSnapshot = useQuery(
-    (api.web.orders as Record<string, any>).getOrdersTablePage,
-    prefetchQueryArgs,
-  ) as OrdersPageSnapshot | undefined;
-
-  // Fulfillment metrics now come from consolidated action
-
-  useEffect(() => {
-    if (!ordersPageSnapshot) return;
-
-    const isNewHighPage = effectivePage >= highestPageRef.current;
-    highestPageRef.current = Math.max(highestPageRef.current, effectivePage);
-
-    let cursorMapChanged = false;
-    const nextPageIndex = effectivePage + 1;
-
-    if (!ordersPageSnapshot.isDone && ordersPageSnapshot.continueCursor !== END_CURSOR) {
-      const nextCursor = ordersPageSnapshot.continueCursor;
-      if (cursorMapRef.current[nextPageIndex] !== nextCursor) {
-        cursorMapRef.current[nextPageIndex] = nextCursor;
-        cursorMapChanged = true;
-      }
-    } else {
-      if (nextPageIndex in cursorMapRef.current) {
-        delete cursorMapRef.current[nextPageIndex];
-        cursorMapChanged = true;
-      }
-
-      if (ordersPageSnapshot.isDone) {
-        const maxPage = effectivePage;
-        if (maxKnownPageRef.current === null || maxKnownPageRef.current < maxPage) {
-          maxKnownPageRef.current = maxPage;
-          setMaxKnownPageVersion((prev) => prev + 1);
-        }
-      }
-    }
-
-    if (isNewHighPage) {
-      if (ordersPageSnapshot.isDone) {
-        const total = (effectivePage - 1) * pageSize + ordersPageSnapshot.page.length;
-        setEstimatedTotal(total);
-      } else {
-        setEstimatedTotal((prev) => Math.max(prev, (effectivePage + 1) * pageSize));
-      }
-    }
-
-    if (cursorMapChanged) {
-      setCursorRevision((prev) => prev + 1);
-    }
-  }, [ordersPageSnapshot, effectivePage, pageSize]);
-
-  useEffect(() => {
-    const pageBeingPrefetched = prefetchInFlightRef.current;
-    if (!prefetchSnapshot || pageBeingPrefetched === null) {
-      return;
-    }
-
-    let cursorMapChanged = false;
-    const nextPageIndex = pageBeingPrefetched + 1;
-
-    if (!prefetchSnapshot.isDone && prefetchSnapshot.continueCursor !== END_CURSOR) {
-      const nextCursor = prefetchSnapshot.continueCursor;
-      if (cursorMapRef.current[nextPageIndex] !== nextCursor) {
-        cursorMapRef.current[nextPageIndex] = nextCursor;
-        cursorMapChanged = true;
-      }
-    } else {
-      if (nextPageIndex in cursorMapRef.current) {
-        delete cursorMapRef.current[nextPageIndex];
-        cursorMapChanged = true;
-      }
-
-      if (prefetchSnapshot.isDone) {
-        const maxPage = pageBeingPrefetched;
-        if (maxKnownPageRef.current === null || maxKnownPageRef.current < maxPage) {
-          maxKnownPageRef.current = maxPage;
-          setMaxKnownPageVersion((prev) => prev + 1);
-        }
-      }
-    }
-
-    const isNewHighPage = pageBeingPrefetched >= highestPageRef.current;
-    highestPageRef.current = Math.max(highestPageRef.current, pageBeingPrefetched);
-
-    if (isNewHighPage) {
-      if (prefetchSnapshot.isDone) {
-        const total = (pageBeingPrefetched - 1) * pageSize + prefetchSnapshot.page.length;
-        setEstimatedTotal((prev) => Math.max(prev, total));
-      } else {
-        setEstimatedTotal((prev) => Math.max(prev, (pageBeingPrefetched + 1) * pageSize));
-      }
-    }
-
-    if (cursorMapChanged) {
-      setCursorRevision((prev) => prev + 1);
-    }
-
-    prefetchInFlightRef.current = null;
-    setPrefetchPage(null);
-  }, [prefetchSnapshot, pageSize]);
-
-  const orders: OrdersResult | undefined = useMemo(() => {
-    if (!ordersPageSnapshot) return undefined;
-    const baseTotal = ordersPageSnapshot.isDone
-      ? (effectivePage - 1) * pageSize + ordersPageSnapshot.page.length
-      : Math.max(estimatedTotal, (effectivePage + 1) * pageSize);
-    const total = Math.max(baseTotal, ordersPageSnapshot.page.length, estimatedTotal);
-    const totalPages = Math.max(1, Math.ceil(total / pageSize));
-
-    return {
-      data: ordersPageSnapshot.page,
-      pagination: {
-        page: effectivePage,
-        pageSize,
-        total,
-        totalPages,
-      },
-    };
-  }, [ordersPageSnapshot, estimatedTotal, effectivePage, pageSize]);
-
+  const exportRows = analyticsResult?.exportRows ?? [];
+  const exportData = useMemo<Record<string, unknown>[]>(
+    () =>
+      exportRows.map((row) => ({
+        "Order Number": row.orderNumber,
+        "Customer Email": row.customerEmail,
+        Status: row.status,
+        "Fulfillment Status": row.fulfillmentStatus,
+        "Financial Status": row.financialStatus,
+        Items: row.items,
+        Revenue: row.revenue,
+        Costs: row.costs,
+        Profit: row.profit,
+        "Profit Margin": row.profitMargin,
+        Shipping: row.shipping,
+        Tax: row.tax,
+        Payment: row.payment,
+        "Ship To": row.shipTo,
+        "Created At": row.createdAt,
+        "Updated At": row.updatedAt,
+      })),
+    [exportRows],
+  );
   const fulfillmentMetrics: OrdersFulfillmentMetrics | undefined =
-    fulfillmentResult ?? undefined;
-
-  const exportData: OrdersAnalyticsExportRow[] = useMemo(() => {
-    if (!ordersPageSnapshot) return [];
-    return ordersPageSnapshot.page.map((order) => ({
-      "Order Number": order.orderNumber,
-      Customer: order.customer.name,
-      Email: order.customer.email,
-      Status: order.status,
-      "Fulfillment Status": order.fulfillmentStatus,
-      "Financial Status": order.financialStatus,
-      Items: order.items,
-      Revenue: order.totalPrice,
-      Costs: order.totalCost,
-      Profit: order.profit,
-      "Profit Margin": order.profitMargin,
-      Shipping: order.shippingCost,
-      Tax: order.taxAmount,
-      Payment: order.paymentMethod,
-      "Ship To": `${order.shippingAddress.city}, ${order.shippingAddress.country}`.trim(),
-      "Created At": order.createdAt,
-      "Updated At": order.updatedAt,
-    }));
-  }, [ordersPageSnapshot]);
-
-  const overviewLoading = metricsArgs !== "skip" && overviewResult === undefined;
-  const ordersLoading = ordersQueryArgs !== "skip" && ordersPageSnapshot === undefined;
-  const fulfillmentLoading = metricsArgs !== "skip" && fulfillmentResult === undefined;
+    analyticsResult?.fulfillment ?? undefined;
 
   const loadingStates = {
-    overview: overviewLoading,
-    orders: ordersLoading,
-    fulfillment: fulfillmentLoading,
+    overview: baseLoading,
+    orders: baseLoading,
+    fulfillment: baseLoading,
   };
 
-  const isLoading = overviewLoading || fulfillmentLoading || ordersLoading;
-  const isInitialLoading = ordersLoading && effectivePage === 1;
+  const isInitialLoading = baseLoading && requestedPage === 1;
 
   return {
-    overview: overview ?? undefined,
+    overview,
     orders,
     fulfillmentMetrics,
     exportData,
-    isLoading,
+    isLoading: baseLoading,
     isInitialLoading,
     loadingStates,
     orderOverview: overview,

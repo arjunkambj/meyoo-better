@@ -30,8 +30,6 @@ import {
   type DailyMetricsOverview,
 } from "../utils/dailyMetrics";
 
-type DateRangeArg = DateRange;
-
 const ORDER_ANALYTICS_DATASETS = [
   "orders",
   "orderItems",
@@ -47,8 +45,6 @@ const MAX_ORDERS_PAGE_SIZE = 50;
 const MAX_ORDERS_FETCH_SIZE = 200;
 const ORDERS_FETCH_MULTIPLIER = 3;
 const MIN_ORDERS_PAGE_SIZE = 1;
-const MAX_CURSOR_CARRY = MAX_ORDERS_FETCH_SIZE;
-const END_CURSOR = "__end__";
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 function shiftDateString(date: string, deltaDays: number): string {
@@ -76,78 +72,41 @@ function derivePreviousRange(range: DateRange): DateRange | null {
   } satisfies DateRange;
 }
 
-type OrdersCursorState = {
-  chunkCursor: string | null;
-  carry: AnalyticsOrder[];
-  done: boolean;
-  key: string;
-};
-
 function stripLineItems(order: AnalyticsOrder): AnalyticsOrder {
   const { lineItems: _lineItems, ...rest } = order;
   return { ...rest } as AnalyticsOrder;
 }
 
-function sortOrdersByCreatedAtDesc(a: AnalyticsOrder, b: AnalyticsOrder): number {
-  return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-}
+function sortAnalyticsOrders(
+  orders: AnalyticsOrder[],
+  sortBy?: string | null,
+  sortOrder: "asc" | "desc" = "desc",
+): AnalyticsOrder[] {
+  if (!sortBy) {
+    return [...orders].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+  }
 
-function buildCursorKey(args: {
-  dateRange: DateRangeArg;
-  status?: string;
-  searchTerm?: string;
-  sortBy?: string;
-  sortOrder?: "asc" | "desc";
-}): string {
-  return JSON.stringify({
-    dateRange: args.dateRange,
-    status: args.status ?? null,
-    searchTerm: args.searchTerm ?? null,
-    sortBy: args.sortBy ?? null,
-    sortOrder: args.sortOrder ?? null,
+  const direction = sortOrder === "asc" ? 1 : -1;
+
+  return [...orders].sort((a, b) => {
+    switch (sortBy) {
+      case "revenue":
+        return (a.totalPrice - b.totalPrice) * direction;
+      case "profit":
+        return (a.profit - b.profit) * direction;
+      case "orders":
+        return (a.items - b.items) * direction;
+      case "status":
+        return a.status.localeCompare(b.status) * direction;
+      default: {
+        const aTime = new Date(a.createdAt).getTime();
+        const bTime = new Date(b.createdAt).getTime();
+        return (aTime - bTime) * direction;
+      }
+    }
   });
-}
-
-function encodeOrdersCursor(state: OrdersCursorState): string {
-  const carry = state.carry.slice(0, MAX_CURSOR_CARRY);
-
-  if ((state.chunkCursor === null || state.done) && carry.length === 0) {
-    return END_CURSOR;
-  }
-
-  return JSON.stringify({
-    chunkCursor: state.chunkCursor,
-    carry,
-    done: state.done,
-    key: state.key,
-  });
-}
-
-function decodeOrdersCursor(cursor: string | null): OrdersCursorState | null {
-  if (!cursor || cursor === END_CURSOR) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(cursor) as Partial<OrdersCursorState>;
-    const chunkCursor = typeof parsed.chunkCursor === "string" ? parsed.chunkCursor : null;
-    const carry = Array.isArray(parsed.carry)
-      ? (parsed.carry as AnalyticsOrder[])
-      : [];
-    const doneFlag = typeof parsed.done === "boolean" ? parsed.done : false;
-    const done = doneFlag || chunkCursor === null;
-    const key = typeof parsed.key === "string" ? parsed.key : "";
-
-    return {
-      chunkCursor,
-      carry: carry.slice(0, MAX_CURSOR_CARRY),
-      done,
-      key,
-    } satisfies OrdersCursorState;
-  } catch (error) {
-    console.warn("Failed to decode orders cursor", error);
-    return null;
-  }
 }
 
 const ZERO_ORDERS_OVERVIEW: OrdersOverviewMetrics = {
@@ -326,16 +285,25 @@ const ordersInsightsResponseValidator = v.object({
   returnRate: v.number(),
 });
 
-const ZERO_FULFILLMENT_METRICS: OrdersFulfillmentMetrics = {
-  avgProcessingTime: 0,
-  avgShippingTime: 0,
-  avgDeliveryTime: 0,
-  onTimeDeliveryRate: 0,
-  fulfillmentAccuracy: 0,
-  returnRate: 0,
-  avgFulfillmentCost: 0,
-  totalOrders: 0,
-};
+const ordersAnalyticsExportRowValidator = v.object({
+  orderNumber: v.string(),
+  customerEmail: v.string(),
+  email: v.string(),
+  status: v.string(),
+  fulfillmentStatus: v.string(),
+  financialStatus: v.string(),
+  items: v.number(),
+  revenue: v.number(),
+  costs: v.number(),
+  profit: v.number(),
+  profitMargin: v.number(),
+  shipping: v.number(),
+  tax: v.number(),
+  payment: v.string(),
+  shipTo: v.string(),
+  createdAt: v.string(),
+  updatedAt: v.string(),
+});
 
 const analyticsOrderValidator = v.object({
   id: v.string(),
@@ -364,146 +332,97 @@ const analyticsOrderValidator = v.object({
   updatedAt: v.string(),
 });
 
-const ordersPageResultValidator = v.object({
-  page: v.array(analyticsOrderValidator),
-  continueCursor: v.string(),
-  isDone: v.boolean(),
-  info: v.object({
-    pageSize: v.number(),
-    returned: v.number(),
-    hasMore: v.boolean(),
-  }),
-});
-
-const ordersPaginationValidator = v.object({
-  cursor: v.optional(v.union(v.string(), v.null())),
-  numItems: v.optional(v.number()),
-});
-
-export const getOrdersOverviewMetrics = query({
-  args: {
-    dateRange: dateRangeValidator,
-  },
-  returns: v.union(
-    v.null(),
-    v.object({
-      metrics: ordersOverviewValidator,
-      meta: v.optional(v.any()),
+const ordersAnalyticsResponseValidator = v.object({
+  overview: v.union(v.null(), ordersOverviewValidator),
+  fulfillment: fulfillmentMetricsValidator,
+  orders: v.object({
+    data: v.array(analyticsOrderValidator),
+    pagination: v.object({
+      page: v.number(),
+      pageSize: v.number(),
+      total: v.number(),
+      totalPages: v.number(),
+      estimatedTotal: v.number(),
+      hasMore: v.boolean(),
     }),
-  ),
-  handler: async (ctx, args) => {
-    const auth = await getUserAndOrg(ctx);
-    if (!auth) return null;
-
-    const range = validateDateRange(args.dateRange);
-    const dailyOverview = await loadOverviewFromDailyMetrics(
-      ctx,
-      auth.orgId as Id<"organizations">,
-      range,
-    );
-
-    const metrics = dailyOverview?.ordersOverview ?? ZERO_ORDERS_OVERVIEW;
-    const meta: Record<string, unknown> = {
-      strategy: "dailyMetrics",
-      status: dailyOverview ? "ready" : "pending",
-      hasFullCoverage: dailyOverview?.hasFullCoverage ?? false,
-    };
-
-    if (dailyOverview) {
-      meta.sourceMeta = dailyOverview.meta;
-    }
-
-    return {
-      metrics,
-      meta,
-    };
-  },
+  }),
+  exportRows: v.array(ordersAnalyticsExportRowValidator),
 });
 
-export const getOrdersTablePage = query({
+const ZERO_FULFILLMENT_METRICS: OrdersFulfillmentMetrics = {
+  avgProcessingTime: 0,
+  avgShippingTime: 0,
+  avgDeliveryTime: 0,
+  onTimeDeliveryRate: 0,
+  fulfillmentAccuracy: 0,
+  returnRate: 0,
+  avgFulfillmentCost: 0,
+  totalOrders: 0,
+};
+
+export const getOrdersAnalytics = query({
   args: {
     dateRange: dateRangeValidator,
     status: v.optional(v.string()),
     searchTerm: v.optional(v.string()),
     sortBy: v.optional(v.string()),
     sortOrder: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
-    paginationOpts: v.optional(ordersPaginationValidator),
+    page: v.optional(v.number()),
+    pageSize: v.optional(v.number()),
   },
-  returns: ordersPageResultValidator,
+  returns: ordersAnalyticsResponseValidator,
   handler: async (ctx, args) => {
     const auth = await getUserAndOrg(ctx);
-
     if (!auth) {
       return {
-        page: [],
-        continueCursor: END_CURSOR,
-        isDone: true,
-        info: {
-          pageSize: DEFAULT_ORDERS_PAGE_SIZE,
-          returned: 0,
-          hasMore: false,
+        overview: null,
+        fulfillment: { ...ZERO_FULFILLMENT_METRICS },
+        orders: {
+          data: [],
+          pagination: {
+            page: 1,
+            pageSize: DEFAULT_ORDERS_PAGE_SIZE,
+            total: 0,
+            totalPages: 1,
+            estimatedTotal: 0,
+            hasMore: false,
+          },
         },
+        exportRows: [],
       };
     }
 
     const range = validateDateRange(args.dateRange);
-    const cursorKey = buildCursorKey({
-      dateRange: args.dateRange,
-      status: args.status,
-      searchTerm: args.searchTerm,
-      sortBy: args.sortBy,
-      sortOrder: args.sortOrder,
-    });
-
-    const requestedItems = args.paginationOpts?.numItems ?? DEFAULT_ORDERS_PAGE_SIZE;
+    const requestedPage = Math.max(1, args.page ?? 1);
+    const requestedSize = args.pageSize ?? DEFAULT_ORDERS_PAGE_SIZE;
     const pageSize = Math.max(
       MIN_ORDERS_PAGE_SIZE,
-      Math.min(requestedItems, MAX_ORDERS_PAGE_SIZE),
+      Math.min(requestedSize, MAX_ORDERS_PAGE_SIZE),
+    );
+    const desiredStartIndex = (requestedPage - 1) * pageSize;
+
+    const overviewPromise = loadOverviewFromDailyMetrics(
+      ctx,
+      auth.orgId as Id<"organizations">,
+      range,
     );
 
-    const decodedState = decodeOrdersCursor(args.paginationOpts?.cursor ?? null);
-    const initialState = decodedState && decodedState.key === cursorKey ? decodedState : null;
+    let chunkCursor: string | null = null;
+    const collectedOrders: AnalyticsOrder[] = [];
+    const requestedFetch = pageSize * ORDERS_FETCH_MULTIPLIER;
+    const fetchSize = Math.min(
+      Math.max(requestedFetch, DEFAULT_ORDERS_PAGE_SIZE),
+      MAX_ORDERS_FETCH_SIZE,
+    );
+    const targetOrderCount = Math.max(
+      desiredStartIndex + pageSize,
+      desiredStartIndex + fetchSize,
+    );
+    const seenCursors = new Set<string>();
+    let reachedEnd = false;
+    let truncated = false;
 
-    const bufferMap = new Map<string, AnalyticsOrder>();
-    if (initialState) {
-      for (const order of initialState.carry) {
-        bufferMap.set(order.id, order);
-      }
-    }
-
-    let chunkCursor = initialState?.chunkCursor ?? null;
-    let done = initialState?.done ?? false;
-
-    const takeFromBuffer = (results: AnalyticsOrder[]): void => {
-      if (results.length >= pageSize || bufferMap.size === 0) {
-        return;
-      }
-
-      const ordered = Array.from(bufferMap.values()).sort(sortOrdersByCreatedAtDesc);
-      for (const order of ordered) {
-        if (results.length >= pageSize) {
-          break;
-        }
-
-        if (!bufferMap.has(order.id)) {
-          continue;
-        }
-
-        results.push(order);
-        bufferMap.delete(order.id);
-      }
-    };
-
-    const results: AnalyticsOrder[] = [];
-    takeFromBuffer(results);
-
-    if (results.length < pageSize && !done) {
-      const requestedFetch = pageSize * ORDERS_FETCH_MULTIPLIER;
-      const fetchSize = Math.min(
-        Math.max(requestedFetch, DEFAULT_ORDERS_PAGE_SIZE),
-        MAX_ORDERS_FETCH_SIZE,
-      );
-
+    while (true) {
       const chunk = await fetchAnalyticsOrderChunk(
         ctx,
         auth.orgId as Id<"organizations">,
@@ -514,8 +433,6 @@ export const getOrdersTablePage = query({
           datasets: ORDER_ANALYTICS_DATASETS,
         },
       );
-
-      chunkCursor = chunk.cursor ?? null;
 
       const chunkResponse: AnalyticsResponse = {
         dateRange: range,
@@ -547,67 +464,105 @@ export const getOrdersTablePage = query({
         pageSize: fetchSize,
       });
 
-      const chunkOrders = computed.orders?.data ?? [];
-      for (const order of chunkOrders) {
-        const sanitized = stripLineItems(order);
-        bufferMap.set(sanitized.id, sanitized);
+      const chunkOrders = (computed.orders?.data ?? []).map(stripLineItems);
+      if (chunkOrders.length > 0) {
+        collectedOrders.push(...chunkOrders);
       }
 
-      takeFromBuffer(results);
+      const nextCursor = chunk.cursor ?? null;
 
-      if (chunk.isDone && !chunkCursor) {
-        done = true;
+      if (!nextCursor || chunk.isDone) {
+        reachedEnd = true;
+        break;
       }
+
+      if (collectedOrders.length >= targetOrderCount) {
+        truncated = true;
+        break;
+      }
+
+      if (seenCursors.has(nextCursor)) {
+        truncated = true;
+        break;
+      }
+
+      seenCursors.add(nextCursor);
+      chunkCursor = nextCursor;
     }
 
-    const remaining = Array.from(bufferMap.values()).sort(sortOrdersByCreatedAtDesc);
-    const hasMore = remaining.length > 0 || !done;
+    const sortedOrders = sortAnalyticsOrders(
+      collectedOrders,
+      args.sortBy ?? undefined,
+      args.sortOrder ?? "desc",
+    );
+    const totalMatches = sortedOrders.length;
+    const boundedStartIndex = Math.min(desiredStartIndex, totalMatches);
+    const pageOrders = sortedOrders.slice(boundedStartIndex, boundedStartIndex + pageSize);
+    const processedEndIndex = boundedStartIndex + pageOrders.length;
+    const hitDataLimit = truncated && !reachedEnd;
+    const hasMoreMatches = hitDataLimit || totalMatches > processedEndIndex;
 
-    const nextCursor = hasMore
-      ? encodeOrdersCursor({
-          chunkCursor,
-          carry: remaining,
-          done,
-          key: cursorKey,
-        })
-      : END_CURSOR;
+    const overviewResult = await overviewPromise;
+    const overview = overviewResult?.ordersOverview ?? ZERO_ORDERS_OVERVIEW;
+    const fulfillmentMetrics = overviewResult
+      ? computeFulfillmentMetricsFromOverview(overviewResult)
+      : { ...ZERO_FULFILLMENT_METRICS };
+
+    const knownTotal = reachedEnd
+      ? totalMatches
+      : Math.max(totalMatches, desiredStartIndex + pageOrders.length);
+    const estimatedTotal = hasMoreMatches
+      ? Math.max(
+          knownTotal + (pageOrders.length === pageSize ? pageSize : 0),
+          desiredStartIndex + pageOrders.length + pageSize,
+        )
+      : knownTotal;
+    const totalForPaging = Math.max(knownTotal, estimatedTotal);
+    const totalPages = Math.max(1, Math.ceil(totalForPaging / pageSize));
+
+    const resolvedPage = pageOrders.length > 0
+      ? Math.min(requestedPage, totalPages)
+      : Math.min(Math.max(1, Math.ceil(totalForPaging / Math.max(pageSize, 1))), totalPages);
+
+    const exportRows = pageOrders.map((order) => ({
+      orderNumber: order.orderNumber,
+      customerEmail: order.customer.email,
+      email: order.customer.email,
+      status: order.status,
+      fulfillmentStatus: order.fulfillmentStatus,
+      financialStatus: order.financialStatus,
+      items: order.items,
+      revenue: order.totalPrice,
+      costs: order.totalCost,
+      profit: order.profit,
+      profitMargin: order.profitMargin,
+      shipping: order.shippingCost,
+      tax: order.taxAmount,
+      payment: order.paymentMethod,
+      shipTo: `${order.shippingAddress.city}, ${order.shippingAddress.country}`.trim(),
+      createdAt: order.createdAt,
+      updatedAt: order.updatedAt,
+    }));
 
     return {
-      page: results,
-      continueCursor: nextCursor,
-      isDone: !hasMore,
-      info: {
-        pageSize,
-        returned: results.length,
-        hasMore,
+      overview,
+      fulfillment: fulfillmentMetrics,
+      orders: {
+        data: pageOrders,
+        pagination: {
+          page: resolvedPage,
+          pageSize,
+          total: totalForPaging,
+          totalPages,
+          estimatedTotal,
+          hasMore: hasMoreMatches || (hitDataLimit && pageOrders.length === pageSize),
+        },
       },
+      exportRows,
     };
   },
 });
 
-export const getFulfillmentMetrics = query({
-  args: {
-    dateRange: dateRangeValidator,
-  },
-  returns: v.union(v.null(), fulfillmentMetricsValidator),
-  handler: async (ctx, args) => {
-    const auth = await getUserAndOrg(ctx);
-    if (!auth) return null;
-
-    const range = validateDateRange(args.dateRange);
-    const dailyOverview = await loadOverviewFromDailyMetrics(
-      ctx,
-      auth.orgId as Id<"organizations">,
-      range,
-    );
-
-    if (!dailyOverview) {
-      return { ...ZERO_FULFILLMENT_METRICS };
-    }
-
-    return computeFulfillmentMetricsFromOverview(dailyOverview);
-  },
-});
 
 export const getOrdersInsights = query({
   args: {

@@ -54,12 +54,12 @@ export const OrdersOverviewCards = memo(function OrdersOverviewCards({
       subtitle: `Margin: ${metrics.grossMargin.toFixed(1)}%`,
     },
     {
-      title: "Tax & Fees",
-      value: formatCurrency(metrics.totalTax),
-      change: 0,
+      title: "Customer Acquisition Cost",
+      value: formatCurrency(metrics.customerAcquisitionCost),
+      change: metrics.changes.cac,
       icon: "solar:bill-list-bold-duotone",
       iconColor: "text-default-500",
-      subtitle: `CAC: ${formatCurrency(metrics.customerAcquisitionCost)}`,
+      subtitle: `Tax & Fees: ${formatCurrency(metrics.totalTax)}`,
     },
     {
       title: "Fulfillment Rate",

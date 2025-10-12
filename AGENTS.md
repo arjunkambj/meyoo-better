@@ -120,3 +120,9 @@
 
 - Store secrets only in per‑app `*.env.local` (never commit). Refer via `process.env` or Convex env.
 - Node ≥ 18 and Bun ≥ 1.2.18 required.
+
+## MPC and Tools
+
+- Use convex mcp to fetch data to check data credibility if you are confuse,
+- you can write funtion executeing using mcp if specicfic data is needed , which you cn delete later, also keep them in diffent folder
+- you can use shopify mcp to webhooks payload if needed

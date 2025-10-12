@@ -17,7 +17,6 @@ import React, { useCallback } from "react";
 import { FulfillmentStatusBadge } from "@/components/shared/badges/StatusBadge";
 import { useUser } from "@/hooks";
 import { formatCurrencyPrecise } from "@/libs/utils/dashboard-formatters";
-import { formatDate } from "@/libs/utils/format";
 import {
   DATA_TABLE_HEADER_CLASS,
   DATA_TABLE_TABLE_CLASS,
@@ -31,13 +30,14 @@ interface OrdersTableProps {
     setPage: (page: number) => void;
     total: number;
     pageSize: number;
+    estimatedTotal?: number;
   };
   loading?: boolean;
 }
 
 const columns = [
   { name: "Order", uid: "order" },
-  { name: "Customer", uid: "customer" },
+  { name: "Customer Email", uid: "customerEmail" },
   { name: "Fulfillment", uid: "status" },
   { name: "Revenue", uid: "revenue" },
   { name: "Payment", uid: "payment" },
@@ -63,10 +63,6 @@ export const OrdersTable = React.memo(function OrdersTable({
               <p className="truncate text-sm font-medium text-default-900">
                 #{item.orderNumber}
               </p>
-              <p className="mt-0.5 flex items-center gap-1 text-xs text-default-500">
-                <Icon icon="solar:calendar-linear" width={14} />
-                {formatDate(item.createdAt)}
-              </p>
               {item.tags && item.tags.length > 0 ? (
                 <div className="mt-2 flex flex-wrap gap-1">
                   {item.tags.map((tag) => (
@@ -79,17 +75,17 @@ export const OrdersTable = React.memo(function OrdersTable({
             </div>
           );
 
-        case "customer":
+        case "customerEmail": {
+          const email =
+            typeof item.customer.email === "string" && item.customer.email.trim().length > 0
+              ? item.customer.email
+              : "Guest Checkout";
           return (
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-default-900">
-                {item.customer.name}
-              </p>
-              <p className="truncate text-xs text-default-500">
-                {item.customer.email}
-              </p>
+            <div className="min-w-0 truncate text-sm text-default-900">
+              {email}
             </div>
           );
+        }
 
         case "status":
           return (
@@ -157,7 +153,10 @@ export const OrdersTable = React.memo(function OrdersTable({
           size="sm"
           total={Math.max(
             1,
-            Math.ceil(pagination.total / Math.max(1, pagination.pageSize))
+            Math.ceil(
+              (pagination.estimatedTotal ?? pagination.total) /
+                Math.max(1, pagination.pageSize)
+            )
           )}
           onChange={(newPage) => {
             pagination.setPage(newPage);

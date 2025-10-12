@@ -75,8 +75,8 @@ const inventoryVariantSummary = v.object({
   title: v.optional(v.string()),
   price: v.number(),
   stock: v.number(),
-  reserved: v.number(),
   available: v.number(),
+  unitsSold: v.optional(v.number()),
 });
 
 export const inventoryProductSummaries = defineTable({
@@ -89,7 +89,6 @@ export const inventoryProductSummaries = defineTable({
   category: v.string(),
   vendor: v.string(),
   stock: v.number(),
-  reserved: v.number(),
   available: v.number(),
   reorderPoint: v.number(),
   stockStatus: v.union(
@@ -101,7 +100,6 @@ export const inventoryProductSummaries = defineTable({
   price: v.number(),
   cost: v.number(),
   margin: v.number(),
-  turnoverRate: v.number(),
   unitsSold: v.optional(v.number()),
   periodRevenue: v.optional(v.number()),
   lastSoldAt: v.optional(v.number()),

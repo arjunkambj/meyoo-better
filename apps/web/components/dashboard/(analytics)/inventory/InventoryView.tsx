@@ -1,10 +1,11 @@
 "use client";
 
 import { Skeleton, Spacer } from "@heroui/react";
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { AnalyticsHeader } from "@/components/shared/AnalyticsHeader";
+import GlobalDateRangePicker from "@/components/shared/GlobalDateRangePicker";
 import { FilterBar } from "@/components/shared/filters/FilterBar";
-import { useInventoryAnalytics } from "@/hooks";
+import { useAnalyticsDateRange, useInventoryAnalytics } from "@/hooks";
 
 import { ProductsTable } from "./components/ProductsTable";
 
@@ -18,11 +19,18 @@ export function InventoryView() {
   const [stockFilter, setStockFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const {
+    analyticsRange: inventoryRange,
+    calendarRange: inventoryCalendarRange,
+    preset: inventoryPreset,
+    updateRange: updateInventoryRange,
+  } = useAnalyticsDateRange('dashboard-inventory', { defaultPreset: 'today' });
 
   const { overview, products, isLoading, isRefreshing, metadata } = useInventoryAnalytics({
     stockLevel: stockFilter,
     category: categoryFilter,
     page: currentPage,
+    dateRange: inventoryRange,
   });
 
   useEffect(() => {
@@ -83,6 +91,14 @@ export function InventoryView() {
     category: categoryFilter,
   };
 
+  const handleAnalyticsRangeChange = useCallback(
+    (...args: Parameters<typeof updateInventoryRange>) => {
+      setCurrentPage(1);
+      return updateInventoryRange(...args);
+    },
+    [updateInventoryRange],
+  );
+
   const lastUpdatedLabel = useMemo(() => {
     if (!metadata?.computedAt) return "Never";
     const date = new Date(metadata.computedAt);
@@ -95,6 +111,12 @@ export function InventoryView() {
         <h1 className="text-2xl font-semibold leading-tight">Inventory Products</h1>
       </div>
       <div className="flex flex-wrap items-center gap-2">
+        <GlobalDateRangePicker
+          size="md"
+          value={inventoryCalendarRange}
+          preset={inventoryPreset}
+          onAnalyticsChange={handleAnalyticsRangeChange}
+        />
         <FilterBar
           filters={filters}
           values={filterValues}

@@ -36,8 +36,8 @@ export interface ProductVariant {
   title: string;
   price: number;
   stock: number;
-  reserved: number;
   available: number;
+  unitsSold?: number;
 }
 
 export interface Product {
@@ -48,14 +48,12 @@ export interface Product {
   category: string;
   vendor: string;
   stock: number;
-  reserved: number;
   available: number;
   reorderPoint: number;
   stockStatus: "healthy" | "low" | "critical" | "out";
   price: number;
   cost: number;
   margin: number;
-  turnoverRate: number;
   unitsSold?: number;
   lastSold?: string;
   variants?: ProductVariant[];
@@ -95,7 +93,6 @@ const columns = [
   { name: "COGS", uid: "cogs" },
   { name: "Margin", uid: "margin" },
   { name: "Units Sold", uid: "unitsSold" },
-  { name: "Turnover", uid: "turnover" },
   { name: "Actions", uid: "actions" },
 ];
 
@@ -132,16 +129,7 @@ export const ProductsTable = React.memo(function ProductsTable({
           return <span className="text-sm">{item.category}</span>;
 
         case "stock":
-          return (
-            <div>
-              <p className="text-sm font-medium">{item.available}</p>
-              {item.reserved > 0 && (
-                <p className="text-xs text-default-500">
-                  {item.reserved} reserved
-                </p>
-              )}
-            </div>
-          );
+          return <p className="text-sm font-medium">{item.available}</p>;
 
         case "status": {
           const statusConfig = getStockStatusConfig(item.stockStatus);
@@ -197,36 +185,6 @@ export const ProductsTable = React.memo(function ProductsTable({
               {formatNumber(item.unitsSold ?? 0)}
             </div>
           );
-
-        case "turnover": {
-          const rate = item.turnoverRate;
-          const displayRate = rate > 0 ? rate.toFixed(1) : "0.0";
-
-          return (
-            <div className="flex items-center gap-1">
-              <span className="text-sm font-medium">{displayRate}x</span>
-              {rate > 0 && (
-                <Icon
-                  className={
-                    rate > 6
-                      ? "text-success"
-                      : rate > 4
-                        ? "text-warning"
-                        : "text-danger"
-                  }
-                  icon={
-                    rate > 6
-                      ? "solar:arrow-up-bold"
-                      : rate > 4
-                        ? "solar:arrow-right-bold"
-                        : "solar:arrow-down-bold"
-                  }
-                  width={14}
-                />
-              )}
-            </div>
-          );
-        }
 
         case "actions":
           return (
@@ -398,16 +356,7 @@ export const ProductsTable = React.memo(function ProductsTable({
                         <span className="text-sm">{item.category}</span>
                       </TableCell>
                       <TableCell>
-                        <div>
-                          <p className="text-sm font-medium">
-                            {item.available}
-                          </p>
-                          {item.reserved > 0 && (
-                            <p className="text-xs text-default-500">
-                              {item.reserved} reserved
-                            </p>
-                          )}
-                        </div>
+                        <p className="text-sm font-medium">{item.available}</p>
                       </TableCell>
                       <TableCell>{renderCell(item, "status")}</TableCell>
                       <TableCell>
@@ -419,7 +368,6 @@ export const ProductsTable = React.memo(function ProductsTable({
                       <TableCell>{renderCell(item, "cogs")}</TableCell>
                       <TableCell>{renderCell(item, "margin")}</TableCell>
                       <TableCell>{renderCell(item, "unitsSold")}</TableCell>
-                      <TableCell>{renderCell(item, "turnover")}</TableCell>
                       <TableCell>{renderCell(item, "actions")}</TableCell>
                     </TableRow>
                   );
@@ -453,14 +401,7 @@ export const ProductsTable = React.memo(function ProductsTable({
                         </span>
                       </TableCell>
                       <TableCell>
-                        <div>
-                          <p className="text-sm font-medium">{v.available}</p>
-                          {v.reserved > 0 && (
-                            <p className="text-xs text-default-500">
-                              {v.reserved} reserved
-                            </p>
-                          )}
-                        </div>
+                        <p className="text-sm font-medium">{v.available}</p>
                       </TableCell>
                       <TableCell>{renderCell(item, "status")}</TableCell>
                       <TableCell>
@@ -471,8 +412,11 @@ export const ProductsTable = React.memo(function ProductsTable({
                       </TableCell>
                       <TableCell>—</TableCell>
                       <TableCell>—</TableCell>
-                      <TableCell>—</TableCell>
-                      <TableCell>—</TableCell>
+                      <TableCell>
+                        <div className="text-sm font-medium">
+                          {formatNumber(v.unitsSold ?? 0)}
+                        </div>
+                      </TableCell>
                       <TableCell>—</TableCell>
                     </TableRow>
                   ));

@@ -6,7 +6,7 @@ import {
 } from "@convex-dev/auth/server";
 import { ConvexError, v } from "convex/values";
 import { api, internal } from "../_generated/api";
-import type { Doc, Id } from "../_generated/dataModel";
+import type { Id } from "../_generated/dataModel";
 import { action, internalQuery, mutation, query } from "../_generated/server";
 import { getUserAndOrg, requireUserAndOrg } from "../utils/auth";
 

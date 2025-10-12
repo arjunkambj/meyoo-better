@@ -52,7 +52,11 @@ interface OrdersAnalyticsQueryResult {
 }
 
 export function useOrdersAnalytics(params: UseOrdersAnalyticsParams = {}) {
-  const { offsetMinutes, timezoneIana } = useShopifyTime();
+  const {
+    offsetMinutes,
+    timezoneIana,
+    isLoading: isShopTimeLoading,
+  } = useShopifyTime();
 
   const {
     dateRange,
@@ -84,13 +88,13 @@ export function useOrdersAnalytics(params: UseOrdersAnalyticsParams = {}) {
   }, [dateRange]);
 
   const rangeStrings = useMemo(() => {
-    if (!effectiveRange) return null;
+    if (!effectiveRange || isShopTimeLoading) return null;
     return dateRangeToUtcWithShopPreference(
       effectiveRange,
       typeof offsetMinutes === "number" ? offsetMinutes : undefined,
       timezoneIana,
     );
-  }, [effectiveRange, offsetMinutes, timezoneIana]);
+  }, [effectiveRange, isShopTimeLoading, offsetMinutes, timezoneIana]);
 
   const normalizedRange = useMemo(() => {
     if (!rangeStrings) return null;
@@ -106,7 +110,7 @@ export function useOrdersAnalytics(params: UseOrdersAnalyticsParams = {}) {
   }, [effectiveRange, rangeStrings]);
 
   const queryArgs = useMemo(() => {
-    if (!normalizedRange) return "skip" as const;
+    if (isShopTimeLoading || !normalizedRange) return "skip" as const;
     return {
       dateRange: normalizedRange,
       status,
@@ -116,14 +120,23 @@ export function useOrdersAnalytics(params: UseOrdersAnalyticsParams = {}) {
       page: requestedPage,
       pageSize,
     } as const;
-  }, [normalizedRange, status, normalizedSearch, sortBy, sortOrder, requestedPage, pageSize]);
+  }, [
+    isShopTimeLoading,
+    normalizedRange,
+    status,
+    normalizedSearch,
+    sortBy,
+    sortOrder,
+    requestedPage,
+    pageSize,
+  ]);
 
   const analyticsResult = useQuery(
     api.web.orders.getOrdersAnalytics,
     queryArgs,
   ) as OrdersAnalyticsQueryResult | undefined;
 
-  const baseLoading = queryArgs !== "skip" && analyticsResult === undefined;
+  const baseLoading = queryArgs === "skip" || analyticsResult === undefined;
 
   const overview = analyticsResult?.overview ?? undefined;
   const orders: OrdersResult | undefined = analyticsResult

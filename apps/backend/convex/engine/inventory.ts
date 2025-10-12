@@ -437,8 +437,8 @@ type InventoryVariantSummary = {
   title?: string;
   price: number;
   stock: number;
-  reserved: number;
   available: number;
+  unitsSold?: number;
 };
 
 type InventoryProductSummary = {
@@ -450,14 +450,12 @@ type InventoryProductSummary = {
   category: string;
   vendor: string;
   stock: number;
-  reserved: number;
   available: number;
   reorderPoint: number;
   stockStatus: "healthy" | "low" | "critical" | "out";
   price: number;
   cost: number;
   margin: number;
-  turnoverRate: number;
   unitsSold?: number;
   periodRevenue?: number;
   lastSoldAt?: number;
@@ -512,7 +510,7 @@ function prepareInventorySummaries(
   for (const product of products) {
     const productVariants = variantsByProduct.get(product._id) ?? [];
     let totalAvailable = 0;
-    let totalReserved = 0;
+    let totalCommitted = 0;
     let weightedCostSum = 0;
     let weightedCostWeight = 0;
 
@@ -526,7 +524,7 @@ function prepareInventorySummaries(
       const weight = available > 0 ? available : 1;
 
       totalAvailable += available;
-      totalReserved += committed;
+      totalCommitted += committed;
       weightedCostSum += getVariantCost(variant) * weight;
       weightedCostWeight += weight;
 
@@ -536,7 +534,6 @@ function prepareInventorySummaries(
         title: variant.title || "Default",
         price: variant.price || 0,
         stock,
-        reserved: committed,
         available,
       });
     }
@@ -564,13 +561,9 @@ function prepareInventorySummaries(
         ? getVariantCost(defaultVariant)
         : 0;
     const margin = price > 0 ? ((price - cost) / price) * 100 : 0;
-    const turnoverRate =
-      totalAvailable > 0 && analysisDays > 0
-        ? Math.round(((unitsSold * (365 / analysisDays)) / totalAvailable) * 10) /
-          10
-        : 0;
 
     const stockStatus = classifyStockStatus(totalAvailable, avgDailySales);
+    const totalStock = totalAvailable + totalCommitted;
 
     summaries.push({
       id: product._id.toString(),
@@ -580,15 +573,13 @@ function prepareInventorySummaries(
       image: product.featuredImage || undefined,
       category: product.productType || "Uncategorized",
       vendor: product.vendor || "Unknown",
-      stock: totalAvailable + totalReserved,
-      reserved: totalReserved,
+      stock: totalStock,
       available: totalAvailable,
       reorderPoint,
       stockStatus,
       price,
       cost,
       margin,
-      turnoverRate,
       unitsSold: unitsSold || undefined,
       periodRevenue: revenue || undefined,
       lastSoldAt: stats?.lastSoldAt,
@@ -825,21 +816,19 @@ export const rebuildInventorySnapshot = internalMutation({
         sku: product.sku,
         image: product.image,
         category: product.category,
-        vendor: product.vendor,
-        stock: product.stock,
-        reserved: product.reserved,
-        available: product.available,
-        reorderPoint: product.reorderPoint,
-        stockStatus: product.stockStatus,
-        price: product.price,
-        cost: product.cost,
-        margin: product.margin,
-        turnoverRate: product.turnoverRate,
-        unitsSold: product.unitsSold,
-        periodRevenue: product.periodRevenue,
-        lastSoldAt: product.lastSoldAt,
-        abcCategory: product.abcCategory,
-        variantCount: product.variantCount,
+      vendor: product.vendor,
+      stock: product.stock,
+      available: product.available,
+      reorderPoint: product.reorderPoint,
+      stockStatus: product.stockStatus,
+      price: product.price,
+      cost: product.cost,
+      margin: product.margin,
+      unitsSold: product.unitsSold,
+      periodRevenue: product.periodRevenue,
+      lastSoldAt: product.lastSoldAt,
+      abcCategory: product.abcCategory,
+      variantCount: product.variantCount,
         variants: product.variants,
       });
     }

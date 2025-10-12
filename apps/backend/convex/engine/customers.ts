@@ -1,11 +1,7 @@
 import { v } from "convex/values";
 
 import type { Doc, Id } from "../_generated/dataModel";
-import {
-  internalMutation,
-  internalQuery,
-  type MutationCtx,
-} from "../_generated/server";
+import { internalMutation, type MutationCtx } from "../_generated/server";
 
 const MS_IN_DAY = 24 * 60 * 60 * 1000;
 const DEFAULT_ANALYSIS_DAYS = 30;

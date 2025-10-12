@@ -1,10 +1,17 @@
 import { ConvexError, v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import { action, query, type QueryCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { getUserAndOrg } from "../utils/auth";
+import { dateRangeValidator } from "./analyticsShared";
+import {
+  getRangeEndExclusiveMs,
+  getRangeStartMs,
+  type DateRange,
+} from "../utils/analyticsSource";
+import { resolveDateRangeForOrganization } from "../utils/orgDateRange";
 
 const SNAPSHOT_TTL_MS = 5 * 60 * 1000;
 
@@ -14,8 +21,8 @@ const inventoryVariantValidator = v.object({
   title: v.string(),
   price: v.number(),
   stock: v.number(),
-  reserved: v.number(),
   available: v.number(),
+  unitsSold: v.optional(v.number()),
 });
 
 const inventoryProductValidator = v.object({
@@ -26,7 +33,6 @@ const inventoryProductValidator = v.object({
   category: v.string(),
   vendor: v.string(),
   stock: v.number(),
-  reserved: v.number(),
   available: v.number(),
   reorderPoint: v.number(),
   stockStatus: v.union(
@@ -38,7 +44,6 @@ const inventoryProductValidator = v.object({
   price: v.number(),
   cost: v.number(),
   margin: v.number(),
-  turnoverRate: v.number(),
   unitsSold: v.optional(v.number()),
   lastSold: v.optional(v.string()),
   periodRevenue: v.optional(v.number()),
@@ -70,14 +75,12 @@ type InventoryProduct = {
   category: string;
   vendor: string;
   stock: number;
-  reserved: number;
   available: number;
   reorderPoint: number;
   stockStatus: "healthy" | "low" | "critical" | "out";
   price: number;
   cost: number;
   margin: number;
-  turnoverRate: number;
   unitsSold?: number;
   periodRevenue?: number;
   lastSold?: string;
@@ -87,8 +90,8 @@ type InventoryProduct = {
     title: string;
     price: number;
     stock: number;
-    reserved: number;
     available: number;
+    unitsSold?: number;
   }>;
   variantCount: number;
   abcCategory: "A" | "B" | "C";
@@ -112,14 +115,12 @@ type InventoryProductRow = {
   category: string;
   vendor: string;
   stock: number;
-  reserved: number;
   available: number;
   reorderPoint: number;
   stockStatus: "healthy" | "low" | "critical" | "out";
   price: number;
   cost: number;
   margin: number;
-  turnoverRate: number;
   unitsSold?: number;
   periodRevenue?: number;
   lastSoldAt?: number;
@@ -129,8 +130,8 @@ type InventoryProductRow = {
     title: string;
     price: number;
     stock: number;
-    reserved: number;
     available: number;
+    unitsSold?: number;
   }>;
   variantCount: number;
   abcCategory: "A" | "B" | "C";
@@ -217,8 +218,6 @@ function sortProducts(
         return product.margin;
       case "unitsSold":
         return product.unitsSold ?? 0;
-      case "turnoverRate":
-        return product.turnoverRate;
       case "reorderPoint":
         return product.reorderPoint;
       case "available":
@@ -256,6 +255,145 @@ function sortProducts(
   });
 
   return sorted;
+}
+
+const ORDER_ITEMS_BATCH_SIZE = 10;
+
+type UnitsSoldMaps = {
+  productUnits: Map<string, number>;
+  variantUnits: Map<string, number>;
+};
+
+function buildVariantProductMap(
+  products: InventoryProductRow[],
+): Map<string, string> {
+  const map = new Map<string, string>();
+
+  for (const product of products) {
+    const productId =
+      typeof product.productId === "string"
+        ? product.productId
+        : product.productId
+        ? String(product.productId)
+        : null;
+
+    if (!productId) {
+      continue;
+    }
+
+    if (Array.isArray(product.variants)) {
+      for (const variant of product.variants) {
+        if (!variant?.id) continue;
+        map.set(variant.id, productId);
+      }
+    }
+  }
+
+  return map;
+}
+
+async function fetchOrderItemsForOrders(
+  ctx: QueryCtx,
+  orderIds: Array<Id<"shopifyOrders">>,
+): Promise<Array<Doc<"shopifyOrderItems">>> {
+  const items: Array<Doc<"shopifyOrderItems">> = [];
+
+  for (let index = 0; index < orderIds.length; index += ORDER_ITEMS_BATCH_SIZE) {
+    const batch = orderIds.slice(index, index + ORDER_ITEMS_BATCH_SIZE);
+    const batchResults = await Promise.all(
+      batch.map((orderId) =>
+        ctx.db
+          .query("shopifyOrderItems")
+          .withIndex("by_order", (q) => q.eq("orderId", orderId))
+          .collect(),
+      ),
+    );
+
+    for (const batchItems of batchResults) {
+      if (batchItems.length > 0) {
+        items.push(...batchItems);
+      }
+    }
+  }
+
+  return items;
+}
+
+async function computeUnitsSoldForRange(
+  ctx: QueryCtx,
+  orgId: Id<"organizations">,
+  products: InventoryProductRow[],
+  range: DateRange,
+): Promise<UnitsSoldMaps> {
+  const rangeStartMs = getRangeStartMs(range);
+  const rangeEndExclusiveMs = getRangeEndExclusiveMs(range);
+
+  const orders = await ctx.db
+    .query("shopifyOrders")
+    .withIndex("by_organization_and_created", (q) =>
+      q
+        .eq("organizationId", orgId)
+        .gte("shopifyCreatedAt", rangeStartMs)
+        .lt("shopifyCreatedAt", rangeEndExclusiveMs),
+    )
+    .collect();
+
+  if (orders.length === 0) {
+    return {
+      productUnits: new Map(),
+      variantUnits: new Map(),
+    };
+  }
+
+  const orderIds = orders.map((order) => order._id as Id<"shopifyOrders">);
+  const orderItems = await fetchOrderItemsForOrders(ctx, orderIds);
+
+  if (orderItems.length === 0) {
+    return {
+      productUnits: new Map(),
+      variantUnits: new Map(),
+    };
+  }
+
+  const variantProductMap = buildVariantProductMap(products);
+  const productUnits = new Map<string, number>();
+  const variantUnits = new Map<string, number>();
+
+  for (const item of orderItems) {
+    const rawQuantity = typeof item.quantity === "number" ? item.quantity : 0;
+    if (rawQuantity <= 0) continue;
+
+    const variantKey =
+      item.variantId !== undefined && item.variantId !== null
+        ? item.variantId.toString()
+        : null;
+
+    let productKey: string | null = null;
+    if (item.productId) {
+      productKey = item.productId.toString();
+    } else if (variantKey) {
+      productKey = variantProductMap.get(variantKey) ?? null;
+    }
+
+    if (variantKey) {
+      variantUnits.set(
+        variantKey,
+        (variantUnits.get(variantKey) ?? 0) + rawQuantity,
+      );
+    }
+
+    if (productKey) {
+      productUnits.set(
+        productKey,
+        (productUnits.get(productKey) ?? 0) + rawQuantity,
+      );
+    }
+  }
+
+  return {
+    productUnits,
+    variantUnits,
+  };
 }
 
 async function loadSnapshot(
@@ -299,14 +437,12 @@ function mapProduct(doc: InventoryProductRow): InventoryProduct {
     category: doc.category,
     vendor: doc.vendor,
     stock: doc.stock,
-    reserved: doc.reserved,
     available: doc.available,
     reorderPoint: doc.reorderPoint,
     stockStatus: doc.stockStatus,
     price: doc.price,
     cost: doc.cost,
     margin: doc.margin,
-    turnoverRate: doc.turnoverRate,
     unitsSold: doc.unitsSold ?? undefined,
     periodRevenue: doc.periodRevenue ?? undefined,
     lastSold: toIsoString(doc.lastSoldAt ?? undefined),
@@ -332,6 +468,7 @@ export const getInventoryAnalytics = query({
     searchTerm: v.optional(v.string()),
     sortBy: v.optional(v.string()),
     sortOrder: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
+    dateRange: v.optional(dateRangeValidator),
   },
   returns: v.object({
     overview: inventoryOverviewValidator,
@@ -395,6 +532,10 @@ export const getInventoryAnalytics = query({
       };
     }
 
+    const range = args.dateRange
+      ? await resolveDateRangeForOrganization(ctx, orgId, args.dateRange)
+      : null;
+
     const cursorState = decodeInventoryCursor(args.paginationOpts?.cursor);
     const legacyPage = args.page ?? 1;
     const pageSize = clampPageSize(
@@ -412,10 +553,32 @@ export const getInventoryAnalytics = query({
       ? args.category.trim().toLowerCase()
       : null;
     const stockLevel = args.stockLevel ?? "all";
-    const sortBy = args.sortBy ?? "available";
+    const rawSortBy = args.sortBy ?? "available";
+    const sortBy = rawSortBy === "turnoverRate" ? "unitsSold" : rawSortBy;
     const sortOrder = args.sortOrder ?? "desc";
 
     const mappedProducts = products.map(mapProduct);
+
+    if (range) {
+      const { productUnits, variantUnits } = await computeUnitsSoldForRange(
+        ctx,
+        orgId,
+        products,
+        range,
+      );
+
+      for (const product of mappedProducts) {
+        const unitsSold = productUnits.get(product.id) ?? 0;
+        product.unitsSold = unitsSold;
+
+        if (product.variants) {
+          product.variants = product.variants.map((variant) => ({
+            ...variant,
+            unitsSold: variantUnits.get(variant.id) ?? 0,
+          }));
+        }
+      }
+    }
 
     const filtered = mappedProducts.filter((product) => {
       if (!matchesSearch(product, normalizedSearch)) {

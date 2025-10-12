@@ -64,7 +64,11 @@ function normalizeJourneyStages(raw: OrdersJourneyStage[] | undefined): JourneyS
 export function useOrdersInsights(
   params: UseOrdersInsightsParams = {},
 ): OrdersInsightsResult {
-  const { offsetMinutes, timezoneIana } = useShopifyTime();
+  const {
+    offsetMinutes,
+    timezoneIana,
+    isLoading: isShopTimeLoading,
+  } = useShopifyTime();
 
   const { dateRange } = params;
 
@@ -80,7 +84,7 @@ export function useOrdersInsights(
   }, [dateRange?.startDate, dateRange?.endDate]);
 
   const normalizedRange = useMemo(() => {
-    if (!effectiveRange) return null;
+    if (!effectiveRange || isShopTimeLoading) return null;
     const rangeStrings = dateRangeToUtcWithShopPreference(
       effectiveRange,
       typeof offsetMinutes === "number" ? offsetMinutes : undefined,
@@ -95,12 +99,13 @@ export function useOrdersInsights(
       startDateTimeUtc: rangeStrings.startDateTimeUtc,
       endDateTimeUtcExclusive: rangeStrings.endDateTimeUtcExclusive,
     } as const;
-  }, [effectiveRange, offsetMinutes, timezoneIana]);
+  }, [effectiveRange, isShopTimeLoading, offsetMinutes, timezoneIana]);
 
   const queryArgs = useMemo(() => {
-    if (!normalizedRange) return "skip" as const;
+    if (isShopTimeLoading || !normalizedRange) return "skip" as const;
     return { dateRange: normalizedRange } as const;
   }, [
+    isShopTimeLoading,
     normalizedRange?.startDate,
     normalizedRange?.endDate,
     normalizedRange?.startDateTimeUtc,
@@ -113,7 +118,7 @@ export function useOrdersInsights(
   ) as OrdersInsightsPayload | null | undefined;
 
   const loading =
-    queryArgs !== "skip" && insightsResult === undefined;
+    queryArgs === "skip" || insightsResult === undefined;
 
   const kpis = insightsResult?.kpis ?? null;
   const fulfillment = insightsResult?.fulfillment ?? null;

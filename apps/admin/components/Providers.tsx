@@ -31,7 +31,7 @@ export function Providers({ children, themeProps }: ProvidersProps) {
       <JotaiProvider>
         <HeroUIProvider navigate={router.push}>
           <NextThemesProvider {...themeProps}>
-            <ConvexQueryCacheProvider>{children} </ConvexQueryCacheProvider>
+            <ConvexQueryCacheProvider>{children}</ConvexQueryCacheProvider>
           </NextThemesProvider>
         </HeroUIProvider>
       </JotaiProvider>

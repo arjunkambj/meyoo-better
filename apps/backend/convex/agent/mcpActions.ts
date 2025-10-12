@@ -785,14 +785,12 @@ export const productsInventory = action({
       category: v.string(),
       vendor: v.string(),
       stock: v.number(),
-      reserved: v.number(),
       available: v.number(),
       reorderPoint: v.number(),
       stockStatus: v.union(v.literal("healthy"), v.literal("low"), v.literal("critical"), v.literal("out")),
       price: v.number(),
       cost: v.number(),
       margin: v.number(),
-      turnoverRate: v.number(),
       unitsSold: v.optional(v.number()),
       lastSold: v.optional(v.string()),
       abcCategory: v.union(v.literal("A"), v.literal("B"), v.literal("C")),
@@ -802,8 +800,8 @@ export const productsInventory = action({
         title: v.string(),
         price: v.number(),
         stock: v.number(),
-        reserved: v.number(),
         available: v.number(),
+        unitsSold: v.optional(v.number()),
       }))),
     })),
   }),
@@ -829,14 +827,12 @@ export const productsInventory = action({
           category: string;
           vendor: string;
           stock: number;
-          reserved: number;
           available: number;
           reorderPoint: number;
           stockStatus: 'healthy' | 'low' | 'critical' | 'out';
           price: number;
           cost: number;
           margin: number;
-          turnoverRate: number;
           unitsSold?: number;
           lastSold?: string;
           abcCategory: 'A' | 'B' | 'C';
@@ -846,8 +842,8 @@ export const productsInventory = action({
             title: string;
             price: number;
             stock: number;
-            reserved: number;
             available: number;
+            unitsSold?: number;
           }>;
         }>;
         pagination: {
@@ -879,14 +875,12 @@ export const productsInventory = action({
       category: String(p.category ?? ""),
       vendor: String(p.vendor ?? ""),
       stock: Number(p.stock ?? 0),
-      reserved: Number(p.reserved ?? 0),
       available: Number(p.available ?? 0),
       reorderPoint: Number(p.reorderPoint ?? 0),
       stockStatus: p.stockStatus as 'healthy' | 'low' | 'critical' | 'out',
       price: Number(p.price ?? 0),
       cost: Number(p.cost ?? 0),
       margin: Number(p.margin ?? 0),
-      turnoverRate: Number(p.turnoverRate ?? 0),
       unitsSold: typeof p.unitsSold === "number" ? p.unitsSold : undefined,
       lastSold: typeof p.lastSold === "string" ? p.lastSold : undefined,
       abcCategory: (p.abcCategory ?? "C") as 'A' | 'B' | 'C',
@@ -897,8 +891,8 @@ export const productsInventory = action({
             title: String(v.title ?? ""),
             price: Number(v.price ?? 0),
             stock: Number(v.stock ?? 0),
-            reserved: Number(v.reserved ?? 0),
             available: Number(v.available ?? 0),
+            unitsSold: typeof v.unitsSold === "number" ? v.unitsSold : undefined,
           }))
         : undefined,
     }));

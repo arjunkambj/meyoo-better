@@ -1,9 +1,12 @@
 import { useAction } from "convex/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "convex-helpers/react/cache/hooks";
+import type { AnalyticsDateRange } from "@repo/types";
 import type { Product } from "@/components/dashboard/(analytics)/inventory/components/ProductsTable";
 
+import { dateRangeToUtcWithShopPreference } from "@/libs/dateRange";
 import { api } from "@/libs/convexApi";
+import { useShopifyTime } from "./useShopifyTime";
 
 export interface UseInventoryAnalyticsParams {
   stockLevel?: string;
@@ -11,6 +14,7 @@ export interface UseInventoryAnalyticsParams {
   searchTerm?: string;
   page?: number;
   pageSize?: number;
+  dateRange?: AnalyticsDateRange;
 }
 
 export interface InventoryOverview {
@@ -46,22 +50,86 @@ export interface UseInventoryAnalyticsReturn {
 export function useInventoryAnalytics(
   params: UseInventoryAnalyticsParams = {},
 ): UseInventoryAnalyticsReturn {
-  const { stockLevel, category, searchTerm, page = 1, pageSize = 50 } = params;
+  const {
+    stockLevel,
+    category,
+    searchTerm,
+    page = 1,
+    pageSize = 50,
+    dateRange,
+  } = params;
+  const {
+    offsetMinutes,
+    timezoneIana,
+    isLoading: isShopTimeLoading,
+  } = useShopifyTime();
 
-  const analyticsArgs = useMemo(
-    () => ({
+  const effectiveRange = useMemo(() => dateRange ?? null, [dateRange]);
+
+  const rangeStrings = useMemo(() => {
+    if (!effectiveRange || isShopTimeLoading) {
+      return null;
+    }
+    return dateRangeToUtcWithShopPreference(
+      {
+        startDate: effectiveRange.startDate,
+        endDate: effectiveRange.endDate,
+      },
+      typeof offsetMinutes === "number" ? offsetMinutes : undefined,
+      timezoneIana,
+    );
+  }, [effectiveRange, isShopTimeLoading, offsetMinutes, timezoneIana]);
+
+  const normalizedRange = useMemo(() => {
+    if (!effectiveRange || !rangeStrings) {
+      return undefined;
+    }
+
+    return {
+      startDate: effectiveRange.startDate,
+      endDate: effectiveRange.endDate,
+      startDateTimeUtc: rangeStrings.startDateTimeUtc,
+      endDateTimeUtc: rangeStrings.endDateTimeUtc,
+      endDateTimeUtcExclusive: rangeStrings.endDateTimeUtcExclusive,
+      dayCount: rangeStrings.dayCount,
+    } as const;
+  }, [effectiveRange, rangeStrings]);
+
+  const queryArgs = useMemo(() => {
+    if (effectiveRange && isShopTimeLoading) {
+      return "skip";
+    }
+
+    const baseArgs = {
       page,
       pageSize,
       stockLevel: stockLevel === "all" ? undefined : stockLevel,
       category: category === "all" ? undefined : category,
       searchTerm,
-    }),
-    [page, pageSize, stockLevel, category, searchTerm],
-  );
+    };
+
+    if (normalizedRange) {
+      return {
+        ...baseArgs,
+        dateRange: normalizedRange,
+      };
+    }
+
+    return baseArgs;
+  }, [
+    effectiveRange,
+    isShopTimeLoading,
+    page,
+    pageSize,
+    stockLevel,
+    category,
+    searchTerm,
+    normalizedRange,
+  ]);
 
   const analytics = useQuery(
     api.web.inventory.getInventoryAnalytics,
-    analyticsArgs,
+    queryArgs,
   );
 
   const refreshInventory = useAction(
@@ -94,7 +162,7 @@ export function useInventoryAnalytics(
     triggerRefresh(false);
   }, [analytics?.metadata.isStale, triggerRefresh]);
 
-  const isLoading = analytics === undefined;
+  const isLoading = queryArgs === "skip" || analytics === undefined;
 
   const transformedOverview: InventoryOverview | null = analytics
     ? {

@@ -850,14 +850,12 @@ export const productsInventoryTool = createTool<
       category: string;
       vendor: string;
       stock: number;
-      reserved: number;
       available: number;
       reorderPoint: number;
       stockStatus: "healthy" | "low" | "critical" | "out";
       price: number;
       cost: number;
       margin: number;
-      turnoverRate: number;
       unitsSold?: number;
       lastSold?: string;
       abcCategory: "A" | "B" | "C";
@@ -867,8 +865,8 @@ export const productsInventoryTool = createTool<
         title: string;
         price: number;
         stock: number;
-        reserved: number;
         available: number;
+        unitsSold?: number;
       }>;
     }>;
   }
@@ -898,14 +896,12 @@ export const productsInventoryTool = createTool<
       category: string;
       vendor: string;
       stock: number;
-      reserved: number;
       available: number;
       reorderPoint: number;
       stockStatus: 'healthy' | 'low' | 'critical' | 'out';
       price: number;
       cost: number;
       margin: number;
-      turnoverRate: number;
       unitsSold?: number;
       lastSold?: string;
       abcCategory: 'A' | 'B' | 'C';
@@ -915,8 +911,8 @@ export const productsInventoryTool = createTool<
         title: string;
         price: number;
         stock: number;
-        reserved: number;
         available: number;
+        unitsSold?: number;
       }>;
     }>;
   }> => {
@@ -943,14 +939,12 @@ export const productsInventoryTool = createTool<
           category: string;
           vendor: string;
           stock: number;
-          reserved: number;
           available: number;
           reorderPoint: number;
           stockStatus: 'healthy' | 'low' | 'critical' | 'out';
           price: number;
           cost: number;
           margin: number;
-          turnoverRate: number;
           unitsSold?: number;
           lastSold?: string;
           abcCategory: 'A' | 'B' | 'C';
@@ -960,8 +954,8 @@ export const productsInventoryTool = createTool<
             title: string;
             price: number;
             stock: number;
-            reserved: number;
             available: number;
+            unitsSold?: number;
           }>;
         }>;
         pagination: {
@@ -988,14 +982,12 @@ export const productsInventoryTool = createTool<
       category: String(p.category ?? ""),
       vendor: String(p.vendor ?? ""),
       stock: Number(p.stock ?? 0),
-      reserved: Number(p.reserved ?? 0),
       available: Number(p.available ?? 0),
       reorderPoint: Number(p.reorderPoint ?? 0),
       stockStatus: p.stockStatus as 'healthy' | 'low' | 'critical' | 'out',
       price: Number(p.price ?? 0),
       cost: Number(p.cost ?? 0),
       margin: Number(p.margin ?? 0),
-      turnoverRate: Number(p.turnoverRate ?? 0),
       unitsSold: typeof p.unitsSold === "number" ? p.unitsSold : undefined,
       lastSold: typeof p.lastSold === "string" ? p.lastSold : undefined,
       abcCategory: (p.abcCategory ?? "C") as 'A' | 'B' | 'C',
@@ -1006,8 +998,8 @@ export const productsInventoryTool = createTool<
             title: String(v.title ?? ""),
             price: Number(v.price ?? 0),
             stock: Number(v.stock ?? 0),
-            reserved: Number(v.reserved ?? 0),
             available: Number(v.available ?? 0),
+            unitsSold: typeof v.unitsSold === "number" ? v.unitsSold : undefined,
           }))
         : undefined,
     }));

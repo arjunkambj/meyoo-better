@@ -39,7 +39,7 @@ export default function RootLayout({
 }) {
   return (
     <ConvexAuthNextjsServerProvider>
-      <html suppressHydrationWarning lang="en">
+      <html lang="en" suppressHydrationWarning>
         <head />
         <body>
           <Providers themeProps={{ attribute: "class", defaultTheme: "light" }}>

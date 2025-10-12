@@ -22,9 +22,19 @@ export function OrdersInsightsKPICards({
   const { primaryCurrency } = useUser();
   const currencySymbol = getCurrencySymbol(primaryCurrency);
 
-  const items = useMemo(() => {
-    if (!kpis) return [];
+  const normalizedKpis: OrdersInsightsKPIs = useMemo(
+    () =>
+      kpis ?? {
+        prepaidRate: { value: 0, change: 0 },
+        repeatRate: { value: 0, change: 0 },
+        rtoRevenueLoss: { value: 0, change: 0 },
+        abandonedCustomers: { value: 0, change: 0 },
+        fulfillmentRate: { value: 0, change: 0 },
+      },
+    [kpis]
+  );
 
+  const items = useMemo(() => {
     const formatCurrencyValue = (value: number) =>
       new Intl.NumberFormat("en-US", {
         minimumFractionDigits: 2,
@@ -34,40 +44,40 @@ export function OrdersInsightsKPICards({
     return [
       {
         title: "Prepaid Rate",
-        value: formatPercent(kpis.prepaidRate.value),
-        change: kpis.prepaidRate.change,
+        value: formatPercent(normalizedKpis.prepaidRate.value),
+        change: normalizedKpis.prepaidRate.change,
         icon: "solar:bill-list-bold-duotone",
         iconColor: "text-primary",
         tooltip: "Percentage of orders paid upfront within the selected range.",
       },
       {
         title: "Repeat Rate",
-        value: formatPercent(kpis.repeatRate.value),
-        change: kpis.repeatRate.change,
+        value: formatPercent(normalizedKpis.repeatRate.value),
+        change: normalizedKpis.repeatRate.change,
         icon: "solar:refresh-circle-bold-duotone",
         iconColor: "text-success",
         tooltip: "Share of customers who returned to place another order.",
       },
       {
         title: "Return/RTO Revenue Loss",
-        value: `${currencySymbol}${formatCurrencyValue(kpis.rtoRevenueLoss.value)}`,
-        change: kpis.rtoRevenueLoss.change,
+        value: `${currencySymbol}${formatCurrencyValue(normalizedKpis.rtoRevenueLoss.value)}`,
+        change: normalizedKpis.rtoRevenueLoss.change,
         icon: "solar:cart-cross-bold-duotone",
         iconColor: "text-danger",
         tooltip: "Revenue lost due to returns or RTO orders.",
       },
       {
         title: "Abandoned Customers",
-        value: formatNumber(kpis.abandonedCustomers.value),
-        change: kpis.abandonedCustomers.change,
+        value: formatNumber(normalizedKpis.abandonedCustomers.value),
+        change: normalizedKpis.abandonedCustomers.change,
         icon: "solar:user-hand-up-bold-duotone",
         iconColor: "text-warning",
         tooltip: "Customers who were acquired but did not complete a purchase.",
       },
       {
         title: "Fulfillment Rate",
-        value: formatPercent(kpis.fulfillmentRate.value),
-        change: kpis.fulfillmentRate.change,
+        value: formatPercent(normalizedKpis.fulfillmentRate.value),
+        change: normalizedKpis.fulfillmentRate.change,
         icon: "solar:delivery-bold-duotone",
         iconColor: "text-default-500",
         tooltip: "Percentage of orders successfully fulfilled.",
@@ -75,7 +85,7 @@ export function OrdersInsightsKPICards({
     ];
   }, [
     currencySymbol,
-    kpis,
+    normalizedKpis,
   ]);
 
   if (loading) {
@@ -83,16 +93,6 @@ export function OrdersInsightsKPICards({
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
         {Array.from({ length: 5 }).map((_, index) => (
           <KPISkeleton key={`orders-insights-kpi-skeleton-${index}`} />
-        ))}
-      </div>
-    );
-  }
-
-  if (!kpis) {
-    return (
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
-        {Array.from({ length: 5 }).map((_, index) => (
-          <KPISkeleton key={`orders-insights-kpi-empty-${index}`} />
         ))}
       </div>
     );

@@ -473,7 +473,7 @@ Video Performance:
             "",
             ...result.items.slice(0, 10).map((item, index) =>
               `${index + 1}. ${item.name} (SKU: ${item.sku})\n` +
-              `   Stock: ${item.stock} (${item.available} available, ${item.reserved} reserved) | Status: ${item.stockStatus.toUpperCase()}\n` +
+              `   Stock: ${item.stock} (${item.available} available) | Status: ${item.stockStatus.toUpperCase()}\n` +
               `   Price: $${item.price.toFixed(2)} | Cost: $${item.cost.toFixed(2)} | Margin: ${item.margin.toFixed(1)}%\n` +
               `   Category: ${item.category} | Vendor: ${item.vendor}${item.variants ? ` | Variants: ${item.variants.length}` : ""}`
             ),

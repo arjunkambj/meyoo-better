@@ -3,14 +3,9 @@ import { v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
 import { action, query, type ActionCtx, type QueryCtx } from "../_generated/server";
 import { api } from "../_generated/api";
-import {
-  dateRangeValidator,
-  defaultDateRange,
-  type AnalyticsResponse,
-} from "./analyticsShared";
+import { dateRangeValidator, defaultDateRange } from "./analyticsShared";
 import { percentageChange } from "../utils/analytics/shared";
-import { type AnalyticsSourceKey, type DateRange } from "../utils/analyticsSource";
-import { computeOverviewMetrics, computePlatformMetrics, computeChannelRevenue } from "../utils/analyticsAggregations";
+import { type DateRange } from "../utils/analyticsSource";
 import type {
   OverviewComputation,
   ChannelRevenueBreakdown,
@@ -18,12 +13,10 @@ import type {
   MetricValue,
   OnboardingStatus,
 } from "@repo/types";
-import { DEFAULT_DASHBOARD_CONFIG } from "@repo/types";
 import { onboardingStatusValidator } from "../utils/onboardingValidators";
 import { getUserAndOrg } from "../utils/auth";
 import { resolveDashboardConfig } from "../utils/dashboardConfig";
 import { computeIntegrationStatus, integrationStatusValidator } from "../utils/integrationStatus";
-import { loadAnalyticsWithChunks } from "../utils/analyticsLoader";
 import { loadOverviewFromDailyMetrics } from "../utils/dailyMetrics";
 import { resolveDateRangeForOrganization } from "../utils/orgDateRange";
 
@@ -47,20 +40,6 @@ type OverviewArgs = {
   endDate?: string;
   dateRange?: DateRange;
 };
-
-const DASHBOARD_SUMMARY_DATASETS = [
-  "orders",
-  "orderItems",
-  "transactions",
-  "refunds",
-  "variants",
-  "variantCosts",
-  "customers",
-  "globalCosts",
-  "manualReturnRates",
-  "metaInsights",
-  "analytics",
-] as const satisfies readonly AnalyticsSourceKey[];
 
 function cloneOverview(overview: OverviewComputation | null): OverviewComputation | null {
   if (!overview) return null;
@@ -175,37 +154,6 @@ function applyUtmRoasMetric(
   overview.metrics = overview.metrics ?? {};
   overview.metrics.metaROAS = metric;
   overview.metrics.roasUTM = { ...metric } satisfies MetricValue;
-}
-
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-function isTooManyReadsError(error: unknown): boolean {
-  return error instanceof Error && error.message.includes("Too many reads");
-}
-
-function shiftDateString(date: string, deltaDays: number): string {
-  const parsed = Date.parse(`${date}T00:00:00.000Z`);
-  if (!Number.isFinite(parsed)) {
-    return date;
-  }
-  const shifted = new Date(parsed);
-  shifted.setUTCDate(shifted.getUTCDate() + deltaDays);
-  return shifted.toISOString().slice(0, 10);
-}
-
-function derivePreviousRange(range: DateRange): DateRange | null {
-  const startMs = Date.parse(`${range.startDate}T00:00:00.000Z`);
-  const endMs = Date.parse(`${range.endDate}T23:59:59.999Z`) + 1;
-  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) {
-    return null;
-  }
-
-  const spanDays = Math.max(1, Math.round((endMs - startMs) / DAY_MS));
-
-  return {
-    startDate: shiftDateString(range.startDate, -spanDays),
-    endDate: shiftDateString(range.startDate, -1),
-  } satisfies DateRange;
 }
 
 export const getOverviewData = query({
@@ -347,102 +295,7 @@ const getOverviewDataActionDefinition = {
     }),
   ),
   handler: async (ctx: ActionCtx, args: OverviewArgs): Promise<OverviewPayload | null> => {
-    const auth = await getUserAndOrg(ctx);
-    if (!auth) return null;
-    const userRole = auth.membership?.role ?? null;
-    const canViewDevTools = userRole === "StoreOwner";
-
-    const orgId = auth.orgId as Id<"organizations">;
-    const rangeInput =
-      args.dateRange ??
-      (args.startDate && args.endDate
-        ? { startDate: args.startDate, endDate: args.endDate }
-        : defaultDateRange(parseTimeRange(args.timeRange)));
-
-    const range = await resolveDateRangeForOrganization(ctx, orgId, rangeInput);
-
-    const { data, meta } = await loadAnalyticsWithChunks(
-      ctx,
-      orgId,
-      range,
-      {
-        datasets: DASHBOARD_SUMMARY_DATASETS,
-      },
-    );
-
-    const analyticsResponse: AnalyticsResponse = {
-      dateRange: range,
-      organizationId: auth.orgId,
-      data,
-      ...(meta ? { meta } : {}),
-    };
-
-    const previousRange = derivePreviousRange(range);
-    let previousAnalyticsResponse: AnalyticsResponse | null = null;
-
-    if (previousRange) {
-      try {
-        const resolvedPreviousRange = await resolveDateRangeForOrganization(
-          ctx,
-          orgId,
-          previousRange,
-        );
-
-        const { data: previousData, meta: previousMeta } = await loadAnalyticsWithChunks(
-          ctx,
-          orgId,
-          resolvedPreviousRange,
-          {
-            datasets: DASHBOARD_SUMMARY_DATASETS,
-          },
-        );
-
-        previousAnalyticsResponse = {
-          dateRange: resolvedPreviousRange,
-          organizationId: auth.orgId,
-          data: previousData,
-          ...(previousMeta ? { meta: previousMeta } : {}),
-        };
-      } catch (error) {
-        if (!isTooManyReadsError(error)) {
-          console.error("Failed to load previous analytics via action:", error);
-        }
-      }
-    }
-
-    const dashboardLayout = await ctx.runQuery(api.core.dashboard.getDashboardLayout, {});
-    const integrationStatus = await ctx.runQuery(api.core.status.getIntegrationStatus, {});
-    const onboardingStatus = await ctx.runQuery(api.core.onboarding.getOnboardingStatus, {});
-
-    const overview = computeOverviewMetrics(analyticsResponse, previousAnalyticsResponse);
-    const platformMetrics = computePlatformMetrics(analyticsResponse);
-    const channelRevenue = computeChannelRevenue(analyticsResponse);
-    applyUtmRoasMetric(overview, channelRevenue);
-
-    const primaryCurrency =
-      (await ctx.runQuery(api.core.currency.getPrimaryCurrencyForOrg, {
-        orgId,
-      })) ?? "USD";
-
-    const metaPayload: Record<string, unknown> = {
-      ...(analyticsResponse.meta ?? {}),
-      ...(previousRange ? { previousRange } : {}),
-      userRole,
-      canViewDevTools,
-    };
-
-    return {
-      dateRange: analyticsResponse.dateRange,
-      organizationId: analyticsResponse.organizationId,
-      overview,
-      platformMetrics,
-      channelRevenue,
-      primaryCurrency,
-      dashboardConfig: dashboardLayout ?? DEFAULT_DASHBOARD_CONFIG,
-      integrationStatus,
-      onboardingStatus,
-      meta: metaPayload,
-    } satisfies OverviewPayload;
+    return ctx.runQuery(api.web.dashboard.getOverviewData, args);
   },
 };
 

@@ -1,80 +1,31 @@
 import { v } from "convex/values";
 
 import type { Doc, Id } from "../_generated/dataModel";
-import { action, query, type QueryCtx } from "../_generated/server";
-import { dateRangeValidator, type AnalyticsResponse } from "./analyticsShared";
-import {
-  type AnalyticsSourceKey,
-  type DateRange,
-  validateDateRange,
-  getRangeEndExclusiveMs,
-  getRangeStartMs,
-} from "../utils/analyticsSource";
+import { action, query } from "../_generated/server";
+import { api } from "../_generated/api";
+import { dateRangeValidator } from "./analyticsShared";
+import { validateDateRange, getRangeEndExclusiveMs, getRangeStartMs } from "../utils/analyticsSource";
 import { getUserAndOrg } from "../utils/auth";
 import {
   DEFAULT_JOURNEY_STAGES,
   loadCustomerJourneyStages,
 } from "../utils/customerJourney";
-import { computeOrdersAnalytics } from "../utils/analyticsAggregations";
-import { deriveAnalyticsOrders } from "../utils/analytics/orders";
 import type {
   AnalyticsOrder,
-  OrdersAnalyticsResult,
   OrdersFulfillmentMetrics,
   OrdersOverviewMetrics,
   MetricWithChange,
   OrdersInsightsKPIs,
   OrdersInsightsPayload,
 } from "@repo/types";
-import { loadAnalyticsWithChunks } from "../utils/analyticsLoader";
 import {
   loadOverviewFromDailyMetrics,
   type DailyMetricsOverview,
 } from "../utils/dailyMetrics";
-import type { AnalyticsSourceData } from "../utils/analyticsSource";
-
-const ORDER_ANALYTICS_DATASETS = [
-  "orders",
-  "orderItems",
-  "transactions",
-  "refunds",
-  "variantCosts",
-] as const satisfies readonly AnalyticsSourceKey[];
 
 const DEFAULT_ORDERS_PAGE_SIZE = 50;
 const MAX_ORDERS_PAGE_SIZE = 50;
 const MIN_ORDERS_PAGE_SIZE = 1;
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-function shiftDateString(date: string, deltaDays: number): string {
-  const parsed = Date.parse(`${date}T00:00:00.000Z`);
-  if (!Number.isFinite(parsed)) {
-    return date;
-  }
-  const shifted = new Date(parsed);
-  shifted.setUTCDate(shifted.getUTCDate() + deltaDays);
-  return shifted.toISOString().slice(0, 10);
-}
-
-function derivePreviousRange(range: DateRange): DateRange | null {
-  const startMs = Date.parse(`${range.startDate}T00:00:00.000Z`);
-  const endMs = Date.parse(`${range.endDate}T23:59:59.999Z`) + 1;
-  if (
-    !Number.isFinite(startMs) ||
-    !Number.isFinite(endMs) ||
-    endMs <= startMs
-  ) {
-    return null;
-  }
-
-  const spanDays = Math.max(1, Math.round((endMs - startMs) / DAY_MS));
-
-  return {
-    startDate: shiftDateString(range.startDate, -spanDays),
-    endDate: shiftDateString(range.startDate, -1),
-  } satisfies DateRange;
-}
-
 function matchesStatusFilter(
   order: Doc<"shopifyOrders">,
   status: string,
@@ -233,141 +184,6 @@ function buildAnalyticsOrder(
     updatedAt: updatedAtIso,
     lineItems: [],
   };
-}
-
-type OrderScopedTable =
-  | "shopifyOrderItems"
-  | "shopifyTransactions"
-  | "shopifyRefunds";
-
-const ORDER_SCOPE_CHUNK_SIZE = 25;
-
-async function fetchOrderScopedDocs<T extends OrderScopedTable>(
-  ctx: QueryCtx,
-  table: T,
-  orderIds: Array<Id<"shopifyOrders">>,
-): Promise<Array<Doc<T>>> {
-  if (orderIds.length === 0) {
-    return [];
-  }
-
-  const collected: Doc<T>[] = [];
-
-  for (let index = 0; index < orderIds.length; index += ORDER_SCOPE_CHUNK_SIZE) {
-    const chunk = orderIds.slice(index, index + ORDER_SCOPE_CHUNK_SIZE);
-    const chunkResults = await Promise.all(
-      chunk.map((orderId) =>
-        ctx.db
-          .query(table)
-          .withIndex("by_order", (q: any) => q.eq("orderId", orderId))
-          .collect(),
-      ),
-    );
-
-    for (const docs of chunkResults) {
-      collected.push(...docs);
-    }
-  }
-
-  return collected;
-}
-
-async function fetchVariantCostsForItems(
-  ctx: QueryCtx,
-  orgId: Id<"organizations">,
-  variantIds: ReadonlySet<Id<"shopifyProductVariants">>,
-): Promise<Doc<"variantCosts">[]> {
-  if (variantIds.size === 0) {
-    return [];
-  }
-
-  const collected: Doc<"variantCosts">[] = [];
-  const ids = Array.from(variantIds);
-
-  for (let index = 0; index < ids.length; index += ORDER_SCOPE_CHUNK_SIZE) {
-    const chunk = ids.slice(index, index + ORDER_SCOPE_CHUNK_SIZE);
-    const chunkResults = await Promise.all(
-      chunk.map((variantId) =>
-        ctx.db
-          .query("variantCosts")
-          .withIndex("by_org_variant", (q: any) =>
-            q.eq("organizationId", orgId).eq("variantId", variantId),
-          )
-          .collect(),
-      ),
-    );
-
-    for (const docs of chunkResults) {
-      collected.push(...docs);
-    }
-  }
-
-  return collected;
-}
-
-type OrderFinancialSnapshot = Pick<
-  AnalyticsOrder,
-  "totalCost" | "profit" | "profitMargin" | "taxAmount" | "shippingCost" | "lineItems"
->;
-
-async function loadOrderFinancialSnapshots(
-  ctx: QueryCtx,
-  orgId: Id<"organizations">,
-  orders: Doc<"shopifyOrders">[],
-): Promise<Map<string, OrderFinancialSnapshot>> {
-  if (orders.length === 0) {
-    return new Map();
-  }
-
-  const orderIds = orders.map((order) => order._id as Id<"shopifyOrders">);
-
-  const [orderItems, transactions, refunds] = await Promise.all([
-    fetchOrderScopedDocs(ctx, "shopifyOrderItems", orderIds),
-    fetchOrderScopedDocs(ctx, "shopifyTransactions", orderIds),
-    fetchOrderScopedDocs(ctx, "shopifyRefunds", orderIds),
-  ]);
-
-  const variantIds = new Set<Id<"shopifyProductVariants">>();
-  for (const item of orderItems) {
-    if (item.variantId) {
-      variantIds.add(item.variantId as Id<"shopifyProductVariants">);
-    }
-  }
-
-  const variantCosts = await fetchVariantCostsForItems(ctx, orgId, variantIds);
-
-  const dataset: AnalyticsSourceData = {
-    orders,
-    orderItems,
-    transactions,
-    refunds,
-    fulfillments: [],
-    products: [],
-    variants: [],
-    customers: [],
-    metaInsights: [],
-    globalCosts: [],
-    variantCosts,
-    manualReturnRates: [],
-    sessions: [],
-    analytics: [],
-  };
-
-  const { orders: analyticsOrders } = deriveAnalyticsOrders(dataset);
-  const map = new Map<string, OrderFinancialSnapshot>();
-
-  for (const order of analyticsOrders) {
-    map.set(order.id, {
-      totalCost: order.totalCost,
-      profit: order.profit,
-      profitMargin: order.profitMargin,
-      taxAmount: order.taxAmount,
-      shippingCost: order.shippingCost,
-      lineItems: order.lineItems ?? [],
-    });
-  }
-
-  return map;
 }
 
 const ZERO_ORDERS_OVERVIEW: OrdersOverviewMetrics = {
@@ -754,11 +570,28 @@ export const getOrdersAnalytics = query({
       ? computeFulfillmentMetricsFromOverview(overviewResult)
       : { ...ZERO_FULFILLMENT_METRICS };
 
-    const financialSnapshots = await loadOrderFinancialSnapshots(
-      ctx,
-      auth.orgId as Id<"organizations">,
-      matchedOrders,
+    const aggregateTotals = overviewResult?.aggregates;
+    const totalOrderCount = Math.max(
+      overview.totalOrders ?? 0,
+      aggregateTotals?.orders ?? 0,
+      matchedOrders.length,
+      1,
     );
+    const totalCosts = overview.totalCosts ?? 0;
+    const totalProfit = overview.netProfit ?? 0;
+    const totalRevenue = overview.totalRevenue ?? aggregateTotals?.revenue ?? 0;
+    const totalTaxes = (() => {
+      if (overview.totalTax && overview.totalTax > 0) {
+        return overview.totalTax;
+      }
+      return aggregateTotals?.taxesCollected ?? 0;
+    })();
+    const totalShippingCost = aggregateTotals?.shippingCosts ?? 0;
+    const averageCostPerOrder = totalCosts / totalOrderCount;
+    const averageProfitPerOrder = totalProfit / totalOrderCount;
+    const averageTaxPerOrder = totalTaxes / totalOrderCount;
+    const averageShippingPerOrder = totalShippingCost / totalOrderCount;
+    const averageProfitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
 
     const analyticsOrders = matchedOrders.map((order) => {
       const customerKey = order.customerId ? (order.customerId as string) : null;
@@ -767,19 +600,13 @@ export const getOrdersAnalytics = query({
         customerDoc = customerCache.get(customerKey) ?? null;
       }
       const base = buildAnalyticsOrder(order, customerDoc);
-      const snapshot = financialSnapshots.get(String(order._id));
-      if (!snapshot) {
-        return base;
-      }
-
       return {
         ...base,
-        totalCost: snapshot.totalCost,
-        profit: snapshot.profit,
-        profitMargin: snapshot.profitMargin,
-        taxAmount: snapshot.taxAmount,
-        shippingCost: snapshot.shippingCost,
-        lineItems: snapshot.lineItems,
+        totalCost: averageCostPerOrder,
+        profit: averageProfitPerOrder,
+        profitMargin: averageProfitMargin,
+        taxAmount: averageTaxPerOrder,
+        shippingCost: averageShippingPerOrder,
       };
     });
 
@@ -873,6 +700,12 @@ const analyticsActionReturns = v.union(
   })
 );
 
+type OrdersAnalyticsActionPayload = {
+  dateRange: { startDate: string; endDate: string };
+  organizationId: string;
+  result?: unknown;
+};
+
 export const getAnalytics = action({
   args: {
     dateRange: dateRangeValidator,
@@ -884,74 +717,26 @@ export const getAnalytics = action({
     pageSize: v.optional(v.number()),
   },
   returns: analyticsActionReturns,
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<OrdersAnalyticsActionPayload | null> => {
     const auth = await getUserAndOrg(ctx);
     if (!auth) return null;
 
     const range = validateDateRange(args.dateRange);
-    const { data, meta } = await loadAnalyticsWithChunks(
-      ctx,
-      auth.orgId as Id<"organizations">,
-      range,
-      {
-        datasets: ORDER_ANALYTICS_DATASETS,
-      }
-    );
 
-    const response: AnalyticsResponse = {
+    const result = await ctx.runQuery(api.web.orders.getOrdersAnalytics, {
       dateRange: range,
-      organizationId: auth.orgId,
-      data,
-      ...(meta ? { meta } : {}),
-    };
-
-    const previousRange = derivePreviousRange(range);
-    let previousResponse: AnalyticsResponse | null = null;
-
-    if (previousRange) {
-      try {
-        const { data: previousData, meta: previousMeta } =
-          await loadAnalyticsWithChunks(
-            ctx,
-            auth.orgId as Id<"organizations">,
-            previousRange,
-            {
-              datasets: ORDER_ANALYTICS_DATASETS,
-            }
-          );
-
-        previousResponse = {
-          dateRange: previousRange,
-          organizationId: auth.orgId,
-          data: previousData,
-          ...(previousMeta ? { meta: previousMeta } : {}),
-        };
-      } catch (error) {
-        console.error("Failed to load previous orders analytics:", error);
-      }
-    }
-
-    const result = computeOrdersAnalytics(
-      response,
-      {
-        status: args.status ?? undefined,
-        searchTerm: args.searchTerm ?? undefined,
-        sortBy: args.sortBy ?? undefined,
-        sortOrder: args.sortOrder ?? undefined,
-        page: args.page ?? undefined,
-        pageSize: args.pageSize ?? undefined,
-      },
-      previousResponse ?? undefined
-    );
+      status: args.status,
+      searchTerm: args.searchTerm,
+      sortBy: args.sortBy,
+      sortOrder: args.sortOrder,
+      page: args.page,
+      pageSize: args.pageSize,
+    });
 
     return {
-      dateRange: response.dateRange,
-      organizationId: response.organizationId,
+      dateRange: range,
+      organizationId: auth.orgId,
       result,
-    } satisfies {
-      dateRange: { startDate: string; endDate: string };
-      organizationId: string;
-      result: OrdersAnalyticsResult;
-    };
+    } satisfies OrdersAnalyticsActionPayload;
   },
 });

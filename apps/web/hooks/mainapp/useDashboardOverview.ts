@@ -480,7 +480,7 @@ function buildOverviewMetrics(
 
 
 export function useDashboardOverview(dateRange: DateRangeArgs) {
-  const { offsetMinutes, timezoneIana } = useShopifyTime();
+  const { offsetMinutes, timezoneIana, isLoading: isShopTimeLoading } = useShopifyTime();
 
   const utcRange = useMemo(
     () =>
@@ -513,10 +513,16 @@ export function useDashboardOverview(dateRange: DateRangeArgs) {
     ],
   );
 
-  const response = useQuery(api.web.dashboard.getOverviewData, queryArgs);
+  // Wait for the Shopify timezone fetch to finish so we only fire the dashboard query once.
+  const shouldLoadOverview = !isShopTimeLoading;
+  const response = useQuery(
+    api.web.dashboard.getOverviewData,
+    shouldLoadOverview ? queryArgs : "skip",
+  );
   const updateLayout = useMutation(api.core.dashboard.updateDashboardLayout);
 
-  const isLoading = response === undefined;
+  const isQuerySkipped = !shouldLoadOverview;
+  const isLoading = isQuerySkipped || response === undefined;
   const data: OverviewResponse = response ?? null;
 
   const primaryCurrency = data?.primaryCurrency ?? "USD";

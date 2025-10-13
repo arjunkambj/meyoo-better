@@ -25,7 +25,7 @@ export async function getSessionByShop(
 
     // Get store data from database
     const store = await fetchQuery(
-      api.integrations.shopify.getPublicStoreByDomain,
+      api.shopify.publicQueries.getPublicStoreByDomain,
       { shopDomain },
       { token: undefined }, // Admin query
     );
@@ -79,7 +79,7 @@ export async function getSessionByOrganization(
 
     // Get active store for organization
     const store = await fetchQuery(
-      api.integrations.shopify.getPublicActiveStore,
+      api.shopify.publicQueries.getPublicActiveStore,
       { organizationId },
       { token: undefined }, // Admin query
     );
@@ -110,7 +110,7 @@ export async function getShopDomainByOrganization(
 ): Promise<string | null> {
   try {
     const store = await fetchQuery(
-      api.integrations.shopify.getPublicActiveStore,
+      api.shopify.publicQueries.getPublicActiveStore,
       { organizationId },
       { token: undefined },
     );

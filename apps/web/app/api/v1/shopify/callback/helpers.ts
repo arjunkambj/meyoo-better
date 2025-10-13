@@ -69,7 +69,7 @@ export async function registerStoreWebhooks(
 ): Promise<boolean> {
   try {
     const webhookStatus = await fetchMutation(
-      api.integrations.shopify.checkAndSetWebhooksRegistered,
+      api.shopify.publicMutations.checkAndSetWebhooksRegistered,
       { shopDomain: session.shop },
       token ? { token } : undefined,
     );
@@ -79,7 +79,7 @@ export async function registerStoreWebhooks(
       if (!reg.success) {
         logger.warn("Webhook registration incomplete, resetting flag");
         await fetchMutation(
-          api.integrations.shopify.setWebhooksRegisteredByDomain,
+          api.shopify.publicMutations.setWebhooksRegisteredByDomain,
           { shopDomain: session.shop, value: false },
           token ? { token } : undefined,
         );
@@ -108,7 +108,7 @@ export async function triggerInitialSync(
   try {
     // Check if any Shopify products exist yet for this org
     const products = await fetchQuery(
-      api.integrations.shopify.getProducts,
+      api.shopify.publicQueries.getProducts,
       { limit: 1 },
       { token },
     );

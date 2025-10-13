@@ -12,7 +12,7 @@ async function getActiveShopForOrg(
   organizationId: string,
 ) {
   const store = await ctx.runQuery(
-    internal.integrations.shopify.getActiveStoreInternal,
+    internal.shopify.internalQueries.getActiveStoreInternal,
     { organizationId },
   );
   return store || null;

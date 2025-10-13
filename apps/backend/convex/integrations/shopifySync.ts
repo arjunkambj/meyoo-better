@@ -675,7 +675,7 @@ export const initial = internalAction({
 
       // Get store credentials from database
       const store = await ctx.runQuery(
-        internal.integrations.shopify.getActiveStoreInternal,
+        internal.shopify.internalQueries.getActiveStoreInternal,
         {
           organizationId: args.organizationId,
         }
@@ -1028,7 +1028,7 @@ export const initial = internalAction({
             // Store products in database
             if (products.length > 0) {
               await ctx.runMutation(
-                internal.integrations.shopify.storeProductsInternal,
+                internal.shopify.productMutations.storeProductsInternal,
                 {
                   organizationId: args.organizationId as Id<"organizations">,
                   storeId, // pass through to avoid race on active store lookup
@@ -1406,7 +1406,7 @@ export const initial = internalAction({
             const batchToPersist = pending.splice(0, count);
             if (!batchToPersist.length) return;
             await ctx.runMutation(
-              internal.integrations.shopify.storeCustomersInternal,
+              internal.shopify.customerMutations.storeCustomersInternal,
               {
                 organizationId: args.organizationId,
                 customers: batchToPersist,
@@ -1572,7 +1572,7 @@ export const initial = internalAction({
 
       try {
         await ctx.runMutation(
-          (internal.integrations.shopify as any).updateStoreLastSyncInternal,
+          (internal.shopify.storeMetadata as any).updateStoreLastSyncInternal,
           {
             storeId,
             timestamp: Date.now(),
@@ -1643,7 +1643,7 @@ export const incremental = internalAction({
 
     try {
       const store = await ctx.runQuery(
-        internal.integrations.shopify.getActiveStoreInternal,
+        internal.shopify.internalQueries.getActiveStoreInternal,
         {
           organizationId: args.organizationId,
         },
@@ -1708,7 +1708,7 @@ export const incremental = internalAction({
       const ensureAnalyticsEligibility = async () => {
         if (analyticsEligibility === undefined) {
           analyticsEligibility = await ctx.runQuery(
-            internal.integrations.shopify.getInitialSyncStatusInternal,
+            internal.shopify.status.getInitialSyncStatusInternal,
             {
               organizationId: args.organizationId,
             },
@@ -1720,7 +1720,7 @@ export const incremental = internalAction({
 
       if (orders.length > 0) {
         await ctx.runMutation(
-          internal.integrations.shopify.storeOrdersInternal,
+          internal.shopify.orderMutations.storeOrdersInternal,
           {
             organizationId: args.organizationId,
             storeId,
@@ -1732,7 +1732,7 @@ export const incremental = internalAction({
 
       if (transactions.length > 0) {
         await ctx.runMutation(
-          internal.integrations.shopify.storeTransactionsInternal,
+          internal.shopify.orderMutations.storeTransactionsInternal,
           {
             organizationId: args.organizationId,
             transactions,
@@ -1743,7 +1743,7 @@ export const incremental = internalAction({
 
       if (refunds.length > 0) {
         await ctx.runMutation(
-          internal.integrations.shopify.storeRefundsInternal,
+          internal.shopify.orderMutations.storeRefundsInternal,
           {
             organizationId: args.organizationId,
             refunds,
@@ -1754,7 +1754,7 @@ export const incremental = internalAction({
 
       if (fulfillments.length > 0) {
         await ctx.runMutation(
-          internal.integrations.shopify.storeFulfillmentsInternal,
+          internal.shopify.orderMutations.storeFulfillmentsInternal,
           {
             organizationId: args.organizationId,
             fulfillments,
@@ -1763,7 +1763,7 @@ export const incremental = internalAction({
       }
 
       await ctx.runMutation(
-        (internal.integrations.shopify as any).updateStoreLastSyncInternal,
+        (internal.shopify.storeMetadata as any).updateStoreLastSyncInternal,
         {
           storeId,
           timestamp: Date.now(),

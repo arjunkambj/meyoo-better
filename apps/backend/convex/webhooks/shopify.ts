@@ -12,7 +12,7 @@ import {
 import { optionalEnv, requireEnv } from "../utils/env";
 import type { Id } from "../_generated/dataModel";
 import { msToDateString, type MsToDateOptions } from "../utils/date";
-import { hasCompletedInitialShopifySync } from "../integrations/shopify";
+import { hasCompletedInitialShopifySync } from "../shopify/status";
 
 const logger = createSimpleLogger("Webhooks.Shopify");
 const SHOPIFY_API_SECRET = requireEnv("SHOPIFY_API_SECRET");
@@ -181,7 +181,7 @@ export const shopifyWebhook = httpAction(async (ctx, request) => {
     let organizationId: Id<"organizations"> | undefined = undefined;
     try {
       const store = await ctx.runQuery(
-        internal.integrations.shopify.getStoreByDomain as any,
+        internal.shopify.internalQueries.getStoreByDomain as any,
         { shopDomain: domain }
       );
       organizationId = store?.organizationId as Id<"organizations"> | undefined;
@@ -284,7 +284,7 @@ async function handleTopicInline(
   // Resolve store by domain when needed
   let store: any = null;
   if (organizationId) {
-    store = await ctx.runQuery(internal.integrations.shopify.getActiveStoreInternal, {
+    store = await ctx.runQuery(internal.shopify.internalQueries.getActiveStoreInternal, {
       organizationId: String(organizationId),
     });
   }
@@ -393,7 +393,7 @@ async function handleTopicInline(
         },
       ];
 
-      await ctx.runMutation(internal.integrations.shopify.storeOrdersInternal, {
+      await ctx.runMutation(internal.shopify.orderMutations.storeOrdersInternal, {
         organizationId: organizationId,
         storeId,
         orders,
@@ -406,7 +406,7 @@ async function handleTopicInline(
       if (!organizationId) break;
       const shopifyId = String((payload as any).id);
       const existingOrder = await ctx.runQuery(
-        (internal.integrations.shopify as any).getOrderByShopifyIdInternal,
+        (internal.shopify.internalQueries as any).getOrderByShopifyIdInternal,
         {
           organizationId,
           shopifyId,
@@ -414,7 +414,7 @@ async function handleTopicInline(
       );
 
       await ctx.runMutation(
-        internal.integrations.shopify.deleteOrderByShopifyIdInternal,
+        internal.shopify.orderMutations.deleteOrderByShopifyIdInternal,
         { organizationId, shopifyId },
       );
       // analytics recalculation handled client-side
@@ -484,7 +484,7 @@ async function handleTopicInline(
           }),
         },
       ];
-      await ctx.runMutation(internal.integrations.shopify.storeProductsInternal, {
+      await ctx.runMutation(internal.shopify.productMutations.storeProductsInternal, {
         organizationId: organizationId,
         storeId,
         products,
@@ -495,7 +495,7 @@ async function handleTopicInline(
     case "products/delete": {
       if (!organizationId) break;
       await ctx.runMutation(
-        internal.integrations.shopify.deleteProductByShopifyIdInternal,
+        internal.shopify.productMutations.deleteProductByShopifyIdInternal,
         { organizationId, shopifyId: String((payload as any).id) },
       );
       break;
@@ -505,7 +505,7 @@ async function handleTopicInline(
     case "customers/update": {
       if (!organizationId || !storeId) break;
       await ctx.runMutation(
-        internal.integrations.shopify.upsertCustomerFromWebhook,
+        internal.shopify.customerMutations.upsertCustomerFromWebhook,
         { organizationId, storeId, customer: payload },
       );
       break;
@@ -516,7 +516,7 @@ async function handleTopicInline(
       // Best-effort delete by id
       const shopifyId = String((payload as any).id);
       const existing = await ctx.runQuery(
-        (internal.integrations.shopify as any).getCustomerByShopifyIdInternal,
+        (internal.shopify.internalQueries as any).getCustomerByShopifyIdInternal,
         {
           organizationId,
           storeId,
@@ -525,7 +525,7 @@ async function handleTopicInline(
       );
       if (existing) {
         await ctx.runMutation(
-          internal.integrations.shopify.deleteCustomerInternal,
+          internal.shopify.customerMutations.deleteCustomerInternal,
           {
             organizationId,
             customerId: shopifyId,
@@ -554,7 +554,7 @@ async function handleTopicInline(
       const customerId = String(cust.id ?? cust.customer?.id ?? "");
       if (!customerId) break;
       await ctx.runMutation(
-        internal.integrations.shopify.updateCustomerStatusInternal,
+        internal.shopify.customerMutations.updateCustomerStatusInternal,
         {
           organizationId: organizationId,
           customerId,
@@ -620,7 +620,7 @@ async function handleTopicInline(
           processedAt: toTs(r.processed_at),
         },
       ];
-      await ctx.runMutation(internal.integrations.shopify.storeRefundsInternal, {
+      await ctx.runMutation(internal.shopify.orderMutations.storeRefundsInternal, {
         organizationId: organizationId,
         refunds,
       });
@@ -662,7 +662,7 @@ async function handleTopicInline(
           shopifyUpdatedAt: toTs(f.updated_at),
         },
       ];
-      await ctx.runMutation(internal.integrations.shopify.storeFulfillmentsInternal, {
+      await ctx.runMutation(internal.shopify.orderMutations.storeFulfillmentsInternal, {
         organizationId: organizationId,
         fulfillments,
       });
@@ -674,7 +674,7 @@ async function handleTopicInline(
       if (!organizationId) break;
       const p: any = payload;
       await ctx.runMutation(
-        internal.integrations.shopify.updateInventoryLevelInternal,
+        internal.shopify.inventoryMutations.updateInventoryLevelInternal,
         {
           organizationId,
           inventoryItemId: String(p.inventory_item_id ?? ""),
@@ -689,7 +689,7 @@ async function handleTopicInline(
       if (!organizationId) break;
       const p: any = payload;
       await ctx.runMutation(
-        internal.integrations.shopify.createInventoryItemInternal,
+        internal.shopify.inventoryMutations.createInventoryItemInternal,
         {
           organizationId,
           inventoryItemId: String(p.id ?? ""),
@@ -704,7 +704,7 @@ async function handleTopicInline(
       if (!organizationId) break;
       const p: any = payload;
       await ctx.runMutation(
-        internal.integrations.shopify.updateInventoryItemInternal,
+        internal.shopify.inventoryMutations.updateInventoryItemInternal,
         {
           organizationId,
           inventoryItemId: String(p.id ?? ""),
@@ -719,7 +719,7 @@ async function handleTopicInline(
       if (!organizationId) break;
       const p: any = payload;
       await ctx.runMutation(
-        internal.integrations.shopify.deleteInventoryItemInternal,
+        internal.shopify.inventoryMutations.deleteInventoryItemInternal,
         {
           organizationId,
           inventoryItemId: String(p.id ?? ""),
@@ -732,7 +732,7 @@ async function handleTopicInline(
       if (!organizationId) break;
       const p: any = payload;
       await ctx.runMutation(
-        internal.integrations.shopify.updateShopDetailsInternal,
+        internal.shopify.shopMutations.updateShopDetailsInternal,
         {
           organizationId,
           shopId: String(p.id ?? ""),
@@ -745,7 +745,7 @@ async function handleTopicInline(
 
     case "collections/create": {
       if (!organizationId) break;
-      await ctx.runMutation(internal.integrations.shopify.storeCollectionInternal, {
+      await ctx.runMutation(internal.shopify.collectionMutations.storeCollectionInternal, {
         organizationId,
         collection: payload as any,
       } as any);
@@ -755,7 +755,7 @@ async function handleTopicInline(
     case "collections/update": {
       if (!organizationId) break;
       await ctx.runMutation(
-        internal.integrations.shopify.updateCollectionInternal,
+        internal.shopify.collectionMutations.updateCollectionInternal,
         {
           organizationId,
           collection: payload as any,
@@ -768,7 +768,7 @@ async function handleTopicInline(
       if (!organizationId) break;
       const p: any = payload;
       await ctx.runMutation(
-        internal.integrations.shopify.deleteCollectionInternal,
+        internal.shopify.collectionMutations.deleteCollectionInternal,
         {
           organizationId,
           collectionId: String(p.id ?? ""),
@@ -794,7 +794,7 @@ async function handleTopicInline(
           processedAt: toTs(t.processed_at),
         },
       ];
-      await ctx.runMutation(internal.integrations.shopify.storeTransactionsInternal, {
+      await ctx.runMutation(internal.shopify.orderMutations.storeTransactionsInternal, {
         organizationId: organizationId,
         transactions: txs,
       });
@@ -882,7 +882,7 @@ async function handleTopicInline(
         try {
           logger.info("Marking store as inactive", { shopDomain });
           await ctx.runMutation(
-            internal.integrations.shopify.handleAppUninstallInternal,
+            internal.shopify.lifecycle.handleAppUninstallInternal,
             { shopDomain },
           );
         } catch (e) {
@@ -928,7 +928,7 @@ async function handleTopicInline(
           });
           
           await ctx.runMutation(
-            internal.integrations.shopify.handleAppUninstalled as any,
+            internal.shopify.lifecycle.handleAppUninstalled as any,
             { organizationId: String(orgId), shopDomain },
           );
 

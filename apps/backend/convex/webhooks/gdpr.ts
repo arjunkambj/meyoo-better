@@ -84,7 +84,7 @@ export const customerRedact = httpAction(async (ctx, request) => {
     // Resolve organization/store for downstream processing
     const store = domain
       ? await ctx.runQuery(
-          internal.integrations.shopify.getStoreByDomain as any,
+          internal.shopify.internalQueries.getStoreByDomain as any,
           { shopDomain: domain },
         )
       : null;
@@ -113,7 +113,7 @@ export const customerRedact = httpAction(async (ctx, request) => {
       : [];
 
     await ctx.runMutation(
-      internal.integrations.shopify.handleGDPRRedact as any,
+      internal.shopify.gdpr.handleGDPRRedact as any,
       {
         organizationId,
         shopDomain: domain,
@@ -234,7 +234,7 @@ export const customerDataRequest = httpAction(async (ctx, request) => {
 
     const store = domain
       ? await ctx.runQuery(
-          internal.integrations.shopify.getStoreByDomain as any,
+          internal.shopify.internalQueries.getStoreByDomain as any,
           { shopDomain: domain },
         )
       : null;
@@ -265,7 +265,7 @@ export const customerDataRequest = httpAction(async (ctx, request) => {
       (data.data_request?.id && String(data.data_request.id)) || "";
 
     await ctx.runMutation(
-      internal.integrations.shopify.handleGDPRDataRequest as any,
+      internal.shopify.gdpr.handleGDPRDataRequest as any,
       {
         organizationId,
         shopDomain: domain,
@@ -388,7 +388,7 @@ export const shopRedact = httpAction(async (ctx, request) => {
 
     const store = domain
       ? await ctx.runQuery(
-          internal.integrations.shopify.getStoreByDomain as any,
+          internal.shopify.internalQueries.getStoreByDomain as any,
           { shopDomain: domain },
         )
       : null;
@@ -410,7 +410,7 @@ export const shopRedact = httpAction(async (ctx, request) => {
     const shopId = data.shop_id ? String(data.shop_id) : "";
 
     await ctx.runMutation(
-      internal.integrations.shopify.handleGDPRShopRedact as any,
+      internal.shopify.gdpr.handleGDPRShopRedact as any,
       {
         organizationId,
         shopId,

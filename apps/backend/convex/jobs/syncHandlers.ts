@@ -313,7 +313,7 @@ export const handleShopifyOrdersBatch = internalAction({
     const ensureAnalyticsEligibility = async () => {
       if (analyticsEligibility === undefined) {
         analyticsEligibility = await ctx.runQuery(
-          internal.integrations.shopify.getInitialSyncStatusInternal,
+          internal.shopify.status.getInitialSyncStatusInternal,
           {
             organizationId: args.organizationId,
           },
@@ -325,7 +325,7 @@ export const handleShopifyOrdersBatch = internalAction({
 
     try {
       if (args.orders.length > 0) {
-        await ctx.runMutation(internal.integrations.shopify.storeOrdersInternal, {
+        await ctx.runMutation(internal.shopify.orderMutations.storeOrdersInternal, {
           organizationId: args.organizationId,
           storeId: args.storeId,
           orders: args.orders as any,
@@ -335,7 +335,7 @@ export const handleShopifyOrdersBatch = internalAction({
 
       if (args.transactions && args.transactions.length > 0) {
         await ctx.runMutation(
-          internal.integrations.shopify.storeTransactionsInternal,
+          internal.shopify.orderMutations.storeTransactionsInternal,
           {
             organizationId: args.organizationId,
             transactions: args.transactions as any,
@@ -345,7 +345,7 @@ export const handleShopifyOrdersBatch = internalAction({
       }
 
       if (args.refunds && args.refunds.length > 0) {
-        await ctx.runMutation(internal.integrations.shopify.storeRefundsInternal, {
+        await ctx.runMutation(internal.shopify.orderMutations.storeRefundsInternal, {
           organizationId: args.organizationId,
           refunds: args.refunds as any,
           shouldScheduleAnalytics: await ensureAnalyticsEligibility(),
@@ -354,7 +354,7 @@ export const handleShopifyOrdersBatch = internalAction({
 
       if (args.fulfillments && args.fulfillments.length > 0) {
         await ctx.runMutation(
-          internal.integrations.shopify.storeFulfillmentsInternal,
+          internal.shopify.orderMutations.storeFulfillmentsInternal,
           {
             organizationId: args.organizationId,
             fulfillments: args.fulfillments as any,

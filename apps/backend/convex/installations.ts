@@ -248,7 +248,7 @@ export const issueTokensFromShopifyOAuth = action({
 
     const shop = normalizeShopDomain(args.shop);
     const store = (await ctx.runQuery(
-      internal.integrations.shopify.getStoreByDomain,
+      internal.shopify.internalQueries.getStoreByDomain,
       { shopDomain: shop },
     )) as { userId?: Id<"users"> } | null;
     if (!store?.userId) throw new Error("Store not found");

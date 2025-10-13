@@ -113,7 +113,7 @@ export async function GET(req: NextRequest) {
         );
 
         const existing = await fetchQuery(
-          api.integrations.shopify.getPublicStoreByDomain,
+          api.shopify.publicQueries.getPublicStoreByDomain,
           { shopDomain },
           { token },
         );

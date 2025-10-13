@@ -69,7 +69,7 @@ export function useShopifyProductVariantsPaginated(
   );
 
   const result = useQuery(
-    api.integrations.shopify.getProductVariantsPaginated,
+    api.shopify.publicQueries.getProductVariantsPaginated,
     args,
   );
 

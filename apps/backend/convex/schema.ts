@@ -24,6 +24,8 @@ import {
   inventoryOverviewSummaries,
   customerMetricsSummaries,
   customerOverviewSummaries,
+  customerDailyActivities,
+  customerDailySummaries,
 } from "./schema/metrics";
 import { gdprRequests, auditLogs, webhookReceipts, apiKeys } from "./schema/security";
 import { tickets, ticketResponses } from "./schema/tickets";
@@ -100,6 +102,8 @@ export default defineSchema({
   inventoryOverviewSummaries,
   customerMetricsSummaries,
   customerOverviewSummaries,
+  customerDailyActivities,
+  customerDailySummaries,
 
   // Operations tables
   webhookReceipts,

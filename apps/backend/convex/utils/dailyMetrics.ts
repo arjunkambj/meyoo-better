@@ -2074,6 +2074,115 @@ function applyCustomerOverviewChanges(
   );
 }
 
+type CustomerRangeStats = {
+  activeCustomers: number;
+  newCustomers: number;
+  repeatCustomers: number;
+  prepaidOrders: number;
+  customersCreated: number;
+  totalCustomersUniverse: number;
+  activityDocs: number;
+};
+
+async function loadCustomerRangeStats(
+  ctx: QueryCtx,
+  organizationId: Id<"organizations">,
+  range: DateRange,
+): Promise<CustomerRangeStats> {
+  const activityDocs = await ctx.db
+    .query("customerDailyActivities")
+    .withIndex("by_org_date", (q) =>
+      q
+        .eq("organizationId", organizationId)
+        .gte("date", range.startDate)
+        .lte("date", range.endDate),
+    )
+    .collect();
+
+  const customerAggregates = new Map<
+    string,
+    {
+      orders: number;
+      prepaidOrders: number;
+      lifetimeOrders?: number;
+    }
+  >();
+
+  for (const doc of activityDocs) {
+    const key = doc.customerKey;
+    if (!key) continue;
+    const entry = customerAggregates.get(key) ?? { orders: 0, prepaidOrders: 0, lifetimeOrders: doc.lifetimeOrders ?? undefined };
+    entry.orders += doc.orders ?? 0;
+    entry.prepaidOrders += doc.prepaidOrders ?? 0;
+    if (typeof doc.lifetimeOrders === "number") {
+      entry.lifetimeOrders = doc.lifetimeOrders;
+    }
+    customerAggregates.set(key, entry);
+  }
+
+  let activeCustomers = 0;
+  let newCustomers = 0;
+  let repeatCustomers = 0;
+  let prepaidOrders = 0;
+
+  for (const aggregate of customerAggregates.values()) {
+    if (aggregate.orders <= 0) {
+      continue;
+    }
+
+    activeCustomers += 1;
+    prepaidOrders += aggregate.prepaidOrders;
+
+    if (aggregate.orders > 1) {
+      repeatCustomers += 1;
+    }
+
+    const lifetimeOrders = aggregate.lifetimeOrders;
+    if (typeof lifetimeOrders === "number" && lifetimeOrders > 0) {
+      if (lifetimeOrders <= aggregate.orders) {
+        newCustomers += 1;
+      }
+    } else {
+      newCustomers += 1;
+    }
+  }
+
+  const summaryDocs = await ctx.db
+    .query("customerDailySummaries")
+    .withIndex("by_org_date", (q) =>
+      q
+        .eq("organizationId", organizationId)
+        .gte("date", range.startDate)
+        .lte("date", range.endDate),
+    )
+    .collect();
+
+  const customersCreated = summaryDocs.reduce((total, doc) => total + (doc.customersCreated ?? 0), 0);
+
+  const latestSummary = await ctx.db
+    .query("customerDailySummaries")
+    .withIndex("by_org_date", (q) =>
+      q.eq("organizationId", organizationId).lte("date", range.endDate),
+    )
+    .order("desc")
+    .first();
+
+  const totalCustomersUniverse = Math.max(
+    latestSummary?.totalCustomers ?? 0,
+    activeCustomers,
+  );
+
+  return {
+    activeCustomers,
+    newCustomers,
+    repeatCustomers,
+    prepaidOrders,
+    customersCreated,
+    totalCustomersUniverse,
+    activityDocs: activityDocs.length,
+  } satisfies CustomerRangeStats;
+}
+
 export async function loadCustomerOverviewFromDailyMetrics(
   ctx: QueryCtx,
   organizationId: Id<"organizations">,
@@ -2093,130 +2202,39 @@ export async function loadCustomerOverviewFromDailyMetrics(
       totalCustomersSnapshot > 0 ? totalCustomersSnapshot : aggregates.totalCustomers,
   };
 
-  const organizationCustomers = await ctx.db
-    .query("shopifyCustomers")
-    .withIndex("by_organization", (q) => q.eq("organizationId", organizationId))
-    .collect();
+  const activityStats = await loadCustomerRangeStats(ctx, organizationId, range);
+  const totalCustomerUniverse = Math.max(
+    activityStats.totalCustomersUniverse,
+    adjustedAggregates.totalCustomers,
+    activityStats.activeCustomers,
+  );
 
-  const rangeStartMs = getRangeStartMs(range);
-  const currentRangeEndExclusive = getRangeEndExclusiveMs(range);
-
-  const ordersInRange = await ctx.db
-    .query("shopifyOrders")
-    .withIndex("by_organization_and_created", (q) =>
-      q
-        .eq("organizationId", organizationId)
-        .gte("shopifyCreatedAt", rangeStartMs)
-        .lt("shopifyCreatedAt", currentRangeEndExclusive),
-    )
-    .filter((q) => q.neq(q.field("financialStatus"), "cancelled"))
-    .collect();
-
-  const orderCustomerIds = new Set<string>();
-  const periodOrdersPerCustomer = new Map<string, number>();
-  let prepaidOrdersInRange = 0;
-  const inferPrepaid = (order: Doc<"shopifyOrders">): boolean => {
-    const rawOrder = order as AnyRecord;
-    const status = String(order.financialStatus ?? rawOrder.financial_status ?? "").toLowerCase();
-    const gateway = String((rawOrder.gateway ?? rawOrder.paymentGateway ?? "") as string).toLowerCase();
-
-    if (status.includes("cod") || gateway.includes("cod")) {
-      return false;
-    }
-    if (gateway.includes("cash_on_delivery") || gateway.includes("cash-on-delivery")) {
-      return false;
-    }
-    if (status.includes("pending") || status.includes("authorized") || status.includes("unpaid")) {
-      return false;
-    }
-    const prepaidIndicators = ["paid", "partially_paid", "refunded", "partially_refunded", "captured"] as const;
-    if (prepaidIndicators.some((token) => status.includes(token))) {
-      return true;
-    }
-    if (gateway.includes("manual")) {
-      return false;
-    }
-    return true;
-  };
-
-  for (const order of ordersInRange) {
-    if (order.customerId) {
-      const id = String(order.customerId);
-      orderCustomerIds.add(id);
-      periodOrdersPerCustomer.set(id, (periodOrdersPerCustomer.get(id) ?? 0) + 1);
-    }
-
-    if (inferPrepaid(order)) {
-      prepaidOrdersInRange += 1;
-    }
-  }
-
-  const customersCreatedInRange = organizationCustomers.filter((customer) => {
-    const createdAt = toNumber(customer.shopifyCreatedAt);
-    return createdAt >= rangeStartMs && createdAt < currentRangeEndExclusive;
-  });
-
-  const abandonedCustomersInRange = customersCreatedInRange.reduce((total, customer) => {
-    const id = String(customer._id);
-    return orderCustomerIds.has(id) ? total : total + 1;
-  }, 0);
-
-  const countCustomersBefore = (exclusiveMs: number | null): number => {
-    if (exclusiveMs === null) {
-      return organizationCustomers.length;
-    }
-    return organizationCustomers.reduce((total, customer) => {
-      const createdAt = toNumber(customer.shopifyCreatedAt);
-      return createdAt < exclusiveMs ? total + 1 : total;
-    }, 0);
-  };
-
-  const actualTotalCustomers = countCustomersBefore(currentRangeEndExclusive);
-  const totalCustomerUniverse = Math.max(actualTotalCustomers, adjustedAggregates.totalCustomers);
   const aggregatesWithCustomers: AggregatedDailyMetrics = {
     ...adjustedAggregates,
     totalCustomers: totalCustomerUniverse,
   };
+
   const metrics = buildCustomerOverviewMetrics(aggregatesWithCustomers);
-  const activeCustomerCount = orderCustomerIds.size;
+  const activeCustomerCount = activityStats.activeCustomers;
   metrics.activeCustomers = activeCustomerCount;
   metrics.periodCustomerCount = activeCustomerCount;
-
-  const customersById = new Map<string, typeof organizationCustomers[number]>();
-  for (const customer of organizationCustomers) {
-    customersById.set(String(customer._id), customer);
-  }
-
-  let newCustomersInRange = 0;
-  let repeatCustomersInRange = 0;
-  for (const [customerId, periodOrders] of periodOrdersPerCustomer.entries()) {
-    const customerDoc = customersById.get(customerId);
-    const rawCustomer = customerDoc as AnyRecord | undefined;
-    const lifetimeOrders = toNumber(
-      customerDoc?.ordersCount ?? rawCustomer?.orders_count ?? periodOrders,
-    );
-    if (periodOrders > 1) {
-      repeatCustomersInRange += 1;
-    }
-    if (periodOrders > 0 && lifetimeOrders === periodOrders) {
-      newCustomersInRange += 1;
-    }
-  }
-
-  metrics.newCustomers = newCustomersInRange;
-  metrics.returningCustomers = Math.max(activeCustomerCount - newCustomersInRange, 0);
-  const repeatRate = activeCustomerCount > 0
-    ? (repeatCustomersInRange / activeCustomerCount) * 100
-    : 0;
-  metrics.repeatPurchaseRate = repeatRate;
-  metrics.periodCustomerCount = activeCustomerCount;
-  metrics.abandonedCartCustomers = Math.max(abandonedCustomersInRange, 0);
+  metrics.newCustomers = activityStats.newCustomers;
+  metrics.returningCustomers = Math.max(activeCustomerCount - activityStats.newCustomers, 0);
+  const abandonedCustomersInRange = Math.max(
+    activityStats.customersCreated - activityStats.newCustomers,
+    0,
+  );
+  metrics.abandonedCartCustomers = abandonedCustomersInRange;
   metrics.abandonedRate = activeCustomerCount > 0
-    ? (metrics.abandonedCartCustomers / activeCustomerCount) * 100
+    ? (abandonedCustomersInRange / activeCustomerCount) * 100
     : 0;
   metrics.totalCustomers = activeCustomerCount;
-  metrics.prepaidRate = ordersInRange.length > 0
-    ? (prepaidOrdersInRange / ordersInRange.length) * 100
+  const totalOrdersInRange = Math.max(aggregatesWithCustomers.orders, 0);
+  metrics.prepaidRate = totalOrdersInRange > 0
+    ? (activityStats.prepaidOrders / totalOrdersInRange) * 100
+    : 0;
+  metrics.repeatPurchaseRate = activeCustomerCount > 0
+    ? (activityStats.repeatCustomers / activeCustomerCount) * 100
     : 0;
   metrics.churnedCustomers = Math.max(totalCustomerUniverse - activeCustomerCount, 0);
   metrics.churnRate = totalCustomerUniverse > 0
@@ -2238,13 +2256,13 @@ export async function loadCustomerOverviewFromDailyMetrics(
       const merged = mergeDailyMetrics(previousFetched.docs);
       const prevLast = previousFetched.docs[previousFetched.docs.length - 1] ?? null;
       const prevTotalSnapshot = prevLast ? toNumber(prevLast.totalCustomers) : 0;
-      const previousRangeEndExclusive = getRangeEndExclusiveMs(previousRange);
-      const previousActualTotal = countCustomersBefore(previousRangeEndExclusive);
+      const previousStats = await loadCustomerRangeStats(ctx, organizationId, previousRange);
       previousAggregates = {
         ...merged,
         totalCustomers: Math.max(
-          previousActualTotal,
+          previousStats.totalCustomersUniverse,
           prevTotalSnapshot > 0 ? prevTotalSnapshot : merged.totalCustomers,
+          previousStats.activeCustomers,
         ),
       } satisfies AggregatedDailyMetrics;
     }
@@ -2278,6 +2296,15 @@ export async function loadCustomerOverviewFromDailyMetrics(
         prepaidOrders: aggregatesWithCustomers.prepaidOrders,
         codOrders: aggregatesWithCustomers.codOrders,
         otherOrders: aggregatesWithCustomers.otherOrders,
+    },
+    customerActivity: {
+      activeCustomers: activityStats.activeCustomers,
+      newCustomers: activityStats.newCustomers,
+      repeatCustomers: activityStats.repeatCustomers,
+      customersCreated: activityStats.customersCreated,
+      totalCustomerUniverse,
+      prepaidOrders: activityStats.prepaidOrders,
+      activityDocs: activityStats.activityDocs,
     },
   } satisfies Record<string, unknown>;
 

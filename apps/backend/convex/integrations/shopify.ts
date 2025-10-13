@@ -2159,31 +2159,34 @@ export const storeProductsInternal = internalMutation({
 
     // Step 5: Bulk process inventory levels
     if (inventoryToStore.length > 0) {
-      // Create a map for quick lookup of existing inventory
       const inventoryKeys = inventoryToStore.map(
         (inv) => `${inv.variantId}-${inv.locationId}`
       );
       const inventoryKeySet = new Set(inventoryKeys);
 
-      // Fetch all relevant inventory records at once
-      const existingInventory = await ctx.db
-        .query("shopifyInventory")
-        .withIndex("by_organization", (q) =>
-          q.eq("organizationId", args.organizationId)
-        )
-        .collect();
+      const existingInventoryMap = new Map<string, Doc<"shopifyInventory">>();
+      const variantIds = Array.from(touchedVariantIds);
 
-      const existingInventoryMap = new Map();
+      if (variantIds.length > 0) {
+        for (const variantChunk of chunkArray(variantIds, BULK_OPS.LOOKUP_SIZE)) {
+          const chunkResults = await Promise.all(
+            variantChunk.map((variantId) =>
+              ctx.db
+                .query("shopifyInventory")
+                .withIndex("by_variant", (q) => q.eq("variantId", variantId))
+                .collect()
+            ),
+          );
 
-      for (const inv of existingInventory) {
-        const key = `${inv.variantId}-${inv.locationId}`;
-
-        if (inventoryKeySet.has(key)) {
-          existingInventoryMap.set(key, inv);
+          for (const docs of chunkResults) {
+            for (const doc of docs) {
+              const key = `${doc.variantId}-${doc.locationId}`;
+              existingInventoryMap.set(key, doc);
+            }
+          }
         }
       }
 
-      // Process inventory updates
       for (const inventory of inventoryToStore) {
         const key = `${inventory.variantId}-${inventory.locationId}`;
         const existing = existingInventoryMap.get(key);
@@ -2201,11 +2204,7 @@ export const storeProductsInternal = internalMutation({
         }
       }
 
-      for (const existing of existingInventory) {
-        if (!touchedVariantIds.has(existing.variantId)) continue;
-
-        const key = `${existing.variantId}-${existing.locationId}`;
-
+      for (const [key, existing] of existingInventoryMap.entries()) {
         if (!inventoryKeySet.has(key)) {
           await ctx.db.delete(existing._id);
         }
@@ -2683,14 +2682,26 @@ export const storeOrdersInternal = internalMutation({
       const productIdMap = new Map();
 
       if (productShopifyIds.size > 0) {
-        for (const pid of productShopifyIds) {
-          const product = await ctx.db
-            .query("shopifyProducts")
-            .withIndex("by_shopify_id_store", (q) =>
-              q.eq("shopifyId", pid as string).eq("storeId", store._id)
-            )
-            .first();
-          if (product) productIdMap.set(pid, product._id);
+        for (const batch of chunkArray(
+          Array.from(productShopifyIds),
+          BULK_OPS.LOOKUP_SIZE,
+        )) {
+          const results = await Promise.all(
+            batch.map((pid) =>
+              ctx.db
+                .query("shopifyProducts")
+                .withIndex("by_shopify_id_store", (q) =>
+                  q.eq("shopifyId", pid as string).eq("storeId", store._id),
+                )
+                .first()
+            ),
+          );
+
+          results.forEach((product, idx) => {
+            if (product) {
+              productIdMap.set(batch[idx]!, product._id);
+            }
+          });
         }
       }
 
@@ -2698,34 +2709,46 @@ export const storeOrdersInternal = internalMutation({
       const variantIdMap = new Map();
 
       if (variantShopifyIds.size > 0) {
-        for (const vid of variantShopifyIds) {
-          const variant = await ctx.db
-            .query("shopifyProductVariants")
-            .withIndex("by_shopify_id", (q) => q.eq("shopifyId", vid as string))
-            .first();
-          if (variant) variantIdMap.set(vid, variant._id);
+        for (const batch of chunkArray(
+          Array.from(variantShopifyIds),
+          BULK_OPS.LOOKUP_SIZE,
+        )) {
+          const results = await Promise.all(
+            batch.map((vid) =>
+              ctx.db
+                .query("shopifyProductVariants")
+                .withIndex("by_shopify_id", (q) => q.eq("shopifyId", vid as string))
+                .first()
+            ),
+          );
+
+          results.forEach((variant, idx) => {
+            if (variant) {
+              variantIdMap.set(batch[idx]!, variant._id);
+            }
+          });
         }
       }
 
       // Bulk fetch existing line items
-      const lineItemShopifyIds = allLineItems.map((item) => item.shopifyId);
-      const existingLineItems = new Map();
+      const existingLineItems = new Map<string, Doc<"shopifyOrderItems">>();
+      const orderIdEntries = Array.from(orderIdMap.entries());
       for (const batch of chunkArray(
-        lineItemShopifyIds,
+        orderIdEntries,
         BULK_OPS.LOOKUP_SIZE,
       )) {
         const results = await Promise.all(
-          batch.map((liId) =>
+          batch.map(([, orderId]) =>
             ctx.db
               .query("shopifyOrderItems")
-              .withIndex("by_shopify_id", (q) => q.eq("shopifyId", liId))
-              .first(),
+              .withIndex("by_order", (q) => q.eq("orderId", orderId))
+              .collect()
           ),
         );
 
-        results.forEach((li, idx) => {
-          if (li) {
-            existingLineItems.set(batch[idx]!, li);
+        results.forEach((items) => {
+          for (const item of items) {
+            existingLineItems.set(item.shopifyId, item);
           }
         });
       }
@@ -2761,7 +2784,7 @@ export const storeOrdersInternal = internalMutation({
         const existingItem = existingLineItems.get(item.shopifyId);
         let itemChanged = false;
 
-        if (existingItem) {
+        if (existingItem && existingItem.orderId === item.orderId) {
           if (hasOrderItemMeaningfulChange(existingItem, itemToStore)) {
             await ctx.db.patch(existingItem._id, itemToStore);
             itemChanged = true;

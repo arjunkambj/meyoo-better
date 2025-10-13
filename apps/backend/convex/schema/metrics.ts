@@ -176,3 +176,24 @@ export const customerOverviewSummaries = defineTable({
 })
   .index("by_organization", ["organizationId"])
   .index("by_org_computed", ["organizationId", "computedAt"]);
+
+export const customerDailyActivities = defineTable({
+  organizationId: v.id("organizations"),
+  date: v.string(),
+  customerKey: v.string(),
+  orders: v.number(),
+  prepaidOrders: v.optional(v.number()),
+  revenue: v.optional(v.number()),
+  lifetimeOrders: v.optional(v.number()),
+  customerCreatedAt: v.optional(v.number()),
+})
+  .index("by_org_date", ["organizationId", "date"])
+  .index("by_org_customer", ["organizationId", "customerKey"]);
+
+export const customerDailySummaries = defineTable({
+  organizationId: v.id("organizations"),
+  date: v.string(),
+  customersCreated: v.number(),
+  totalCustomers: v.number(),
+})
+  .index("by_org_date", ["organizationId", "date"]);

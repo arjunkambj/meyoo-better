@@ -855,6 +855,21 @@ export const updateProductMetrics = internalAction({
 
 type GenericRecord = Record<string, any>;
 
+type CustomerDailyActivityPayload = {
+  customerKey: string;
+  orders: number;
+  prepaidOrders: number;
+  revenue: number;
+  lifetimeOrders?: number;
+  customerCreatedAt?: number;
+};
+
+type DailyMetricsComputation = {
+  metrics: DailyMetricsPayload;
+  customerActivities: CustomerDailyActivityPayload[];
+  customersCreated: number;
+};
+
 function toSafeNumber(value: unknown): number {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     return 0;
@@ -915,7 +930,7 @@ function sanitizeDocument(doc: Record<string, unknown>): Record<string, unknown>
 
 function buildDailyMetricsFromResponse(
   response: AnalyticsResponse,
-): DailyMetricsPayload {
+): DailyMetricsComputation {
   const overview = computeOverviewMetrics(response);
   const platformMetrics = computePlatformMetrics(response);
   const channelRevenue = computeChannelRevenue(response);
@@ -925,6 +940,7 @@ function buildDailyMetricsFromResponse(
   const transactions = (response.data.transactions ?? []) as GenericRecord[];
   const refunds = (response.data.refunds ?? []) as GenericRecord[];
   const orderItems = (response.data.orderItems ?? []) as GenericRecord[];
+  const customerDocs = (response.data.customers ?? []) as GenericRecord[];
 
   const transactionsByOrder = new Map<string, GenericRecord[]>();
   for (const transaction of transactions) {
@@ -943,6 +959,50 @@ function buildDailyMetricsFromResponse(
   let cancelledOrders = 0;
 
   const ordersPerCustomer = new Map<string, number>();
+
+  const customerDetails = new Map<
+    string,
+    {
+      lifetimeOrders?: number;
+      customerCreatedAt?: number;
+    }
+  >();
+
+  for (const customer of customerDocs) {
+    const key = toStringId(customer._id ?? customer.id ?? customer.customerId ?? customer.shopifyId);
+    if (!key) {
+      continue;
+    }
+
+    const lifetimeOrders = toSafeNumber(customer.ordersCount ?? customer.orders_count);
+    const createdAt = toSafeNumber(customer.shopifyCreatedAt ?? customer.shopify_created_at);
+
+    customerDetails.set(key, {
+      lifetimeOrders: lifetimeOrders > 0 ? lifetimeOrders : undefined,
+      customerCreatedAt: Number.isFinite(createdAt) ? createdAt : undefined,
+    });
+  }
+
+  type ActivityAccumulator = {
+    orders: number;
+    prepaidOrders: number;
+    revenue: number;
+    lifetimeOrders?: number;
+    customerCreatedAt?: number;
+  };
+
+  const activityMap = new Map<string, ActivityAccumulator>();
+
+  const toRevenueNumber = (order: GenericRecord): number => {
+    const revenueCandidate =
+      order.totalPrice ??
+      order.total_price ??
+      order.subtotalPrice ??
+      order.subtotal_price ??
+      order.total ??
+      0;
+    return toSafeNumber(revenueCandidate);
+  };
 
   const isCancelledOrder = (order: GenericRecord): boolean => {
     const candidates = [
@@ -980,7 +1040,8 @@ function buildDailyMetricsFromResponse(
         break;
     }
 
-    if (isCancelledOrder(order)) {
+    const cancelled = isCancelledOrder(order);
+    if (cancelled) {
       cancelledOrders += 1;
     }
 
@@ -991,6 +1052,36 @@ function buildDailyMetricsFromResponse(
         (ordersPerCustomer.get(customerKey) ?? 0) + 1,
       );
     }
+
+    if (!customerKey || cancelled) {
+      continue;
+    }
+
+    const info = customerDetails.get(customerKey);
+    const existing = activityMap.get(customerKey) ?? {
+      orders: 0,
+      prepaidOrders: 0,
+      revenue: 0,
+      lifetimeOrders: info?.lifetimeOrders,
+      customerCreatedAt: info?.customerCreatedAt,
+    } satisfies ActivityAccumulator;
+
+    existing.orders += 1;
+    if (classification === "prepaid") {
+      existing.prepaidOrders += 1;
+    }
+    const orderRevenue = toRevenueNumber(order);
+    if (orderRevenue > 0) {
+      existing.revenue += orderRevenue;
+    }
+    if (typeof info?.lifetimeOrders === "number") {
+      existing.lifetimeOrders = info.lifetimeOrders;
+    }
+    if (typeof info?.customerCreatedAt === "number") {
+      existing.customerCreatedAt = info.customerCreatedAt;
+    }
+
+    activityMap.set(customerKey, existing);
   }
 
   const paymentBreakdown = prepaidOrders + codOrders + otherOrders > 0
@@ -1090,12 +1181,66 @@ function buildDailyMetricsFromResponse(
     conversions: analytics.reduce((sum, a) => sum + toSafeNumber(a.conversions), 0),
   });
 
-  return {
+  const customersCreated = (() => {
+    const startIso =
+      response.dateRange.startDateTimeUtc ??
+      `${response.dateRange.startDate}T00:00:00.000Z`;
+
+    const fallbackEndExclusive = (() => {
+      const parsed = Date.parse(`${response.dateRange.endDate}T00:00:00.000Z`);
+      if (!Number.isFinite(parsed)) {
+        return null;
+      }
+      const end = new Date(parsed);
+      end.setUTCDate(end.getUTCDate() + 1);
+      return end.toISOString();
+    })();
+
+    const endExclusiveIso =
+      response.dateRange.endDateTimeUtcExclusive ?? fallbackEndExclusive;
+
+    const startMs = Date.parse(startIso);
+    const endExclusiveMs = endExclusiveIso ? Date.parse(endExclusiveIso) : NaN;
+    if (!Number.isFinite(startMs) || !Number.isFinite(endExclusiveMs)) {
+      return 0;
+    }
+
+    let count = 0;
+    for (const customer of customerDocs) {
+      const createdAt = toSafeNumber(customer.shopifyCreatedAt ?? customer.shopify_created_at);
+      if (!Number.isFinite(createdAt)) {
+        continue;
+      }
+      if (createdAt >= startMs && createdAt < endExclusiveMs) {
+        count += 1;
+      }
+    }
+    return count;
+  })();
+
+  const activityList: CustomerDailyActivityPayload[] = Array.from(activityMap.entries()).map(
+    ([customerKey, activity]) => ({
+      customerKey,
+      orders: activity.orders,
+      prepaidOrders: activity.prepaidOrders,
+      revenue: activity.revenue,
+      lifetimeOrders: activity.lifetimeOrders,
+      customerCreatedAt: activity.customerCreatedAt,
+    }),
+  );
+
+  const metricsPayload = {
     ...metrics,
     paymentBreakdown: paymentBreakdown ?? undefined,
     customerBreakdown: customerBreakdown ?? undefined,
     channelRevenue: channelRevenueEntries.length ? channelRevenueEntries : undefined,
   } as DailyMetricsPayload;
+
+  return {
+    metrics: metricsPayload,
+    customerActivities: activityList,
+    customersCreated,
+  } satisfies DailyMetricsComputation;
 }
 
 const dailyMetricsPayload = v.object({
@@ -1144,6 +1289,15 @@ const dailyMetricsPayload = v.object({
   ),
 });
 
+const customerDailyActivityValidator = v.object({
+  customerKey: v.string(),
+  orders: v.number(),
+  prepaidOrders: v.optional(v.number()),
+  revenue: v.optional(v.number()),
+  lifetimeOrders: v.optional(v.number()),
+  customerCreatedAt: v.optional(v.number()),
+});
+
 type DailyMetricsPayload = Infer<typeof dailyMetricsPayload>;
 
 export const upsertDailyMetric = internalMutation({
@@ -1171,6 +1325,143 @@ export const upsertDailyMetric = internalMutation({
         ...args.metrics,
       } as any);
     }
+  },
+});
+
+export const clearCustomerDailyActivity = internalMutation({
+  args: {
+    organizationId: v.id("organizations"),
+    date: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const activities = await ctx.db
+      .query("customerDailyActivities")
+      .withIndex("by_org_date", (q) =>
+        q.eq("organizationId", args.organizationId).eq("date", args.date),
+      )
+      .collect();
+
+    for (const doc of activities) {
+      await ctx.db.delete(doc._id);
+    }
+
+    const summary = await ctx.db
+      .query("customerDailySummaries")
+      .withIndex("by_org_date", (q) =>
+        q.eq("organizationId", args.organizationId).eq("date", args.date),
+      )
+      .first();
+
+    if (summary) {
+      await ctx.db.delete(summary._id);
+    }
+  },
+});
+
+export const insertCustomerDailyActivityChunk = internalMutation({
+  args: {
+    organizationId: v.id("organizations"),
+    date: v.string(),
+    activities: v.array(customerDailyActivityValidator),
+  },
+  handler: async (ctx, args) => {
+    if (args.activities.length === 0) {
+      return;
+    }
+
+    for (const activity of args.activities) {
+      await ctx.db.insert("customerDailyActivities", {
+        organizationId: args.organizationId,
+        date: args.date,
+        customerKey: activity.customerKey,
+        orders: activity.orders,
+        prepaidOrders: activity.prepaidOrders ?? undefined,
+        revenue: activity.revenue ?? undefined,
+        lifetimeOrders: activity.lifetimeOrders ?? undefined,
+        customerCreatedAt: activity.customerCreatedAt ?? undefined,
+      } as any);
+    }
+  },
+});
+
+export const upsertCustomerDailySummary = internalMutation({
+  args: {
+    organizationId: v.id("organizations"),
+    date: v.string(),
+    customersCreated: v.number(),
+    totalCustomers: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("customerDailySummaries")
+      .withIndex("by_org_date", (q) =>
+        q.eq("organizationId", args.organizationId).eq("date", args.date),
+      )
+      .first();
+
+    const payload = {
+      organizationId: args.organizationId,
+      date: args.date,
+      customersCreated: args.customersCreated,
+      totalCustomers: args.totalCustomers,
+    } as const;
+
+    if (existing) {
+      await ctx.db.patch(existing._id, payload as any);
+    } else {
+      await ctx.db.insert("customerDailySummaries", payload as any);
+    }
+  },
+});
+
+export const countCustomersUpToDate = internalQuery({
+  args: {
+    organizationId: v.id("organizations"),
+    exclusiveUpperBound: v.number(),
+  },
+  returns: v.number(),
+  handler: async (ctx, args) => {
+    const customers = await ctx.db
+      .query("shopifyCustomers")
+      .withIndex("by_organization_and_created", (q) =>
+        q
+          .eq("organizationId", args.organizationId)
+          .lt("shopifyCreatedAt", args.exclusiveUpperBound),
+      )
+      .collect();
+
+    return customers.length;
+  },
+});
+
+export const getCustomerSummaryBeforeDate = internalQuery({
+  args: {
+    organizationId: v.id("organizations"),
+    date: v.string(),
+  },
+  returns: v.union(v.null(), v.object({
+    date: v.string(),
+    customersCreated: v.number(),
+    totalCustomers: v.number(),
+  })),
+  handler: async (ctx, args) => {
+    const doc = await ctx.db
+      .query("customerDailySummaries")
+      .withIndex("by_org_date", (q) =>
+        q.eq("organizationId", args.organizationId).lt("date", args.date),
+      )
+      .order("desc")
+      .first();
+
+    if (!doc) {
+      return null;
+    }
+
+    return {
+      date: doc.date,
+      customersCreated: doc.customersCreated,
+      totalCustomers: doc.totalCustomers,
+    } as const;
   },
 });
 
@@ -1251,12 +1542,79 @@ export const rebuildDailyMetrics = internalAction({
           data,
         };
 
-        const metrics = buildDailyMetricsFromResponse(response);
+        const {
+          metrics,
+          customerActivities,
+          customersCreated,
+        } = buildDailyMetricsFromResponse(response);
 
         await ctx.runMutation(internal.engine.analytics.upsertDailyMetric, {
           organizationId: args.organizationId,
           date,
           metrics,
+        });
+
+        await ctx.runMutation(internal.engine.analytics.clearCustomerDailyActivity, {
+          organizationId: args.organizationId,
+          date,
+        });
+
+        const ACTIVITY_CHUNK_SIZE = 64;
+        for (let index = 0; index < customerActivities.length; index += ACTIVITY_CHUNK_SIZE) {
+          const chunk = customerActivities.slice(index, index + ACTIVITY_CHUNK_SIZE);
+          await ctx.runMutation(internal.engine.analytics.insertCustomerDailyActivityChunk, {
+            organizationId: args.organizationId,
+            date,
+            activities: chunk,
+          });
+        }
+
+        let totalCustomers: number | null = null;
+        const endExclusive = Date.parse(dateRange.endDateTimeUtcExclusive ?? "");
+        if (Number.isFinite(endExclusive)) {
+          try {
+            totalCustomers = await ctx.runQuery(
+              internal.engine.analytics.countCustomersUpToDate,
+              {
+                organizationId: args.organizationId,
+                exclusiveUpperBound: endExclusive,
+              },
+            );
+          } catch (countError) {
+            console.warn("[Analytics] Failed to count customers for summary", {
+              organizationId: args.organizationId,
+              date,
+              error: countError,
+            });
+            totalCustomers = null;
+          }
+        }
+
+        if (totalCustomers === null) {
+          try {
+            const previousSummary = await ctx.runQuery(
+              internal.engine.analytics.getCustomerSummaryBeforeDate,
+              {
+                organizationId: args.organizationId,
+                date,
+              },
+            );
+            totalCustomers = (previousSummary?.totalCustomers ?? 0) + customersCreated;
+          } catch (summaryError) {
+            console.warn("[Analytics] Failed to derive customer summary fallback", {
+              organizationId: args.organizationId,
+              date,
+              error: summaryError,
+            });
+            totalCustomers = customersCreated;
+          }
+        }
+
+        await ctx.runMutation(internal.engine.analytics.upsertCustomerDailySummary, {
+          organizationId: args.organizationId,
+          date,
+          customersCreated,
+          totalCustomers: totalCustomers ?? customersCreated,
         });
 
         updated += 1;

@@ -3,9 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import type React from "react";
 import { memo, useEffect, useMemo } from "react";
-import { useQuery } from "convex/react";
 import { useSetAtom, useAtomValue } from "jotai";
-import { api } from "@/libs/convexApi";
 import {
   getStepByRoute,
   TOTAL_STEPS,
@@ -23,18 +21,27 @@ import { OnboardingSkeleton } from "./OnboardingSkeleton";
 import { Logo } from "@/components/shared/Logo";
 import UserProfile from "@/components/shared/UserProfile";
 import MinimalProgressBar from "../MinimalProgressBar";
+import { useUserContext } from "@/contexts/UserContext";
+import { useOnboarding } from "@/hooks/onboarding/useOnboarding";
+import type { UserProfile as UserProfileDoc } from "@/hooks/mainapp/useUser";
 
 // Hook for batched onboarding data with Jotai integration
 const useOnboardingData = () => {
   const router = useRouter();
-  const user = useQuery(api.core.users.getCurrentUser);
-  const status = useQuery(api.core.onboarding.getOnboardingStatus);
+  const {
+    user,
+    loading: userLoading,
+  } = useUserContext();
+  const {
+    status,
+    loading: onboardingLoading,
+  } = useOnboarding();
 
   const setOnboardingData = useSetAtom(setOnboardingDataAtom);
   const setLoading = useSetAtom(setOnboardingLoadingAtom);
   const prefetchRoute = useSetAtom(prefetchRouteAtom);
 
-  const isLoading = user === undefined || status === undefined;
+  const isLoading = userLoading || onboardingLoading;
   const isCompleted = status?.completed ?? false;
 
   // Redirect to the dashboard once onboarding is marked complete server-side.
@@ -46,10 +53,31 @@ const useOnboardingData = () => {
 
   // Update Jotai store when data changes
   useEffect(() => {
+    const profile = user as UserProfileDoc | null;
+    const normalizedUser: UserProfileDoc | null = profile
+      ? {
+          _id: typeof profile._id === "string" ? profile._id : undefined,
+          name: typeof profile.name === "string" ? profile.name : undefined,
+          email: typeof profile.email === "string" ? profile.email : undefined,
+          organizationId:
+            typeof profile.organizationId === "string"
+              ? profile.organizationId
+              : undefined,
+          isOnboarded:
+            typeof profile.isOnboarded === "boolean"
+              ? profile.isOnboarded
+              : undefined,
+          hasMetaConnection:
+            typeof profile.hasMetaConnection === "boolean"
+              ? profile.hasMetaConnection
+              : undefined,
+        }
+      : null;
+
     if (!isLoading) {
       setOnboardingData({
-        user: user || null,
-        status: status || null,
+        user: normalizedUser,
+        status,
         connections: status?.connections
           ? [
               { platform: "shopify", isActive: status.connections.shopify },

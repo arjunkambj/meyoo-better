@@ -1,7 +1,8 @@
 import { useMutation } from "convex/react";
-import { useQuery } from "convex-helpers/react/cache/hooks";
 
+import { useUserContext } from "@/contexts/UserContext";
 import { api } from "@/libs/convexApi";
+import { useOnboarding } from "@/hooks/onboarding/useOnboarding";
 
 /**
  * User and Organization Management Hooks
@@ -12,17 +13,31 @@ import { api } from "@/libs/convexApi";
 /**
  * Get current authenticated user
  */
+export type UserProfile = {
+  _id?: string;
+  name?: string;
+  email?: string;
+  phone?: string;
+  image?: string;
+  organizationId?: string;
+  isOnboarded?: boolean;
+  hasMetaConnection?: boolean;
+  [key: string]: unknown;
+};
+
 export function useUser() {
-  const user = useQuery(api.core.users.getCurrentUser);
-  const membership = useQuery(api.core.memberships.getCurrentMembership);
-  const organization = useQuery(api.core.organizations.getCurrentOrganization);
+  const {
+    user,
+    loading,
+    error,
+    membershipRole,
+    organizationId,
+    primaryCurrency,
+  } = useUserContext();
   const updateBusinessProfileMutation = useMutation(
     api.core.users.updateBusinessProfile,
   );
   const updateProfileMutation = useMutation(api.core.users.updateProfile);
-
-  const loading = user === undefined;
-  const error = user === null && !loading ? "User not found" : null;
 
   // Update profile function - for basic user info
   const updateProfile = async (data: {
@@ -46,23 +61,20 @@ export function useUser() {
     return await updateBusinessProfileMutation(data);
   };
 
-  // Get onboarding data separately
-  const onboarding = useQuery(
-    api.core.onboarding.getOnboardingStatus,
-    user ? {} : "skip",
-  );
+  const typedUser = user ? (user as UserProfile) : null;
+  const { status: onboardingStatus } = useOnboarding();
 
   return {
-    user,
+    user: typedUser,
     loading,
     error,
-    isAuthenticated: !!user,
-    role: membership?.role ?? null,
-    membershipRole: membership?.role ?? null,
-    organizationId: user?.organizationId,
-    hasShopifyConnection: onboarding?.connections?.shopify || false,
-    hasMetaConnection: onboarding?.connections?.meta || false,
-    primaryCurrency: organization?.primaryCurrency ?? "USD",
+    isAuthenticated: !!typedUser,
+    role: membershipRole ?? null,
+    membershipRole,
+    organizationId,
+    hasShopifyConnection: onboardingStatus?.connections?.shopify || false,
+    hasMetaConnection: onboardingStatus?.connections?.meta || false,
+    primaryCurrency,
     isLoading: loading,
     updateProfile,
     updateBusinessProfile,
@@ -93,15 +105,15 @@ export function useIsOnboarded() {
  * Get user's integration status
  */
 export function useIntegrationStatus() {
-  const onboarding = useQuery(api.core.onboarding.getOnboardingStatus);
+  const { status: onboardingStatus } = useOnboarding();
 
   return {
-    hasShopify: onboarding?.connections?.shopify || false,
-    hasMeta: onboarding?.connections?.meta || false,
-    isInitialSyncComplete: onboarding?.isInitialSyncComplete || false,
+    hasShopify: onboardingStatus?.connections?.shopify || false,
+    hasMeta: onboardingStatus?.connections?.meta || false,
+    isInitialSyncComplete: onboardingStatus?.isInitialSyncComplete || false,
     hasAnyIntegration: !!(
-      onboarding?.connections?.shopify ||
-      onboarding?.connections?.meta
+      onboardingStatus?.connections?.shopify ||
+      onboardingStatus?.connections?.meta
     ),
   };
 }

@@ -22,6 +22,7 @@ import {
   SHOPIFY_PLAN_NAME_BY_TIER_KEY,
   getTierKeyFromPlanName,
 } from "@/components/shared/billing/planUtils";
+import { useOnboarding } from "@/hooks/onboarding/useOnboarding";
 
 export default function OnboardingBillingView() {
   const router = useRouter();
@@ -41,8 +42,8 @@ export default function OnboardingBillingView() {
     api.core.shopDomainHelper.getCurrentShopDomain
   );
 
-  // Live onboarding status (Convex query) to auto-redirect when state updates via webhook/verify
-  const onboardingStatus = useQuery(api.core.onboarding.getOnboardingStatus);
+  // Live onboarding status via shared provider to avoid duplicate queries
+  const { status: onboardingStatus } = useOnboarding();
   const hasShopifySubscription =
     onboardingStatus?.hasShopifySubscription ?? false;
 

@@ -8,11 +8,19 @@ import { getUserAndOrg } from "../utils/auth";
 import { loadPnLAnalyticsFromDailyMetrics } from "../utils/dailyMetrics";
 import type { PnLAnalyticsResult, PnLGranularity } from "@repo/types";
 
-type DateRangeArg = { startDate: string; endDate: string };
+type DateRangeArg = {
+  startDate: string;
+  endDate: string;
+  startDateTimeUtc?: string;
+  endDateTimeUtc?: string;
+  endDateTimeUtcExclusive?: string;
+};
 
 function toIsoDate(date: Date): string {
   // Returns YYYY-MM-DD in UTC
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()))
+  return new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
+  )
     .toISOString()
     .slice(0, 10);
 }
@@ -23,8 +31,41 @@ function parseIsoDate(dateStr: string): Date {
   return d;
 }
 
+function deriveShopOffsetMs(range: DateRangeArg): number {
+  const referenceStart = parseIsoDate(range.startDate).getTime();
+
+  if (range.startDateTimeUtc) {
+    const actualStart = Date.parse(range.startDateTimeUtc);
+    if (Number.isFinite(actualStart)) {
+      return referenceStart - actualStart;
+    }
+  }
+
+  if (range.endDateTimeUtcExclusive) {
+    const localExclusive = parseIsoDate(range.endDate);
+    localExclusive.setUTCDate(localExclusive.getUTCDate() + 1);
+    const actualExclusive = Date.parse(range.endDateTimeUtcExclusive);
+    if (Number.isFinite(actualExclusive)) {
+      return localExclusive.getTime() - actualExclusive;
+    }
+  }
+
+  if (range.endDateTimeUtc) {
+    const localInclusive = parseIsoDate(range.endDate);
+    localInclusive.setUTCDate(localInclusive.getUTCDate() + 1);
+    const actualInclusive = Date.parse(range.endDateTimeUtc);
+    if (Number.isFinite(actualInclusive)) {
+      return localInclusive.getTime() - (actualInclusive + 1);
+    }
+  }
+
+  return 0;
+}
+
 function startOfWeekMonday(d: Date): Date {
-  const base = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const base = new Date(
+    Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()),
+  );
   const day = base.getUTCDay() || 7; // 1..7 (Mon..Sun)
   if (day !== 1) {
     base.setUTCDate(base.getUTCDate() - day + 1);
@@ -36,12 +77,20 @@ function startOfMonth(d: Date): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
 }
 
+function toUtcMidnight(date: Date, offsetMs: number): Date {
+  return new Date(date.getTime() - offsetMs);
+}
+
 function clampDateRangeForGranularity(
   range: DateRangeArg,
   granularity: PnLGranularity,
 ): DateRangeArg {
-  // Clamp end date to today to avoid future dates
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const offsetMs = deriveShopOffsetMs(range);
+  const todayIso =
+    offsetMs === 0
+      ? new Date().toISOString().slice(0, 10)
+      : toIsoDate(new Date(Date.now() + offsetMs));
+
   const endInput = parseIsoDate(range.endDate);
   const today = parseIsoDate(todayIso);
   const end = endInput.getTime() > today.getTime() ? today : endInput;
@@ -61,7 +110,24 @@ function clampDateRangeForGranularity(
       aligned.getTime() > end.getTime() ? startOfMonth(end) : aligned;
   }
 
-  return { startDate: toIsoDate(normalizedStart), endDate: toIsoDate(end) };
+  const normalizedStartDate = toIsoDate(normalizedStart);
+  const normalizedEndDate = toIsoDate(end);
+
+  const startUtc = toUtcMidnight(parseIsoDate(normalizedStartDate), offsetMs);
+  const endExclusiveUtc = toUtcMidnight(
+    parseIsoDate(normalizedEndDate),
+    offsetMs,
+  );
+  endExclusiveUtc.setUTCDate(endExclusiveUtc.getUTCDate() + 1);
+
+  return {
+    ...range,
+    startDate: normalizedStartDate,
+    endDate: normalizedEndDate,
+    startDateTimeUtc: startUtc.toISOString(),
+    endDateTimeUtc: new Date(endExclusiveUtc.getTime() - 1).toISOString(),
+    endDateTimeUtcExclusive: endExclusiveUtc.toISOString(),
+  };
 }
 
 export const getAnalytics = query({

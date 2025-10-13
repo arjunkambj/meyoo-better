@@ -27,8 +27,13 @@ export function createSimpleLogger(context: string): SimpleLogger {
     return words.slice(0, MAX_MESSAGE_WORDS).join(" ");
   };
 
+  const formatTimestamp = () => {
+    const iso = new Date().toISOString();
+    return iso.slice(11);
+  };
+
   const log = (level: LogLevel, message: string, data?: unknown) => {
-    const timestamp = new Date().toISOString();
+    const timestamp = formatTimestamp();
     const logEntry: Record<string, unknown> = {
       timestamp,
       level,

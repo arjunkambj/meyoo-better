@@ -20,7 +20,7 @@ async function getValidAccessTokenImpl(
   args: GetValidAccessTokenArgs,
 ): Promise<string> {
   const session = await ctx.runQuery(
-    internal.integrations.tokenManager.getActiveSessionInternal,
+    internal.meta.tokenManager.getActiveSessionInternal,
     {
       organizationId: args.organizationId,
       platform: args.platform,
@@ -42,14 +42,14 @@ async function getValidAccessTokenImpl(
     if (!session.expiresAt || expiringSoon) {
       try {
         // Validate token app ownership before attempting exchange
-        const { debugToken } = await import("./metaTokens");
+        const { debugToken } = await import("./tokens");
         const info = await debugToken(session.accessToken);
         const desiredAppId = META_APP_ID;
         const tokenAppId = info?.data?.app_id ?? info?.app_id;
 
         // Persist appId and last check
         await ctx.runMutation(
-          internal.integrations.tokenManager.updateSessionTokenInternal,
+          internal.meta.tokenManager.updateSessionTokenInternal,
           {
             sessionId: session._id,
             accessToken: session.accessToken,
@@ -79,14 +79,14 @@ async function getValidAccessTokenImpl(
         logger.warn("Meta token debug failed", { error: String(e) });
       }
       try {
-        const { exchangeForLongLivedUserToken } = await import("./metaTokens");
+        const { exchangeForLongLivedUserToken } = await import("./tokens");
         const exchanged = await exchangeForLongLivedUserToken(
           session.accessToken,
         );
         if (exchanged?.access_token) {
           const ttlSec = exchanged.expires_in ?? 60 * 24 * 60 * 60;
           await ctx.runMutation(
-            internal.integrations.tokenManager.updateSessionTokenInternal,
+            internal.meta.tokenManager.updateSessionTokenInternal,
             {
               sessionId: session._id,
               accessToken: exchanged.access_token,
@@ -129,7 +129,7 @@ export const refreshExpiring = internalAction({
     const lookaheadMs = (args.lookaheadHours ?? 72) * 60 * 60 * 1000;
     const now = Date.now();
     const allSessions = await ctx.runQuery(
-      internal.integrations.tokenManager.listAllActiveSessionsInternal,
+      internal.meta.tokenManager.listAllActiveSessionsInternal,
       {},
     );
     const target = allSessions.filter(

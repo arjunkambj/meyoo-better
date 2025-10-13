@@ -1,6 +1,6 @@
 import { createTool } from "@convex-dev/agent";
 import { api } from "../_generated/api";
-import { resend } from "../integrations/resend";
+import { resend } from "../resend";
 import { z } from "zod/v3";
 import { rag } from "../rag";
 import { requireUserAndOrg } from "../utils/auth";

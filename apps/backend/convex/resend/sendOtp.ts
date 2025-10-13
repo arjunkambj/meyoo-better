@@ -1,6 +1,7 @@
 import { internalMutation } from "../_generated/server";
 import { v } from "convex/values";
-import { resend } from "../integrations/resend";
+
+import { resend } from "./index";
 
 export const sendOtpEmail = internalMutation({
   args: {
@@ -19,6 +20,7 @@ export const sendOtpEmail = internalMutation({
         <p style="color: #666; font-size: 14px;">If you didn't request this code, you can safely ignore this email.</p>
       </div>
     `;
+
     await resend.sendEmail(ctx, {
       from: "Meyoo <noreply@meyoo.io>",
       to,
@@ -28,3 +30,4 @@ export const sendOtpEmail = internalMutation({
     });
   },
 });
+

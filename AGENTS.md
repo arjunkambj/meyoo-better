@@ -5,6 +5,7 @@
 - always remove legecy or unused funtion , we are doing rewrite of some funtion , make sure old get deleted
 
 - explain explain in simple plain langagues without addin jargons. with clariy
+- removing legacy or duplicate code where relevant
 
 ## Agent & Components Usage Rules
 

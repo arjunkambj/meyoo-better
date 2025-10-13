@@ -2,7 +2,7 @@
 import type { GenericActionCtx } from "convex/server";
 import { internal } from "../_generated/api";
 import type { DataModel, Doc, Id } from "../_generated/dataModel";
-import { createIntegration, type SyncResult } from "../integrations/_base";
+import { createIntegration, type SyncResult } from "../core/integrationBase";
 import { initializeShopifyClient } from "./client";
 import { toStringArray } from "../utils/shopify";
 import { logger } from "./shared";
@@ -25,7 +25,7 @@ export const shopify: any = createIntegration({
     ): Promise<SyncResult> => {
       const daysBack = args.dateRange?.daysBack ?? 60;
       const response = (await ctx.runAction(
-        internal.integrations.shopifySync.initial,
+        internal.shopify.sync.initial,
         {
           organizationId: args.organizationId as Id<"organizations">,
           dateRange: { daysBack },
@@ -63,7 +63,7 @@ export const shopify: any = createIntegration({
     ): Promise<SyncResult> => {
       const sinceMs = args.since ? Date.parse(args.since) : undefined;
       const response = (await ctx.runAction(
-        internal.integrations.shopifySync.incremental,
+        internal.shopify.sync.incremental,
         {
           organizationId: args.organizationId as Id<"organizations">,
           since: Number.isFinite(sinceMs) ? sinceMs : undefined,

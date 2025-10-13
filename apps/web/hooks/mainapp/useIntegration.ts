@@ -12,7 +12,7 @@ import { api } from "@/libs/convexApi";
  * Get integration status for all platforms
  */
 export function useIntegration() {
-  const overview = useQuery(api.integrations.overview.getOverview);
+  const overview = useQuery(api.core.integrationOverview.getOverview);
   const loading = overview === undefined;
 
   const disconnectMeta = async () => {

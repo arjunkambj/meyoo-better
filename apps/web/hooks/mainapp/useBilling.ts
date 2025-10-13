@@ -93,12 +93,12 @@ export function useBilling() {
   // Fetch billing metadata for the current organization
   const billingInfo = useQuery(api.core.users.getUserBilling);
   const organization = useQuery(
-    api.billing.organizationHelpers.getOrganizationByUser,
+    api.core.organizationBilling.getOrganizationByUser,
   );
 
   // Mutations for billing operations
   const updateOrganizationPlan = useMutation(
-    api.billing.organizationHelpers.updateOrganizationPlan,
+    api.core.organizationBilling.updateOrganizationPlan,
   );
 
   const checkBillingStatus = async (

@@ -8,181 +8,13 @@ import type { Id } from "../_generated/dataModel";
 import { internalAction } from "../_generated/server";
 import { createJob, PRIORITY } from "../engine/workpool";
 import { toStringArray } from "../utils/shopify";
-
-// Minimal GraphQL types to avoid `any`
-type ShopifyMoney = { amount?: string; currencyCode?: string };
-type ShopifyProductVariant = {
-  id: string;
-  title?: string;
-  sku?: string;
-  barcode?: string;
-  price?: string | number;
-  compareAtPrice?: string | number;
-  position?: number;
-  inventoryQuantity?: number;
-  availableForSale?: boolean;
-  taxable?: boolean;
-  taxCode?: string;
-  inventoryItem?: {
-    id?: string;
-    unitCost?: { amount?: string };
-    measurement?: { weight?: { value?: number; unit?: string } };
-  };
-  selectedOptions?: Array<{ name?: string; value?: string }>;
-  createdAt: string;
-  updatedAt: string;
-};
-type ShopifyProductNode = {
-  id: string;
-  handle?: string;
-  title?: string;
-  productType?: string;
-  vendor?: string;
-  status?: string;
-  featuredImage?: { url?: string };
-  totalInventory?: number | string;
-  tags?: string[];
-  createdAt?: string;
-  updatedAt?: string;
-  publishedAt?: string;
-  variants?: { edges?: Array<{ node: ShopifyProductVariant }> };
-};
-type ShopifyLineItem = {
-  id: string;
-  title?: string;
-  name?: string;
-  quantity?: number;
-  sku?: string;
-  variant?: { id?: string; sku?: string; product?: { id?: string } };
-  originalUnitPriceSet?: { shopMoney?: ShopifyMoney };
-  discountedUnitPriceSet?: { shopMoney?: ShopifyMoney };
-  totalDiscountSet?: { shopMoney?: ShopifyMoney };
-  fulfillableQuantity?: number;
-  fulfillmentStatus?: string;
-};
-type ShopifyTransaction = {
-  id: string;
-  kind?: string;
-  status?: string;
-  gateway?: string;
-  amountSet?: { shopMoney?: ShopifyMoney };
-  fees?: Array<{ amount?: { amount?: string } }>;
-  paymentId?: string;
-  createdAt: string;
-  processedAt?: string;
-};
-type ShopifyRefund = {
-  id: string;
-  note?: string;
-  user?: { id?: string };
-  totalRefundedSet?: { shopMoney?: ShopifyMoney };
-  refundLineItems?: {
-    edges?: Array<{
-      node: {
-        lineItem?: { id?: string };
-        quantity?: number;
-        subtotalSet?: { shopMoney?: ShopifyMoney };
-      };
-    }>;
-  };
-  createdAt?: string;
-  processedAt?: string;
-};
-type ShopifyFulfillment = {
-  id: string;
-  status: string;
-  shipmentStatus?: string;
-  trackingInfo?: Array<{ company?: string; number?: string; url?: string }>;
-  location?: { id?: string | null } | null;
-  service?: { serviceName?: string | null } | string | null;
-  fulfillmentLineItems?: {
-    edges?: Array<{
-      node: {
-        id?: string;
-        quantity?: number;
-        lineItem?: { id?: string | null } | null;
-      };
-    }>;
-  };
-  createdAt?: string;
-  updatedAt?: string;
-};
-type ShopifyFulfillmentOrder = {
-  id: string;
-  status?: string;
-  assignedLocation?: {
-    location?: { id?: string | null } | null;
-  } | null;
-  deliveryMethod?: { methodType?: string | null; serviceName?: string | null } | null;
-  lineItems?: {
-    edges?: Array<{
-      node?: {
-        id?: string | null;
-        lineItem?: { id?: string | null } | null;
-      } | null;
-    }>;
-  };
-};
-type ShopifyOrderNode = {
-  id: string;
-  name?: string;
-  email?: string;
-  phone?: string;
-  createdAt?: string;
-  processedAt?: string;
-  updatedAt?: string;
-  closedAt?: string;
-  cancelledAt?: string;
-  currentTotalPriceSet?: { shopMoney?: ShopifyMoney };
-  currentSubtotalPriceSet?: { shopMoney?: ShopifyMoney };
-  currentTotalTaxSet?: { shopMoney?: ShopifyMoney };
-  currentTotalDiscountsSet?: { shopMoney?: ShopifyMoney };
-  totalShippingPriceSet?: { shopMoney?: ShopifyMoney };
-  totalTipReceivedSet?: { shopMoney?: ShopifyMoney };
-  subtotalLineItemsQuantity?: number | string;
-  totalWeight?: string | number;
-  tags?: string[];
-  note?: string;
-  risks?: Array<{ level?: string }>;
-  shippingAddress?: {
-    country?: string;
-    provinceCode?: string;
-    city?: string;
-    zip?: string;
-  };
-  customer?: {
-    id: string;
-    email?: string;
-    firstName?: string;
-    lastName?: string;
-    phone?: string;
-    createdAt?: string;
-    updatedAt?: string;
-  };
-  lineItems?: { edges?: Array<{ node: ShopifyLineItem }> };
-  transactions?: Array<ShopifyTransaction>;
-  refunds?: Array<ShopifyRefund>;
-  fulfillments?: Array<ShopifyFulfillment>;
-  fulfillmentOrders?: { edges?: Array<{ node: ShopifyFulfillmentOrder }> };
-  customerJourneySummary?: {
-    firstVisit?: {
-      source?: string;
-      landingPage?: string;
-      referrerUrl?: string;
-      utmParameters?: {
-        source?: string;
-        medium?: string;
-        campaign?: string;
-        content?: string;
-        term?: string;
-      };
-      id?: string;
-      occurredAt?: string;
-      device?: { type?: string };
-    };
-    momentsCount?: number;
-  };
-};
+import type {
+  ShopifyLineItem,
+  ShopifyOrderInput,
+  ShopifyOrderNode,
+  ShopifyProductNode,
+  ShopifyProductVariant,
+} from "./types";
 
 const logger = createSimpleLogger("ShopifySync");
 
@@ -200,63 +32,6 @@ const toOptional = (value: unknown): string | undefined =>
       ? value
       : String(value);
 
-type ShopifyOrderLineItemInput = {
-  shopifyId: string;
-  title: string;
-  name?: string;
-  quantity: number;
-  sku?: string;
-  shopifyVariantId?: string;
-  shopifyProductId?: string;
-  price: number;
-  totalDiscount: number;
-  discountedPrice?: number;
-  fulfillableQuantity: number;
-  fulfillmentStatus?: string;
-};
-
-type ShopifyOrderInput = {
-  shopifyId: string;
-  orderNumber: string;
-  name: string;
-  email?: string;
-  phone?: string;
-  shopifyCreatedAt: number;
-  processedAt?: number;
-  updatedAt?: number;
-  closedAt?: number;
-  cancelledAt?: number;
-  totalPrice: number;
-  subtotalPrice: number;
-  totalDiscounts: number;
-  totalTip?: number;
-  currency?: string;
-  financialStatus?: string;
-  fulfillmentStatus?: string;
-  totalItems: number;
-  totalQuantity: number;
-  totalWeight?: number;
-  tags?: string[];
-  note?: string;
-  shippingAddress?: {
-    country?: string;
-    province?: string;
-    city?: string;
-    zip?: string;
-  };
-  customer?: {
-    shopifyId: string;
-    email?: string;
-    firstName?: string;
-    lastName?: string;
-    phone?: string;
-    shopifyCreatedAt?: number;
-    shopifyUpdatedAt?: number;
-  };
-  lineItems: ShopifyOrderLineItemInput[];
-  syncedAt?: number;
-};
-
 const MAX_ERROR_SUMMARY_ITEMS = 3;
 
 const shortenText = (input: string, maxWords: number) => {
@@ -269,7 +44,7 @@ const shortenText = (input: string, maxWords: number) => {
 };
 
 const summarizeGraphQLErrors = (
-  errors: Array<{ message?: string; extensions?: { code?: string } }>,
+  errors: Array<{ message?: string; extensions?: { code?: string } }>
 ) => {
   if (!errors.length) {
     return { count: 0, codes: [], samples: [] };
@@ -303,7 +78,7 @@ const summarizeGraphQLErrors = (
 
 function mapOrderNodeToPersistence(
   order: ShopifyOrderNode,
-  organizationId: Id<"organizations">,
+  organizationId: Id<"organizations">
 ): OrderPersistencePayload {
   const orderId = String(order.id).replace("gid://shopify/Order/", "");
 
@@ -314,13 +89,21 @@ function mapOrderNodeToPersistence(
     email: toOptional(order.email),
     phone: toOptional(order.phone),
     shopifyCreatedAt: Date.parse(String(order.createdAt ?? Date.now())),
-    processedAt: order.processedAt ? Date.parse(String(order.processedAt)) : undefined,
-    updatedAt: order.updatedAt ? Date.parse(String(order.updatedAt)) : undefined,
+    processedAt: order.processedAt
+      ? Date.parse(String(order.processedAt))
+      : undefined,
+    updatedAt: order.updatedAt
+      ? Date.parse(String(order.updatedAt))
+      : undefined,
     closedAt: order.closedAt ? Date.parse(String(order.closedAt)) : undefined,
-    cancelledAt: order.cancelledAt ? Date.parse(String(order.cancelledAt)) : undefined,
+    cancelledAt: order.cancelledAt
+      ? Date.parse(String(order.cancelledAt))
+      : undefined,
     totalPrice: parseMoney(order.currentTotalPriceSet?.shopMoney?.amount),
     subtotalPrice: parseMoney(order.currentSubtotalPriceSet?.shopMoney?.amount),
-    totalDiscounts: parseMoney(order.currentTotalDiscountsSet?.shopMoney?.amount),
+    totalDiscounts: parseMoney(
+      order.currentTotalDiscountsSet?.shopMoney?.amount
+    ),
     totalTip: order.totalTipReceivedSet
       ? parseMoney(order.totalTipReceivedSet.shopMoney?.amount)
       : undefined,
@@ -351,7 +134,7 @@ function mapOrderNodeToPersistence(
       ? {
           shopifyId: String(order.customer.id).replace(
             "gid://shopify/Customer/",
-            "",
+            ""
           ),
           email: toOptional(order.customer.email),
           firstName: toOptional(order.customer.firstName),
@@ -368,12 +151,16 @@ function mapOrderNodeToPersistence(
     lineItems:
       order.lineItems?.edges?.map((itemEdge: { node: ShopifyLineItem }) => {
         const item = itemEdge.node;
-        const basePrice = parseMoney(item.originalUnitPriceSet?.shopMoney?.amount);
+        const basePrice = parseMoney(
+          item.originalUnitPriceSet?.shopMoney?.amount
+        );
         const discounted = item.discountedUnitPriceSet
           ? parseMoney(item.discountedUnitPriceSet.shopMoney?.amount)
           : undefined;
         const quantity = item.quantity ?? 0;
-        const rawDiscount = parseMoney(item.totalDiscountSet?.shopMoney?.amount);
+        const rawDiscount = parseMoney(
+          item.totalDiscountSet?.shopMoney?.amount
+        );
         const perUnitDiscount =
           discounted !== undefined ? Math.max(0, basePrice - discounted) : 0;
         const computedDiscount =
@@ -388,12 +175,15 @@ function mapOrderNodeToPersistence(
           quantity,
           sku,
           shopifyVariantId: item.variant?.id
-            ? String(item.variant.id).replace("gid://shopify/ProductVariant/", "")
+            ? String(item.variant.id).replace(
+                "gid://shopify/ProductVariant/",
+                ""
+              )
             : undefined,
           shopifyProductId: (item.variant as any)?.product?.id
             ? String((item.variant as any).product.id).replace(
                 "gid://shopify/Product/",
-                "",
+                ""
               )
             : undefined,
           price: basePrice,
@@ -415,13 +205,13 @@ function mapOrderNodeToPersistence(
         shopifyOrderId: orderId,
         shopifyId: transaction.id.replace(
           "gid://shopify/OrderTransaction/",
-          "",
+          ""
         ),
         kind: transaction.kind,
         status: transaction.status,
         gateway: transaction.gateway,
         amount: parseMoney(
-          String(transaction.amountSet?.shopMoney?.amount ?? "0"),
+          String(transaction.amountSet?.shopMoney?.amount ?? "0")
         ),
         fee:
           transaction.fees && transaction.fees.length > 0
@@ -452,14 +242,17 @@ function mapOrderNodeToPersistence(
             const item = edge.node;
             return {
               lineItemId: item.lineItem?.id
-                ? String(item.lineItem.id).replace("gid://shopify/LineItem/", "")
+                ? String(item.lineItem.id).replace(
+                    "gid://shopify/LineItem/",
+                    ""
+                  )
                 : "",
               quantity: item.quantity || 0,
               subtotal: parseMoney(item.subtotalSet?.shopMoney?.amount),
             };
           }) || [],
         shopifyCreatedAt: Date.parse(
-          String(refund.createdAt || new Date().toISOString()),
+          String(refund.createdAt || new Date().toISOString())
         ),
         processedAt: refund.processedAt
           ? Date.parse(String(refund.processedAt))
@@ -486,7 +279,7 @@ function mapOrderNodeToPersistence(
       const locationId = fulfillmentOrder.assignedLocation?.location?.id
         ? String(fulfillmentOrder.assignedLocation.location.id).replace(
             "gid://shopify/Location/",
-            "",
+            ""
           )
         : undefined;
       const serviceName = fulfillmentOrder.deliveryMethod?.serviceName
@@ -502,7 +295,7 @@ function mapOrderNodeToPersistence(
           const orderLineId = lineNode?.lineItem?.id
             ? String(lineNode.lineItem.id).replace(
                 "gid://shopify/LineItem/",
-                "",
+                ""
               )
             : undefined;
           if (!orderLineId) continue;
@@ -511,7 +304,9 @@ function mapOrderNodeToPersistence(
             locationId,
             serviceName,
             methodType,
-            status: fulfillmentOrder.status ? String(fulfillmentOrder.status) : undefined,
+            status: fulfillmentOrder.status
+              ? String(fulfillmentOrder.status)
+              : undefined,
           });
         }
       }
@@ -523,10 +318,10 @@ function mapOrderNodeToPersistence(
   if (order.fulfillments && Array.isArray(order.fulfillments)) {
     for (const fulfillment of order.fulfillments) {
       const trackingNumbers = toStringArray(
-        fulfillment.trackingInfo?.map((t) => t.number),
+        fulfillment.trackingInfo?.map((t) => t.number)
       );
       const trackingUrls = toStringArray(
-        fulfillment.trackingInfo?.map((t) => t.url),
+        fulfillment.trackingInfo?.map((t) => t.url)
       );
       const locationId =
         typeof fulfillment.location?.id === "string"
@@ -534,10 +329,11 @@ function mapOrderNodeToPersistence(
           : undefined;
       const serviceName =
         typeof fulfillment.service === "object" && fulfillment.service !== null
-          ? ((fulfillment.service as { serviceName?: string | null }).serviceName || undefined)
-          : fulfillment.service ?? undefined;
+          ? (fulfillment.service as { serviceName?: string | null })
+              .serviceName || undefined
+          : (fulfillment.service ?? undefined);
       const trackingCompany = toOptional(
-        fulfillment.trackingInfo?.[0]?.company,
+        fulfillment.trackingInfo?.[0]?.company
       );
       let derivedLocationId = locationId;
       let derivedServiceName = serviceName;
@@ -545,7 +341,8 @@ function mapOrderNodeToPersistence(
         ? String(fulfillment.shipmentStatus)
         : undefined;
 
-      const fulfillmentLineItems = fulfillment.fulfillmentLineItems?.edges ?? [];
+      const fulfillmentLineItems =
+        fulfillment.fulfillmentLineItems?.edges ?? [];
       const normalizedLineItems = fulfillmentLineItems.map((edge) => {
         const item = edge.node;
         const quantity = item?.quantity || 0;
@@ -591,7 +388,7 @@ function mapOrderNodeToPersistence(
         service: toOptional(derivedServiceName),
         lineItems: normalizedLineItems,
         shopifyCreatedAt: Date.parse(
-          String(fulfillment.createdAt || new Date().toISOString()),
+          String(fulfillment.createdAt || new Date().toISOString())
         ),
         shopifyUpdatedAt: fulfillment.updatedAt
           ? Date.parse(String(fulfillment.updatedAt))
@@ -609,11 +406,6 @@ function mapOrderNodeToPersistence(
 }
 
 /**
- * Shopify Sync Functions
- * Handles initial and incremental data synchronization
- */
-
-/**
  * Initial sync - fetch 60 days of historical data
  */
 export const initial = internalAction({
@@ -626,7 +418,10 @@ export const initial = internalAction({
       })
     ),
   },
-  handler: async (ctx, args): Promise<{
+  handler: async (
+    ctx,
+    args
+  ): Promise<{
     success: boolean;
     recordsProcessed: number;
     dataChanged: boolean;
@@ -664,13 +459,10 @@ export const initial = internalAction({
 
       const patchSyncMetadata = async (metadata: StageMetadataPatch) => {
         if (!args.syncSessionId) return;
-        await ctx.runMutation(
-          internal.jobs.helpers.patchSyncSessionMetadata,
-          {
-            sessionId: args.syncSessionId,
-            metadata: metadata as any,
-          },
-        );
+        await ctx.runMutation(internal.jobs.helpers.patchSyncSessionMetadata, {
+          sessionId: args.syncSessionId,
+          metadata: metadata as any,
+        });
       };
 
       // Get store credentials from database
@@ -713,385 +505,380 @@ export const initial = internalAction({
       // Parallel fetch products, orders, and customers
       // 1. Fetch Products
       const fetchProducts = async () => {
-          try {
-            await patchSyncMetadata({
-              stageStatus: {
-                products: "processing",
-                inventory: "processing",
-              },
+        try {
+          await patchSyncMetadata({
+            stageStatus: {
+              products: "processing",
+              inventory: "processing",
+            },
+          });
+          logger.info("Starting products fetch", {
+            timestamp: new Date().toISOString(),
+            storeId: store._id,
+            domain: store.shopDomain,
+            hasAccessToken: !!store.accessToken,
+            apiVersion: store.apiVersion,
+          });
+          const products: Array<Record<string, unknown>> = [];
+          const variantsToCreateCostComponents: Array<{
+            variantId: string;
+            cogsPerUnit: number;
+          }> = [];
+          let totalVariants = 0;
+          let variantsWithCogs = 0;
+          let hasNextPage = true;
+          let cursor = null;
+          let pageCount = 0;
+
+          while (hasNextPage) {
+            pageCount++;
+            logger.debug(`Fetching products page ${pageCount}`, {
+              cursor,
+              batchSize: SHOPIFY_CONFIG.QUERIES.PRODUCTS_BATCH_SIZE,
             });
-            logger.info("Starting products fetch", {
-              timestamp: new Date().toISOString(),
-              storeId: store._id,
-              domain: store.shopDomain,
-              hasAccessToken: !!store.accessToken,
-              apiVersion: store.apiVersion,
+
+            const response: any = await client.getProducts(
+              SHOPIFY_CONFIG.QUERIES.PRODUCTS_BATCH_SIZE,
+              cursor,
+              undefined
+            );
+
+            // Log the full response structure for debugging
+            logger.debug("Product API Response", {
+              hasData: !!response.data,
+              hasProducts: !!response.data?.products,
+              hasEdges: !!response.data?.products?.edges,
+              edgeCount: response.data?.products?.edges?.length || 0,
+              pageInfo: response.data?.products?.pageInfo,
+              errors: response.errors,
+              extensions: response.extensions,
             });
-            const products: Array<Record<string, unknown>> = [];
-            const variantsToCreateCostComponents: Array<{
-              variantId: string;
-              cogsPerUnit: number;
-            }> = [];
-            let totalVariants = 0;
-            let variantsWithCogs = 0;
-            let hasNextPage = true;
-            let cursor = null;
-            let pageCount = 0;
 
-            while (hasNextPage) {
-              pageCount++;
-              logger.debug(`Fetching products page ${pageCount}`, {
-                cursor,
-                batchSize: SHOPIFY_CONFIG.QUERIES.PRODUCTS_BATCH_SIZE,
-              });
-
-              const response: any = await client.getProducts(
-                SHOPIFY_CONFIG.QUERIES.PRODUCTS_BATCH_SIZE,
-                cursor,
-                undefined,
-              );
-
-              // Log the full response structure for debugging
-              logger.debug("Product API Response", {
-                hasData: !!response.data,
-                hasProducts: !!response.data?.products,
-                hasEdges: !!response.data?.products?.edges,
-                edgeCount: response.data?.products?.edges?.length || 0,
-                pageInfo: response.data?.products?.pageInfo,
+            // Check for errors first
+            if (response.errors && response.errors.length > 0) {
+              logger.error("GraphQL errors in product fetch", {
                 errors: response.errors,
                 extensions: response.extensions,
               });
+              throw new Error(
+                `GraphQL errors: ${JSON.stringify(response.errors)}`
+              );
+            }
 
-              // Check for errors first
-              if (response.errors && response.errors.length > 0) {
-                logger.error("GraphQL errors in product fetch", {
-                  errors: response.errors,
-                  extensions: response.extensions,
-                });
-                throw new Error(
-                  `GraphQL errors: ${JSON.stringify(response.errors)}`
-                );
-              }
+            // Also log if we have data but in a different structure
+            if (!response.data) {
+              logger.error("No data in response", {
+                fullResponse: JSON.stringify(response, null, 2),
+              });
+            } else if (!response.data.products) {
+              logger.error("No products field in data", {
+                dataKeys: Object.keys(response.data),
+                data: JSON.stringify(response.data, null, 2),
+              });
+            }
 
-              // Also log if we have data but in a different structure
-              if (!response.data) {
-                logger.error("No data in response", {
-                  fullResponse: JSON.stringify(response, null, 2),
-                });
-              } else if (!response.data.products) {
-                logger.error("No products field in data", {
-                  dataKeys: Object.keys(response.data),
-                  data: JSON.stringify(response.data, null, 2),
-                });
-              }
+            if (
+              response.data?.products?.edges &&
+              response.data.products.edges.length > 0
+            ) {
+              logger.info(
+                `Processing ${response.data.products.edges.length} products from page ${pageCount}`
+              );
+              // Map product edges
+              const batch = response.data.products.edges.map(
+                (edge: { node: ShopifyProductNode }) => {
+                  const product = edge.node;
 
-              if (
-                response.data?.products?.edges &&
-                response.data.products.edges.length > 0
-              ) {
-                logger.info(
-                  `Processing ${response.data.products.edges.length} products from page ${pageCount}`
-                );
-                // Map product edges
-                const batch = response.data.products.edges.map(
-                  (edge: { node: ShopifyProductNode }) => {
-                    const product = edge.node;
+                  // Parse variants
+                  const variants: Array<Record<string, unknown>> = [];
 
-                    // Parse variants
-                    const variants: Array<Record<string, unknown>> = [];
+                  const variantsEdges =
+                    (product.variants?.edges as Array<{
+                      node: ShopifyProductVariant;
+                    }>) || [];
+                  if (variantsEdges.length > 0) {
+                    for (const variantEdge of variantsEdges) {
+                      const variant = variantEdge.node;
 
-                    const variantsEdges =
-                      (product.variants?.edges as Array<{
-                        node: ShopifyProductVariant;
-                      }>) || [];
-                    if (variantsEdges.length > 0) {
-                      for (const variantEdge of variantsEdges) {
-                        const variant = variantEdge.node;
+                      const unitCost = variant.inventoryItem?.unitCost?.amount
+                        ? parseMoney(
+                            String(variant.inventoryItem.unitCost.amount)
+                          )
+                        : undefined;
 
-                        const unitCost = variant.inventoryItem?.unitCost?.amount
-                          ? parseMoney(String(variant.inventoryItem.unitCost.amount))
-                          : undefined;
-
-                        const variantData = {
-                          shopifyId: String(variant.id).replace(
-                            "gid://shopify/ProductVariant/",
+                      const variantData = {
+                        shopifyId: String(variant.id).replace(
+                          "gid://shopify/ProductVariant/",
+                          ""
+                        ),
+                        title: variant.title,
+                        sku: variant.sku || undefined,
+                        barcode: variant.barcode || undefined,
+                        price: parseMoney(String(variant.price)),
+                        compareAtPrice: variant.compareAtPrice
+                          ? parseMoney(String(variant.compareAtPrice))
+                          : undefined,
+                        position: variant.position,
+                        inventoryQuantity: variant.inventoryQuantity || 0,
+                        available: variant.availableForSale !== false,
+                        taxable: variant.taxable,
+                        inventoryItemId:
+                          variant.inventoryItem?.id?.replace(
+                            "gid://shopify/InventoryItem/",
                             ""
-                          ),
-                          title: variant.title,
-                          sku: variant.sku || undefined,
-                          barcode: variant.barcode || undefined,
-                          price: parseMoney(String(variant.price)),
-                          compareAtPrice: variant.compareAtPrice
-                            ? parseMoney(String(variant.compareAtPrice))
-                            : undefined,
-                          position: variant.position,
-                          inventoryQuantity: variant.inventoryQuantity || 0,
-                          available: variant.availableForSale !== false,
-                          taxable: variant.taxable,
-                          inventoryItemId:
-                            variant.inventoryItem?.id?.replace(
-                              "gid://shopify/InventoryItem/",
-                              ""
-                            ) || undefined,
-                          weight:
-                            variant.inventoryItem?.measurement?.weight?.value ||
-                            undefined,
-                          weightUnit:
-                            variant.inventoryItem?.measurement?.weight?.unit ||
-                            undefined,
-                          shopifyCreatedAt: Date.parse(variant.createdAt),
-                          shopifyUpdatedAt: Date.parse(variant.updatedAt),
-                          option1: variant.selectedOptions?.[0]?.value,
-                          option2: variant.selectedOptions?.[1]?.value,
-                          option3: variant.selectedOptions?.[2]?.value,
-                          inventoryLevels: [],
-                        };
+                          ) || undefined,
+                        weight:
+                          variant.inventoryItem?.measurement?.weight?.value ||
+                          undefined,
+                        weightUnit:
+                          variant.inventoryItem?.measurement?.weight?.unit ||
+                          undefined,
+                        shopifyCreatedAt: Date.parse(variant.createdAt),
+                        shopifyUpdatedAt: Date.parse(variant.updatedAt),
+                        option1: variant.selectedOptions?.[0]?.value,
+                        option2: variant.selectedOptions?.[1]?.value,
+                        option3: variant.selectedOptions?.[2]?.value,
+                        inventoryLevels: [],
+                      };
 
-                        variants.push(variantData);
-                        totalVariants += 1;
-                        if (typeof unitCost === "number" && unitCost > 0) {
-                          variantsToCreateCostComponents.push({
-                            variantId: variantData.shopifyId,
-                            cogsPerUnit: unitCost,
-                          });
-                          variantsWithCogs += 1;
-                        }
+                      variants.push(variantData);
+                      totalVariants += 1;
+                      if (typeof unitCost === "number" && unitCost > 0) {
+                        variantsToCreateCostComponents.push({
+                          variantId: variantData.shopifyId,
+                          cogsPerUnit: unitCost,
+                        });
+                        variantsWithCogs += 1;
                       }
                     }
-
-                    return {
-                      organizationId:
-                        args.organizationId as Id<"organizations">,
-                      storeId,
-                      shopifyId: String(product.id).replace(
-                        "gid://shopify/Product/",
-                        ""
-                      ),
-                      handle: product.handle,
-                      title: product.title,
-                      productType: product.productType || undefined,
-                      vendor: product.vendor || undefined,
-                      status: product.status,
-                      featuredImage: product.featuredImage?.url || undefined,
-                      totalInventory: product.totalInventory
-                        ? parseInt(String(product.totalInventory), 10)
-                        : 0,
-                      totalVariants: variants.length,
-                      tags: product.tags || [],
-                      shopifyCreatedAt: Date.parse(String(product.createdAt)),
-                      shopifyUpdatedAt: Date.parse(String(product.updatedAt)),
-                      publishedAt: product.publishedAt
-                        ? Date.parse(String(product.publishedAt))
-                        : undefined,
-                      syncedAt: Date.now(),
-                      variants,
-                    };
                   }
-                );
 
-                products.push(...batch);
+                  return {
+                    organizationId: args.organizationId as Id<"organizations">,
+                    storeId,
+                    shopifyId: String(product.id).replace(
+                      "gid://shopify/Product/",
+                      ""
+                    ),
+                    handle: product.handle,
+                    title: product.title,
+                    productType: product.productType || undefined,
+                    vendor: product.vendor || undefined,
+                    status: product.status,
+                    featuredImage: product.featuredImage?.url || undefined,
+                    totalInventory: product.totalInventory
+                      ? parseInt(String(product.totalInventory), 10)
+                      : 0,
+                    totalVariants: variants.length,
+                    tags: product.tags || [],
+                    shopifyCreatedAt: Date.parse(String(product.createdAt)),
+                    shopifyUpdatedAt: Date.parse(String(product.updatedAt)),
+                    publishedAt: product.publishedAt
+                      ? Date.parse(String(product.publishedAt))
+                      : undefined,
+                    syncedAt: Date.now(),
+                    variants,
+                  };
+                }
+              );
 
-                hasNextPage = response.data.products.pageInfo.hasNextPage;
-                cursor = response.data.products.pageInfo.endCursor;
-                logger.debug(`Page ${pageCount} complete`, {
-                  hasNextPage,
-                  nextCursor: cursor,
-                  totalProductsSoFar: products.length,
-                });
-              } else {
-                logger.warn("No products in response", {
-                  pageCount,
-                  response: JSON.stringify(response, null, 2),
-                });
-                hasNextPage = false;
+              products.push(...batch);
+
+              hasNextPage = response.data.products.pageInfo.hasNextPage;
+              cursor = response.data.products.pageInfo.endCursor;
+              logger.debug(`Page ${pageCount} complete`, {
+                hasNextPage,
+                nextCursor: cursor,
+                totalProductsSoFar: products.length,
+              });
+            } else {
+              logger.warn("No products in response", {
+                pageCount,
+                response: JSON.stringify(response, null, 2),
+              });
+              hasNextPage = false;
+            }
+          }
+
+          // Fetch inventory levels separately to reduce query cost
+          if (products.length > 0) {
+            logger.info("Fetching inventory levels for all variants");
+
+            // Collect all inventory item IDs
+            const inventoryItemIds: string[] = [];
+            const inventoryItemToVariant = new Map<
+              string,
+              Record<string, unknown>
+            >();
+
+            for (const product of products) {
+              const variants = (product.variants as any[]) || [];
+              for (const variant of variants) {
+                if (variant.inventoryItemId) {
+                  const gid = `gid://shopify/InventoryItem/${variant.inventoryItemId}`;
+
+                  inventoryItemIds.push(gid);
+                  inventoryItemToVariant.set(gid, variant);
+                }
               }
             }
 
-            // Fetch inventory levels separately to reduce query cost
-            if (products.length > 0) {
-              logger.info("Fetching inventory levels for all variants");
+            logger.debug(
+              `Found ${inventoryItemIds.length} inventory items to fetch`
+            );
 
-              // Collect all inventory item IDs
-              const inventoryItemIds: string[] = [];
-              const inventoryItemToVariant = new Map<
-                string,
-                Record<string, unknown>
-              >();
+            // Fetch inventory in batches
+            const batchSize = SHOPIFY_CONFIG.QUERIES.INVENTORY_BATCH_SIZE;
 
-              for (const product of products) {
-                const variants = (product.variants as any[]) || [];
-                for (const variant of variants) {
-                  if (variant.inventoryItemId) {
-                    const gid = `gid://shopify/InventoryItem/${variant.inventoryItemId}`;
-
-                    inventoryItemIds.push(gid);
-                    inventoryItemToVariant.set(gid, variant);
-                  }
-                }
-              }
+            for (let i = 0; i < inventoryItemIds.length; i += batchSize) {
+              const batch = inventoryItemIds.slice(i, i + batchSize);
 
               logger.debug(
-                `Found ${inventoryItemIds.length} inventory items to fetch`
+                `Fetching inventory batch ${Math.floor(i / batchSize) + 1}`,
+                {
+                  batchSize: batch.length,
+                  from: i,
+                  to: Math.min(i + batchSize, inventoryItemIds.length),
+                }
               );
 
-              // Fetch inventory in batches
-              const batchSize = SHOPIFY_CONFIG.QUERIES.INVENTORY_BATCH_SIZE;
+              try {
+                const invResponse: any = await client.getInventoryLevels(batch);
 
-              for (let i = 0; i < inventoryItemIds.length; i += batchSize) {
-                const batch = inventoryItemIds.slice(i, i + batchSize);
+                if (invResponse.data?.nodes) {
+                  // Map inventory data back to variants
+                  for (const node of invResponse.data.nodes) {
+                    const variant = inventoryItemToVariant.get(node.id);
 
-                logger.debug(
-                  `Fetching inventory batch ${Math.floor(i / batchSize) + 1}`,
-                  {
-                    batchSize: batch.length,
-                    from: i,
-                    to: Math.min(i + batchSize, inventoryItemIds.length),
-                  }
-                );
-
-                try {
-                  const invResponse: any =
-                    await client.getInventoryLevels(batch);
-
-                  if (invResponse.data?.nodes) {
-                    // Map inventory data back to variants
-                    for (const node of invResponse.data.nodes) {
-                      const variant = inventoryItemToVariant.get(node.id);
-
-                      if (variant && node.inventoryLevels?.edges) {
-                        variant.inventoryLevels =
-                          node.inventoryLevels.edges.map(
-                            (edge: {
-                              node: {
-                                available?: number | null;
-                                availableQuantity?: number | null;
-                                incoming?: number | null;
-                                incomingQuantity?: number | null;
-                                committed?: number | null;
-                                reservedQuantity?: number | null;
-                                location?:
-                                  | {
-                                      id?: string | null;
-                                    }
-                                  | null;
-                              };
-                            }) => {
-                              const location = edge.node.location;
-                              const availableValue =
-                                typeof edge.node.availableQuantity === "number"
-                                  ? edge.node.availableQuantity
-                                  : typeof edge.node.available === "number"
-                                    ? edge.node.available
-                                    : 0;
-                              const incomingValue =
-                                typeof edge.node.incomingQuantity === "number"
-                                  ? edge.node.incomingQuantity
-                                  : typeof edge.node.incoming === "number"
-                                    ? edge.node.incoming
-                                    : 0;
-                              const reservedValue =
-                                typeof edge.node.reservedQuantity === "number"
-                                  ? edge.node.reservedQuantity
-                                  : typeof edge.node.committed === "number"
-                                    ? edge.node.committed
-                                    : 0;
-                              return {
-                                locationId:
-                                  location?.id?.replace(
-                                    "gid://shopify/Location/",
-                                    ""
-                                  ) || "",
-                                available: availableValue,
-                                incoming: incomingValue,
-                                committed: reservedValue,
-                              };
-                            }
-                          );
-                      }
+                    if (variant && node.inventoryLevels?.edges) {
+                      variant.inventoryLevels = node.inventoryLevels.edges.map(
+                        (edge: {
+                          node: {
+                            available?: number | null;
+                            availableQuantity?: number | null;
+                            incoming?: number | null;
+                            incomingQuantity?: number | null;
+                            committed?: number | null;
+                            reservedQuantity?: number | null;
+                            location?: {
+                              id?: string | null;
+                            } | null;
+                          };
+                        }) => {
+                          const location = edge.node.location;
+                          const availableValue =
+                            typeof edge.node.availableQuantity === "number"
+                              ? edge.node.availableQuantity
+                              : typeof edge.node.available === "number"
+                                ? edge.node.available
+                                : 0;
+                          const incomingValue =
+                            typeof edge.node.incomingQuantity === "number"
+                              ? edge.node.incomingQuantity
+                              : typeof edge.node.incoming === "number"
+                                ? edge.node.incoming
+                                : 0;
+                          const reservedValue =
+                            typeof edge.node.reservedQuantity === "number"
+                              ? edge.node.reservedQuantity
+                              : typeof edge.node.committed === "number"
+                                ? edge.node.committed
+                                : 0;
+                          return {
+                            locationId:
+                              location?.id?.replace(
+                                "gid://shopify/Location/",
+                                ""
+                              ) || "",
+                            available: availableValue,
+                            incoming: incomingValue,
+                            committed: reservedValue,
+                          };
+                        }
+                      );
                     }
                   }
-                } catch (error) {
-                  logger.error("Failed to fetch inventory batch", {
-                    batch: i / batchSize + 1,
-                    error:
-                      error instanceof Error
-                        ? error.message
-                        : JSON.stringify(error),
-                  });
-                  // Continue with other batches even if one fails
                 }
+              } catch (error) {
+                logger.error("Failed to fetch inventory batch", {
+                  batch: i / batchSize + 1,
+                  error:
+                    error instanceof Error
+                      ? error.message
+                      : JSON.stringify(error),
+                });
+                // Continue with other batches even if one fails
               }
-
-              logger.info("Inventory levels fetched successfully");
             }
 
-            // Store products in database
-            if (products.length > 0) {
-              await ctx.runMutation(
-                internal.shopify.productMutations.storeProductsInternal,
-                {
-                  organizationId: args.organizationId as Id<"organizations">,
-                  storeId, // pass through to avoid race on active store lookup
-                  products,
-                }
-              );
-              
-              // Calculate COGS coverage statistics
-              const cogsPercentage = totalVariants > 0 
+            logger.info("Inventory levels fetched successfully");
+          }
+
+          // Store products in database
+          if (products.length > 0) {
+            await ctx.runMutation(
+              internal.shopify.productMutations.storeProductsInternal,
+              {
+                organizationId: args.organizationId as Id<"organizations">,
+                storeId, // pass through to avoid race on active store lookup
+                products,
+              }
+            );
+
+            // Calculate COGS coverage statistics
+            const cogsPercentage =
+              totalVariants > 0
                 ? Math.round((variantsWithCogs / totalVariants) * 100)
                 : 0;
-              
-              logger.info("COGS Coverage Report", {
-                variantsWithCogs,
-                totalVariants,
-                cogsPercentage: `${cogsPercentage}%`,
-                missingCogs: totalVariants - variantsWithCogs,
+
+            logger.info("COGS Coverage Report", {
+              variantsWithCogs,
+              totalVariants,
+              cogsPercentage: `${cogsPercentage}%`,
+              missingCogs: totalVariants - variantsWithCogs,
+            });
+
+            // Create product cost components for variants with COGS
+            if (variantsToCreateCostComponents.length > 0) {
+              logger.info("Creating product cost components", {
+                count: variantsToCreateCostComponents.length,
               });
-              
-              // Create product cost components for variants with COGS
-              if (variantsToCreateCostComponents.length > 0) {
-                logger.info("Creating product cost components", {
-                  count: variantsToCreateCostComponents.length,
-                });
-                
-                await ctx.runMutation(
-                  internal.core.costs.createVariantCosts,
-                  {
-                    organizationId: args.organizationId as Id<"organizations">,
-                    components: variantsToCreateCostComponents,
-                  }
-                );
-              }
+
+              await ctx.runMutation(internal.core.costs.createVariantCosts, {
+                organizationId: args.organizationId as Id<"organizations">,
+                components: variantsToCreateCostComponents,
+              });
             }
-
-            logger.info("Products fetched", {
-              count: products.length,
-              completedAt: new Date().toISOString(),
-            });
-
-            await patchSyncMetadata({
-              stageStatus: {
-                products: "completed",
-                inventory: "completed",
-              },
-              syncedEntities: ["products", "inventory"],
-            });
-
-            return products.length;
-          } catch (error) {
-            errors.push(`Product sync failed: ${error}`);
-            logger.error("Product sync failed", error);
-
-            await patchSyncMetadata({
-              stageStatus: {
-                products: "failed",
-                inventory: "failed",
-              },
-            });
-
-            return 0;
           }
-        };
+
+          logger.info("Products fetched", {
+            count: products.length,
+            completedAt: new Date().toISOString(),
+          });
+
+          await patchSyncMetadata({
+            stageStatus: {
+              products: "completed",
+              inventory: "completed",
+            },
+            syncedEntities: ["products", "inventory"],
+          });
+
+          return products.length;
+        } catch (error) {
+          errors.push(`Product sync failed: ${error}`);
+          logger.error("Product sync failed", error);
+
+          await patchSyncMetadata({
+            stageStatus: {
+              products: "failed",
+              inventory: "failed",
+            },
+          });
+
+          return 0;
+        }
+      };
 
       // 2. Fetch Orders with full details in paginated batches and enqueue persistence jobs
       const fetchOrders = async () => {
@@ -1147,9 +934,7 @@ export const initial = internalAction({
             const refundsPayload =
               refundsBatch.length > 0 ? [...refundsBatch] : undefined;
             const fulfillmentsPayload =
-              fulfillmentsBatch.length > 0
-                ? [...fulfillmentsBatch]
-                : undefined;
+              fulfillmentsBatch.length > 0 ? [...fulfillmentsBatch] : undefined;
 
             const batchNum = batchesScheduled + 1;
             const jobId = await createJob(
@@ -1166,7 +951,7 @@ export const initial = internalAction({
                 transactions: transactionsPayload,
                 refunds: refundsPayload,
                 fulfillments: fulfillmentsPayload,
-              },
+              }
             );
 
             logger.info(`Created order batch job ${batchNum}`, {
@@ -1186,7 +971,7 @@ export const initial = internalAction({
                     currentPage: pageCount,
                     totalOrdersSeen,
                   },
-                },
+                }
               );
             }
 
@@ -1206,13 +991,13 @@ export const initial = internalAction({
               {
                 cursor,
                 dateQuery,
-              },
+              }
             );
 
             const response: any = await client.getOrders(
               currentPageSize,
               cursor,
-              dateQuery,
+              dateQuery
             );
 
             const errorSummary =
@@ -1236,19 +1021,19 @@ export const initial = internalAction({
 
               const costError = response.errors.find(
                 (error: { extensions?: { code?: string } }) =>
-                  error.extensions?.code === "MAX_COST_EXCEEDED",
+                  error.extensions?.code === "MAX_COST_EXCEEDED"
               );
 
               if (costError) {
                 const previousPageSize = currentPageSize;
                 const nextPageSize = Math.max(
                   MIN_ORDERS_PAGE_SIZE,
-                  Math.floor(previousPageSize / 2),
+                  Math.floor(previousPageSize / 2)
                 );
 
                 if (nextPageSize === previousPageSize) {
                   throw new Error(
-                    `Shopify orders query exceeded cost limit even at minimum page size ${MIN_ORDERS_PAGE_SIZE}`,
+                    `Shopify orders query exceeded cost limit even at minimum page size ${MIN_ORDERS_PAGE_SIZE}`
                   );
                 }
 
@@ -1259,7 +1044,7 @@ export const initial = internalAction({
                     previousPageSize,
                     nextPageSize,
                     dateQuery,
-                  },
+                  }
                 );
                 // Retry the same cursor with the smaller page size
                 await sleep(COST_BACKOFF_MS);
@@ -1272,8 +1057,9 @@ export const initial = internalAction({
               response.data.orders.edges.length > 0
             ) {
               pageCount += 1;
-              const pageOrders =
-                response.data.orders.edges as Array<{ node: ShopifyOrderNode }>;
+              const pageOrders = response.data.orders.edges as Array<{
+                node: ShopifyOrderNode;
+              }>;
 
               totalOrdersSeen += pageOrders.length;
 
@@ -1283,16 +1069,20 @@ export const initial = internalAction({
                   {
                     organizationId: args.organizationId as Id<"organizations">,
                     pageCount,
-                  },
+                  }
                 );
               }
 
               for (const edge of pageOrders) {
-                const { order: mappedOrder, transactions, refunds, fulfillments } =
-                  mapOrderNodeToPersistence(
-                    edge.node,
-                    args.organizationId as Id<"organizations">,
-                  );
+                const {
+                  order: mappedOrder,
+                  transactions,
+                  refunds,
+                  fulfillments,
+                } = mapOrderNodeToPersistence(
+                  edge.node,
+                  args.organizationId as Id<"organizations">
+                );
 
                 ordersBatch.push(mappedOrder);
 
@@ -1332,7 +1122,7 @@ export const initial = internalAction({
                   totalPages: pageCount,
                   totalOrdersSeen,
                 },
-              },
+              }
             );
           }
 
@@ -1368,7 +1158,6 @@ export const initial = internalAction({
         }
       };
 
-
       // 3. Fetch Customers with complete data
       const fetchCustomers = async () => {
         try {
@@ -1388,11 +1177,11 @@ export const initial = internalAction({
               : Number.POSITIVE_INFINITY;
           const persistBatchSize = Math.max(
             1,
-            SHOPIFY_CONFIG.SYNC?.CUSTOMERS_PERSIST_BATCH_SIZE ?? 200,
+            SHOPIFY_CONFIG.SYNC?.CUSTOMERS_PERSIST_BATCH_SIZE ?? 200
           );
           const pageSizeBase = Math.max(
             1,
-            SHOPIFY_CONFIG.QUERIES?.CUSTOMERS_BATCH_SIZE ?? 200,
+            SHOPIFY_CONFIG.QUERIES?.CUSTOMERS_BATCH_SIZE ?? 200
           );
 
           let hasNextPage = true;
@@ -1410,14 +1199,17 @@ export const initial = internalAction({
               {
                 organizationId: args.organizationId,
                 customers: batchToPersist,
-              },
+              }
             );
 
             totalPersisted += batchToPersist.length;
           };
 
           const flushReadyChunks = async () => {
-            while (pending.length >= persistBatchSize && totalPersisted < maxCustomers) {
+            while (
+              pending.length >= persistBatchSize &&
+              totalPersisted < maxCustomers
+            ) {
               const remainingCapacity = maxCustomers - totalPersisted;
               if (remainingCapacity <= 0) {
                 break;
@@ -1445,7 +1237,7 @@ export const initial = internalAction({
                   const customer = edge.node;
                   const customerId = String(customer.id).replace(
                     "gid://shopify/Customer/",
-                    "",
+                    ""
                   );
 
                   return {
@@ -1458,10 +1250,10 @@ export const initial = internalAction({
                     lastName: customer.lastName || undefined,
                     ordersCount: parseInt(
                       String((customer as any).numberOfOrders?.count || 0),
-                      10,
+                      10
                     ),
                     totalSpent: parseMoney(
-                      String((customer as any).amountSpent?.amount),
+                      String((customer as any).amountSpent?.amount)
                     ),
                     state: customer.state || undefined,
                     verifiedEmail: customer.verifiedEmail || false,
@@ -1477,7 +1269,8 @@ export const initial = internalAction({
                             (customer as any).addresses[0].city || undefined,
                           zip:
                             (customer as any).addresses[0].zip ||
-                            (customer as any).addresses[0].zipCode || undefined,
+                            (customer as any).addresses[0].zipCode ||
+                            undefined,
                         }
                       : undefined,
                     tags: customer.tags || [],
@@ -1486,7 +1279,7 @@ export const initial = internalAction({
                     shopifyUpdatedAt: Date.parse(String(customer.updatedAt)),
                     syncedAt: Date.now(),
                   };
-                },
+                }
               );
 
               if (batch.length) {
@@ -1510,7 +1303,9 @@ export const initial = internalAction({
           if (pending.length && totalPersisted < maxCustomers) {
             const remainingCapacity = maxCustomers - totalPersisted;
             if (remainingCapacity > 0) {
-              await persistCustomers(Math.min(pending.length, remainingCapacity));
+              await persistCustomers(
+                Math.min(pending.length, remainingCapacity)
+              );
             }
           }
 
@@ -1576,7 +1371,7 @@ export const initial = internalAction({
           {
             storeId,
             timestamp: Date.now(),
-          },
+          }
         );
       } catch (error) {
         logger.warn("Failed to update store last sync timestamp", {
@@ -1592,16 +1387,17 @@ export const initial = internalAction({
           organizationId: args.organizationId,
         }
       );
-      
+
       if (validationReport) {
         logger.info("Cost Data Completeness Report", validationReport);
-        
+
         // Notify if cost data is incomplete
         if (validationReport.completenessPercentage < 50) {
           logger.warn("Low cost data completeness detected", {
             organizationId: args.organizationId,
             completeness: `${validationReport.completenessPercentage}%`,
-            recommendation: "Consider updating product costs in Shopify or manually setting costs in the application",
+            recommendation:
+              "Consider updating product costs in Shopify or manually setting costs in the application",
           });
         }
       }
@@ -1646,7 +1442,7 @@ export const incremental = internalAction({
         internal.shopify.internalQueries.getActiveStoreInternal,
         {
           organizationId: args.organizationId,
-        },
+        }
       );
 
       if (!store) {
@@ -1655,7 +1451,8 @@ export const incremental = internalAction({
 
       const storeId = store._id as Id<"shopifyStores">;
       const fallbackWindowMs = 6 * 60 * 60 * 1000; // 6 hours
-      const sinceMs = args.since ?? store.lastSyncAt ?? Date.now() - fallbackWindowMs;
+      const sinceMs =
+        args.since ?? store.lastSyncAt ?? Date.now() - fallbackWindowMs;
       const sinceIso = new Date(sinceMs).toISOString();
 
       const client = new ShopifyGraphQLClient({
@@ -1676,7 +1473,7 @@ export const incremental = internalAction({
         const response: any = await client.getOrders(
           SHOPIFY_CONFIG.QUERIES.ORDERS_BATCH_SIZE,
           cursor,
-          `updated_at:>=${sinceIso}`,
+          `updated_at:>=${sinceIso}`
         );
 
         if (response.errors && response.errors.length > 0) {
@@ -1690,8 +1487,15 @@ export const incremental = internalAction({
         }>;
 
         for (const edge of edges) {
-          const { order, transactions: txs, refunds: rfs, fulfillments: ffs } =
-            mapOrderNodeToPersistence(edge.node, args.organizationId as Id<"organizations">);
+          const {
+            order,
+            transactions: txs,
+            refunds: rfs,
+            fulfillments: ffs,
+          } = mapOrderNodeToPersistence(
+            edge.node,
+            args.organizationId as Id<"organizations">
+          );
 
           orders.push(order);
 
@@ -1711,7 +1515,7 @@ export const incremental = internalAction({
             internal.shopify.status.getInitialSyncStatusInternal,
             {
               organizationId: args.organizationId,
-            },
+            }
           );
         }
 
@@ -1726,7 +1530,7 @@ export const incremental = internalAction({
             storeId,
             orders,
             shouldScheduleAnalytics: await ensureAnalyticsEligibility(),
-          },
+          }
         );
       }
 
@@ -1737,7 +1541,7 @@ export const incremental = internalAction({
             organizationId: args.organizationId,
             transactions,
             shouldScheduleAnalytics: await ensureAnalyticsEligibility(),
-          },
+          }
         );
       }
 
@@ -1748,7 +1552,7 @@ export const incremental = internalAction({
             organizationId: args.organizationId,
             refunds,
             shouldScheduleAnalytics: await ensureAnalyticsEligibility(),
-          },
+          }
         );
       }
 
@@ -1758,7 +1562,7 @@ export const incremental = internalAction({
           {
             organizationId: args.organizationId,
             fulfillments,
-          },
+          }
         );
       }
 
@@ -1767,7 +1571,7 @@ export const incremental = internalAction({
         {
           storeId,
           timestamp: Date.now(),
-        },
+        }
       );
 
       const recordsProcessed = orders.length;

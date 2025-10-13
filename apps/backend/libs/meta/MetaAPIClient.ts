@@ -199,7 +199,7 @@ export class MetaAPIClient {
       accountId,
       params,
       fieldsCount: fields?.length || 0,
-      fullUrl: url,
+      request: this.summarizeUrl(url),
       dateRange: params.timeRange || params.datePreset || "no date specified",
     });
 
@@ -412,7 +412,7 @@ export class MetaAPIClient {
     logger.info("Getting account details", {
       originalAccountId: accountId,
       formattedAccountId,
-      url,
+      request: this.summarizeUrl(url),
       fields: fields.join(","),
     });
 
@@ -489,13 +489,37 @@ export class MetaAPIClient {
     return `${this.baseURL}/${endpoint}?${params.toString()}`;
   }
 
+  private summarizeUrl(url: string) {
+    try {
+      const parsed = new URL(url);
+      const searchParams = Array.from(parsed.searchParams.entries());
+      const previewLimit = 5;
+
+      return {
+        host: parsed.host,
+        path: parsed.pathname,
+        totalParams: searchParams.length,
+        paramsPreview: searchParams.slice(0, previewLimit).map(([key, value]) => ({
+          key,
+          value: value.length > 32 ? `${value.slice(0, 32)}...` : value,
+        })),
+        truncated: searchParams.length > previewLimit,
+      };
+    } catch {
+      return {
+        preview: url.slice(0, 80),
+        totalLength: url.length,
+      };
+    }
+  }
+
   /**
    * Make HTTP request
    */
   private async makeRequest<T>(url: string): Promise<APIResponse<T>> {
     // Log outgoing request
     logger.info("Making API request", {
-      url: url.substring(0, 200), // Log first 200 chars to avoid huge logs
+      request: this.summarizeUrl(url),
       hasAccessToken: !!this.accessToken,
     });
 
@@ -569,22 +593,29 @@ export class MetaAPIClient {
     let url: string | undefined = initialUrl;
     let pageNumber = 0;
 
-    logger.info("Starting pagination", { initialUrl });
+    logger.info("Starting pagination", {
+      request: this.summarizeUrl(initialUrl),
+    });
 
     while (url) {
       pageNumber++;
-      logger.info("Fetching page", { pageNumber, url });
+      logger.info("Fetching page", {
+        pageNumber,
+        request: this.summarizeUrl(url),
+      });
 
       const response: APIResponse<T[]> = await this.makeRequest<T[]>(url);
 
       // Log response details
+      const nextPageUrl = response.paging?.next;
+
       logger.info("Page response received", {
         pageNumber,
         hasData: !!response.data,
         dataLength: response.data?.length || 0,
         hasPaging: !!response.paging,
         hasNext: !!response.paging?.next,
-        nextUrl: response.paging?.next?.substring(0, 100) || "none",
+        nextPage: nextPageUrl ? this.summarizeUrl(nextPageUrl) : null,
       });
 
       if (response.data && response.data.length > 0) {

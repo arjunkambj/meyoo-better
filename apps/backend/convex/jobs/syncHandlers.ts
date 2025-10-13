@@ -117,7 +117,7 @@ export const handleInitialSync = internalAction({
       switch (args.platform) {
         case "shopify":
           result = (await ctx.runAction(
-            internal.integrations.shopifySync.initial,
+            internal.shopify.sync.initial,
             {
               organizationId: args.organizationId,
               dateRange: {
@@ -194,7 +194,7 @@ export const handleInitialSync = internalAction({
           break;
         case "meta":
           result = (await ctx.runAction(
-            internal.integrations.metaSync.initial,
+            internal.meta.sync.initial,
             {
               organizationId: args.organizationId,
               accountId: args.accountId,

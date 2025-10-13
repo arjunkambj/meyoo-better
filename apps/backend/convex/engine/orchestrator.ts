@@ -235,7 +235,7 @@ async function executeShopifySync(
 ) {
   if (args.syncType === "initial") {
     const result = await ctx.runAction(
-      internal.integrations.shopifySync.initial,
+      internal.shopify.sync.initial,
       {
         organizationId: args.organizationId,
         dateRange: {
@@ -250,7 +250,7 @@ async function executeShopifySync(
     };
   } else {
     const incremental = await ctx.runAction(
-      internal.integrations.shopifySync.incremental,
+      internal.shopify.sync.incremental,
       {
         organizationId: args.organizationId,
         since: args.dateRange?.startDate
@@ -276,7 +276,7 @@ async function executeMetaSync(
   // Use the production Meta sync pipeline backed by MetaAPIClient
   if (args.syncType === "initial") {
     const res = await ctx.runAction(
-      internal.integrations.metaSync.initial,
+      internal.meta.sync.initial,
       {
         organizationId: String(args.organizationId),
         dateRange: args.dateRange?.daysBack
@@ -290,7 +290,7 @@ async function executeMetaSync(
     };
   } else {
     const res = await ctx.runAction(
-      internal.integrations.metaSync.incremental,
+      internal.meta.sync.incremental,
       {
         organizationId: String(args.organizationId),
         since: args.dateRange?.startDate

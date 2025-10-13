@@ -37,7 +37,7 @@ crons.interval(
 crons.interval(
   "refresh integration tokens",
   { hours: 24 },
-  internal.integrations.tokenManager.refreshExpiring,
+  internal.meta.tokenManager.refreshExpiring,
   {},
 );
 

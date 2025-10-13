@@ -5,7 +5,7 @@ import type { Id } from "../_generated/dataModel";
 import { api, internal } from "../_generated/api";
 import { dateRangeValidator } from "../web/analyticsShared";
 import { rag } from "../rag";
-import { resend } from "../integrations/resend";
+import { resend } from "../resend";
 import type {
   OrdersAnalyticsResult,
   PlatformMetrics as AggregatedPlatformMetrics,

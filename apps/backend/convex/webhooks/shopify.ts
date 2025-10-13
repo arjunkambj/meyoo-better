@@ -2,7 +2,7 @@ import { SHOPIFY_WEBHOOK_TOPICS } from "../../libs/integrations";
 import { createSimpleLogger } from "../../libs/logging/simple";
 import { internal } from "../_generated/api";
 import { httpAction } from "../_generated/server";
-import { WebhookUtils } from "../integrations/_base";
+import { WebhookUtils } from "../core/integrationBase";
 import {
   toNum,
   toMoney,
@@ -1033,7 +1033,7 @@ async function handleTopicInline(
           resolvedPlan !== "free" && currentPlan !== resolvedPlan && status === "ACTIVE";
 
         await ctx.runMutation(
-          internal.billing.organizationHelpers.updateOrganizationPlanInternalWithTracking,
+          internal.core.organizationBilling.updateOrganizationPlanInternalWithTracking,
           {
             organizationId,
             plan: resolvedPlan,
@@ -1084,7 +1084,7 @@ async function handleTopicInline(
         !currentBilling?.shopifyBilling?.isActive;
       if (isCurrent) {
         await ctx.runMutation(
-          internal.billing.organizationHelpers.updateOrganizationPlanInternal,
+          internal.core.organizationBilling.updateOrganizationPlanInternal,
           {
             organizationId,
             plan: "free",

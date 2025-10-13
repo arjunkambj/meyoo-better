@@ -22,8 +22,8 @@ export default function AccountSelectionClient() {
   const setNavigationPending = useSetAtom(setNavigationPendingAtom);
 
   // Fetch ad accounts
-  const adAccounts = useQuery(api.integrations.meta.getAdAccounts);
-  const setPrimaryAccount = useMutation(api.integrations.meta.setPrimaryAdAccount);
+  const adAccounts = useQuery(api.meta.queries.getAdAccounts);
+  const setPrimaryAccount = useMutation(api.meta.mutations.setPrimaryAdAccount);
 
   // Analytics: step view
   useEffect(() => {

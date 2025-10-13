@@ -97,7 +97,7 @@ export async function GET(req: NextRequest) {
 
     // Store Meta connection in Convex
     await fetchMutation(
-      api.integrations.meta.connectMeta,
+      api.meta.mutations.connectMeta,
       {
         accessToken: accessToken,
         refreshToken: tokenResponse.data.refresh_token,
@@ -112,7 +112,7 @@ export async function GET(req: NextRequest) {
     // Fetch and store ad accounts immediately after connection
     try {
       const accountsResult = await fetchAction(
-        api.integrations.meta.fetchMetaAccountsAction,
+        api.meta.actions.fetchMetaAccountsAction,
         {},
         { token },
       );
@@ -124,7 +124,7 @@ export async function GET(req: NextRequest) {
         });
       } else {
         await fetchMutation(
-          api.integrations.meta.storeAdAccountsFromCallback,
+          api.meta.mutations.storeAdAccountsFromCallback,
           { accounts: accountsResult.accounts },
           { token },
         );

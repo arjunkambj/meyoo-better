@@ -144,7 +144,7 @@ export const tick = internalAction({
       try {
         // Pull today's insights (minimal)
         const today = new Date().toISOString().substring(0, 10);
-        await ctx.runAction(internal.integrations.metaSync.pullDaily, {
+        await ctx.runAction(internal.meta.sync.pullDaily, {
           organizationId: a.organizationId,
           accountId: a.accountId,
           date: today,

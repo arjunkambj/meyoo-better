@@ -1,6 +1,6 @@
 import { internal } from "../_generated/api";
 import { httpAction } from "../_generated/server";
-import { WebhookUtils } from "../integrations/_base";
+import { WebhookUtils } from "../core/integrationBase";
 import { requireEnv } from "../utils/env";
 
 const SHOPIFY_API_SECRET = requireEnv("SHOPIFY_API_SECRET");

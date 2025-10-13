@@ -33,7 +33,7 @@ export const scheduleNext = internalMutation({
 
     if (!platformsToSync) {
       const metaSession = await ctx.runQuery(
-        (internal.integrations.tokenManager as any).getActiveSessionInternal,
+        (internal.meta.tokenManager as any).getActiveSessionInternal,
         {
           organizationId: args.organizationId,
           platform: "meta",

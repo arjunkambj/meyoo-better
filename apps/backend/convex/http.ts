@@ -1,14 +1,14 @@
 import { httpRouter } from "convex/server";
 
 import { auth } from "./auth";
-import { syncGoogle, syncMeta, syncShopify } from "./sync/http";
+import { syncGoogle, syncMeta, syncShopify } from "./httpSync";
 import {
   customerDataRequest,
   customerRedact,
   shopRedact,
 } from "./webhooks/gdpr";
 import { shopifyWebhook, shopifyWebhookHealth } from "./webhooks/shopify";
-import { sendOtp } from "./emails/http";
+import { sendOtp } from "./resend/http";
 
 const http = httpRouter();
 

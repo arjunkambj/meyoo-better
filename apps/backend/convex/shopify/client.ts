@@ -1,10 +1,6 @@
 import { ShopifyGraphQLClient } from "../../libs/shopify/ShopifyGraphQLClient";
 
-export type ShopifyStoreLike = {
-  shopDomain: string;
-  accessToken: string;
-  apiVersion?: string;
-};
+import type { ShopifyStoreLike } from "./types";
 
 export async function initializeShopifyClient(
   store: ShopifyStoreLike,

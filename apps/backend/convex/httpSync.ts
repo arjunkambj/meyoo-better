@@ -1,5 +1,5 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { httpAction } from "../_generated/server";
+import { httpAction } from "./_generated/server";
 
 /**
  * Sync HTTP Endpoints

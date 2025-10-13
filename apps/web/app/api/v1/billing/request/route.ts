@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
 
     // Get organization details to check trial status
     const organization = await fetchQuery(
-      api.billing.organizationHelpers.getOrganizationByUser,
+      api.core.organizationBilling.getOrganizationByUser,
       {},
       { token },
     );

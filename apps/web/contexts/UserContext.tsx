@@ -4,7 +4,7 @@ import React, { createContext, useContext, type ReactNode } from "react";
 import { useQuery } from "convex-helpers/react/cache/hooks";
 
 import { api } from "@/libs/convexApi";
-import type { Doc } from "@/types/convex";
+import type { Doc } from "@repo/convex/dataModel";
 
 type UserContextValue = {
   user: Doc<"users"> | null;

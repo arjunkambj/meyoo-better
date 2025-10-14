@@ -1,4 +1,11 @@
-import type React from "react";
+type ReactNodeLike =
+  | string
+  | number
+  | boolean
+  | null
+  | undefined
+  | { [key: string]: unknown }
+  | ReactNodeLike[];
 
 // UI Component types
 export interface SelectOption {
@@ -15,7 +22,7 @@ export interface TableColumn<T = unknown> {
   sortable?: boolean;
   width?: string;
   align?: "left" | "center" | "right";
-  render?: (value: unknown, row: T) => React.ReactNode;
+  render?: (value: unknown, row: T) => ReactNodeLike;
 }
 
 export interface FilterConfig {

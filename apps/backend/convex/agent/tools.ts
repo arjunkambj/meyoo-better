@@ -1,4 +1,5 @@
 import { createTool } from "@convex-dev/agent";
+import type { Tool } from "ai";
 import { api } from "../_generated/api";
 import { resend } from "../resend";
 import { z } from "zod/v3";
@@ -164,41 +165,45 @@ type SendEmailToolResult = {
   error?: string;
 };
 
+type OrdersSummaryArgs = { startDate?: string; endDate?: string };
+
+type OrdersSummaryResult = {
+  dateRange: { startDate: string; endDate: string };
+  totals: {
+    totalOrders: number;
+    pendingOrders: number;
+    processingOrders: number;
+    completedOrders: number;
+    cancelledOrders: number;
+  };
+  financials: {
+    totalRevenue: number;
+    totalCosts: number;
+    netProfit: number;
+    avgOrderValue: number;
+    grossMargin: number;
+    customerAcquisitionCost: number;
+  };
+  fulfillment: {
+    fulfillmentRate: number;
+    avgFulfillmentTime: number;
+    returnRate: number;
+  };
+  changes: {
+    totalOrders: number;
+    revenue: number;
+    netProfit: number;
+    avgOrderValue: number;
+    cac: number;
+    margin: number;
+    fulfillmentRate: number;
+  };
+  summary: string;
+};
+
 export const ordersSummaryTool = createTool<
-  { startDate?: string; endDate?: string },
-  {
-    dateRange: { startDate: string; endDate: string };
-    totals: {
-      totalOrders: number;
-      pendingOrders: number;
-      processingOrders: number;
-      completedOrders: number;
-      cancelledOrders: number;
-    };
-    financials: {
-      totalRevenue: number;
-      totalCosts: number;
-      netProfit: number;
-      avgOrderValue: number;
-      grossMargin: number;
-      customerAcquisitionCost: number;
-    };
-    fulfillment: {
-      fulfillmentRate: number;
-      avgFulfillmentTime: number;
-      returnRate: number;
-    };
-    changes: {
-      totalOrders: number;
-      revenue: number;
-      netProfit: number;
-      avgOrderValue: number;
-      cac: number;
-      margin: number;
-      fulfillmentRate: number;
-    };
-    summary: string;
-  }
+  OrdersSummaryArgs,
+  OrdersSummaryResult
 >({
   description:
     "Summarize order volume, revenue, and fulfillment performance over a date range.",
@@ -209,39 +214,7 @@ export const ordersSummaryTool = createTool<
   handler: async (
     ctx,
     args,
-  ): Promise<{
-    dateRange: { startDate: string; endDate: string };
-    totals: {
-      totalOrders: number;
-      pendingOrders: number;
-      processingOrders: number;
-      completedOrders: number;
-      cancelledOrders: number;
-    };
-    financials: {
-      totalRevenue: number;
-      totalCosts: number;
-      netProfit: number;
-      avgOrderValue: number;
-      grossMargin: number;
-      customerAcquisitionCost: number;
-    };
-    fulfillment: {
-      fulfillmentRate: number;
-      avgFulfillmentTime: number;
-      returnRate: number;
-    };
-    changes: {
-      totalOrders: number;
-      revenue: number;
-      netProfit: number;
-      avgOrderValue: number;
-      cac: number;
-      margin: number;
-      fulfillmentRate: number;
-    };
-    summary: string;
-  }> => {
+  ): Promise<OrdersSummaryResult> => {
     console.log("[TOOL CALL] ordersSummary", { startDate: args.startDate, endDate: args.endDate });
     const { orgId } = await requireUserAndOrg(ctx);
     const dateRange = await resolveDateRangeOrDefault(
@@ -374,24 +347,28 @@ export const ordersSummaryTool = createTool<
       summary,
     };
   },
-});
+}) as Tool<OrdersSummaryArgs, OrdersSummaryResult>;
+
+type InventoryLowStockArgs = { limit?: number };
+
+type InventoryLowStockResult = {
+  summary: string;
+  totalAlerts: number;
+  alerts: Array<{
+    id: string;
+    type: "critical" | "low" | "reorder";
+    productName: string;
+    sku: string;
+    currentStock: number;
+    reorderPoint?: number;
+    daysUntilStockout?: number;
+    message: string;
+  }>;
+};
 
 export const inventoryLowStockTool = createTool<
-  { limit?: number },
-  {
-    summary: string;
-    totalAlerts: number;
-    alerts: Array<{
-      id: string;
-      type: "critical" | "low" | "reorder";
-      productName: string;
-      sku: string;
-      currentStock: number;
-      reorderPoint?: number;
-      daysUntilStockout?: number;
-      message: string;
-    }>;
-  }
+  InventoryLowStockArgs,
+  InventoryLowStockResult
 >({
   description:
     "List products that are low or critical on stock so replenishment can be prioritised.",
@@ -401,20 +378,7 @@ export const inventoryLowStockTool = createTool<
   handler: async (
     ctx,
     args,
-  ): Promise<{
-    summary: string;
-    totalAlerts: number;
-    alerts: Array<{
-      id: string;
-      type: "critical" | "low" | "reorder";
-      productName: string;
-      sku: string;
-      currentStock: number;
-      reorderPoint?: number;
-      daysUntilStockout?: number;
-      message: string;
-    }>;
-  }> => {
+  ): Promise<InventoryLowStockResult> => {
     console.log("[TOOL CALL] inventoryLowStock", { limit: args.limit });
     await requireUserAndOrg(ctx);
     const limit = args.limit && args.limit > 0 ? Math.min(args.limit, 50) : 10;
@@ -442,7 +406,7 @@ export const inventoryLowStockTool = createTool<
       alerts: normalized,
     };
   },
-});
+}) as Tool<InventoryLowStockArgs, InventoryLowStockResult>;
 
 const analyticsSummaryArgs = z.object({
   startDate: isoDate,
@@ -523,15 +487,19 @@ export const analyticsSummaryTool = createTool<
       records,
     };
   },
-});
+}) as Tool<AnalyticsSummaryArgs, AnalyticsSummaryResult>;
+
+type MetaAdsOverviewArgs = { startDate?: string; endDate?: string };
+
+type MetaAdsOverviewResult = {
+  summary: string;
+  dateRange: { startDate: string; endDate: string };
+  meta: MetaPlatformSummary;
+};
 
 export const metaAdsOverviewTool = createTool<
-  { startDate?: string; endDate?: string },
-  {
-    summary: string;
-    dateRange: { startDate: string; endDate: string };
-    meta: MetaPlatformSummary;
-  }
+  MetaAdsOverviewArgs,
+  MetaAdsOverviewResult
 >({
   description:
     "Retrieve Meta ads performance metrics (impressions, clicks, conversions, CPC, etc.) for a date window.",
@@ -542,7 +510,7 @@ export const metaAdsOverviewTool = createTool<
   handler: async (
     ctx,
     args,
-  ): Promise<{ summary: string; dateRange: { startDate: string; endDate: string }; meta: MetaPlatformSummary }> => {
+  ): Promise<MetaAdsOverviewResult> => {
     console.log("[TOOL CALL] metaAdsOverview", { startDate: args.startDate, endDate: args.endDate });
     const { orgId } = await requireUserAndOrg(ctx);
     const dateRange = await resolveDateRangeOrDefault(
@@ -616,20 +584,24 @@ export const metaAdsOverviewTool = createTool<
       meta,
     };
   },
-});
+}) as Tool<MetaAdsOverviewArgs, MetaAdsOverviewResult>;
+
+type CurrentDateArgs = Record<string, never>;
+
+type CurrentDateResult = {
+  isoDate: string;
+  isoDateTime: string;
+  utc: string;
+};
 
 export const currentDateTool = createTool<
-  Record<string, never>,
-  {
-    isoDate: string;
-    isoDateTime: string;
-    utc: string;
-  }
+  CurrentDateArgs,
+  CurrentDateResult
 >({
   description:
     'Returns the current date in ISO 8601 format (UTC). Use this when you need to reference "today" explicitly.',
   args: z.object({}),
-  handler: async () => {
+  handler: async (): Promise<CurrentDateResult> => {
     console.log("[TOOL CALL] currentDate");
     const now = new Date();
     return {
@@ -638,30 +610,34 @@ export const currentDateTool = createTool<
       utc: now.toUTCString(),
     };
   },
-});
+}) as Tool<CurrentDateArgs, CurrentDateResult>;
 
-export const pnlSnapshotTool = createTool<
-  { startDate?: string; endDate?: string },
-  {
-    summary: string;
-    dateRange: { startDate: string; endDate: string };
+type PnlSnapshotArgs = { startDate?: string; endDate?: string };
+
+type PnlSnapshotResult = {
+  summary: string;
+  dateRange: { startDate: string; endDate: string };
+  revenue: number;
+  grossProfit: number;
+  netProfit: number;
+  grossMargin: number;
+  netMargin: number;
+  operatingExpenses: number;
+  adSpend: number;
+  marketingROI: number;
+  ebitda: number;
+  changes: {
     revenue: number;
-    grossProfit: number;
     netProfit: number;
     grossMargin: number;
     netMargin: number;
-    operatingExpenses: number;
-    adSpend: number;
     marketingROI: number;
-    ebitda: number;
-    changes: {
-      revenue: number;
-      netProfit: number;
-      grossMargin: number;
-      netMargin: number;
-      marketingROI: number;
-    };
-  }
+  };
+};
+
+export const pnlSnapshotTool = createTool<
+  PnlSnapshotArgs,
+  PnlSnapshotResult
 >({
   description:
     "Generate a profit & loss snapshot covering revenue, profit margins, and spend for a period.",
@@ -672,26 +648,7 @@ export const pnlSnapshotTool = createTool<
   handler: async (
     ctx,
     args,
-  ): Promise<{
-    summary: string;
-    dateRange: { startDate: string; endDate: string };
-    revenue: number;
-    grossProfit: number;
-    netProfit: number;
-    grossMargin: number;
-    netMargin: number;
-    operatingExpenses: number;
-    adSpend: number;
-    marketingROI: number;
-    ebitda: number;
-    changes: {
-      revenue: number;
-      netProfit: number;
-      grossMargin: number;
-      netMargin: number;
-      marketingROI: number;
-    };
-  }> => {
+  ): Promise<PnlSnapshotResult> => {
     console.log("[TOOL CALL] pnlSnapshot", { startDate: args.startDate, endDate: args.endDate });
     const { orgId } = await requireUserAndOrg(ctx);
     const dateRange = await resolveDateRangeOrDefault(
@@ -769,20 +726,24 @@ export const pnlSnapshotTool = createTool<
       changes,
     };
   },
-});
+}) as Tool<PnlSnapshotArgs, PnlSnapshotResult>;
+
+type BrandSummaryArgs = Record<string, never>;
+
+type BrandSummaryResult = {
+  summary: string;
+  generatedAt?: string;
+  source?: string;
+};
 
 export const brandSummaryTool = createTool<
-  Record<string, never>,
-  {
-    summary: string;
-    generatedAt?: string;
-    source?: string;
-  }
+  BrandSummaryArgs,
+  BrandSummaryResult
 >({
   description:
     'Retrieve the latest stored overview of the merchant brand. Use this to understand positioning, key products, and sales cadence.',
   args: z.object({}),
-  handler: async (ctx) => {
+  handler: async (ctx): Promise<BrandSummaryResult> => {
     console.log("[TOOL CALL] brandSummary");
     const { orgId } = await requireUserAndOrg(ctx);
     const namespace = String(orgId);
@@ -800,7 +761,7 @@ export const brandSummaryTool = createTool<
       return {
         summary:
           "No brand summary is stored yet. Ask an administrator to run the brand summary update action to refresh the knowledge base.",
-      };
+      } satisfies BrandSummaryResult;
     }
 
     const entry = search.entries?.[0];
@@ -822,7 +783,7 @@ export const brandSummaryTool = createTool<
       return {
         summary:
           "No brand summary is stored yet. Ask an administrator to run the brand summary update action to refresh the knowledge base.",
-      };
+      } satisfies BrandSummaryResult;
     }
 
     const metadata = (entry.metadata ?? {}) as Record<string, unknown>;
@@ -831,52 +792,58 @@ export const brandSummaryTool = createTool<
       summary,
       generatedAt: typeof metadata.generatedAt === "string" ? metadata.generatedAt : undefined,
       source: typeof metadata.shopDomain === "string" ? metadata.shopDomain : undefined,
-    };
+    } satisfies BrandSummaryResult;
   },
-});
+}) as Tool<BrandSummaryArgs, BrandSummaryResult>;
+
+type ProductsInventoryArgs = {
+  page?: number;
+  pageSize?: number;
+  stockLevel?: "all" | "healthy" | "low" | "critical" | "out";
+  search?: string;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+};
+
+type ProductsInventoryItem = {
+  id: string;
+  name: string;
+  sku: string;
+  category: string;
+  vendor: string;
+  stock: number;
+  available: number;
+  reorderPoint: number;
+  stockStatus: "healthy" | "low" | "critical" | "out";
+  price: number;
+  cost: number;
+  margin: number;
+  unitsSold?: number;
+  lastSold?: string;
+  abcCategory: "A" | "B" | "C";
+  variants?: Array<{
+    id: string;
+    sku: string;
+    title: string;
+    price: number;
+    stock: number;
+    available: number;
+    unitsSold?: number;
+  }>;
+};
+
+type ProductsInventoryResult = {
+  summary: string;
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  items: ProductsInventoryItem[];
+};
 
 export const productsInventoryTool = createTool<
-  {
-    page?: number;
-    pageSize?: number;
-    stockLevel?: "all" | "healthy" | "low" | "critical" | "out";
-    search?: string;
-    sortBy?: string;
-    sortOrder?: "asc" | "desc";
-  },
-  {
-    summary: string;
-    page: number;
-    pageSize: number;
-    total: number;
-    totalPages: number;
-    items: Array<{
-      id: string;
-      name: string;
-      sku: string;
-      category: string;
-      vendor: string;
-      stock: number;
-      available: number;
-      reorderPoint: number;
-      stockStatus: "healthy" | "low" | "critical" | "out";
-      price: number;
-      cost: number;
-      margin: number;
-      unitsSold?: number;
-      lastSold?: string;
-      abcCategory: "A" | "B" | "C";
-      variants?: Array<{
-        id: string;
-        sku: string;
-        title: string;
-        price: number;
-        stock: number;
-        available: number;
-        unitsSold?: number;
-      }>;
-    }>;
-  }
+  ProductsInventoryArgs,
+  ProductsInventoryResult
 >({
   description: "List all products with inventory details, variants, and stock status (paginated).",
   args: z.object({
@@ -890,39 +857,7 @@ export const productsInventoryTool = createTool<
   handler: async (
     ctx,
     args,
-  ): Promise<{
-    summary: string;
-    page: number;
-    pageSize: number;
-    total: number;
-    totalPages: number;
-    items: Array<{
-      id: string;
-      name: string;
-      sku: string;
-      category: string;
-      vendor: string;
-      stock: number;
-      available: number;
-      reorderPoint: number;
-      stockStatus: 'healthy' | 'low' | 'critical' | 'out';
-      price: number;
-      cost: number;
-      margin: number;
-      unitsSold?: number;
-      lastSold?: string;
-      abcCategory: 'A' | 'B' | 'C';
-      variants?: Array<{
-        id: string;
-        sku: string;
-        title: string;
-        price: number;
-        stock: number;
-        available: number;
-        unitsSold?: number;
-      }>;
-    }>;
-  }> => {
+  ): Promise<ProductsInventoryResult> => {
     console.log("[TOOL CALL] productsInventory", { page: args.page, pageSize: args.pageSize, stockLevel: args.stockLevel, search: args.search });
     await requireUserAndOrg(ctx);
 
@@ -1020,9 +955,9 @@ export const productsInventoryTool = createTool<
       total: result.products.pagination.total,
       totalPages: result.products.pagination.totalPages,
       items,
-    };
+    } satisfies ProductsInventoryResult;
   },
-});
+}) as Tool<ProductsInventoryArgs, ProductsInventoryResult>;
 
 export const orgMembersTool = createTool<OrgMembersToolArgs, OrgMembersToolResult>({
   description:
@@ -1157,7 +1092,7 @@ export const orgMembersTool = createTool<OrgMembersToolArgs, OrgMembersToolResul
       members: filteredMembers,
     };
   },
-});
+}) as Tool<OrgMembersToolArgs, OrgMembersToolResult>;
 
 export const sendEmailTool = createTool<SendEmailToolArgs, SendEmailToolResult>({
   description:
@@ -1330,7 +1265,7 @@ export const sendEmailTool = createTool<SendEmailToolArgs, SendEmailToolResult>(
       preview,
     };
   },
-});
+}) as Tool<SendEmailToolArgs, SendEmailToolResult>;
 
 export const agentTools = {
   ordersSummary: ordersSummaryTool,
@@ -1343,6 +1278,6 @@ export const agentTools = {
   productsInventory: productsInventoryTool,
   orgMembers: orgMembersTool,
   sendEmail: sendEmailTool,
-};
+} as const satisfies Record<string, Tool<any, any>>;
 
 export type AgentToolset = typeof agentTools;

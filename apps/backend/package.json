@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "convex dev",
     "check-types": "tsc --noEmit",
-    "lint": "eslint . --fix"
+    "lint": "node ../web/node_modules/eslint/bin/eslint.js . --fix"
   },
   "dependencies": {
     "@ai-sdk/openai": "^2.0.32",
@@ -16,17 +16,21 @@
     "@convex-dev/rag": "^0.5.3",
     "@convex-dev/resend": "^0.1.13",
     "@convex-dev/workpool": "^0.2.18",
+    "@internationalized/date": "^3.9.0",
     "@mendable/firecrawl-js": "^4.3.5",
     "@oslojs/crypto": "^1.0.1",
     "@react-email/render": "^1.2.1",
     "@repo/types": "workspace:*",
     "@repo/typescript-config": "workspace:*",
+    "ai": "^5.0.71",
     "convex": "^1.27.3",
     "graphql-request": "^7.2.0",
     "zod": "^4.1.11"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@repo/eslint-config": "workspace:*",
+    "@types/bun": "latest",
+    "eslint": "^9.37.0"
   },
   "peerDependencies": {
     "typescript": "^5"

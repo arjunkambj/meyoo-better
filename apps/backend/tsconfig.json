@@ -24,6 +24,13 @@
     // Some stricter flags (disabled by default)
     "noUnusedLocals": false,
     "noUnusedParameters": false,
-    "noPropertyAccessFromIndexSignature": false
+    "noPropertyAccessFromIndexSignature": false,
+
+    // Workspace module aliases
+    "baseUrl": ".",
+    "paths": {
+      "@repo/convex/*": ["./convex/_generated/*"],
+      "@repo/types/*": ["../../packages/types/*"]
+    }
   }
 }

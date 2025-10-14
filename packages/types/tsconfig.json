@@ -9,8 +9,12 @@
     "emitDeclarationOnly": false,
     "baseUrl": ".",
     "paths": {
+      "@repo/convex/dataModel": [
+        "../../apps/backend/convex/_generated/dataModel"
+      ],
       "@repo/convex/*": [
-        "../../apps/backend/convex/_generated/*"
+        "../../apps/backend/convex/_generated/*",
+        "../../apps/backend/convex/_generated/*.d.ts"
       ]
     }
   },

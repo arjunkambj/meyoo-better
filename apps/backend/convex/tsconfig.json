@@ -18,7 +18,15 @@
     "forceConsistentCasingInFileNames": true,
     "module": "ESNext",
     "isolatedModules": true,
-    "noEmit": true
+    "noEmit": true,
+
+    /* Workspace module aliases */
+    "baseUrl": ".",
+    "paths": {
+      "@repo/convex/dataModel": ["./_generated/dataModel"],
+      "@repo/convex/*": ["./_generated/*"],
+      "@repo/types/*": ["../../../packages/types/*"]
+    }
   },
   "include": ["./**/*"],
   "exclude": ["./_generated"]

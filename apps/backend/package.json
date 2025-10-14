@@ -29,5 +29,11 @@
     "convex": "^1.27.3",
     "graphql-request": "^7.2.0",
     "zod": "^4.1.11"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
   }
 }

@@ -8,6 +8,7 @@ import { createJob, PRIORITY } from "../engine/workpool";
 import { normalizeShopDomain } from "../utils/shop";
 import { getUserAndOrg, requireUserAndOrg } from "../utils/auth";
 import { buildDateSpan } from "../utils/date";
+import { getOrgTimeInfo } from "../utils/orgDateRange";
 import { optionalEnv } from "../utils/env";
 import { onboardingStatusValidator } from "../utils/onboardingValidators";
 import { isIanaTimeZone } from "@repo/time";
@@ -1385,9 +1386,16 @@ export const monitorInitialSyncs = internalMutation({
           });
 
           // Create analytics rebuild jobs
+          const timeInfo = await getOrgTimeInfo(ctx, orgId);
+          const dateOptions = timeInfo.timeZone
+            ? { timezone: timeInfo.timeZone }
+            : typeof timeInfo.offsetMinutes === "number"
+              ? { offsetMinutes: timeInfo.offsetMinutes }
+              : undefined;
           const dates = buildDateSpan(
             ONBOARDING_COST_LOOKBACK_DAYS,
-            new Date().toISOString(),
+            undefined,
+            dateOptions,
           );
 
           const totalJobs = Math.ceil(dates.length / ONBOARDING_ANALYTICS_REBUILD_CHUNK_SIZE);

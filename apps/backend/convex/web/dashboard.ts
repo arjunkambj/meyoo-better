@@ -3,7 +3,7 @@ import { v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
 import { action, query, type ActionCtx, type QueryCtx } from "../_generated/server";
 import { api } from "../_generated/api";
-import { dateRangeValidator, defaultDateRange } from "./analyticsShared";
+import { dateRangeValidator } from "./analyticsShared";
 import { percentageChange } from "../utils/analytics/shared";
 import { type DateRange } from "../utils/analyticsSource";
 import type {
@@ -18,7 +18,7 @@ import { getUserAndOrg } from "../utils/auth";
 import { resolveDashboardConfig } from "../utils/dashboardConfig";
 import { computeIntegrationStatus, integrationStatusValidator } from "../utils/integrationStatus";
 import { loadOverviewFromDailyMetrics } from "../utils/dailyMetrics";
-import { resolveDateRangeForOrganization } from "../utils/orgDateRange";
+import { defaultOrgDateRange, resolveDateRangeForOrganization } from "../utils/orgDateRange";
 
 type IntegrationStatus = Awaited<ReturnType<typeof computeIntegrationStatus>>;
 type OverviewPayload = {
@@ -187,17 +187,14 @@ export const getOverviewData = query({
 
     const orgId = auth.orgId as Id<"organizations">;
 
-    const rangeInput =
-      args.dateRange ??
-      (args.startDate && args.endDate
-        ? { startDate: args.startDate, endDate: args.endDate }
-        : defaultDateRange(parseTimeRange(args.timeRange)));
-
-    const range = await resolveDateRangeForOrganization(
-      ctx,
-      orgId,
-      rangeInput,
-    );
+    const range = args.dateRange
+      ? await resolveDateRangeForOrganization(ctx, orgId, args.dateRange)
+      : args.startDate && args.endDate
+        ? await resolveDateRangeForOrganization(ctx, orgId, {
+            startDate: args.startDate,
+            endDate: args.endDate,
+          })
+        : await defaultOrgDateRange(ctx, orgId, parseTimeRange(args.timeRange));
 
     const dashboardConfig = await resolveDashboardConfig(
       ctx,

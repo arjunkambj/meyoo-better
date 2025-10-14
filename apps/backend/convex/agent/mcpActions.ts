@@ -6,6 +6,7 @@ import { api, internal } from "../_generated/api";
 import { dateRangeValidator } from "../web/analyticsShared";
 import { rag } from "../rag";
 import { resend } from "../resend";
+import { resolveDateRangeOrDefault } from "../utils/orgDateRange";
 import type {
   OrdersAnalyticsResult,
   PlatformMetrics as AggregatedPlatformMetrics,
@@ -29,13 +30,6 @@ const hashApiKey = (key: string) => {
   const combined = (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16);
   return combined.padStart(32, "0");
 };
-
-function defaultDateRange(days: number = 30) {
-  const end = new Date();
-  const start = new Date(end.getTime() - days * 24 * 60 * 60 * 1000);
-  const normalize = (d: Date) => d.toISOString().substring(0, 10);
-  return { startDate: normalize(start), endDate: normalize(end) };
-}
 
 type ValidatedOrganization = {
   _id: Id<"organizations">;
@@ -255,11 +249,15 @@ export const metaAdsOverview = action({
     }),
   }),
   handler: async (ctx, args): Promise<{ summary: string; dateRange: { startDate: string; endDate: string; }; meta: MetaPlatformSummary }> => {
-    const { organizationId: _organizationId } = await validateAndGetOrgContext(ctx, args.apiKey);
+    const { organizationId } = await validateAndGetOrgContext(ctx, args.apiKey);
 
-    const dateRange = args.startDate && args.endDate
-      ? { startDate: args.startDate, endDate: args.endDate }
-      : defaultDateRange();
+    const dateRange = await resolveDateRangeOrDefault(
+      ctx,
+      organizationId,
+      args.startDate && args.endDate
+        ? { startDate: args.startDate, endDate: args.endDate }
+        : null,
+    );
 
     const metricsResponse = await ctx.runQuery(
       api.web.analytics.getPlatformMetricsSummary,
@@ -366,11 +364,15 @@ export const ordersSummary = action({
     summary: v.string(),
   }),
   handler: async (ctx, args) => {
-    await validateAndGetOrgContext(ctx, args.apiKey);
+    const { organizationId } = await validateAndGetOrgContext(ctx, args.apiKey);
 
-    const dateRange = args.startDate && args.endDate
-      ? { startDate: args.startDate, endDate: args.endDate }
-      : defaultDateRange();
+    const dateRange = await resolveDateRangeOrDefault(
+      ctx,
+      organizationId,
+      args.startDate && args.endDate
+        ? { startDate: args.startDate, endDate: args.endDate }
+        : null,
+    );
 
     const analyticsResponse = await ctx.runAction(api.web.orders.getAnalytics, {
       dateRange,
@@ -585,11 +587,15 @@ export const pnlSnapshot = action({
   }),
   handler: async (ctx, args): Promise<PnLSnapshotResult> => {
     console.log("[MCP TOOL CALL] pnlSnapshot", { startDate: args.startDate, endDate: args.endDate });
-    await validateAndGetOrgContext(ctx, args.apiKey);
+    const { organizationId } = await validateAndGetOrgContext(ctx, args.apiKey);
 
-    const dateRange = args.startDate && args.endDate
-      ? { startDate: args.startDate, endDate: args.endDate }
-      : defaultDateRange();
+    const dateRange = await resolveDateRangeOrDefault(
+      ctx,
+      organizationId,
+      args.startDate && args.endDate
+        ? { startDate: args.startDate, endDate: args.endDate }
+        : null,
+    );
 
     const pnlResponse = (await ctx.runQuery(api.web.pnl.getAnalytics, {
       dateRange,

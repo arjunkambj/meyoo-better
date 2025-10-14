@@ -582,42 +582,38 @@ function startOfWeekMondayUtc(date: Date): Date {
 }
 
 function deriveTableRangeForGranularity(range: DateRange, granularity: PnLGranularity): DateRange {
+  const startMs = Date.parse(`${range.startDate}T00:00:00.000Z`);
   const endMs = Date.parse(`${range.endDate}T00:00:00.000Z`);
-  if (!Number.isFinite(endMs)) {
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || startMs > endMs) {
     return range;
   }
 
+  const startDate = new Date(startMs);
   const endDate = new Date(endMs);
 
   if (granularity === "weekly") {
-    const endWeekStart = startOfWeekMondayUtc(endDate);
-    const endWeekEnd = new Date(endWeekStart.getTime());
-    endWeekEnd.setUTCDate(endWeekEnd.getUTCDate() + 6);
-    const startWeekStart = new Date(endWeekStart.getTime());
-    startWeekStart.setUTCDate(startWeekStart.getUTCDate() - 7 * (6 - 1));
+    const alignedStart = startOfWeekMondayUtc(startDate);
+    const alignedEndStart = startOfWeekMondayUtc(endDate);
+    const alignedEnd = new Date(alignedEndStart.getTime());
+    alignedEnd.setUTCDate(alignedEnd.getUTCDate() + 6);
     return {
-      startDate: toIsoDateUtc(startWeekStart),
-      endDate: toIsoDateUtc(endWeekEnd),
+      startDate: toIsoDateUtc(alignedStart),
+      endDate: toIsoDateUtc(alignedEnd),
     };
   }
 
   if (granularity === "monthly") {
-    const endMonthStart = new Date(Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth(), 1));
-    const endMonthEnd = new Date(Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth() + 1, 0));
-    const startMonthStart = new Date(
-      Date.UTC(endMonthStart.getUTCFullYear(), endMonthStart.getUTCMonth() - (3 - 1), 1),
-    );
+    const alignedStart = new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth(), 1));
+    const alignedEnd = new Date(Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth() + 1, 0));
     return {
-      startDate: toIsoDateUtc(startMonthStart),
-      endDate: toIsoDateUtc(endMonthEnd),
+      startDate: toIsoDateUtc(alignedStart),
+      endDate: toIsoDateUtc(alignedEnd),
     };
   }
 
-  const startDate = new Date(endDate.getTime());
-  startDate.setUTCDate(startDate.getUTCDate() - 6);
   return {
-    startDate: toIsoDateUtc(startDate),
-    endDate: toIsoDateUtc(endDate),
+    startDate: range.startDate,
+    endDate: range.endDate,
   };
 }
 

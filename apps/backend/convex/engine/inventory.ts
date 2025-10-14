@@ -7,6 +7,7 @@ import {
   type MutationCtx,
   type QueryCtx,
 } from "../_generated/server";
+import { defaultOrgDateRange } from "../utils/orgDateRange";
 
 const MS_IN_DAY = 24 * 60 * 60 * 1000;
 const DEFAULT_ANALYSIS_DAYS = 30;
@@ -114,25 +115,42 @@ const aggregateInventoryLevels = (
   return totals;
 };
 
-const normalizeDateRange = (
-  range: { startDate: string; endDate: string } | undefined,
+const resolveAnalysisWindow = async (
+  ctx: DbCtx,
+  orgId: Id<"organizations">,
   fallbackWindowDays: number,
-): { start: Date; end: Date } => {
-  const now = new Date();
-  const end = range?.endDate ? new Date(range.endDate) : now;
-  const fallbackStart = new Date(end.getTime() - fallbackWindowDays * MS_IN_DAY);
-  const start = range?.startDate
-    ? new Date(range.startDate)
-    : fallbackStart;
+): Promise<{ start: Date; end: Date; dayCount: number }> => {
+  const range = await defaultOrgDateRange(ctx, orgId, fallbackWindowDays);
 
-  const safeEnd = Number.isNaN(end.getTime()) ? now : end;
-  const safeStart = Number.isNaN(start.getTime()) ? fallbackStart : start;
+  const startMs = range.startDateTimeUtc
+    ? Date.parse(range.startDateTimeUtc)
+    : Date.parse(`${range.startDate}T00:00:00.000Z`);
 
-  if (safeStart.getTime() > safeEnd.getTime()) {
-    return { start: safeEnd, end: safeStart };
-  }
+  const endExclusiveMs = range.endDateTimeUtcExclusive
+    ? Date.parse(range.endDateTimeUtcExclusive)
+    : Date.parse(`${range.endDate}T00:00:00.000Z`) + MS_IN_DAY;
 
-  return { start: safeStart, end: safeEnd };
+  const minimumWindowDays = Math.max(1, Math.floor(fallbackWindowDays));
+  const fallbackSpanMs = minimumWindowDays * MS_IN_DAY;
+
+  const fallbackStartMs = Date.now() - fallbackSpanMs;
+
+  const safeStartMs = Number.isFinite(startMs) ? startMs : fallbackStartMs;
+  const safeEndExclusiveMs = Number.isFinite(endExclusiveMs)
+    ? endExclusiveMs
+    : safeStartMs + fallbackSpanMs;
+
+  const normalizedStartMs = Math.max(
+    safeStartMs,
+    safeEndExclusiveMs - fallbackSpanMs,
+  );
+  const spanMs = Math.max(0, safeEndExclusiveMs - normalizedStartMs);
+  const dayCount = Math.max(1, Math.round(spanMs / MS_IN_DAY));
+
+  const start = new Date(normalizedStartMs);
+  const end = new Date(safeEndExclusiveMs - 1);
+
+  return { start, end, dayCount };
 };
 
 async function fetchOrderItemsForOrders(
@@ -717,7 +735,12 @@ export const rebuildInventorySnapshot = internalMutation({
 
     const inventoryTotals = aggregateInventoryLevels(inventoryTotalsDocs, variants);
 
-    const { start, end } = normalizeDateRange(undefined, analysisWindowDays);
+    const {
+      start,
+      end,
+      dayCount: normalizedAnalysisDays,
+    } = await resolveAnalysisWindow(ctx, orgId, analysisWindowDays);
+    const analysisDays = normalizedAnalysisDays;
 
     const { orders, orderItems } = await fetchOrdersWithItems(ctx, orgId, start, end);
 
@@ -739,7 +762,7 @@ export const rebuildInventorySnapshot = internalMutation({
       inventoryTotals,
       productSales,
       abcCategories,
-      analysisWindowDays,
+      analysisDays,
     );
 
     const ninetyDaysAgo = Date.now() - 90 * MS_IN_DAY;
@@ -772,7 +795,7 @@ export const rebuildInventorySnapshot = internalMutation({
       inventoryTotals,
       orderItems,
       variantLookup,
-      analysisWindowDays,
+      analysisDays,
       deadStock,
     );
 

@@ -9,6 +9,7 @@ import { api, internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { action, internalQuery, mutation, query } from "../_generated/server";
 import { getUserAndOrg, requireUserAndOrg } from "../utils/auth";
+import { defaultOrgDateRange } from "../utils/orgDateRange";
 
 /**
  * User management and Clerk webhook handling
@@ -172,11 +173,12 @@ export const getUserUsage = query({
     const auth = await getUserAndOrg(ctx);
     if (!auth) return null;
 
-    // Calculate date 30 days ago
-    const today = new Date();
-    const thirtyDaysAgo = new Date(today);
-    thirtyDaysAgo.setDate(today.getDate() - 30);
-    const startDate = thirtyDaysAgo.toISOString().slice(0, 10); // YYYY-MM-DD
+    const range = await defaultOrgDateRange(
+      ctx,
+      auth.orgId as Id<"organizations">,
+      30,
+    );
+    const startDate = range.startDate;
 
     // Get daily metrics for the last 30 days
     const dailyMetrics = await ctx.db

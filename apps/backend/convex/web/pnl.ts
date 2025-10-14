@@ -2,11 +2,12 @@ import { v } from "convex/values";
 
 import type { Id } from "../_generated/dataModel";
 import { query } from "../_generated/server";
-import { dateRangeValidator } from "./analyticsShared";
+import { dateRangeValidator, loadAnalytics } from "./analyticsShared";
 import { validateDateRange } from "../utils/analyticsSource";
 import { getUserAndOrg } from "../utils/auth";
 import { loadPnLAnalyticsFromDailyMetrics } from "../utils/dailyMetrics";
 import type { PnLAnalyticsResult, PnLGranularity } from "@repo/types";
+import { computePnLAnalytics } from "../utils/analytics/pnl";
 
 type DateRangeArg = {
   startDate: string;
@@ -167,20 +168,45 @@ export const getAnalytics = query({
       granularity
     );
 
-    const meta: Record<string, unknown> = {
+    let result: PnLAnalyticsResult = {
+      ...dailyMetrics.result,
+      primaryCurrency,
+    };
+
+    let meta: Record<string, unknown> = {
       strategy: "dailyMetrics",
       status: dailyMetrics.meta.hasData ? "ready" : "pending",
       ...dailyMetrics.meta,
       primaryCurrency,
     };
 
+    const needsFallback =
+      !dailyMetrics.meta.selectedHasData ||
+      !dailyMetrics.meta.hasData ||
+      result.metrics === null;
+
+    if (needsFallback) {
+      const fallbackAnalytics = await loadAnalytics(ctx, organizationId, range, {
+        datasets: ["orders", "globalCosts", "manualReturnRates", "metaInsights"] as const,
+      });
+      const fallbackResult = computePnLAnalytics(fallbackAnalytics, granularity);
+      result = {
+        ...fallbackResult,
+        primaryCurrency,
+        tableRange: result.tableRange ?? fallbackResult.tableRange,
+      };
+      meta = {
+        ...meta,
+        strategy: "rawFallback",
+        status: fallbackResult.metrics ? "ready" : "pending",
+        fallbackApplied: true,
+      };
+    }
+
     return {
       dateRange: range,
       organizationId: auth.orgId as string,
-      result: {
-        ...dailyMetrics.result,
-        primaryCurrency,
-      } satisfies PnLAnalyticsResult,
+      result,
       meta,
     } satisfies {
       dateRange: { startDate: string; endDate: string };

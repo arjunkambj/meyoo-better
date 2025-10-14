@@ -4,6 +4,7 @@ import { resend } from "../resend";
 import { z } from "zod/v3";
 import { rag } from "../rag";
 import { requireUserAndOrg } from "../utils/auth";
+import { resolveDateRangeOrDefault } from "../utils/orgDateRange";
 import type {
   OrdersAnalyticsResult,
   PlatformMetrics as AggregatedPlatformMetrics,
@@ -27,13 +28,6 @@ const toIsoString = (timestamp?: number | null) =>
   typeof timestamp === "number" && Number.isFinite(timestamp)
     ? new Date(timestamp).toISOString()
     : undefined;
-
-function defaultDateRange(days: number = 30) {
-  const end = new Date();
-  const start = new Date(end.getTime() - days * 24 * 60 * 60 * 1000);
-  const normalize = (d: Date) => d.toISOString().substring(0, 10);
-  return { startDate: normalize(start), endDate: normalize(end) };
-}
 
 type AnalyticsRow = Record<string, number | string>;
 
@@ -249,10 +243,14 @@ export const ordersSummaryTool = createTool<
     summary: string;
   }> => {
     console.log("[TOOL CALL] ordersSummary", { startDate: args.startDate, endDate: args.endDate });
-    await requireUserAndOrg(ctx);
-    const dateRange = args.startDate && args.endDate
-      ? { startDate: args.startDate, endDate: args.endDate }
-      : defaultDateRange();
+    const { orgId } = await requireUserAndOrg(ctx);
+    const dateRange = await resolveDateRangeOrDefault(
+      ctx,
+      orgId,
+      args.startDate && args.endDate
+        ? { startDate: args.startDate, endDate: args.endDate }
+        : null,
+    );
 
     const analyticsResponse = await ctx.runAction(api.web.orders.getAnalytics, {
       dateRange,
@@ -546,9 +544,14 @@ export const metaAdsOverviewTool = createTool<
     args,
   ): Promise<{ summary: string; dateRange: { startDate: string; endDate: string }; meta: MetaPlatformSummary }> => {
     console.log("[TOOL CALL] metaAdsOverview", { startDate: args.startDate, endDate: args.endDate });
-    const dateRange = args.startDate && args.endDate
-      ? { startDate: args.startDate, endDate: args.endDate }
-      : defaultDateRange();
+    const { orgId } = await requireUserAndOrg(ctx);
+    const dateRange = await resolveDateRangeOrDefault(
+      ctx,
+      orgId,
+      args.startDate && args.endDate
+        ? { startDate: args.startDate, endDate: args.endDate }
+        : null,
+    );
 
     const metricsResponse = (await ctx.runQuery(
       api.web.analytics.getPlatformMetricsSummary,
@@ -690,10 +693,14 @@ export const pnlSnapshotTool = createTool<
     };
   }> => {
     console.log("[TOOL CALL] pnlSnapshot", { startDate: args.startDate, endDate: args.endDate });
-    await requireUserAndOrg(ctx);
-    const dateRange = args.startDate && args.endDate
-      ? { startDate: args.startDate, endDate: args.endDate }
-      : defaultDateRange();
+    const { orgId } = await requireUserAndOrg(ctx);
+    const dateRange = await resolveDateRangeOrDefault(
+      ctx,
+      orgId,
+      args.startDate && args.endDate
+        ? { startDate: args.startDate, endDate: args.endDate }
+        : null,
+    );
 
     const response = (await ctx.runQuery(api.web.pnl.getAnalytics, {
       dateRange,

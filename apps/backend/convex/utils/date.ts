@@ -1,3 +1,5 @@
+import { parseDate } from "@internationalized/date";
+
 export interface MsToDateOptions {
   timezone?: string;
   offsetMinutes?: number;
@@ -62,16 +64,52 @@ export function normalizeDateString(value: string): string {
   return date.toISOString().slice(0, 10);
 }
 
-export function buildDateSpan(daysBack: number, endDate?: string): string[] {
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function utcMidnightForLocalDate(
+  dateString: string,
+  options?: MsToDateOptions,
+): Date {
+  if (options?.timezone) {
+    try {
+      return parseDate(dateString).toDate(options.timezone);
+    } catch (_error) {
+      // Fallback to offset-based handling below
+    }
+  }
+
+  const [yearStr, monthStr, dayStr] = dateString.split("-");
+  const year = Number(yearStr);
+  const month = Number(monthStr);
+  const day = Number(dayStr);
+  const offsetMinutes = typeof options?.offsetMinutes === "number" ? options.offsetMinutes : 0;
+
+  return new Date(Date.UTC(year, month - 1, day) - offsetMinutes * 60_000);
+}
+
+export function buildDateSpan(
+  daysBack: number,
+  endDate?: string,
+  options?: MsToDateOptions,
+): string[] {
   const limit = Math.max(1, Math.floor(daysBack));
-  const anchor = endDate ? normalizeDateString(endDate) : normalizeDateString(new Date().toISOString());
+  const resolvedOptions = options ?? {};
+
+  const anchorLocal =
+    endDate ??
+    msToDateString(Date.now(), resolvedOptions) ??
+    new Date().toISOString().slice(0, 10);
+  const normalizedAnchor = normalizeDateString(anchorLocal);
+  const anchorUtc = utcMidnightForLocalDate(normalizedAnchor, resolvedOptions);
 
   const results: string[] = [];
-  const anchorDate = new Date(`${anchor}T00:00:00.000Z`);
 
   for (let offset = 0; offset < limit; offset += 1) {
-    const current = new Date(anchorDate.getTime() - offset * 24 * 60 * 60 * 1000);
-    results.push(current.toISOString().slice(0, 10));
+    const currentMs = anchorUtc.getTime() - offset * DAY_MS;
+    const formatted =
+      msToDateString(currentMs, resolvedOptions) ??
+      new Date(currentMs).toISOString().slice(0, 10);
+    results.push(formatted);
   }
 
   return results;

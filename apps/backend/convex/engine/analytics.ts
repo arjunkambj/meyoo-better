@@ -25,6 +25,7 @@ import type { AnalyticsResponse } from "../web/analyticsShared";
 import { toUtcRangeForOffset } from "@repo/time";
 import { getShopUtcOffsetMinutes } from "../../libs/time/shopTime";
 import { createJob, PRIORITY } from "./workpool";
+import { resolveDateRangeOrDefault } from "../utils/orgDateRange";
 
 const datasetCountValidator = v.object({
   orders: v.number(),
@@ -96,31 +97,6 @@ function buildDateRangeForLocalDay(
   } satisfies DateRange;
 }
 
-function resolveDateRange(
-  input?: {
-    startDate?: string;
-    endDate?: string;
-    daysBack?: number;
-  },
-): DateRange {
-  if (input?.startDate && input?.endDate) {
-    return validateDateRange({
-      startDate: input.startDate,
-      endDate: input.endDate,
-    });
-  }
-
-  const endDate = input?.endDate ?? new Date().toISOString().substring(0, 10);
-  const dayMs = 24 * 60 * 60 * 1000;
-  const daysBack = Math.max(1, input?.daysBack ?? 30);
-  const end = new Date(`${endDate}T00:00:00.000Z`).getTime();
-  const startDate = input?.startDate
-    ? input.startDate
-    : new Date(end - daysBack * dayMs).toISOString().substring(0, 10);
-
-  return validateDateRange({ startDate, endDate });
-}
-
 export const calculateAnalytics = internalAction({
   args: {
     organizationId: v.string(),
@@ -145,7 +121,13 @@ export const calculateAnalytics = internalAction({
     args,
   ): Promise<{ success: boolean; duration: number; datasetCounts: DatasetCounts }> => {
     const startedAt = Date.now();
-    const range = resolveDateRange(args.dateRange);
+    const fallbackDays = Math.max(1, args.dateRange?.daysBack ?? 30);
+    const range = await resolveDateRangeOrDefault(
+      ctx,
+      args.organizationId as Id<"organizations">,
+      args.dateRange,
+      fallbackDays,
+    );
     const organizationId = args.organizationId;
 
     const counts: DatasetCounts = {

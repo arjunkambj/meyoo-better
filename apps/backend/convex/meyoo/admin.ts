@@ -8,6 +8,7 @@ import { createNewUserData } from "../authHelpers";
 import { createJob, PRIORITY } from "../engine/workpool";
 import { optionalEnv } from "../utils/env";
 import { buildDateSpan } from "../utils/date";
+import { getOrgTimeInfo } from "../utils/orgDateRange";
 
 const CONVEX_CLOUD_URL = optionalEnv("CONVEX_CLOUD_URL");
 
@@ -703,7 +704,13 @@ export const recalculateAnalytics = action({
     );
 
     const daysBack = Math.max(1, Math.floor(args.daysBack ?? 60));
-    const dates = buildDateSpan(daysBack);
+    const timeInfo = await getOrgTimeInfo(ctx, organizationId);
+    const dateOptions = timeInfo.timeZone
+      ? { timezone: timeInfo.timeZone }
+      : typeof timeInfo.offsetMinutes === "number"
+        ? { offsetMinutes: timeInfo.offsetMinutes }
+        : undefined;
+    const dates = buildDateSpan(daysBack, undefined, dateOptions);
 
     if (dates.length === 0) {
       return {

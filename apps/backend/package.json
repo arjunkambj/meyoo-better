@@ -4,13 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "convex dev",
-    "dev:server": "",
     "check-types": "tsc --noEmit",
-    "check-types:watch": "tsc --noEmit -w",
-    "watch-types": "tsc --noEmit -w",
-    "lint": "eslint . --fix",
-    "codegen": "convex codegen",
-    "build": "echo nothing-to-build"
+    "lint": "eslint . --fix"
   },
   "dependencies": {
     "@ai-sdk/openai": "^2.0.32",

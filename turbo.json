@@ -16,10 +16,6 @@
     "dev": {
       "cache": false,
       "persistent": true
-    },
-    "watch-types": {
-      "cache": false,
-      "persistent": true
     }
   },
   "globalEnv": [

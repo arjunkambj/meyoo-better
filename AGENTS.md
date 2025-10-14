@@ -9,26 +9,24 @@
 
 ## Agent & Components Usage Rules
 
-- Always fetch latest Context7 docs before editing code that touches Convex Agent, Resend, or other Convex components (`/get-convex/agent`, `/get-convex/resend`, etc.).
-- When wiring components, keep middleware order stable:
+- When wiring components:
   - `app.use(workpool, { name: "mainWorkpool" })`
   - `app.use(actionRetrier)`
   - `app.use(rag)`
   - `app.use(agent)`
   - `app.use(resend)`
-- In Convex actions, never use `ctx.db` directly — use `ctx.runQuery`/`ctx.runMutation` to access the database.
+    Always fetch latest Context7 docs before editing code related to compoents
 
 ## Project Structure & Module Organization
 
 - Monorepo managed by Turbo and Bun.
 - Apps
   - `apps/web` — Next.js (App Router) storefront; code in `app/`, shared UI in `components/`, utilities under `libs/`.
-  - `apps/mobile` — Expo Router React Native app with NativeWind styling and HeroUI Native components.
-- `apps/admin` — Next.js Admin panel (formerly `apps/meyoo`); minimal scaffold plus standard folders (`components/`, `hooks/`, `libs/`, `config/`, `constants/`, `store/`, `types/`, `styles/`). Dev on port 3001.
   - `apps/backend` — Convex backend. Functions and jobs under `convex/` organized by domain:
     - `convex/web/*` — storefront APIs
     - `convex/meyoo/*` — admin APIs
     - shared domains under `convex/core`, `convex/engine`, `convex/integrations`, etc.
+
 - Packages
   - `packages/ui` — Shared React components.
   - `packages/eslint-config` — Centralized ESLint configs.

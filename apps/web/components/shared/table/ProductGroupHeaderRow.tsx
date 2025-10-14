@@ -1,6 +1,6 @@
 "use client";
 
-import { TableCell } from "@heroui/react";
+import { TableCell } from "@heroui/table";
 import { Icon } from "@iconify/react";
 import React from "react";
 

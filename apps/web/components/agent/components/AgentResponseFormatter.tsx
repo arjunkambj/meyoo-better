@@ -2,7 +2,9 @@
 
 import type React from "react";
 import {useMemo} from "react";
-import {Button, Divider, Tooltip} from "@heroui/react";
+import { Button } from "@heroui/button";
+import { Divider } from "@heroui/divider";
+import { Tooltip } from "@heroui/tooltip";
 import {Icon} from "@iconify/react";
 
 type CodeBlock = { type: "code"; lang?: string; value: string };

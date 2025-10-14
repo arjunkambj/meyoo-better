@@ -1,14 +1,11 @@
 "use client";
 
-import {
-  Avatar,
-  Button,
-  Input,
-  Select,
-  SelectItem,
-  addToast,
-  useDisclosure,
-} from "@heroui/react";
+import { Avatar } from "@heroui/avatar";
+import { Button } from "@heroui/button";
+import { Input } from "@heroui/input";
+import { Select, SelectItem } from "@heroui/select";
+import { addToast } from "@heroui/toast";
+import { useDisclosure } from "@heroui/use-disclosure";
 import type { Selection } from "@react-types/shared";
 import { Icon } from "@iconify/react";
 import { useAction } from "convex/react";

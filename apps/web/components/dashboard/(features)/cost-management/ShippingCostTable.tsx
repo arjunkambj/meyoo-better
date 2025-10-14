@@ -1,23 +1,12 @@
 "use client";
 
-import {
-  addToast,
-  Button,
-  Input,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  Table,
-  TableBody,
-  TableCell,
-  TableColumn,
-  TableHeader,
-  TableRow,
-  useDisclosure,
-  Skeleton,
-} from "@heroui/react";
+import { Button } from "@heroui/button";
+import { Input } from "@heroui/input";
+import { Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/modal";
+import { Skeleton } from "@heroui/skeleton";
+import { Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from "@heroui/table";
+import { addToast } from "@heroui/toast";
+import { useDisclosure } from "@heroui/use-disclosure";
 import { Icon } from "@iconify/react";
 import { useState } from "react";
 // Delete flow removed; only edit/set single shipping cost

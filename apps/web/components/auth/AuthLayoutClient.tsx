@@ -1,6 +1,6 @@
 "use client";
 
-import { Link } from "@heroui/link";
+import Link from "next/link";
 import { Icon } from "@iconify/react";
 import Image from "next/image";
 import React from "react";

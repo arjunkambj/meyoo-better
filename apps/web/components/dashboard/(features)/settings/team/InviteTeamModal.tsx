@@ -1,16 +1,10 @@
 "use client";
 
-import {
-  Button,
-  Divider,
-  Input,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  addToast,
-} from "@heroui/react";
+import { Button } from "@heroui/button";
+import { Divider } from "@heroui/divider";
+import { Input } from "@heroui/input";
+import { Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/modal";
+import { addToast } from "@heroui/toast";
 import { Icon } from "@iconify/react";
 import { useMutation } from "convex/react";
 import { useState } from "react";

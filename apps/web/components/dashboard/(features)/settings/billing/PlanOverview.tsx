@@ -2,7 +2,8 @@
 
 import { useMemo } from "react";
 
-import { Chip, Progress } from "@heroui/react";
+import { Chip } from "@heroui/chip";
+import { Progress } from "@heroui/progress";
 import { Icon } from "@iconify/react";
 import { useQuery } from "convex-helpers/react/cache/hooks";
 

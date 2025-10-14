@@ -1,6 +1,8 @@
 "use client";
 
-import { Card, CardBody, CardHeader, Skeleton, Switch } from "@heroui/react";
+import { Card, CardBody, CardHeader } from "@heroui/card";
+import { Skeleton } from "@heroui/skeleton";
+import { Switch } from "@heroui/switch";
 import { Icon } from "@iconify/react";
 import { useAtom } from "jotai";
 

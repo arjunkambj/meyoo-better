@@ -1,6 +1,6 @@
 "use client";
 
-import { HeroUIProvider } from "@heroui/react";
+import { HeroUIProvider } from "@heroui/system";
 import { ConvexQueryCacheProvider } from "convex-helpers/react/cache/provider";
 import { Provider as JotaiProvider } from "jotai";
 import { useRouter } from "next/navigation";

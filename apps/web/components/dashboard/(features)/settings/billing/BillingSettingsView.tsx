@@ -1,5 +1,5 @@
 "use client";
-import { Card, CardBody } from "@heroui/react";
+import { Card, CardBody } from "@heroui/card";
 import AvailablePlans from "./AvailablePlans";
 import InvoicesList from "./InvoicesList";
 import PlanOverview from "./PlanOverview";

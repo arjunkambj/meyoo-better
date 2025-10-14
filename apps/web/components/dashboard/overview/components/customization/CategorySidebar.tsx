@@ -1,6 +1,8 @@
 "use client";
 
-import { Button, Chip, ScrollShadow } from "@heroui/react";
+import { Button } from "@heroui/button";
+import { Chip } from "@heroui/chip";
+import { ScrollShadow } from "@heroui/scroll-shadow";
 import { Icon } from "@iconify/react";
 import React, { useCallback } from "react";
 

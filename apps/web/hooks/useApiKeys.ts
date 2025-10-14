@@ -3,8 +3,7 @@ import { useMutation } from "convex/react";
 import { useQuery } from "convex-helpers/react/cache/hooks";
 import type { GenericId as Id } from "convex/values";
 import { api } from "@/libs/convexApi";
-import { addToast } from "@heroui/react";
-
+import { addToast } from "@heroui/toast";
 export interface ApiKey {
   _id: Id<"apiKeys">;
   name: string;

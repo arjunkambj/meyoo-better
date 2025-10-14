@@ -1,6 +1,6 @@
 "use client";
 
-import { Spacer } from "@heroui/react";
+import { Spacer } from "@heroui/spacer";
 import { useAtomValue } from "jotai";
 import React, { useCallback, useMemo, useState } from "react";
 import { useAnalyticsDateRange, useDashboardOverview } from "@/hooks";

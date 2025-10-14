@@ -1,7 +1,9 @@
 "use client";
 
 import { BadgeCheck } from "lucide-react";
-import { Button, Card, CardBody, CardHeader, Divider } from "@heroui/react";
+import { Button } from "@heroui/button";
+import { Card, CardBody, CardHeader } from "@heroui/card";
+import { Divider } from "@heroui/divider";
 import type { ComponentProps } from "react";
 
 import type { Frequency, Tier } from "@/components/home/pricing/types";

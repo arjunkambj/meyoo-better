@@ -1,6 +1,9 @@
 "use client";
 
-import { Checkbox, cn, Input, ScrollShadow } from "@heroui/react";
+import { Checkbox } from "@heroui/checkbox";
+import { Input } from "@heroui/input";
+import { ScrollShadow } from "@heroui/scroll-shadow";
+import { cn } from "@heroui/theme";
 import { Icon } from "@iconify/react";
 import { useMemo } from "react";
 

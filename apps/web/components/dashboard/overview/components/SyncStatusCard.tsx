@@ -1,6 +1,8 @@
 "use client";
 
-import { Card, CardBody, Chip, Spinner } from "@heroui/react";
+import { Card, CardBody } from "@heroui/card";
+import { Chip } from "@heroui/chip";
+import { Spinner } from "@heroui/spinner";
 import { Icon } from "@iconify/react";
 import { formatDistanceToNow } from "date-fns";
 

@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Avatar } from "@heroui/react";
+import { Avatar } from "@heroui/avatar";
 import { Icon } from "@iconify/react";
 import { designSystem } from "@/libs/design-system";
 

@@ -4,7 +4,8 @@ import { motion } from "framer-motion";
 import { Icon } from "@iconify/react";
 import React from "react";
 
-import { Button, Card, CardBody } from "@heroui/react";
+import { Button } from "@heroui/button";
+import { Card, CardBody } from "@heroui/card";
 import Image from "next/image";
 import Link from "next/link";
 import { designSystem } from "@/libs/design-system";

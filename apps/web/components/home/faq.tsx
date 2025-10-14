@@ -1,6 +1,7 @@
 "use client";
 
-import { Accordion, AccordionItem, Button } from "@heroui/react";
+import { Accordion, AccordionItem } from "@heroui/accordion";
+import { Button } from "@heroui/button";
 import { Icon } from "@iconify/react";
 import { designSystem } from "@/libs/design-system";
 

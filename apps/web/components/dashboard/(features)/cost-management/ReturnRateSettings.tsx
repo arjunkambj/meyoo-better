@@ -1,6 +1,9 @@
 "use client";
 
-import { Button, Input, addToast, Skeleton } from "@heroui/react";
+import { Button } from "@heroui/button";
+import { Input } from "@heroui/input";
+import { Skeleton } from "@heroui/skeleton";
+import { addToast } from "@heroui/toast";
 import { useEffect, useMemo, useState } from "react";
 
 import { useManualReturnRate, useSetManualReturnRate } from "@/hooks";

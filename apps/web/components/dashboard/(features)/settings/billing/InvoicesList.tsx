@@ -1,5 +1,7 @@
 "use client";
-import { Button, Chip, Skeleton } from "@heroui/react";
+import { Button } from "@heroui/button";
+import { Chip } from "@heroui/chip";
+import { Skeleton } from "@heroui/skeleton";
 import { Icon } from "@iconify/react";
 import { useState } from "react";
 

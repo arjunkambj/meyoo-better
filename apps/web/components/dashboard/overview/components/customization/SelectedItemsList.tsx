@@ -15,7 +15,8 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { Chip, ScrollShadow } from "@heroui/react";
+import { Chip } from "@heroui/chip";
+import { ScrollShadow } from "@heroui/scroll-shadow";
 import { Icon } from "@iconify/react";
 import React, { useCallback, useMemo } from "react";
 

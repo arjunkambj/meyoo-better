@@ -1,6 +1,7 @@
 "use client";
 
-import { Card, CardBody, Divider } from "@heroui/react";
+import { Card, CardBody } from "@heroui/card";
+import { Divider } from "@heroui/divider";
 import { Icon } from "@iconify/react";
 import Link from "next/link";
 

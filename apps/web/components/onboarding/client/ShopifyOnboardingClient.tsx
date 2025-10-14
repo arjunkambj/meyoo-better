@@ -1,15 +1,9 @@
 "use client";
 
-import {
-  addToast,
-  Button,
-  Divider,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-} from "@heroui/react";
+import { Button } from "@heroui/button";
+import { Divider } from "@heroui/divider";
+import { Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/modal";
+import { addToast } from "@heroui/toast";
 import { Icon } from "@iconify/react";
 import { useMutation } from "convex/react";
 import { useRouter } from "next/navigation";

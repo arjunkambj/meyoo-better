@@ -1,6 +1,6 @@
 "use client";
 
-import { Skeleton } from "@heroui/react";
+import { Skeleton } from "@heroui/skeleton";
 import type { ReactNode } from "react";
 
 import { cn } from "@/libs/utils";

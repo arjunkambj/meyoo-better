@@ -1,6 +1,6 @@
 "use client";
 
-import { Spacer } from "@heroui/react";
+import { Spacer } from "@heroui/spacer";
 import { Tab, Tabs } from "@heroui/tabs";
 import { Icon } from "@iconify/react";
 

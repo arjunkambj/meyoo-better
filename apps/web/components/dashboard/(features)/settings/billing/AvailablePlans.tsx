@@ -1,5 +1,7 @@
 "use client";
-import { Button, Chip, Tab, Tabs } from "@heroui/react";
+import { Button } from "@heroui/button";
+import { Chip } from "@heroui/chip";
+import { Tab, Tabs } from "@heroui/tabs";
 import { Icon } from "@iconify/react";
 import { useQuery } from "convex-helpers/react/cache/hooks";
 import { useMemo, useState } from "react";

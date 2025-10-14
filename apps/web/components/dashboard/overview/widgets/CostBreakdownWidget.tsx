@@ -1,6 +1,8 @@
 "use client";
 
-import { Button, Card, Tooltip } from "@heroui/react";
+import { Button } from "@heroui/button";
+import { Card } from "@heroui/card";
+import { Tooltip } from "@heroui/tooltip";
 import { Icon } from "@iconify/react";
 import { useRouter } from "next/navigation";
 import { useMemo } from "react";

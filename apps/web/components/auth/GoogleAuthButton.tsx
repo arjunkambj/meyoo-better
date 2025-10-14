@@ -2,7 +2,7 @@
 
 import { useAuthActions } from "@convex-dev/auth/react";
 import { Button } from "@heroui/button";
-import { addToast } from "@heroui/react";
+import { addToast } from "@heroui/toast";
 import { Icon } from "@iconify/react";
 import React from "react";
 

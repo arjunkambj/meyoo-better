@@ -1,6 +1,7 @@
 "use client";
 
-import { Chip, cn } from "@heroui/react";
+import { Chip } from "@heroui/chip";
+import { cn } from "@heroui/theme";
 import { Icon } from "@iconify/react";
 import type React from "react";
 

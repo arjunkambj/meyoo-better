@@ -1,6 +1,6 @@
 "use client";
 
-import { addToast } from "@heroui/react";
+import { addToast } from "@heroui/toast";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 

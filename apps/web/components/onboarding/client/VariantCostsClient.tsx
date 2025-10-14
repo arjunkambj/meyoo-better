@@ -1,23 +1,14 @@
 "use client";
 
-import {
-  Button,
-  Card,
-  CardBody,
-  Chip,
-  Input,
-  Pagination,
-  Select,
-  SelectItem,
-  Skeleton,
-  Spinner,
-  Table,
-  TableBody,
-  TableCell,
-  TableColumn,
-  TableHeader,
-  TableRow,
-} from "@heroui/react";
+import { Button } from "@heroui/button";
+import { Card, CardBody } from "@heroui/card";
+import { Chip } from "@heroui/chip";
+import { Input } from "@heroui/input";
+import { Pagination } from "@heroui/pagination";
+import { Select, SelectItem } from "@heroui/select";
+import { Skeleton } from "@heroui/skeleton";
+import { Spinner } from "@heroui/spinner";
+import { Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from "@heroui/table";
 import { Icon } from "@iconify/react";
 import {
   useCallback,

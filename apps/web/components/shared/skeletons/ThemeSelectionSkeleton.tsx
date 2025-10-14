@@ -1,7 +1,7 @@
 "use client";
 
-import { Card, CardBody, Skeleton } from "@heroui/react";
-
+import { Card, CardBody } from "@heroui/card";
+import { Skeleton } from "@heroui/skeleton";
 export function ThemeSelectionSkeleton() {
   return (
     <div className="space-y-6">

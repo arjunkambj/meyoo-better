@@ -1,15 +1,9 @@
 "use client";
 
-import {
-  Button,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  Snippet,
-  addToast,
-} from "@heroui/react";
+import { Button } from "@heroui/button";
+import { Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/modal";
+import { Snippet } from "@heroui/snippet";
+import { addToast } from "@heroui/toast";
 import { Icon } from "@iconify/react";
 import { useState } from "react";
 

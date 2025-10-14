@@ -1,7 +1,7 @@
 "use client";
 
-import { Card, Skeleton } from "@heroui/react";
-
+import { Card } from "@heroui/card";
+import { Skeleton } from "@heroui/skeleton";
 import { KPISkeleton } from "@/components/shared/cards/KPI";
 
 export function PinnedMetricsGridSkeleton() {

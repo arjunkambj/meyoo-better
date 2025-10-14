@@ -8,7 +8,9 @@ import {
   TableHeader,
   TableRow,
 } from "@heroui/table";
-import { Button, Chip, Tooltip } from "@heroui/react";
+import { Button } from "@heroui/button";
+import { Chip } from "@heroui/chip";
+import { Tooltip } from "@heroui/tooltip";
 import { Icon } from "@iconify/react";
 import { formatDistanceToNow } from "date-fns";
 import type { GenericId as Id } from "convex/values";

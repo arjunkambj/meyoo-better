@@ -1,7 +1,6 @@
 "use client";
 
-import { Skeleton } from "@heroui/react";
-
+import { Skeleton } from "@heroui/skeleton";
 export function PlanOverviewSkeleton() {
   return (
     <div className="space-y-4">

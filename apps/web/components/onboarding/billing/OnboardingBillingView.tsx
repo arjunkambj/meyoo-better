@@ -1,6 +1,8 @@
 "use client";
 
-import { addToast, Chip, Switch } from "@heroui/react";
+import { Chip } from "@heroui/chip";
+import { Switch } from "@heroui/switch";
+import { addToast } from "@heroui/toast";
 import { Icon } from "@iconify/react";
 import { useQuery } from "convex/react";
 import { useRouter, useSearchParams } from "next/navigation";

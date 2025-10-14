@@ -1,6 +1,6 @@
 "use client";
 
-import { Card, CardBody } from "@heroui/react";
+import { Card, CardBody } from "@heroui/card";
 import { Icon } from "@iconify/react";
 import Link from "next/link";
 import { designSystem } from "@/libs/design-system";

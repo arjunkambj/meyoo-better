@@ -2,7 +2,9 @@
 
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Badge, Button, cn } from "@heroui/react";
+import { Badge } from "@heroui/badge";
+import { Button } from "@heroui/button";
+import { cn } from "@heroui/theme";
 import { Icon } from "@iconify/react";
 
 interface SortableItemProps {

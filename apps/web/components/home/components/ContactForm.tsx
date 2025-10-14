@@ -1,13 +1,9 @@
 "use client";
 
-import {
-  addToast,
-  Button,
-  Input,
-  Select,
-  SelectItem,
-  Textarea,
-} from "@heroui/react";
+import { Button } from "@heroui/button";
+import { Input, Textarea } from "@heroui/input";
+import { Select, SelectItem } from "@heroui/select";
+import { addToast } from "@heroui/toast";
 import { Icon } from "@iconify/react";
 import type React from "react";
 import { useState } from "react";

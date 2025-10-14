@@ -1,13 +1,9 @@
 "use client";
 
-import {
-  Button,
-  Input,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-  RangeCalendar,
-} from "@heroui/react";
+import { Button } from "@heroui/button";
+import { RangeCalendar } from "@heroui/calendar";
+import { Input } from "@heroui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@heroui/popover";
 import { Icon } from "@iconify/react";
 import {
   type CalendarDate,

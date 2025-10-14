@@ -1,6 +1,9 @@
 "use client";
 
-import { addToast, Button, Card, CardBody, Spinner } from "@heroui/react";
+import { Button } from "@heroui/button";
+import { Card, CardBody } from "@heroui/card";
+import { Spinner } from "@heroui/spinner";
+import { addToast } from "@heroui/toast";
 import { cn } from "@heroui/theme";
 import { Icon } from "@iconify/react";
 import Link from "next/link";

@@ -1,6 +1,6 @@
 "use client";
 
-import { Skeleton } from "@heroui/react";
+import { Skeleton } from "@heroui/skeleton";
 import { memo } from "react";
 // import { TOTAL_STEPS as _TOTAL_STEPS } from "@/constants/onboarding";
 

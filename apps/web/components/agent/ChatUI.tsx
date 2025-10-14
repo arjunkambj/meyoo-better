@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Button } from "@heroui/react";
+import { Button } from "@heroui/button";
 import AgentChatInput from "@/components/agent/components/AgentChatInput";
 import NewChatButton from "@/components/agent/components/NewChatButton";
 import AssistantMessage from "@/components/agent/components/AssistantMessage";

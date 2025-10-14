@@ -1,6 +1,7 @@
 "use client";
 
-import { Card, CardBody, Spacer } from "@heroui/react";
+import { Card, CardBody } from "@heroui/card";
+import { Spacer } from "@heroui/spacer";
 import { Icon } from "@iconify/react";
 
 export default function ReportView() {

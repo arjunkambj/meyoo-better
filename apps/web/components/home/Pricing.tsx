@@ -3,15 +3,10 @@
 import { BadgeCheck } from "lucide-react";
 import React, { useMemo, useState } from "react";
 
-import {
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  Divider,
-  Switch,
-} from "@heroui/react";
-
+import { Button } from "@heroui/button";
+import { Card, CardBody, CardHeader } from "@heroui/card";
+import { Divider } from "@heroui/divider";
+import { Switch } from "@heroui/switch";
 import { frequencies, tiers } from "./pricing/constants";
 import { type Frequency, FrequencyEnum, TiersEnum } from "./pricing/types";
 import { designSystem } from "@/libs/design-system";

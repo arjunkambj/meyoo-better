@@ -1,6 +1,7 @@
 "use client";
 
-import { Skeleton, Tab, Tabs } from "@heroui/react";
+import { Skeleton } from "@heroui/skeleton";
+import { Tab, Tabs } from "@heroui/tabs";
 import { Icon } from "@iconify/react";
 import React, { useCallback, useMemo } from "react";
 import type { PnLGranularity, PnLMetrics, PnLTablePeriod } from "@repo/types";

@@ -1,15 +1,8 @@
 "use client";
 
-import {
-  Button,
-  Input,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  Textarea,
-} from "@heroui/react";
+import { Button } from "@heroui/button";
+import { Input, Textarea } from "@heroui/input";
+import { Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/modal";
 import { Icon } from "@iconify/react";
 import { useState } from "react";
 

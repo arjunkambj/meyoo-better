@@ -1,15 +1,9 @@
 "use client";
 
 import { useAuthActions } from "@convex-dev/auth/react";
-import {
-  Avatar,
-  Dropdown,
-  DropdownItem,
-  DropdownMenu,
-  DropdownSection,
-  DropdownTrigger,
-  Switch,
-} from "@heroui/react";
+import { Avatar } from "@heroui/avatar";
+import { Dropdown, DropdownItem, DropdownMenu, DropdownSection, DropdownTrigger } from "@heroui/dropdown";
+import { Switch } from "@heroui/switch";
 import { Icon } from "@iconify/react";
 import { useTheme } from "next-themes";
 import Link from "next/link";

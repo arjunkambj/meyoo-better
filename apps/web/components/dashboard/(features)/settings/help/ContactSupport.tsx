@@ -1,12 +1,8 @@
 "use client";
-import {
-  Button,
-  Card,
-  CardBody,
-  Input,
-  Spacer,
-  Textarea,
-} from "@heroui/react";
+import { Button } from "@heroui/button";
+import { Card, CardBody } from "@heroui/card";
+import { Input, Textarea } from "@heroui/input";
+import { Spacer } from "@heroui/spacer";
 import { Icon } from "@iconify/react";
 import React, { useState } from "react";
 

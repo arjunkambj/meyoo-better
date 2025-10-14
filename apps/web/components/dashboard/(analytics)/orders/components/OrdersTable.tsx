@@ -1,16 +1,9 @@
 "use client";
 
-import {
-  Chip,
-  Pagination,
-  Skeleton,
-  Table,
-  TableBody,
-  TableCell,
-  TableColumn,
-  TableHeader,
-  TableRow,
-} from "@heroui/react";
+import { Chip } from "@heroui/chip";
+import { Pagination } from "@heroui/pagination";
+import { Skeleton } from "@heroui/skeleton";
+import { Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from "@heroui/table";
 import { Icon } from "@iconify/react";
 import React, { useCallback } from "react";
 

@@ -1,6 +1,7 @@
 "use client";
 
-import { Card, cn } from "@heroui/react";
+import { Card } from "@heroui/card";
+import { cn } from "@heroui/theme";
 import { Icon } from "@iconify/react";
 import React, { useMemo } from "react";
 

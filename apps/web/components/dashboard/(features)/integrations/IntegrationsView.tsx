@@ -1,6 +1,8 @@
 "use client";
 
-import { Button, Skeleton, Tab, Tabs } from "@heroui/react";
+import { Button } from "@heroui/button";
+import { Skeleton } from "@heroui/skeleton";
+import { Tab, Tabs } from "@heroui/tabs";
 import { Spacer } from "@heroui/spacer";
 import { Icon } from "@iconify/react";
 import { useCallback, useState } from "react";

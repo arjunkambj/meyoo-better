@@ -1,6 +1,8 @@
 "use client";
 
-import { Card, CardBody, Chip, Divider } from "@heroui/react";
+import { Card, CardBody } from "@heroui/card";
+import { Chip } from "@heroui/chip";
+import { Divider } from "@heroui/divider";
 import { Icon } from "@iconify/react";
 
 import CareerApplicationButton from "@/components/home/components/CareerApplicationButton";

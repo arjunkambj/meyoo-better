@@ -1,6 +1,7 @@
 "use client";
 
-import { Card, CardBody, Skeleton } from "@heroui/react";
+import { Card, CardBody } from "@heroui/card";
+import { Skeleton } from "@heroui/skeleton";
 import { Icon } from "@iconify/react";
 
 import { useTeamStats, useUser } from "@/hooks";

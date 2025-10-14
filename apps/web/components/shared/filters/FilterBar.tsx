@@ -1,17 +1,11 @@
 "use client";
 
-import {
-  Button,
-  Chip,
-  cn,
-  DatePicker,
-  DateRangePicker,
-  Dropdown,
-  DropdownItem,
-  DropdownMenu,
-  DropdownTrigger,
-  Input,
-} from "@heroui/react";
+import { Button } from "@heroui/button";
+import { Chip } from "@heroui/chip";
+import { DatePicker, DateRangePicker } from "@heroui/date-picker";
+import { Dropdown, DropdownItem, DropdownMenu, DropdownTrigger } from "@heroui/dropdown";
+import { Input } from "@heroui/input";
+import { cn } from "@heroui/theme";
 import { Icon } from "@iconify/react";
 import { parseDate } from "@internationalized/date";
 import React from "react";

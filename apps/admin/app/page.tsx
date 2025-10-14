@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuthActions } from "@convex-dev/auth/react";
-import { Button } from "@heroui/react";
+import { Button } from "@heroui/button";
 import { Icon } from "@iconify/react";
 import Logo from "@/components/shared/Logo";
 import { useState } from "react";

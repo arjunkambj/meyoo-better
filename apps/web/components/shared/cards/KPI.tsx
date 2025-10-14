@@ -1,6 +1,10 @@
 "use client";
 
-import { Card, cn, Tooltip, Divider, Skeleton } from "@heroui/react";
+import { Card } from "@heroui/card";
+import { Divider } from "@heroui/divider";
+import { Skeleton } from "@heroui/skeleton";
+import { cn } from "@heroui/theme";
+import { Tooltip } from "@heroui/tooltip";
 import { Icon } from "@iconify/react";
 import React, { useMemo } from "react";
 

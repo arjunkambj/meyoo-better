@@ -1,7 +1,7 @@
 "use client";
 
-import { Input } from "@heroui/react";
-import type { InputProps } from "@heroui/react";
+import { Input } from "@heroui/input";
+import type { InputProps } from "@heroui/input";
 import React from "react";
 
 import { cn } from "@/libs/utils";

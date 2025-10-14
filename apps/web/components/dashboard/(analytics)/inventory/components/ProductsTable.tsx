@@ -1,20 +1,13 @@
 "use client";
 
-import {
-  Avatar,
-  addToast,
-  Button,
-  Chip,
-  Pagination,
-  Skeleton,
-  Table,
-  TableBody,
-  TableCell,
-  TableColumn,
-  TableHeader,
-  TableRow,
-  Tooltip,
-} from "@heroui/react";
+import { Avatar } from "@heroui/avatar";
+import { Button } from "@heroui/button";
+import { Chip } from "@heroui/chip";
+import { Pagination } from "@heroui/pagination";
+import { Skeleton } from "@heroui/skeleton";
+import { Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from "@heroui/table";
+import { addToast } from "@heroui/toast";
+import { Tooltip } from "@heroui/tooltip";
 import { Icon } from "@iconify/react";
 import React, { useCallback, useState } from "react";
 import { useUser } from "@/hooks";

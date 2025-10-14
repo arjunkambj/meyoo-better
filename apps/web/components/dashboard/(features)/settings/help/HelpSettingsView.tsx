@@ -1,17 +1,10 @@
 "use client";
-import {
-  Button,
-  Card,
-  CardBody,
-  Chip,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  addToast,
-  useDisclosure,
-} from "@heroui/react";
+import { Button } from "@heroui/button";
+import { Card, CardBody } from "@heroui/card";
+import { Chip } from "@heroui/chip";
+import { Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/modal";
+import { addToast } from "@heroui/toast";
+import { useDisclosure } from "@heroui/use-disclosure";
 import { Icon } from "@iconify/react";
 import { useCallback, useState } from "react";
 import type { GenericId as Id } from "convex/values";

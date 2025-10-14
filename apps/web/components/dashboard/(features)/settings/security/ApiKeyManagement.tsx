@@ -1,6 +1,8 @@
 "use client";
 
-import { Button, Card, CardBody, CardHeader, Skeleton } from "@heroui/react";
+import { Button } from "@heroui/button";
+import { Card, CardBody, CardHeader } from "@heroui/card";
+import { Skeleton } from "@heroui/skeleton";
 import { Icon } from "@iconify/react";
 import { useState } from "react";
 import type { GenericId as Id } from "convex/values";

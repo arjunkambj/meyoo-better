@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from '@heroui/react';
+import { Button } from "@heroui/button";
 import { Icon } from '@iconify/react';
 import { AnalyticsHeader } from '@/components/shared/AnalyticsHeader';
 import GlobalDateRangePicker from '@/components/shared/GlobalDateRangePicker';

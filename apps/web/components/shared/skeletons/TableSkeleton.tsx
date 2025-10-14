@@ -1,7 +1,7 @@
 "use client";
 
-import { Card, Skeleton } from "@heroui/react";
-
+import { Card } from "@heroui/card";
+import { Skeleton } from "@heroui/skeleton";
 interface TableSkeletonProps {
   rows?: number;
   columns?: number;

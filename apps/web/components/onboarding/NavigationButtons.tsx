@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@heroui/react";
+import { Button } from "@heroui/button";
 import { Icon } from "@iconify/react";
 import { useRouter, usePathname } from "next/navigation";
 import { memo, useCallback, useMemo, useState } from "react";

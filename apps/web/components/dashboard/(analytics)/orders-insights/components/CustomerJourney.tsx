@@ -1,6 +1,7 @@
 "use client";
 
-import { Card, Tooltip } from "@heroui/react";
+import { Card } from "@heroui/card";
+import { Tooltip } from "@heroui/tooltip";
 import { Icon } from "@iconify/react";
 import { memo } from "react";
 

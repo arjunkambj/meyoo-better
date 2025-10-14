@@ -1,13 +1,10 @@
 "use client";
 
-import {
-  Button,
-  Card,
-  CardBody,
-  Input,
-  Spinner,
-  addToast,
-} from "@heroui/react";
+import { Button } from "@heroui/button";
+import { Card, CardBody } from "@heroui/card";
+import { Input } from "@heroui/input";
+import { Spinner } from "@heroui/spinner";
+import { addToast } from "@heroui/toast";
 import { Icon } from "@iconify/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";

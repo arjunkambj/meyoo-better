@@ -1,18 +1,11 @@
 "use client";
 
-import {
-  Button,
-  Chip,
-  Input,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  Radio,
-  RadioGroup,
-  useDisclosure,
-} from "@heroui/react";
+import { Button } from "@heroui/button";
+import { Chip } from "@heroui/chip";
+import { Input } from "@heroui/input";
+import { Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/modal";
+import { Radio, RadioGroup } from "@heroui/radio";
+import { useDisclosure } from "@heroui/use-disclosure";
 import { Icon } from "@iconify/react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";

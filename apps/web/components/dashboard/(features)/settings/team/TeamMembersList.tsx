@@ -1,18 +1,11 @@
 "use client";
 
-import {
-  Avatar,
-  Button,
-  Chip,
-  Skeleton,
-  Table,
-  TableBody,
-  TableCell,
-  TableColumn,
-  TableHeader,
-  TableRow,
-  addToast,
-} from "@heroui/react";
+import { Avatar } from "@heroui/avatar";
+import { Button } from "@heroui/button";
+import { Chip } from "@heroui/chip";
+import { Skeleton } from "@heroui/skeleton";
+import { Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from "@heroui/table";
+import { addToast } from "@heroui/toast";
 import { Icon } from "@iconify/react";
 import { useMutation } from "convex/react";
 import { useCallback, useMemo, useState } from "react";

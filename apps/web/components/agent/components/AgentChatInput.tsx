@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { Button, Textarea, Tooltip } from "@heroui/react";
+import { Button } from "@heroui/button";
+import { Textarea } from "@heroui/input";
+import { Tooltip } from "@heroui/tooltip";
 import { Icon } from "@iconify/react";
 import { cn } from "@heroui/theme";
 

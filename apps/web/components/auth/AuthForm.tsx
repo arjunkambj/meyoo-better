@@ -1,7 +1,11 @@
 "use client";
 
 import { useAuthActions } from "@convex-dev/auth/react";
-import { addToast, Button, Input, Skeleton, Tab, Tabs } from "@heroui/react";
+import { Button } from "@heroui/button";
+import { Input } from "@heroui/input";
+import { Skeleton } from "@heroui/skeleton";
+import { Tab, Tabs } from "@heroui/tabs";
+import { addToast } from "@heroui/toast";
 import { Icon } from "@iconify/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";

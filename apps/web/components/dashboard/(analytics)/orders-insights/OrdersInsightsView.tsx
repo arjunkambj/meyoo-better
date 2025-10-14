@@ -1,6 +1,7 @@
 "use client";
 
-import { Skeleton, Spacer } from "@heroui/react";
+import { Skeleton } from "@heroui/skeleton";
+import { Spacer } from "@heroui/spacer";
 import { memo, useCallback } from "react";
 import { AnalyticsHeader } from "@/components/shared/AnalyticsHeader";
 import GlobalDateRangePicker from "@/components/shared/GlobalDateRangePicker";

@@ -11,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from "@heroui/table";
-import { Button } from "@heroui/react";
+import { Button } from "@heroui/button";
 import { Tooltip } from "@heroui/tooltip";
 import { Icon } from "@iconify/react";
 import Image from "next/image";

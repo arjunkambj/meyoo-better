@@ -1,6 +1,8 @@
 "use client";
 
-import { Checkbox, cn, ScrollShadow } from "@heroui/react";
+import { Checkbox } from "@heroui/checkbox";
+import { ScrollShadow } from "@heroui/scroll-shadow";
+import { cn } from "@heroui/theme";
 import { Icon } from "@iconify/react";
 import React, { useCallback, useMemo } from "react";
 

@@ -1,17 +1,10 @@
 "use client";
 
-import {
-  Button,
-  Chip,
-  Input,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  Tab,
-  Tabs,
-} from "@heroui/react";
+import { Button } from "@heroui/button";
+import { Chip } from "@heroui/chip";
+import { Input } from "@heroui/input";
+import { Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/modal";
+import { Tab, Tabs } from "@heroui/tabs";
 import { Icon } from "@iconify/react";
 import React, { useCallback, useMemo, useState, useTransition } from "react";
 import { SelectedItemsList } from "./components/customization/SelectedItemsList";

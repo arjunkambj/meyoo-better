@@ -1,5 +1,7 @@
 ﻿"use client";
-import { Card, CardBody, Divider, Link } from "@heroui/react";
+import { Card, CardBody } from "@heroui/card";
+import { Divider } from "@heroui/divider";
+import Link from "next/link";
 import { Icon } from "@iconify/react";
 
 const lastUpdated = "January 15, 2025";

@@ -1,6 +1,7 @@
 "use client";
 
-import { Button, Tooltip } from "@heroui/react";
+import { Button } from "@heroui/button";
+import { Tooltip } from "@heroui/tooltip";
 import { Icon } from "@iconify/react";
 
 export default function NewChatButton({ onNew }: { onNew: () => void }) {

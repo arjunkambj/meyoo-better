@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import IntegrationCard from "@/components/onboarding/IntegrationCard";
 import NavigationButtons from "@/components/onboarding/NavigationButtons";
 import StepLoadingState from "@/components/onboarding/StepLoadingState";
-import { useCurrentUser, useIntegration, useOnboarding } from "@/hooks";
+import { useUser, useIntegration, useOnboarding } from "@/hooks";
 import { trackOnboardingAction, trackOnboardingView } from "@/libs/analytics";
 
 // Utility function to sanitize URL parameters to prevent XSS (defined outside component)
@@ -20,7 +20,7 @@ const sanitizeParam = (param: string | null): string => {
 const clearParams = (
   router: ReturnType<typeof useRouter>,
   searchParams: ReturnType<typeof useSearchParams>,
-  keys: string[],
+  keys: string[]
 ) => {
   const next = new URLSearchParams(searchParams);
   keys.forEach((k) => next.delete(k));
@@ -31,7 +31,7 @@ const clearParams = (
 export default function MarketingIntegrationsClient() {
   const [metaLoading, setMetaLoading] = useState(false);
 
-  const user = useCurrentUser();
+  const user = useUser();
   const { meta } = useIntegration();
   const { status } = useOnboarding();
   const router = useRouter();
@@ -62,7 +62,7 @@ export default function MarketingIntegrationsClient() {
   // Derived integration state (memoized)
   const _hasMetaAccounts = useMemo(
     () => Boolean(meta.accounts && meta.accounts.length > 0),
-    [meta.accounts],
+    [meta.accounts]
   );
 
   // Handle error parameters from OAuth callbacks
@@ -137,10 +137,16 @@ export default function MarketingIntegrationsClient() {
       // advance the server step and navigate to the next route.
       trackOnboardingAction("marketing", "continue");
     } catch (error) {
-      console.error("[ONBOARDING] Failed to continue from marketing step:", error);
+      console.error(
+        "[ONBOARDING] Failed to continue from marketing step:",
+        error
+      );
       addToast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to continue. Please try again.",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to continue. Please try again.",
         color: "danger",
         timeout: 3000,
       });

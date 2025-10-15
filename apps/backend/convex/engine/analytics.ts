@@ -1396,26 +1396,6 @@ export const upsertCustomerDailySummary = internalMutation({
   },
 });
 
-export const countCustomersUpToDate = internalQuery({
-  args: {
-    organizationId: v.id("organizations"),
-    exclusiveUpperBound: v.number(),
-  },
-  returns: v.number(),
-  handler: async (ctx, args) => {
-    const customers = await ctx.db
-      .query("shopifyCustomers")
-      .withIndex("by_organization_and_created", (q) =>
-        q
-          .eq("organizationId", args.organizationId)
-          .lt("shopifyCreatedAt", args.exclusiveUpperBound),
-      )
-      .collect();
-
-    return customers.length;
-  },
-});
-
 export const getCustomerSummaryBeforeDate = internalQuery({
   args: {
     organizationId: v.id("organizations"),
@@ -1444,6 +1424,47 @@ export const getCustomerSummaryBeforeDate = internalQuery({
       customersCreated: doc.customersCreated,
       totalCustomers: doc.totalCustomers,
     } as const;
+  },
+});
+
+export const countCustomersBeforeUtcExclusive = internalQuery({
+  args: {
+    organizationId: v.id("organizations"),
+    endDateTimeUtcExclusive: v.string(),
+  },
+  returns: v.number(),
+  handler: async (ctx, args) => {
+    const cutoffMs = Date.parse(args.endDateTimeUtcExclusive);
+    if (!Number.isFinite(cutoffMs)) {
+      return 0;
+    }
+
+    const PAGE_SIZE = 256;
+    let total = 0;
+    let cursor: string | null = null;
+
+    while (true) {
+      const page = await ctx.db
+        .query("shopifyCustomers")
+        .withIndex("by_organization_and_created", (q) =>
+          q.eq("organizationId", args.organizationId).lt("shopifyCreatedAt", cutoffMs),
+        )
+        .order("asc")
+        .paginate({
+          numItems: PAGE_SIZE,
+          cursor,
+        });
+
+      total += page.page.length;
+
+      if (page.isDone) {
+        break;
+      }
+
+      cursor = page.continueCursor ?? null;
+    }
+
+    return total;
   },
 });
 
@@ -1551,52 +1572,47 @@ export const rebuildDailyMetrics = internalAction({
           });
         }
 
-        let totalCustomers: number | null = null;
-        const endExclusive = Date.parse(dateRange.endDateTimeUtcExclusive ?? "");
-        if (Number.isFinite(endExclusive)) {
-          try {
-            totalCustomers = await ctx.runQuery(
-              internal.engine.analytics.countCustomersUpToDate,
-              {
-                organizationId: args.organizationId,
-                exclusiveUpperBound: endExclusive,
-              },
-            );
-          } catch (countError) {
-            console.warn("[Analytics] Failed to count customers for summary", {
+        let totalCustomers = customersCreated;
+        try {
+          const previousSummary = await ctx.runQuery(
+            internal.engine.analytics.getCustomerSummaryBeforeDate,
+            {
               organizationId: args.organizationId,
               date,
-              error: countError,
-            });
-            totalCustomers = null;
-          }
-        }
+            },
+          );
 
-        if (totalCustomers === null) {
-          try {
-            const previousSummary = await ctx.runQuery(
-              internal.engine.analytics.getCustomerSummaryBeforeDate,
-              {
-                organizationId: args.organizationId,
-                date,
-              },
-            );
-            totalCustomers = (previousSummary?.totalCustomers ?? 0) + customersCreated;
-          } catch (summaryError) {
-            console.warn("[Analytics] Failed to derive customer summary fallback", {
-              organizationId: args.organizationId,
-              date,
-              error: summaryError,
-            });
-            totalCustomers = customersCreated;
+          if (previousSummary) {
+            totalCustomers = previousSummary.totalCustomers + customersCreated;
+          } else if (dateRange.endDateTimeUtcExclusive) {
+            const cutoffMs = Date.parse(dateRange.endDateTimeUtcExclusive);
+            if (Number.isFinite(cutoffMs)) {
+              const baselineTotal = await ctx.runQuery(
+                internal.engine.analytics.countCustomersBeforeUtcExclusive,
+                {
+                  organizationId: args.organizationId,
+                  endDateTimeUtcExclusive: dateRange.endDateTimeUtcExclusive,
+                },
+              );
+              if (Number.isFinite(baselineTotal) && baselineTotal >= 0) {
+                totalCustomers = Math.max(baselineTotal, customersCreated);
+              }
+            }
           }
+        } catch (summaryError) {
+          console.warn("[Analytics] Failed to derive customer summary baseline", {
+            organizationId: args.organizationId,
+            date,
+            error: summaryError,
+          });
+          totalCustomers = customersCreated;
         }
 
         await ctx.runMutation(internal.engine.analytics.upsertCustomerDailySummary, {
           organizationId: args.organizationId,
           date,
           customersCreated,
-          totalCustomers: totalCustomers ?? customersCreated,
+          totalCustomers,
         });
 
         updated += 1;

@@ -82,10 +82,6 @@ engine/analytics.insertCustomerDailyActivityChunk
 prod
 78
 
-engine/analytics.countCustomersUpToDate
-prod
-78
-
 shopify/orderMutations.storeOrdersInternal
 prod
 65

@@ -8,7 +8,14 @@ import { Pagination } from "@heroui/pagination";
 import { Select, SelectItem } from "@heroui/select";
 import { Skeleton } from "@heroui/skeleton";
 import { Spinner } from "@heroui/spinner";
-import { Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from "@heroui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableColumn,
+  TableHeader,
+  TableRow,
+} from "@heroui/table";
 import { Icon } from "@iconify/react";
 import {
   useCallback,
@@ -27,7 +34,7 @@ import {
   useShopifyProductVariantsPaginated,
   useUpsertVariantCosts,
   useSaveVariantCosts,
-  useCurrentUser,
+  useUser,
   useOnboarding,
 } from "@/hooks";
 import { trackOnboardingAction, trackOnboardingView } from "@/libs/analytics";
@@ -98,17 +105,18 @@ export default function VariantCostsClient({
   hideTitle?: boolean;
 } = {}) {
   const router = useRouter();
-  const user = useCurrentUser();
+  const user = useUser();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const pageSize = 1000;
   const [bulkValue, setBulkValue] = useState<string>("10");
   const [bulkType, setBulkType] = useState<"percent" | "flat">("percent");
-  const { data, totalPages, currentPage, loading } = useShopifyProductVariantsPaginated(
-    page,
-    pageSize,
-    hideSearch ? undefined : search
-  );
+  const { data, totalPages, currentPage, loading } =
+    useShopifyProductVariantsPaginated(
+      page,
+      pageSize,
+      hideSearch ? undefined : search
+    );
 
   useEffect(() => {
     if (currentPage !== page) {
@@ -193,7 +201,9 @@ export default function VariantCostsClient({
           if (!isFinite(original) || original === 0) {
             const price = Number(v.price ?? 0) || 0;
             const computed = (price * value) / 100;
-            variantEdit.cogs = isFinite(computed) ? computed.toFixed(2) : "0.00";
+            variantEdit.cogs = isFinite(computed)
+              ? computed.toFixed(2)
+              : "0.00";
           }
         } else {
           variantEdit.cogs = value.toFixed(2);
@@ -212,7 +222,9 @@ export default function VariantCostsClient({
         if (type === "percent") {
           const price = Number(v.price ?? 0) || 0;
           const computed = (price * value) / 100;
-          variantEdit.handling = isFinite(computed) ? computed.toFixed(2) : "0.00";
+          variantEdit.handling = isFinite(computed)
+            ? computed.toFixed(2)
+            : "0.00";
         } else {
           variantEdit.handling = value.toFixed(2);
         }
@@ -334,11 +346,7 @@ export default function VariantCostsClient({
       const next = { ...prev } as Record<string, RowEdit>;
       dataToProcess.forEach((v) => {
         const id = String(v._id);
-        const original = (
-          prev[id]?.cogs ??
-          v.cogsPerUnit ??
-          ""
-        ).toString();
+        const original = (prev[id]?.cogs ?? v.cogsPerUnit ?? "").toString();
         const originalVal = Number(original || 0);
 
         let computed: number;
@@ -447,7 +455,10 @@ export default function VariantCostsClient({
               </div>
               <div className="text-start space-y-1">
                 <p className="font-semibold text-warning-600">
-                  Shopify sync {hasShopifySyncError ? "needs attention" : "is still in progress"}
+                  Shopify sync{" "}
+                  {hasShopifySyncError
+                    ? "needs attention"
+                    : "is still in progress"}
                 </p>
                 <p className="text-sm leading-relaxed">
                   {hasShopifySyncError
@@ -496,7 +507,10 @@ export default function VariantCostsClient({
   const headerContent = hideTitle ? null : (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
       <div className="flex items-start gap-2">
-        <Icon icon="solar:box-minimalistic-bold-duotone" className="mt-1 text-primary" />
+        <Icon
+          icon="solar:box-minimalistic-bold-duotone"
+          className="mt-1 text-primary"
+        />
         <div>
           <h2 className="text-xl font-semibold">Variant Costs</h2>
           <p className="text-xs text-default-500">
@@ -518,7 +532,9 @@ export default function VariantCostsClient({
                 input: DATA_TABLE_INPUT_CLASS,
               }}
               placeholder="Search..."
-              startContent={<Icon icon="solar:search-bold-duotone" width={16} />}
+              startContent={
+                <Icon icon="solar:search-bold-duotone" width={16} />
+              }
               value={search}
               onValueChange={setSearch}
             />
@@ -548,12 +564,8 @@ export default function VariantCostsClient({
           }}
           aria-label="Bulk operation type"
         >
-          <SelectItem key="percent">
-            Percent
-          </SelectItem>
-          <SelectItem key="flat">
-            Flat
-          </SelectItem>
+          <SelectItem key="percent">Percent</SelectItem>
+          <SelectItem key="flat">Flat</SelectItem>
         </Select>
         <Button
           size={compact ? "sm" : "md"}
@@ -921,8 +933,10 @@ export default function VariantCostsClient({
                     <TableRow
                       key={`grp-h-${grp.key}`}
                       className={cn(
-                        stripe ? DATA_TABLE_ROW_STRIPE_BG : DATA_TABLE_ROW_BASE_BG,
-                        DATA_TABLE_GROUP_ROW_BORDER_CLASS,
+                        stripe
+                          ? DATA_TABLE_ROW_STRIPE_BG
+                          : DATA_TABLE_ROW_BASE_BG,
+                        DATA_TABLE_GROUP_ROW_BORDER_CLASS
                       )}
                     >
                       {headerCells}
@@ -939,7 +953,7 @@ export default function VariantCostsClient({
                         key={String(v._id)}
                         className={cn(
                           DATA_TABLE_ROW_BASE_BG,
-                          stripe && DATA_TABLE_ROW_STRIPE_CHILD_BG,
+                          stripe && DATA_TABLE_ROW_STRIPE_CHILD_BG
                         )}
                       >
                         {(() => {
@@ -1071,7 +1085,8 @@ export default function VariantCostsClient({
                                   step="0.01"
                                   size={compact ? "sm" : "md"}
                                   classNames={{
-                                    inputWrapper: DATA_TABLE_INPUT_WRAPPER_CLASS,
+                                    inputWrapper:
+                                      DATA_TABLE_INPUT_WRAPPER_CLASS,
                                     input: DATA_TABLE_INPUT_CLASS,
                                   }}
                                   startContent={

@@ -5,12 +5,6 @@ import { api } from "@/libs/convexApi";
 import { useOnboarding } from "@/hooks/onboarding/useOnboarding";
 
 /**
- * User and Organization Management Hooks
- */
-
-// ============ USER HOOKS ============
-
-/**
  * Get current authenticated user
  */
 export type UserProfile = {
@@ -35,7 +29,7 @@ export function useUser() {
     primaryCurrency,
   } = useUserContext();
   const updateBusinessProfileMutation = useMutation(
-    api.core.users.updateBusinessProfile,
+    api.core.users.updateBusinessProfile
   );
   const updateProfileMutation = useMutation(api.core.users.updateProfile);
 
@@ -55,9 +49,7 @@ export function useUser() {
   };
 
   // Update business profile function - for business-specific info
-  const updateBusinessProfile = async (data: {
-    mobileNumber?: string;
-  }) => {
+  const updateBusinessProfile = async (data: { mobileNumber?: string }) => {
     return await updateBusinessProfileMutation(data);
   };
 
@@ -81,29 +73,12 @@ export function useUser() {
   };
 }
 
-/**
- * Get current user (alias for useUser)
- */
-export function useCurrentUser() {
-  return useUser();
-}
-
-/**
- * Get team members for current organization
- */
-// (removed) useTeamMembers
-
-// ============ MUTATION HOOKS ============
-
 export function useIsOnboarded() {
   const { user } = useUser();
 
   return user?.isOnboarded || false;
 }
 
-/**
- * Get user's integration status
- */
 export function useIntegrationStatus() {
   const { status: onboardingStatus } = useOnboarding();
 

@@ -2,7 +2,13 @@
 
 import { Button } from "@heroui/button";
 import { Divider } from "@heroui/divider";
-import { Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/modal";
+import {
+  Modal,
+  ModalBody,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+} from "@heroui/modal";
 import { addToast } from "@heroui/toast";
 import { Icon } from "@iconify/react";
 import { useMutation } from "convex/react";
@@ -12,7 +18,7 @@ import { useEffect, useRef, useState } from "react";
 import IntegrationCard from "@/components/onboarding/IntegrationCard";
 import SimpleNavigationButtons from "@/components/onboarding/SimpleNavigationButtons";
 import StepLoadingState from "@/components/onboarding/StepLoadingState";
-import { useCurrentUser } from "@/hooks";
+import { useUser } from "@/hooks";
 import { trackOnboardingAction, trackOnboardingView } from "@/libs/analytics";
 import { api } from "@/libs/convexApi";
 import { useSetAtom } from "jotai";
@@ -21,7 +27,7 @@ import { setNavigationPendingAtom } from "@/store/onboarding";
 type Props = { installUri?: string | null };
 
 export default function ShopifyOnboardingClient({ installUri }: Props) {
-  const user = useCurrentUser();
+  const user = useUser();
   const router = useRouter();
   const [connecting, setConnecting] = useState(false);
   const joinDemoOrganization = useMutation(

@@ -4,11 +4,6 @@ import { useQuery } from "convex-helpers/react/cache/hooks";
 import { api } from "@/libs/convexApi";
 
 /**
- * Integration Management Hooks
- * Handles Shopify, Meta, and Google integrations
- */
-
-/**
  * Get integration status for all platforms
  */
 export function useIntegration() {
@@ -61,16 +56,16 @@ export function useIntegration() {
 export function useShopifyProductVariantsPaginated(
   page?: number,
   pageSize?: number,
-  searchTerm?: string,
+  searchTerm?: string
 ) {
   const args = useMemo(
     () => ({ page, pageSize, searchTerm }),
-    [page, pageSize, searchTerm],
+    [page, pageSize, searchTerm]
   );
 
   const result = useQuery(
     api.shopify.publicQueries.getProductVariantsPaginated,
-    args,
+    args
   );
 
   return {

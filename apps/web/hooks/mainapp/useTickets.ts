@@ -5,13 +5,6 @@ import { useMemo } from "react";
 import { api } from "@/libs/convexApi";
 import type { GenericId as Id } from "convex/values";
 
-/**
- * Support Ticket Management Hooks
- */
-
-// ============ TICKET QUERIES ============
-
-// Mirror of returns from api.web.tickets.getUserTickets
 type TicketListItem = {
   id: Id<"tickets">;
   type: string;
@@ -25,53 +18,46 @@ type TicketListItem = {
   responseCount: number;
 };
 
-/**
- * Get user's tickets
- */
 export function useUserTickets(
   status?: "open" | "in_progress" | "resolved" | "closed",
   limit?: number
 ) {
-  const args = useMemo(
-    () => ({ status, limit }),
-    [status, limit],
-  );
+  const args = useMemo(() => ({ status, limit }), [status, limit]);
   const tickets = useQuery(api.web.tickets.getUserTickets, args);
 
   const loading = tickets === undefined;
   const error = tickets === null && !loading ? "Failed to load tickets" : null;
 
-  const { list, openCount, inProgressCount, resolvedCount } =
-    useMemo(() => {
-      const list = (tickets as TicketListItem[] | null | undefined) || [];
+  const { list, openCount, inProgressCount, resolvedCount } = useMemo(() => {
+    const list = (tickets as TicketListItem[] | null | undefined) || [];
 
-      return list.reduce(
-        (acc, ticket) => {
-          switch (ticket.status) {
-            case "open":
-              acc.openCount += 1;
-              break;
-            case "in_progress":
-              acc.inProgressCount += 1;
-              break;
-            case "resolved":
-              acc.resolvedCount += 1;
-              break;
-            default:
-              break;
-          }
+    return list.reduce(
+      (acc, ticket) => {
+        switch (ticket.status) {
+          case "open":
+            acc.openCount += 1;
+            break;
+          case "in_progress":
+            acc.inProgressCount += 1;
+            break;
+          case "resolved":
+            acc.resolvedCount += 1;
+            break;
+          default:
+            break;
+        }
 
-          acc.list.push(ticket);
-          return acc;
-        },
-        {
-          list: [] as TicketListItem[],
-          openCount: 0,
-          inProgressCount: 0,
-          resolvedCount: 0,
-        },
-      );
-    }, [tickets]);
+        acc.list.push(ticket);
+        return acc;
+      },
+      {
+        list: [] as TicketListItem[],
+        openCount: 0,
+        inProgressCount: 0,
+        resolvedCount: 0,
+      }
+    );
+  }, [tickets]);
 
   return {
     tickets: list,
@@ -84,14 +70,6 @@ export function useUserTickets(
   };
 }
 
-/**
- * Get single ticket with responses
- */
-// (removed) useTicket
-
-/**
- * Get all tickets (admin only)
- */
 function useAllTickets(filters?: {
   status?: "open" | "in_progress" | "resolved" | "closed";
   priority?: "low" | "medium" | "high" | "urgent";
@@ -104,13 +82,10 @@ function useAllTickets(filters?: {
       priority: filters?.priority,
       limit: filters?.limit,
     }),
-    [filters?.limit, filters?.priority, filters?.status],
+    [filters?.limit, filters?.priority, filters?.status]
   );
 
-  const tickets = useQuery(
-    api.meyoo.tickets.getAllTickets,
-    normalizedFilters,
-  );
+  const tickets = useQuery(api.meyoo.tickets.getAllTickets, normalizedFilters);
 
   const loading = tickets === undefined;
   const error =
@@ -118,42 +93,38 @@ function useAllTickets(filters?: {
       ? "Failed to load tickets or access denied"
       : null;
 
-  const {
-    list,
-    openCount,
-    inProgressCount,
-    highPriorityCount,
-  } = useMemo(() => {
-    const list = (tickets as TicketListItem[] | null | undefined) || [];
+  const { list, openCount, inProgressCount, highPriorityCount } =
+    useMemo(() => {
+      const list = (tickets as TicketListItem[] | null | undefined) || [];
 
-    return list.reduce(
-      (acc, ticket) => {
-        switch (ticket.status) {
-          case "open":
-            acc.openCount += 1;
-            break;
-          case "in_progress":
-            acc.inProgressCount += 1;
-            break;
-          default:
-            break;
+      return list.reduce(
+        (acc, ticket) => {
+          switch (ticket.status) {
+            case "open":
+              acc.openCount += 1;
+              break;
+            case "in_progress":
+              acc.inProgressCount += 1;
+              break;
+            default:
+              break;
+          }
+
+          if (ticket.priority === "high" || ticket.priority === "urgent") {
+            acc.highPriorityCount += 1;
+          }
+
+          acc.list.push(ticket);
+          return acc;
+        },
+        {
+          list: [] as TicketListItem[],
+          openCount: 0,
+          inProgressCount: 0,
+          highPriorityCount: 0,
         }
-
-        if (ticket.priority === "high" || ticket.priority === "urgent") {
-          acc.highPriorityCount += 1;
-        }
-
-        acc.list.push(ticket);
-        return acc;
-      },
-      {
-        list: [] as TicketListItem[],
-        openCount: 0,
-        inProgressCount: 0,
-        highPriorityCount: 0,
-      },
-    );
-  }, [tickets]);
+      );
+    }, [tickets]);
 
   return {
     tickets: list,
@@ -166,11 +137,6 @@ function useAllTickets(filters?: {
   };
 }
 
-// ============ TICKET MUTATIONS ============
-
-/**
- * Create a new ticket
- */
 export function useCreateTicket() {
   const createTicket = useMutation(api.web.tickets.createTicket);
 
@@ -200,9 +166,6 @@ export function useCreateTicket() {
   };
 }
 
-/**
- * Add response to ticket
- */
 function useAddTicketResponse() {
   const addResponse = useMutation(api.web.tickets.addTicketResponse);
 
@@ -225,9 +188,6 @@ function useAddTicketResponse() {
   };
 }
 
-/**
- * Update ticket status
- */
 function useUpdateTicketStatus() {
   // Admin-side status update lives under meyoo namespace
   const updateStatus = useMutation(api.meyoo.tickets.updateTicketStatus);
@@ -254,9 +214,6 @@ function useUpdateTicketStatus() {
   };
 }
 
-/**
- * Delete a ticket
- */
 export function useDeleteTicket() {
   const deleteTicket = useMutation(api.web.tickets.deleteTicket);
 
@@ -279,11 +236,6 @@ export function useDeleteTicket() {
   };
 }
 
-// ============ COMBINED TICKET HOOK ============
-
-/**
- * Combined ticket management hook
- */
 export function useTickets() {
   const userTickets = useUserTickets();
   const { createTicket } = useCreateTicket();
@@ -314,13 +266,13 @@ export function useTickets() {
     // Utility functions
     getTicketById: (id: Id<"tickets">) => {
       return (userTickets.tickets as TicketListItem[]).find(
-        (t: TicketListItem) => t.id === id,
+        (t: TicketListItem) => t.id === id
       );
     },
 
     getOpenTickets: () => {
       return (userTickets.tickets as TicketListItem[]).filter(
-        (t: TicketListItem) => t.status === "open",
+        (t: TicketListItem) => t.status === "open"
       );
     },
 

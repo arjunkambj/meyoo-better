@@ -7,11 +7,6 @@ import type { GenericId as Id } from "convex/values";
 import { dateRangeToUtcWithShopPreference } from "@/libs/dateRange";
 import { useShopifyTime } from "./useShopifyTime";
 
-/**
- * Cost Management Hooks
- * Handles organization-level costs including shipping, payment processing, and operational expenses
- */
-
 // Cost type constants
 const COST_TYPES = {
   SHIPPING: "shipping",
@@ -52,7 +47,7 @@ const COST_FREQUENCY = {
  */
 export function useCost(
   type?: keyof typeof COST_TYPES,
-  dateRange?: { startDate: string; endDate: string },
+  dateRange?: { startDate: string; endDate: string }
 ) {
   const { offsetMinutes, timezoneIana } = useShopifyTime();
   const normalizedRange = useMemo(() => {
@@ -60,7 +55,7 @@ export function useCost(
     const utcRange = dateRangeToUtcWithShopPreference(
       dateRange,
       typeof offsetMinutes === "number" ? offsetMinutes : undefined,
-      timezoneIana,
+      timezoneIana
     );
     return {
       ...utcRange,
@@ -74,7 +69,7 @@ export function useCost(
       type: type ? COST_TYPES[type] : undefined,
       dateRange: normalizedRange,
     }),
-    [normalizedRange, type],
+    [normalizedRange, type]
   );
 
   const costs = useQuery(api.core.costs.getCosts, queryArgs);
@@ -173,12 +168,12 @@ export function useCreateExpense() {
     frequency?: keyof typeof COST_FREQUENCY;
   }) => {
     try {
-      const costType =
-        COST_TYPES[data.type] as (typeof COST_TYPES)[keyof typeof COST_TYPES];
-      const calculation =
-        CALCULATION_METHODS[
-          data.calculation
-        ] as (typeof CALCULATION_METHODS)[keyof typeof CALCULATION_METHODS];
+      const costType = COST_TYPES[
+        data.type
+      ] as (typeof COST_TYPES)[keyof typeof COST_TYPES];
+      const calculation = CALCULATION_METHODS[
+        data.calculation
+      ] as (typeof CALCULATION_METHODS)[keyof typeof CALCULATION_METHODS];
       const frequency = data.frequency
         ? (COST_FREQUENCY[
             data.frequency
@@ -193,7 +188,7 @@ export function useCreateExpense() {
         effectiveFrom:
           typeof data.effectiveFrom === "string"
             ? new Date(data.effectiveFrom).getTime()
-            : data.effectiveFrom?.getTime?.() ?? Date.now(),
+            : (data.effectiveFrom?.getTime?.() ?? Date.now()),
         description: data.description,
         frequency,
       });
@@ -363,21 +358,23 @@ export function useSaveVariantCosts() {
       cogsPerUnit?: number;
       handlingPerUnit?: number;
       taxPercent?: number;
-    }>,
+    }>
   ) => {
-    const payload = costs
-      .map((c) => ({
-        variantId: c.variantId as Id<"shopifyProductVariants">,
-        cogsPerUnit: c.cogsPerUnit,
-        handlingPerUnit: c.handlingPerUnit,
-        taxPercent: c.taxPercent,
-      })) as any;
+    const payload = costs.map((c) => ({
+      variantId: c.variantId as Id<"shopifyProductVariants">,
+      cogsPerUnit: c.cogsPerUnit,
+      handlingPerUnit: c.handlingPerUnit,
+      taxPercent: c.taxPercent,
+    })) as any;
 
     try {
       const res = await mutation({ costs: payload });
       return { success: res.success };
     } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
     }
   };
 }

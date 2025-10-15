@@ -8,6 +8,7 @@ import type {
 import type { AnyRecord } from './shared';
 import {
   computeCostOverlap,
+  computeCostRetentionFactor,
   defaultMetric,
   ensureDataset,
   filterAccountLevelMetaInsights,
@@ -509,20 +510,41 @@ function computeOverviewBaseline(
 
   const totalAdSpend = metaAdSpend;
 
-  const totalCostsWithoutAds =
-    cogs + shippingCosts + transactionFees + handlingCostTotal + customCostTotal + taxesCollected;
   const rtoRevenueLost = manualReturnRatePercent > 0
     ? Math.min(
         Math.max((revenue * manualReturnRatePercent) / 100, 0),
         Math.max(revenue, 0),
       )
     : 0;
+  const costRetentionFactor = computeCostRetentionFactor({
+    revenue,
+    refunds: refundsAmount,
+    rtoRevenueLost,
+    manualReturnRatePercent,
+  });
+  const adjustedCogs = cogs * costRetentionFactor;
+  const adjustedHandlingCostTotal = handlingCostTotal * costRetentionFactor;
+  const adjustedTaxesCollected = taxesCollected * costRetentionFactor;
+
+  const totalCostsWithoutAds =
+    adjustedCogs +
+    shippingCosts +
+    transactionFees +
+    adjustedHandlingCostTotal +
+    customCostTotal +
+    adjustedTaxesCollected;
   const totalReturnImpact = refundsAmount + rtoRevenueLost;
   const netRevenue = Math.max(revenue - totalReturnImpact, 0);
   const netProfit = netRevenue - totalCostsWithoutAds - totalAdSpend;
   const operatingProfit = netRevenue - totalCostsWithoutAds;
-  const grossProfit = netRevenue - cogs;
-  const contributionProfit = netRevenue - (cogs + shippingCosts + transactionFees + handlingCostTotal + customCostTotal);
+  const grossProfit = netRevenue - adjustedCogs;
+  const contributionProfit = netRevenue - (
+    adjustedCogs +
+    shippingCosts +
+    transactionFees +
+    adjustedHandlingCostTotal +
+    customCostTotal
+  );
 
   const profitMargin = netRevenue > 0 ? (netProfit / netRevenue) * 100 : 0;
   const operatingMargin = netRevenue > 0 ? (operatingProfit / netRevenue) * 100 : 0;
@@ -540,10 +562,10 @@ function computeOverviewBaseline(
   const marketingPercentageOfGross = grossSales > 0 ? (totalAdSpend / grossSales) * 100 : 0;
   const marketingPercentageOfNet = netRevenue > 0 ? (totalAdSpend / netRevenue) * 100 : 0;
 
-  const cogsPercentageOfGross = grossSales > 0 ? (cogs / grossSales) * 100 : 0;
-  const cogsPercentageOfNet = netRevenue > 0 ? (cogs / netRevenue) * 100 : 0;
+  const cogsPercentageOfGross = grossSales > 0 ? (adjustedCogs / grossSales) * 100 : 0;
+  const cogsPercentageOfNet = netRevenue > 0 ? (adjustedCogs / netRevenue) * 100 : 0;
   const shippingPercentageOfNet = netRevenue > 0 ? (shippingCosts / netRevenue) * 100 : 0;
-  const taxesPercentageOfRevenue = netRevenue > 0 ? (taxesCollected / netRevenue) * 100 : 0;
+  const taxesPercentageOfRevenue = netRevenue > 0 ? (adjustedTaxesCollected / netRevenue) * 100 : 0;
 
   const returnRate = activeOrderCount > 0 ? (refunds.length / activeOrderCount) * 100 : 0;
   const paidCustomersCount = uniqueCustomerIds.size;
@@ -624,7 +646,7 @@ function computeOverviewBaseline(
     profitPerUnitChange: 0,
     fulfillmentCostPerOrder: 0,
     fulfillmentCostPerOrderChange: 0,
-    cogs,
+    cogs: adjustedCogs,
     cogsChange: 0,
     cogsPercentageOfGross,
     cogsPercentageOfGrossChange: 0,
@@ -636,9 +658,9 @@ function computeOverviewBaseline(
     shippingPercentageOfNetChange: 0,
     transactionFees,
     transactionFeesChange: 0,
-    handlingFees: handlingCostTotal,
+    handlingFees: adjustedHandlingCostTotal,
     handlingFeesChange: 0,
-    taxesCollected,
+    taxesCollected: adjustedTaxesCollected,
     taxesCollectedChange: 0,
     taxesPercentageOfRevenue,
     taxesPercentageOfRevenueChange: 0,

@@ -10,8 +10,8 @@ import type {
 
 import type { AnyRecord } from './shared';
 import {
-  clampPercentage,
   computeCostOverlap,
+  computeCostRetentionFactor,
   ensureDataset,
   filterAccountLevelMetaInsights,
   getFrequencyDurationMs,
@@ -115,34 +115,6 @@ function finalisePnLMetrics(metrics: PnLMetrics): PnLMetrics {
     ...metrics,
     netProfitMargin: netMargin,
   };
-}
-
-function computeCostRetentionFactor({
-  revenue,
-  refunds,
-  rtoRevenueLost,
-  manualReturnRatePercent,
-}: {
-  revenue: number;
-  refunds: number;
-  rtoRevenueLost: number;
-  manualReturnRatePercent: number;
-}): number {
-  const baseRevenue = Math.max(revenue, 0);
-  const manualRatio = clampPercentage(manualReturnRatePercent) / 100;
-
-  if (baseRevenue <= 0) {
-    return Math.max(0, 1 - manualRatio);
-  }
-
-  const normalizedRefunds = Math.max(refunds, 0);
-  const normalizedRtoLoss = Math.max(rtoRevenueLost, 0);
-
-  const refundRatio = Math.min(normalizedRefunds / baseRevenue, 1);
-  const rtoRatio = Math.min(normalizedRtoLoss / baseRevenue, 1);
-  const combinedRatio = Math.min(refundRatio + rtoRatio, 1);
-
-  return Math.max(0, 1 - combinedRatio);
 }
 
 type CostComputationContext = {

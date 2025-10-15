@@ -27,30 +27,30 @@ const Hero = () => {
       <div className={`${designSystem.spacing.container} relative z-10`}>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 sm:gap-12 lg:gap-12 items-center">
           {/* Left Column - Text Content */}
-          <div className="text-left flex flex-col px-2 sm:px-0">
+          <div className="text-center sm:text-left flex flex-col items-center sm:items-start px-2 sm:px-0">
             {/* Header  */}
-            <h1 className="text-3xl leading-[1.1] tracking-tight text-balance sm:text-5xl lg:text-6xl xl:text-7xl font-semibold mb-4 sm:mb-5">
-              See, Measure And <span className="text-primary">Grow Profit</span>
-              <br />
-              <span className="font-playfair italic text-2xl sm:text-4xl lg:text-5xl xl:text-6xl leading-[1.2]">
-                Built for <span className="text-primary italic">D2C</span>{" "}
-                brands.
+            <h1 className="flex flex-col gap-3 font-semibold tracking-tight leading-[1.05] text-pretty text-[clamp(2.8rem,7.5vw,4.1rem)] sm:text-[clamp(3.1rem,5vw,5rem)] xl:text-[clamp(3.4rem,4vw,5.6rem)] mb-4 sm:mb-5">
+              <span className="block text-balance">
+                See, Measure and <span className="text-primary">Grow Profit</span>
+              </span>
+              <span className="block font-playfair italic leading-snug text-[clamp(1.9rem,7vw,2.9rem)] sm:text-[clamp(2rem,4.5vw,3.4rem)]">
+                Built for <span className="text-primary italic">D2C</span> brands.
               </span>
             </h1>
 
             {/* Professional info */}
-            <p className="text-sm sm:text-base lg:text-lg text-muted-foreground leading-relaxed text-left max-w-xl mb-2">
+            <p className="text-sm sm:text-base lg:text-lg text-muted-foreground leading-relaxed text-pretty text-center sm:text-left max-w-xl mx-auto sm:mx-0 mb-2">
               Meyoo connects Shopify, ad platforms, and costs to show real
               profit by product and channel—so D2C brands can make smarter
               decisions fast.
             </p>
 
             {/* CTA Buttons */}
-            <div className="mt-8 sm:mt-10 flex flex-col items-stretch gap-3 sm:gap-4 sm:flex-row sm:items-center sm:justify-start">
+            <div className="mt-8 sm:mt-10 flex flex-row flex-wrap justify-center sm:justify-start items-center gap-3 sm:gap-4">
               <Button
                 as={Link}
                 href="/signin"
-                className="w-full sm:w-auto font-semibold px-6 sm:px-8 h-11 sm:h-12 transition-all duration-200 hover:scale-105 active:scale-100 text-sm sm:text-base"
+                className="w-auto font-semibold px-6 sm:px-8 h-11 sm:h-12 transition-all duration-200 hover:scale-105 active:scale-100 text-sm sm:text-base"
                 color="primary"
                 endContent={<Icon icon="solar:arrow-right-linear" width={18} />}
                 size="lg"
@@ -62,7 +62,7 @@ const Hero = () => {
                 href="#pricing"
                 variant="flat"
                 size="lg"
-                className="w-full sm:w-auto h-11 sm:h-12 transition-all duration-200 hover:scale-105 active:scale-100 text-sm sm:text-base"
+                className="w-auto h-11 sm:h-12 transition-all duration-200 hover:scale-105 active:scale-100 text-sm sm:text-base"
               >
                 View pricing
               </Button>

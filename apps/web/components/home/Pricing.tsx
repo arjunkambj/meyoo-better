@@ -60,7 +60,9 @@ const Pricing = () => {
   );
 
   return (
-    <section className={`relative ${designSystem.spacing.section} ${designSystem.background.gradient} w-full`}>
+    <section
+      className={`relative ${designSystem.spacing.section} ${designSystem.background.gradient} w-full`}
+    >
       <div
         className={`${designSystem.spacing.container} flex flex-col gap-8 sm:gap-10`}
       >
@@ -70,14 +72,23 @@ const Pricing = () => {
               Plans
             </span>
           </div>
-          <h2 className={designSystem.typography.sectionTitle}>Simple, Transparent Pricing</h2>
-          <p className={`${designSystem.typography.sectionSubtitle} max-w-2xl mx-auto`}>
-            Choose the perfect plan for your business. Start free, scale as you grow, cancel anytime.
+          <h2 className={designSystem.typography.sectionTitle}>
+            Simple, Transparent Pricing
+          </h2>
+          <p
+            className={`${designSystem.typography.sectionSubtitle} max-w-2xl mx-auto`}
+          >
+            Choose the perfect plan for your business. Start free, scale as you
+            grow, cancel anytime.
           </p>
         </div>
 
         <div className="flex items-center justify-center gap-4 text-sm">
-          <span className={`font-medium transition-colors ${billingCycle === FrequencyEnum.Monthly ? 'text-foreground' : 'text-muted-foreground'}`}>Monthly</span>
+          <span
+            className={`font-medium transition-colors ${billingCycle === FrequencyEnum.Monthly ? "text-foreground" : "text-muted-foreground"}`}
+          >
+            Monthly
+          </span>
           <Switch
             isSelected={billingCycle === FrequencyEnum.Yearly}
             onValueChange={(isSelected) => {
@@ -88,8 +99,14 @@ const Pricing = () => {
             size="lg"
           />
           <div className="flex items-center gap-2">
-            <span className={`font-medium transition-colors ${billingCycle === FrequencyEnum.Yearly ? 'text-foreground' : 'text-muted-foreground'}`}>Yearly</span>
-            <span className="text-xs font-semibold text-success bg-success/10 px-2 py-0.5 rounded-full">Save 20%</span>
+            <span
+              className={`font-medium transition-colors ${billingCycle === FrequencyEnum.Yearly ? "text-foreground" : "text-muted-foreground"}`}
+            >
+              Yearly
+            </span>
+            <span className="text-xs font-semibold text-success bg-success/10 px-2 py-0.5 rounded-full">
+              Save 20%
+            </span>
           </div>
         </div>
 
@@ -113,7 +130,7 @@ const Pricing = () => {
             return (
               <Card
                 key={tier.key}
-                className={`h-full w-full ${designSystem.card.base} rounded-3xl p-1.5 transition-all duration-300 hover:scale-[1.02] sm:w-96 overflow-hidden`}
+                className={`h-full w-full ${designSystem.card.base} rounded-3xl p-1.5 transition-all duration-300 hover:scale-[1.02] shadow-none sm:w-96 overflow-hidden`}
               >
                 <CardHeader className="flex flex-col gap-3 py-5 px-6 bg-background rounded-[20px]">
                   <div className="text-center space-y-1.5">

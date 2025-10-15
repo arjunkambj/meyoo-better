@@ -5,11 +5,40 @@ import { createSimpleLogger } from "../../libs/logging/simple";
 import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { internalAction } from "../_generated/server";
+import { msToDateString, type MsToDateOptions } from "../utils/date";
 import { optionalEnv } from "../utils/env";
 import type { MetaCampaign } from "./types";
 
 const logger = createSimpleLogger("MetaSync");
 const LOG_META_ENABLED = optionalEnv("LOG_META") === "1";
+
+type AccountTimezoneSnapshot = {
+  timezone?: string;
+  timezoneOffsetHours?: number;
+} | null;
+
+function buildTimezoneOptions(snapshot: AccountTimezoneSnapshot): MsToDateOptions | undefined {
+  if (!snapshot) return undefined;
+  const { timezone, timezoneOffsetHours } = snapshot;
+  const offsetMinutes =
+    typeof timezoneOffsetHours === "number" && Number.isFinite(timezoneOffsetHours)
+      ? Math.round(timezoneOffsetHours * 60)
+      : undefined;
+
+  if (!timezone && offsetMinutes === undefined) {
+    return undefined;
+  }
+
+  return {
+    timezone: timezone ?? undefined,
+    offsetMinutes,
+  };
+}
+
+function formatDateWithTimezone(date: Date, options?: MsToDateOptions): string {
+  const formatted = msToDateString(date.getTime(), options);
+  return formatted ?? date.toISOString().slice(0, 10);
+}
 
 /**
  * Initial sync - fetch 60 days of historical data
@@ -66,6 +95,15 @@ export const initial = internalAction({
         throw new Error("No Meta ad account specified");
       }
 
+      const accountTimezone = await ctx.runQuery(
+        internal.meta.internal.getAccountTimezoneInternal,
+        {
+          organizationId: args.organizationId as Id<"organizations">,
+          accountId,
+        }
+      );
+      const timezoneOptions = buildTimezoneOptions(accountTimezone);
+
       let totalRecordsProcessed = 0;
       const errors: string[] = [];
 
@@ -76,7 +114,7 @@ export const initial = internalAction({
       startDate.setDate(startDate.getDate() - daysBack);
 
       // Format dates for Meta API (YYYY-MM-DD)
-      const formatDate = (date: Date) => date.toISOString().substring(0, 10);
+      const formatDate = (date: Date) => formatDateWithTimezone(date, timezoneOptions);
 
       try {
         // Fetch insights with daily breakdown

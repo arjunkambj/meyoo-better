@@ -107,6 +107,35 @@ export const getStoredAdAccountsInternal = internalQuery({
   },
 });
 
+export const getAccountTimezoneInternal = internalQuery({
+  args: {
+    organizationId: v.id("organizations"),
+    accountId: v.string(),
+  },
+  returns: v.union(
+    v.null(),
+    v.object({
+      timezone: v.optional(v.string()),
+      timezoneOffsetHours: v.optional(v.number()),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    const account = await ctx.db
+      .query("metaAdAccounts")
+      .withIndex("by_account_org", (q) =>
+        q.eq("accountId", args.accountId).eq("organizationId", args.organizationId),
+      )
+      .first();
+
+    if (!account) return null;
+
+    return {
+      timezone: account.timezone ?? undefined,
+      timezoneOffsetHours: account.timezoneOffsetHours ?? undefined,
+    };
+  },
+});
+
 export const storeAdAccountsInternal = internalMutation({
   args: {
     organizationId: v.id("organizations"),

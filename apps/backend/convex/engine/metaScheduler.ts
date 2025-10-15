@@ -4,6 +4,7 @@ import { internal } from "../_generated/api";
 import { internalAction, internalMutation, internalQuery } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import { optionalEnv, requireEnv } from "../utils/env";
+import { msToDateString } from "../utils/date";
 
 const META_TICK_MINUTES = Number(requireEnv("META_TICK_MINUTES"));
 if (Number.isNaN(META_TICK_MINUTES) || META_TICK_MINUTES <= 0) {
@@ -41,14 +42,26 @@ export const listMetaAccounts = internalQuery({
       byOrg.set(org, list);
     }
 
-    const selected: Array<{ _id: Id<"metaAdAccounts">; organizationId: Id<"organizations">; accountId: string }> = [];
+    const selected: Array<{
+      _id: Id<"metaAdAccounts">;
+      organizationId: Id<"organizations">;
+      accountId: string;
+      timezone?: string;
+      timezoneOffsetMinutes?: number;
+    }> = [];
     for (const [, list] of byOrg.entries()) {
       const primary = list.find((x) => x.isPrimary === true) || list[0];
       if (primary) {
+        const timezoneOffsetMinutes =
+          typeof primary.timezoneOffsetHours === "number" && Number.isFinite(primary.timezoneOffsetHours)
+            ? Math.round(primary.timezoneOffsetHours * 60)
+            : undefined;
         selected.push({
           _id: primary._id as Id<"metaAdAccounts">,
           organizationId: primary.organizationId as Id<"organizations">,
           accountId: primary.accountId as string,
+          timezone: primary.timezone ?? undefined,
+          timezoneOffsetMinutes,
         });
       }
     }
@@ -143,7 +156,11 @@ export const tick = internalAction({
 
       try {
         // Pull today's insights (minimal)
-        const today = new Date().toISOString().substring(0, 10);
+        const today =
+          msToDateString(Date.now(), {
+            timezone: a.timezone,
+            offsetMinutes: typeof a.timezoneOffsetMinutes === "number" ? a.timezoneOffsetMinutes : undefined,
+          }) ?? new Date().toISOString().slice(0, 10);
         await ctx.runAction(internal.meta.sync.pullDaily, {
           organizationId: a.organizationId,
           accountId: a.accountId,

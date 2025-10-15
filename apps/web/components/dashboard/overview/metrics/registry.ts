@@ -9,7 +9,7 @@ export const METRIC_CATEGORIES: Record<string, MetricCategory> = {
     icon: "solar:chart-2-bold-duotone",
     metrics: [
       // kpi.md — Home Dashboard (10)
-      "revenue",               // Revenue (Net)
+      "revenue",               // Gross Revenue
       "netProfit",             // Net Profit
       "orders",                // Orders
       "blendedMarketingCost",  // Total Ad Spend
@@ -26,6 +26,7 @@ export const METRIC_CATEGORIES: Record<string, MetricCategory> = {
     name: "Profit & Cost Stack",
     icon: "solar:dollar-circle-bold-duotone",
     metrics: [
+      "netRevenue",
       "refunds",
       "returns",
       "returnRate",
@@ -149,13 +150,23 @@ export const METRICS: Record<string, MetricDefinition> = {
   // Key Performance Indicators
   revenue: {
     id: "revenue",
-    label: "Revenue (Net)",
+    label: "Gross Revenue",
     icon: "solar:wallet-money-bold-duotone",
     iconColor: "text-default-500",
     category: "coreKPIs",
     format: "currency",
     prefix: "$",
-    description: "Total revenue",
+    description: "Revenue before returns and cancellations",
+  },
+  netRevenue: {
+    id: "netRevenue",
+    label: "Net Revenue",
+    icon: "solar:wallet-2-bold-duotone",
+    iconColor: "text-primary-500",
+    category: "revenue",
+    format: "currency",
+    prefix: "$",
+    description: "Revenue after returns and cancellations",
   },
   netProfit: {
     id: "netProfit",

@@ -201,6 +201,8 @@ const EMPTY_PNL_METRICS: PnLMetrics = {
   discounts: 0,
   refunds: 0,
   rtoRevenueLost: 0,
+  cancelledRevenue: 0,
+  grossRevenue: 0,
   revenue: 0,
   cogs: 0,
   shippingCosts: 0,
@@ -484,6 +486,7 @@ function applyManualReturnRateToPnLMetrics(
   );
 
   metrics.rtoRevenueLost = rtoRevenueLost;
+  metrics.grossRevenue = Math.max(grossRevenue, 0);
   metrics.revenue = netRevenue;
   metrics.cogs = adjustedCogs;
   metrics.handlingFees = adjustedHandlingFees;
@@ -1530,6 +1533,8 @@ function aggregatedToPnLMetrics(aggregates: AggregatedDailyMetrics): PnLMetrics 
   const manualRatePercent = aggregates.manualReturnRatePercent ?? 0;
 
   const baseRevenue = Math.max(revenue, 0);
+  const grossRevenue = baseRevenue;
+  const cancelledRevenue = 0;
   const normalizedRefunds = Math.max(refunds, 0);
   const normalizedRto = Math.max(rtoRevenueLost, 0);
 
@@ -1561,6 +1566,8 @@ function aggregatedToPnLMetrics(aggregates: AggregatedDailyMetrics): PnLMetrics 
     discounts,
     refunds: normalizedRefunds,
     rtoRevenueLost: normalizedRto,
+    cancelledRevenue,
+    grossRevenue,
     revenue: netRevenue,
     cogs: adjustedCogs,
     shippingCosts,
@@ -1580,6 +1587,8 @@ function accumulatePnLMetrics(target: PnLMetrics, addition: PnLMetrics): void {
   target.discounts += addition.discounts;
   target.refunds += addition.refunds;
   target.rtoRevenueLost += addition.rtoRevenueLost;
+  target.cancelledRevenue += addition.cancelledRevenue;
+  target.grossRevenue += addition.grossRevenue;
   target.revenue += addition.revenue;
   target.cogs += addition.cogs;
   target.shippingCosts += addition.shippingCosts;
@@ -1612,12 +1621,15 @@ function metricsFromDailyMetricDoc(doc: DailyMetricDoc): PnLMetrics {
   const grossProfit = netRevenue - cogs;
   const netProfit = grossProfit - (shippingCosts + transactionFees + handlingFees + taxesCollected + customCosts + adSpend);
   const netProfitMargin = netRevenue > 0 ? (netProfit / netRevenue) * 100 : 0;
+  const grossRevenue = Math.max(revenue, 0);
 
   return {
     grossSales,
     discounts,
     refunds,
     rtoRevenueLost,
+    cancelledRevenue: 0,
+    grossRevenue,
     revenue: netRevenue,
     cogs,
     shippingCosts,
@@ -1702,6 +1714,7 @@ function buildPnLKpisFromTotals(total: PnLMetrics, previous?: PnLMetrics | null)
 
   return {
     grossSales: total.grossSales,
+    grossRevenue: total.grossRevenue,
     discountsReturns: total.discounts + total.refunds,
     netRevenue: total.revenue,
     grossProfit: total.grossProfit,
@@ -1714,6 +1727,7 @@ function buildPnLKpisFromTotals(total: PnLMetrics, previous?: PnLMetrics | null)
     marketingROI,
     changes: {
       grossSales: percentageChange(total.grossSales, previous?.grossSales ?? 0),
+      grossRevenue: percentageChange(total.grossRevenue, previous?.grossRevenue ?? 0),
       discountsReturns: percentageChange(
         total.discounts + total.refunds,
         previous ? previous.discounts + previous.refunds : 0,

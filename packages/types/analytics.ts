@@ -346,6 +346,8 @@ export interface PnLMetrics {
   discounts: number;
   refunds: number;
   rtoRevenueLost: number;
+  cancelledRevenue: number;
+  grossRevenue: number;
   revenue: number;
   cogs: number;
   shippingCosts: number;
@@ -372,6 +374,7 @@ export interface PnLTablePeriod {
 
 export interface PnLKPIMetrics {
   grossSales: number;
+  grossRevenue: number;
   discountsReturns: number;
   netRevenue: number;
   grossProfit: number;
@@ -384,6 +387,7 @@ export interface PnLKPIMetrics {
   marketingROI: number;
   changes: {
     grossSales: number;
+    grossRevenue: number;
     discountsReturns: number;
     netRevenue: number;
     grossProfit: number;

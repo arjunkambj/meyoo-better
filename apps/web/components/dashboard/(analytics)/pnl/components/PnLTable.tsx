@@ -22,6 +22,8 @@ const buildZeroMetrics = (): PnLMetrics => ({
   discounts: 0,
   refunds: 0,
   rtoRevenueLost: 0,
+  cancelledRevenue: 0,
+  grossRevenue: 0,
   revenue: 0,
   cogs: 0,
   shippingCosts: 0,
@@ -73,12 +75,16 @@ function formatMonthYearFromIsoStart(iso: string): string {
 
 const buildExpectedPeriods = (
   granularity: PnLGranularity,
-  range: { startDate: string; endDate: string },
+  range: { startDate: string; endDate: string }
 ): Array<{ key: string; label: string; date: string }> => {
   const start = toUtcMidnight(range.startDate);
   const end = toUtcMidnight(range.endDate);
 
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) {
+  if (
+    Number.isNaN(start.getTime()) ||
+    Number.isNaN(end.getTime()) ||
+    start > end
+  ) {
     return [];
   }
 
@@ -111,20 +117,32 @@ const buildExpectedPeriods = (
       const endIso = formatISODate(labelEnd);
 
       // For weekly we keep the key/date as the ISO start (shop-local) and label will be formatted later
-      definitions.push({ key: startIso, label: `${startIso} – ${endIso}`, date: startIso });
+      definitions.push({
+        key: startIso,
+        label: `${startIso} – ${endIso}`,
+        date: startIso,
+      });
       cursor.setUTCDate(cursor.getUTCDate() + 7);
     }
   } else {
     // Monthly: from the first of the start month to the first of the end month
-    const monthCursor = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1));
-    const endMonth = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), 1));
+    const monthCursor = new Date(
+      Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1)
+    );
+    const endMonth = new Date(
+      Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), 1)
+    );
 
     while (monthCursor <= endMonth) {
       const year = monthCursor.getUTCFullYear();
       const monthIdx = monthCursor.getUTCMonth();
       const monthStartIso = `${year}-${String(monthIdx + 1).padStart(2, "0")}-01`;
       const monthLabel = formatMonthYearFromIsoStart(monthStartIso);
-      definitions.push({ key: monthStartIso, label: monthLabel, date: monthStartIso });
+      definitions.push({
+        key: monthStartIso,
+        label: monthLabel,
+        date: monthStartIso,
+      });
       monthCursor.setUTCMonth(monthCursor.getUTCMonth() + 1);
     }
   }
@@ -132,7 +150,13 @@ const buildExpectedPeriods = (
   return definitions;
 };
 
-const createPlaceholderPeriod = ({ label, date }: { label: string; date: string }): PnLTablePeriod => ({
+const createPlaceholderPeriod = ({
+  label,
+  date,
+}: {
+  label: string;
+  date: string;
+}): PnLTablePeriod => ({
   label,
   date,
   metrics: buildZeroMetrics(),
@@ -151,6 +175,7 @@ const metricConfig: Record<
     isBold?: boolean;
     isSubItem?: boolean;
     hidden?: boolean;
+    rowTintClass?: string;
   }
 > = {
   grossSales: {
@@ -161,12 +186,13 @@ const metricConfig: Record<
     isBold: true,
     hidden: true,
   },
-  revenue: {
-    label: "Net Revenue",
-    icon: "solar:wallet-2-bold-duotone",
+  grossRevenue: {
+    label: "Gross Revenue",
+    icon: "solar:wallet-money-bold-duotone",
     iconColor: "text-success-600",
     category: "revenue",
     isBold: true,
+    rowTintClass: "bg-success-50 dark:bg-success-500/10",
   },
   discounts: {
     label: "Discounts",
@@ -182,12 +208,27 @@ const metricConfig: Record<
     category: "revenue",
     isSubItem: true,
   },
+  cancelledRevenue: {
+    label: "Cancellations",
+    icon: "solar:close-circle-bold-duotone",
+    iconColor: "text-default-500",
+    category: "revenue",
+    isSubItem: true,
+  },
   rtoRevenueLost: {
     label: "RTO Revenue Lost",
     icon: "solar:alt-arrow-down-bold",
     iconColor: "text-danger",
     category: "revenue",
     isSubItem: true,
+  },
+  revenue: {
+    label: "Net Revenue",
+    icon: "solar:wallet-2-bold-duotone",
+    iconColor: "text-primary",
+    category: "revenue",
+    isBold: true,
+    rowTintClass: "bg-primary-50 dark:bg-primary-500/10",
   },
   cogs: {
     label: "Total COGS",
@@ -223,6 +264,7 @@ const metricConfig: Record<
     iconColor: "text-primary",
     category: "profit",
     isBold: true,
+    rowTintClass: "bg-success-50 dark:bg-success-500/10",
   },
   taxesCollected: {
     label: "Taxes Collected",
@@ -251,6 +293,7 @@ const metricConfig: Record<
     iconColor: "text-success",
     category: "profit",
     isBold: true,
+    rowTintClass: "bg-content2 dark:bg-default-100/10",
   },
   netProfitMargin: {
     label: "Net Margin %",
@@ -258,6 +301,7 @@ const metricConfig: Record<
     iconColor: "text-success-600",
     category: "profit",
     isBold: true,
+    rowTintClass: "bg-content2 dark:bg-default-100/10",
   },
 };
 
@@ -305,6 +349,8 @@ export const PnLTable = React.memo(function PnLTable({
     return [
       "discounts",
       "refunds",
+      "cancelledRevenue",
+      "rtoRevenueLost",
       "cogs",
       "shippingCosts",
       "transactionFees",
@@ -322,8 +368,13 @@ export const PnLTable = React.memo(function PnLTable({
     const regularPeriods = periods.filter((period) => !period.isTotal);
 
     const rangeForDisplay = tableRange ?? dateRange;
-    const expectedDefinitions = buildExpectedPeriods(granularity, rangeForDisplay);
-    const periodMap = new Map(regularPeriods.map((period) => [period.date, period]));
+    const expectedDefinitions = buildExpectedPeriods(
+      granularity,
+      rangeForDisplay
+    );
+    const periodMap = new Map(
+      regularPeriods.map((period) => [period.date, period])
+    );
     const displayPeriods = expectedDefinitions.length
       ? expectedDefinitions.map((definition) => {
           const matched = periodMap.get(definition.key);
@@ -339,10 +390,10 @@ export const PnLTable = React.memo(function PnLTable({
       : regularPeriods;
 
     const formatPeriodLabel = (period: PnLTablePeriod) => {
-      if (granularity === 'weekly' && period.date) {
+      if (granularity === "weekly" && period.date) {
         return `Week ${formatMonthDay(period.date)}`;
       }
-      if (granularity === 'daily') {
+      if (granularity === "daily") {
         return formatMonthDay(period.date || period.label);
       }
       return period.label;
@@ -350,12 +401,15 @@ export const PnLTable = React.memo(function PnLTable({
 
     const renderMetricRow = (
       metricKey: string,
-      config: (typeof metricConfig)[keyof typeof metricConfig],
+      config: (typeof metricConfig)[keyof typeof metricConfig]
     ) => {
-      const isPercentage = metricKey === 'netProfitMargin';
+      const isPercentage = metricKey === "netProfitMargin";
       const shouldAddParentheses = isDeduction(metricKey as keyof PnLMetrics);
       const isBoldRow = config.isBold;
       const isSubItem = config.isSubItem;
+      const rowTintClass =
+        config.rowTintClass ??
+        (isBoldRow ? "bg-content2 dark:bg-default-100/10" : "");
 
       return (
         <tr
@@ -363,8 +417,9 @@ export const PnLTable = React.memo(function PnLTable({
           className={`
             border-b border-divider
             transition-all duration-200
-            ${isBoldRow ? "bg-content2 font-semibold" : ""}
-            ${isSubItem ? "hover:bg-content2" : "hover:bg-content1"}
+            ${isBoldRow ? "font-semibold" : ""}
+            ${rowTintClass}
+            ${isSubItem ? "" : "hover:bg-content1"}
           `}
         >
           <td
@@ -392,12 +447,14 @@ export const PnLTable = React.memo(function PnLTable({
           </td>
           {displayPeriods.map((period) => {
             const value = period.metrics[metricKey as keyof PnLMetrics];
+            const isHeadlineRevenue =
+              metricKey === "revenue" || metricKey === "grossRevenue";
             const textColor =
               metricKey === "netProfit" || metricKey === "grossProfit"
                 ? value < 0
                   ? "text-danger"
                   : "text-success"
-                : metricKey === "revenue"
+                : isHeadlineRevenue
                   ? "text-primary"
                   : metricKey === "netProfitMargin"
                     ? value < 0
@@ -408,7 +465,10 @@ export const PnLTable = React.memo(function PnLTable({
                       : "text-foreground";
 
             return (
-              <td key={period.label} className="text-right py-2 px-3 border-r border-divider">
+              <td
+                key={period.label}
+                className="text-right py-2 px-3 border-r border-divider"
+              >
                 <span
                   className={`
                   ${isSubItem ? "text-xs" : "text-sm"}
@@ -423,29 +483,40 @@ export const PnLTable = React.memo(function PnLTable({
           })}
           {totalPeriod && (
             <td
-              className={`sticky right-0 text-right py-2 px-3 border-l-4 border-primary-200 dark:border-primary-600 z-10 shadow-[-2px_0_4px_rgba(0,0,0,0.02)] ${isBoldRow ? "bg-primary-50 dark:bg-primary-100/10" : "bg-content1"}`}
+              className={`sticky right-0 text-right py-2 px-3 border-l-4 border-primary-200 dark:border-primary-600 z-10 shadow-[-2px_0_4px_rgba(0,0,0,0.02)] ${isBoldRow ? "bg-primary-100 dark:bg-primary-100/10" : "bg-content1"}`}
             >
               <span
                 className={`
                 ${isSubItem ? "text-xs font-medium" : isBoldRow ? "text-sm font-bold" : "text-sm font-semibold"}
-                ${
-                  metricKey === "netProfit" || metricKey === "grossProfit"
-                    ? totalPeriod.metrics[metricKey as keyof PnLMetrics] < 0
-                      ? "text-danger"
-                      : "text-success"
-                    : metricKey === "revenue"
-                      ? "text-primary"
-                      : metricKey === "netProfitMargin"
-                        ? totalPeriod.metrics[metricKey as keyof PnLMetrics] < 0
-                          ? "text-danger"
-                          : "text-success-600"
-                        : isSubItem || shouldAddParentheses
-                          ? "text-default-500"
-                          : "text-foreground"
-                }
+                ${(() => {
+                  const totalValue =
+                    totalPeriod.metrics[metricKey as keyof PnLMetrics];
+                  const isHeadlineRevenueTotal =
+                    metricKey === "revenue" || metricKey === "grossRevenue";
+                  if (
+                    metricKey === "netProfit" ||
+                    metricKey === "grossProfit"
+                  ) {
+                    return totalValue < 0 ? "text-danger" : "text-success";
+                  }
+                  if (isHeadlineRevenueTotal) {
+                    return "text-primary";
+                  }
+                  if (metricKey === "netProfitMargin") {
+                    return totalValue < 0 ? "text-danger" : "text-success-600";
+                  }
+                  if (isSubItem || shouldAddParentheses) {
+                    return "text-default-500";
+                  }
+                  return "text-foreground";
+                })()}
               `}
               >
-                {formatValue(totalPeriod.metrics[metricKey as keyof PnLMetrics], isPercentage, shouldAddParentheses)}
+                {formatValue(
+                  totalPeriod.metrics[metricKey as keyof PnLMetrics],
+                  isPercentage,
+                  shouldAddParentheses
+                )}
               </span>
             </td>
           )}
@@ -457,23 +528,27 @@ export const PnLTable = React.memo(function PnLTable({
       <div className="w-full overflow-x-auto border rounded-2xl relative max-w-full">
         <table className="w-full text-sm  min-w-fit">
           <thead className="sticky top-0 z-20">
-            <tr className="bg-content2">
-              <th className="text-left py-3 px-3 font-semibold text-foreground sticky left-0 bg-content2 min-w-[180px] max-w-[200px] z-30 border-b-2 border-divider shadow-[2px_0_4px_rgba(0,0,0,0.05)]">
+            <tr className="bg-content2 dark:bg-content1">
+              <th className="text-left py-3 px-3 font-semibold text-foreground sticky left-0 bg-content2 dark:bg-content1 min-w-[180px] max-w-[200px] z-30 border-b-2 border-divider shadow-[2px_0_4px_rgba(0,0,0,0.05)]">
                 <div className="flex items-center gap-1.5">
-                  <Icon icon="solar:chart-square-bold-duotone" width={16} className="text-primary" />
+                  <Icon
+                    icon="solar:chart-square-bold-duotone"
+                    width={16}
+                    className="text-primary"
+                  />
                   <span className="text-xs">Metrics</span>
                 </div>
               </th>
               {displayPeriods.map((period) => (
                 <th
                   key={period.label}
-                  className="text-right py-3 px-3 font-medium text-xs text-default-600 min-w-[110px] border-r border-divider border-b-2 border-divider"
+                  className="text-right py-3 px-3 font-medium text-xs text-default-800 min-w-[110px] border-r border-b-2 border-divider"
                 >
                   {formatPeriodLabel(period)}
                 </th>
               ))}
               {totalPeriod && (
-                <th className="sticky right-0 text-right py-3 px-3 font-bold text-xs text-primary-700 dark:text-primary-300 bg-primary-50 dark:bg-primary-100/10 min-w-[100px] border-l-4 border-primary-500 border-b-2 border-divider z-30 shadow-[-2px_0_4px_rgba(0,0,0,0.05)]">
+                <th className="sticky right-0 text-right py-3 px-3 font-bold text-xs text-primary-700 dark:text-primary-300 bg-primary-50 dark:bg-primary-100/10 min-w-[100px] border-l-4 border-primary-500 border-b-2 z-30 shadow-[-2px_0_4px_rgba(0,0,0,0.05)]">
                   TOTAL
                 </th>
               )}
@@ -495,7 +570,9 @@ export const PnLTable = React.memo(function PnLTable({
               </td>
             </tr>
             {Object.entries(metricConfig)
-              .filter(([_, config]) => !config.hidden && config.category === "revenue")
+              .filter(
+                ([_, config]) => !config.hidden && config.category === "revenue"
+              )
               .map(([key, config]) => renderMetricRow(key, config))}
 
             {/* Spacer */}
@@ -521,7 +598,9 @@ export const PnLTable = React.memo(function PnLTable({
               </td>
             </tr>
             {Object.entries(metricConfig)
-              .filter(([_, config]) => !config.hidden && config.category === "cogs")
+              .filter(
+                ([_, config]) => !config.hidden && config.category === "cogs"
+              )
               .map(([key, config]) => renderMetricRow(key, config))}
 
             {/* Spacer */}
@@ -558,7 +637,10 @@ export const PnLTable = React.memo(function PnLTable({
               </td>
             </tr>
             {Object.entries(metricConfig)
-              .filter(([_, config]) => !config.hidden && config.category === "operations")
+              .filter(
+                ([_, config]) =>
+                  !config.hidden && config.category === "operations"
+              )
               .map(([key, config]) => renderMetricRow(key, config))}
 
             {/* Spacer */}
@@ -613,15 +695,15 @@ export const PnLTable = React.memo(function PnLTable({
         <div className="flex flex-col items-center justify-center py-20">
           <div className="p-4 bg-content2 rounded-full mb-4">
             <Icon
-              className="text-default-400"
+              className="text-default-700"
               icon="solar:chart-square-line-duotone"
               width={48}
             />
           </div>
-          <p className="text-base font-medium text-default-600 mb-1">
+          <p className="text-base font-medium text-default-700 mb-1">
             No P&L data available
           </p>
-          <p className="text-sm text-default-400">
+          <p className="text-sm text-default-700">
             Select a different date range to view financial data
           </p>
         </div>

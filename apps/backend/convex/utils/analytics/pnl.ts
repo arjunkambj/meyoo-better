@@ -87,6 +87,14 @@ function aggregatePnLMetrics(items: AnyRecord[]): PnLMetrics {
     discounts: sumBy(items, (item) => safeNumber(item.discounts ?? item.totalDiscounts ?? 0)),
     refunds: sumBy(items, (item) => safeNumber(item.refunds ?? item.totalRefunds ?? 0)),
     rtoRevenueLost: sumBy(items, (item) => safeNumber(item.rtoRevenueLost ?? 0)),
+    cancelledRevenue: sumBy(items, (item) => safeNumber(item.cancelledRevenue ?? 0)),
+    grossRevenue: sumBy(items, (item) => {
+      const provided = safeNumber(item.grossRevenue ?? 0);
+      if (provided > 0) return provided;
+      const baseRevenue = safeNumber(item.totalPrice ?? item.revenue ?? 0);
+      const cancelled = safeNumber(item.cancelledRevenue ?? 0);
+      return baseRevenue + cancelled;
+    }),
     revenue: sumBy(items, (item) => safeNumber(item.revenue ?? item.netSales ?? item.totalPrice ?? 0)),
     cogs: sumBy(items, (item) => safeNumber(item.cogs ?? item.totalCostOfGoods ?? 0)),
     shippingCosts: sumBy(items, (item) => safeNumber(item.shippingCosts ?? item.totalShipping ?? 0)),
@@ -223,19 +231,58 @@ function calculatePnLMetricsForRange({
     return true;
   });
 
-  const grossSales = sumBy(filteredOrders, (order) =>
-    safeNumber(order.subtotalPrice ?? order.totalSales ?? order.totalPrice ?? 0),
-  );
-  const revenue = sumBy(filteredOrders, (order) => safeNumber(order.totalPrice ?? order.revenue ?? 0));
-  const discounts = sumBy(filteredOrders, (order) => safeNumber(order.totalDiscounts ?? order.discounts ?? 0));
-  const refunds = sumBy(filteredOrders, (order) => safeNumber(order.totalRefunded ?? order.totalRefunds ?? 0));
-  const cogs = sumBy(filteredOrders, (order) => safeNumber(order.totalCostOfGoods ?? order.cogs ?? 0));
-  let shippingCosts = sumBy(filteredOrders, (order) => safeNumber(order.shippingCosts ?? 0));
-  let transactionFees = sumBy(filteredOrders, (order) => safeNumber(order.totalFees ?? order.transactionFees ?? 0));
-  const handlingFees = sumBy(filteredOrders, (order) => safeNumber(order.handlingFees ?? 0));
-  const taxesCollected = sumBy(filteredOrders, (order) => safeNumber(order.taxesCollected ?? 0));
+  const isCancelledOrder = (order: AnyRecord): boolean => {
+    const candidates = [
+      order.status,
+      order.financialStatus,
+      order.fulfillmentStatus,
+      order.financial_status,
+      order.fulfillment_status,
+    ];
 
-  const unitsSold = sumBy(filteredOrders, (order) =>
+    return candidates.some((value) => {
+      if (!value) return false;
+      const normalized = String(value).toLowerCase();
+      return normalized.includes("cancel") || normalized.includes("void") || normalized.includes("decline");
+    });
+  };
+
+  const activeOrders: AnyRecord[] = [];
+  for (const order of filteredOrders) {
+    if (isCancelledOrder(order)) {
+      continue;
+    }
+    activeOrders.push(order);
+  }
+
+  const grossSales = Math.max(
+    sumBy(filteredOrders, (order) => safeNumber(order.subtotalPrice ?? order.totalSales ?? order.totalPrice ?? 0)),
+    0,
+  );
+  const grossRevenue = Math.max(
+    sumBy(filteredOrders, (order) => safeNumber(order.totalPrice ?? order.revenue ?? 0)),
+    0,
+  );
+  const recognizedRevenue = Math.max(
+    sumBy(activeOrders, (order) => safeNumber(order.totalPrice ?? order.revenue ?? 0)),
+    0,
+  );
+  const cancelledRevenue = Math.max(grossRevenue - recognizedRevenue, 0);
+  const discounts = Math.max(
+    sumBy(filteredOrders, (order) => safeNumber(order.totalDiscounts ?? order.discounts ?? 0)),
+    0,
+  );
+  const refunds = Math.max(
+    sumBy(activeOrders, (order) => safeNumber(order.totalRefunded ?? order.totalRefunds ?? 0)),
+    0,
+  );
+  const cogs = sumBy(activeOrders, (order) => safeNumber(order.totalCostOfGoods ?? order.cogs ?? 0));
+  let shippingCosts = sumBy(activeOrders, (order) => safeNumber(order.shippingCosts ?? 0));
+  let transactionFees = sumBy(activeOrders, (order) => safeNumber(order.totalFees ?? order.transactionFees ?? 0));
+  const handlingFees = sumBy(activeOrders, (order) => safeNumber(order.handlingFees ?? 0));
+  const taxesCollected = sumBy(activeOrders, (order) => safeNumber(order.taxesCollected ?? 0));
+
+  const unitsSold = sumBy(activeOrders, (order) =>
     safeNumber(
       order.totalQuantity ??
         order.totalQuantityOrdered ??
@@ -246,9 +293,9 @@ function calculatePnLMetricsForRange({
   );
 
   const context: CostComputationContext = {
-    ordersCount: filteredOrders.length,
+    ordersCount: activeOrders.length,
     unitsSold,
-    revenue,
+    revenue: recognizedRevenue,
     rangeStartMs,
     rangeEndMs,
   };
@@ -286,13 +333,13 @@ function calculatePnLMetricsForRange({
   const manualReturnRatePercent = resolveManualReturnRate(manualReturnRates, manualRateWindow).ratePercent;
   const rtoRevenueLost = manualReturnRatePercent > 0
     ? Math.min(
-        Math.max((revenue * manualReturnRatePercent) / 100, 0),
-        Math.max(revenue, 0),
+        Math.max((recognizedRevenue * manualReturnRatePercent) / 100, 0),
+        Math.max(recognizedRevenue, 0),
       )
     : 0;
 
   const costRetentionFactor = computeCostRetentionFactor({
-    revenue,
+    revenue: recognizedRevenue,
     refunds,
     rtoRevenueLost,
     manualReturnRatePercent,
@@ -302,7 +349,7 @@ function calculatePnLMetricsForRange({
   const adjustedHandlingFees = handlingFees * costRetentionFactor;
   const adjustedTaxesCollected = taxesCollected * costRetentionFactor;
 
-  const netRevenue = Math.max(revenue - refunds - rtoRevenueLost, 0);
+  const netRevenue = Math.max(recognizedRevenue - refunds - rtoRevenueLost, 0);
   const grossProfit = netRevenue - adjustedCogs;
   const netProfit = grossProfit - (
     shippingCosts +
@@ -318,6 +365,8 @@ function calculatePnLMetricsForRange({
     discounts,
     refunds,
     rtoRevenueLost,
+    cancelledRevenue,
+    grossRevenue,
     revenue: netRevenue,
     cogs: adjustedCogs,
     shippingCosts,
@@ -346,6 +395,7 @@ function buildPnLKPIs(total: PnLMetrics, marketingCost: number): PnLKPIMetrics {
 
   return {
     grossSales: total.grossSales,
+    grossRevenue: total.grossRevenue,
     discountsReturns: total.discounts + total.refunds,
     netRevenue,
     grossProfit: total.grossProfit,
@@ -358,6 +408,7 @@ function buildPnLKPIs(total: PnLMetrics, marketingCost: number): PnLKPIMetrics {
     marketingROI,
     changes: {
       grossSales: 0,
+      grossRevenue: 0,
       discountsReturns: 0,
       netRevenue: 0,
       grossProfit: 0,

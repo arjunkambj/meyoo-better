@@ -40,26 +40,27 @@ export const PnLKPICards = memo(function PnLKPICards({
 
   const kpiData = [
     {
+      title: "Gross Revenue",
+      value: formatCurrency(metrics?.grossRevenue ?? metrics?.grossSales ?? 0),
+      subtitle: "before returns",
+      change: metrics?.changes?.grossRevenue,
+      changeType:
+        (metrics?.changes?.grossRevenue ?? 0) >= 0
+          ? "positive"
+          : ("negative" as const),
+      icon: "solar:wallet-money-bold-duotone",
+      iconColor: "text-primary-500",
+    },
+    {
       title: "Net Revenue",
       value: formatCurrency(metrics?.netRevenue ?? 0),
-      subtitle: "after returns",
+      subtitle: "after returns & cancellations",
       change: metrics?.changes?.netRevenue,
       changeType:
         (metrics?.changes?.netRevenue ?? 0) >= 0
           ? "positive"
           : ("negative" as const),
-      icon: "solar:wallet-money-bold-duotone",
-      iconColor: "text-default-500",
-    },
-    {
-      title: "Gross Profit",
-      value: formatCurrency(metrics?.grossProfit ?? 0),
-      change: metrics?.changes?.grossProfit,
-      changeType:
-        (metrics?.changes?.grossProfit ?? 0) >= 0
-          ? "positive"
-          : ("negative" as const),
-      icon: "solar:graph-new-up-bold-duotone",
+      icon: "solar:wallet-2-bold-duotone",
       iconColor: "text-default-500",
     },
     {

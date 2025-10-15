@@ -621,14 +621,22 @@ export const storeTransactionsInternal = internalMutation({
       : undefined;
     const affectedDates = new Set<string>();
     const retryTransactions: Array<(typeof args.transactions)[number]> = [];
+    const orderCache = new Map<string, Doc<"shopifyOrders"> | null>();
+    const loadOrderByShopifyId = async (shopifyId: string): Promise<Doc<"shopifyOrders"> | null> => {
+      if (!shopifyId) return null;
+      if (orderCache.has(shopifyId)) {
+        return orderCache.get(shopifyId) ?? null;
+      }
+      const fetched = await ctx.db
+        .query("shopifyOrders")
+        .withIndex("by_shopify_id", (q) => q.eq("shopifyId", shopifyId))
+        .first();
+      orderCache.set(shopifyId, fetched ?? null);
+      return fetched ?? null;
+    };
     for (const transaction of args.transactions) {
       // Find the order first
-      const order = await ctx.db
-        .query("shopifyOrders")
-        .withIndex("by_shopify_id", (q) =>
-          q.eq("shopifyId", transaction.shopifyOrderId)
-        )
-        .first();
+      const order = await loadOrderByShopifyId(transaction.shopifyOrderId);
 
       if (!order) {
         logger.warn("Order not found for transaction", {
@@ -746,14 +754,22 @@ export const storeRefundsInternal = internalMutation({
       : undefined;
     const affectedDates = new Set<string>();
     const retryRefunds: Array<(typeof args.refunds)[number]> = [];
+    const orderCache = new Map<string, Doc<"shopifyOrders"> | null>();
+    const loadOrderByShopifyId = async (shopifyId: string): Promise<Doc<"shopifyOrders"> | null> => {
+      if (!shopifyId) return null;
+      if (orderCache.has(shopifyId)) {
+        return orderCache.get(shopifyId) ?? null;
+      }
+      const fetched = await ctx.db
+        .query("shopifyOrders")
+        .withIndex("by_shopify_id", (q) => q.eq("shopifyId", shopifyId))
+        .first();
+      orderCache.set(shopifyId, fetched ?? null);
+      return fetched ?? null;
+    };
     for (const refund of args.refunds) {
       // Find the order first
-      const order = await ctx.db
-        .query("shopifyOrders")
-        .withIndex("by_shopify_id", (q) =>
-          q.eq("shopifyId", refund.shopifyOrderId)
-        )
-        .first();
+      const order = await loadOrderByShopifyId(refund.shopifyOrderId);
 
       if (!order) {
         logger.warn("Order not found for refund", {

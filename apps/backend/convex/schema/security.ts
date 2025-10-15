@@ -83,6 +83,7 @@ export const webhookReceipts = defineTable({
   error: v.optional(v.string()),
 })
   .index("by_provider", ["providerWebhookId"])
+  .index("by_provider_topic_shop", ["providerWebhookId", "topic", "shopDomain"])
   .index("by_shop_topic", ["shopDomain", "topic"])
   .index("by_processed_at", ["processedAt"]);
 

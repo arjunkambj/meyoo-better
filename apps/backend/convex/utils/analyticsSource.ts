@@ -18,9 +18,9 @@ export interface TimestampRange {
 }
 
 const ORDER_ID_CHUNK_SIZE = 25;
-const DEFAULT_ORDER_PAGE_SIZE = 40;
+const DEFAULT_ORDER_PAGE_SIZE = 80;
 const MAX_ORDER_PAGE_SIZE = 100;
-const DEFAULT_SUPPLEMENTAL_PAGE_SIZE = 200;
+const DEFAULT_SUPPLEMENTAL_PAGE_SIZE = 400;
 const MAX_SUPPLEMENTAL_PAGE_SIZE = 500;
 
 interface PaginationOptions {

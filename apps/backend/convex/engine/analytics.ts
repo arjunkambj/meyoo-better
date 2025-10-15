@@ -325,14 +325,25 @@ export const enqueueDailyRebuildRequests = internalMutation({
         .first();
 
       const lockExpiresAt = now + debounceWindow;
+      let shouldSchedule = false;
 
       if (existing) {
-        await ctx.db.patch(existing._id, {
-          lockedUntil: lockExpiresAt,
-          lastScope: args.scope ?? existing.lastScope,
-          createdAt: existing.createdAt ?? now,
-          updatedAt: now,
-        });
+        const nextScope = args.scope ?? existing.lastScope;
+        const shouldExtend = existing.lockedUntil < lockExpiresAt;
+        const scopeChanged = nextScope !== existing.lastScope;
+
+        if (shouldExtend || scopeChanged) {
+          await ctx.db.patch(existing._id, {
+            ...(shouldExtend ? { lockedUntil: lockExpiresAt } : {}),
+            ...(scopeChanged ? { lastScope: nextScope ?? undefined } : {}),
+            createdAt: existing.createdAt ?? now,
+            updatedAt: now,
+          });
+        }
+
+        if (existing.lockedUntil <= now) {
+          shouldSchedule = true;
+        }
       } else {
         await ctx.db.insert("analyticsRebuildLocks", {
           organizationId: args.organizationId,
@@ -342,17 +353,20 @@ export const enqueueDailyRebuildRequests = internalMutation({
           createdAt: now,
           updatedAt: now,
         });
+        shouldSchedule = true;
       }
 
-      const delay = Math.max(lockExpiresAt - now, 0);
-      await ctx.scheduler.runAfter(
-        delay,
-        internal.engine.analytics.processRebuildLock,
-        {
-          organizationId: args.organizationId,
-          date,
-        },
-      );
+      if (shouldSchedule) {
+        const delay = Math.max(lockExpiresAt - now, 0);
+        await ctx.scheduler.runAfter(
+          delay,
+          internal.engine.analytics.processRebuildLock,
+          {
+            organizationId: args.organizationId,
+            date,
+          },
+        );
+      }
 
       scheduledDates.push(date);
     }
@@ -1316,15 +1330,28 @@ export const clearCustomerDailyActivity = internalMutation({
     date: v.string(),
   },
   handler: async (ctx, args) => {
-    const activities = await ctx.db
-      .query("customerDailyActivities")
-      .withIndex("by_org_date", (q) =>
-        q.eq("organizationId", args.organizationId).eq("date", args.date),
-      )
-      .collect();
+    const PAGE_SIZE = 64;
+    let cursor: string | null = null;
+    while (true) {
+      const page = await ctx.db
+        .query("customerDailyActivities")
+        .withIndex("by_org_date", (q) =>
+          q.eq("organizationId", args.organizationId).eq("date", args.date),
+        )
+        .paginate({ numItems: PAGE_SIZE, cursor });
 
-    for (const doc of activities) {
-      await ctx.db.delete(doc._id);
+      for (const doc of page.page) {
+        await ctx.db.delete(doc._id);
+      }
+
+      if (page.isDone) {
+        break;
+      }
+
+      cursor = page.continueCursor ?? null;
+      if (!cursor) {
+        break;
+      }
     }
 
     const summary = await ctx.db

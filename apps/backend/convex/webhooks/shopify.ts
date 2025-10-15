@@ -178,14 +178,27 @@ export const shopifyWebhook = httpAction(async (ctx, request) => {
     const providerId = eventId || webhookId || "";
 
     // Resolve organization for this shop for analytics fanout
+    type StoreDoc = {
+      _id: Id<"shopifyStores">;
+      organizationId: Id<"organizations">;
+      isActive?: boolean;
+    } & Record<string, unknown>;
+
+    let store: StoreDoc | null = null;
     let organizationId: Id<"organizations"> | undefined = undefined;
     try {
-      const store = await ctx.runQuery(
+      const fetched = await ctx.runQuery(
         internal.shopify.internalQueries.getStoreByDomain as any,
         { shopDomain: domain }
       );
-      organizationId = store?.organizationId as Id<"organizations"> | undefined;
-    } catch (_e) { void 0; }
+      if (fetched) {
+        store = fetched as StoreDoc;
+        organizationId = store.organizationId;
+      }
+    } catch (_e) {
+      store = null;
+      organizationId = undefined;
+    }
 
     // Lightweight receipt log (gated by env)
     if (LOG_WEBHOOKS_ENABLED) {
@@ -219,7 +232,13 @@ export const shopifyWebhook = httpAction(async (ctx, request) => {
     }
 
     // Inline topic handling – minimal writes + analytics touch
-    await handleTopicInline(ctx as any, { topic, payload, organizationId, domain });
+    await handleTopicInline(ctx as any, {
+      topic,
+      payload,
+      organizationId,
+      domain,
+      store,
+    });
 
     if (LOG_WEBHOOKS_ENABLED) {
       logger.info("Webhook processed", {
@@ -277,19 +296,60 @@ export const shopifyWebhookHealth = httpAction(async () => {
 // Inline topic dispatcher: keep lightweight and idempotent.
 async function handleTopicInline(
   ctx: any,
-  args: { topic: string; payload: any; organizationId?: Id<"organizations">; domain?: string },
+  args: {
+    topic: string;
+    payload: any;
+    organizationId?: Id<"organizations">;
+    domain?: string;
+    store?: {
+      _id: Id<"shopifyStores">;
+      organizationId: Id<"organizations">;
+      isActive?: boolean;
+    } | null;
+  },
 ) {
-  const { topic, payload, organizationId, domain } = args;
+  const { topic, payload, domain } = args;
 
-  // Resolve store by domain when needed
-  let store: any = null;
-  if (organizationId) {
+  type StoreShape = {
+    _id: Id<"shopifyStores">;
+    organizationId: Id<"organizations">;
+    isActive?: boolean;
+  };
+
+  let organizationId: Id<"organizations"> | undefined = args.organizationId;
+  let store: StoreShape | null = (args.store as StoreShape | null) ?? null;
+
+  if (!store && organizationId) {
     store = await ctx.runQuery(internal.shopify.internalQueries.getActiveStoreInternal, {
       organizationId: String(organizationId),
     });
   }
 
-  const storeId = store?._id as Id<"shopifyStores"> | undefined;
+  if (!organizationId && store) {
+    organizationId = store.organizationId as Id<"organizations">;
+  }
+
+  const storeIsActive = store ? store.isActive !== false : false;
+  const storeId = storeIsActive
+    ? (store?._id as Id<"shopifyStores"> | undefined)
+    : undefined;
+
+  let initialSyncChecked = false;
+  let initialSyncComplete = false;
+  const ensureInitialSyncComplete = async (): Promise<boolean> => {
+    if (!organizationId) {
+      return false;
+    }
+    if (!initialSyncChecked) {
+      try {
+        initialSyncComplete = await hasCompletedInitialShopifySync(ctx as any, organizationId);
+      } catch (_error) {
+        initialSyncComplete = false;
+      }
+      initialSyncChecked = true;
+    }
+    return initialSyncComplete;
+  };
 
   let cachedDateOptions: MsToDateOptions | null = null;
   let dateOptionsResolved = false;
@@ -422,7 +482,7 @@ async function handleTopicInline(
       const deletionDate = existingOrder
         ? msToDateString(existingOrder.shopifyCreatedAt, dateOptions)
         : null;
-      const canSchedule = await hasCompletedInitialShopifySync(ctx as any, organizationId);
+      const canSchedule = await ensureInitialSyncComplete();
       if (deletionDate && canSchedule) {
         await scheduleAnalyticsRebuild(
           ctx,
@@ -532,7 +592,7 @@ async function handleTopicInline(
           },
         );
       }
-      const canSchedule = await hasCompletedInitialShopifySync(ctx as any, organizationId);
+      const canSchedule = await ensureInitialSyncComplete();
       const dateOptions = await resolveDateOptions();
       const today = msToDateString(Date.now(), dateOptions);
       if (canSchedule && today) {
@@ -561,18 +621,7 @@ async function handleTopicInline(
           state,
         } as any,
       );
-      // analytics recalculation handled client-side
-      const canSchedule = await hasCompletedInitialShopifySync(ctx as any, organizationId);
-      const dateOptions = await resolveDateOptions();
-      const today = msToDateString(Date.now(), dateOptions);
-      if (canSchedule && today) {
-        await scheduleAnalyticsRebuild(
-          ctx,
-          organizationId,
-          [today],
-          "shopifyWebhook.customerState",
-        );
-      }
+      // No analytics rebuild needed for status toggle; daily metrics skip this data
       break;
     }
 
@@ -625,7 +674,7 @@ async function handleTopicInline(
         refunds,
       });
       // analytics recalculation handled client-side
-      const canSchedule = await hasCompletedInitialShopifySync(ctx as any, organizationId);
+      const canSchedule = await ensureInitialSyncComplete();
       const dateOptions = await resolveDateOptions();
       const refundDate = msToDateString(refunds[0]?.shopifyCreatedAt, dateOptions);
       if (canSchedule && refundDate) {
@@ -850,8 +899,8 @@ async function handleTopicInline(
         payloadShopDomain: (payload as any)?.shop_domain,
       });
 
-      let orgId = organizationId;
-      
+      let orgId = organizationId ?? (store?.organizationId as Id<"organizations"> | undefined);
+
       // If no organizationId, try to find it by shop domain
       if (!orgId && shopDomain) {
         try {

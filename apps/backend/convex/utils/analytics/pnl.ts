@@ -303,11 +303,9 @@ function calculatePnLMetricsForRange({
     ? { start: rangeStartMs, end: rangeEndMs }
     : undefined;
   const manualReturnRatePercent = resolveManualReturnRate(manualReturnRates, manualRateWindow).ratePercent;
-  const rtoRevenueLost = manualReturnRatePercent > 0
-    ? Math.min(
-        Math.max((recognizedRevenue * manualReturnRatePercent) / 100, 0),
-        Math.max(recognizedRevenue, 0),
-      )
+  const baseForRto = Math.max(recognizedRevenue, grossRevenue, 0);
+  const rtoRevenueLost = manualReturnRatePercent > 0 && baseForRto > 0
+    ? Math.min((baseForRto * manualReturnRatePercent) / 100, baseForRto)
     : 0;
 
   const costRetentionFactor = computeCostRetentionFactor({

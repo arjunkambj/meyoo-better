@@ -68,8 +68,8 @@ export const shopifyOrders = defineTable({
   // Financial
   totalPrice: v.number(),
   subtotalPrice: v.number(),
-   totalDiscounts: v.number(),
-  
+  totalDiscounts: v.number(),
+
   totalTip: v.optional(v.number()),
   currency: v.optional(v.string()), // Currency code for this order
 
@@ -90,7 +90,7 @@ export const shopifyOrders = defineTable({
       province: v.optional(v.string()),
       city: v.optional(v.string()),
       zip: v.optional(v.string()),
-    }),
+    })
   ),
 
   // Tags and notes
@@ -267,7 +267,7 @@ export const shopifyCustomers = defineTable({
       province: v.optional(v.string()),
       city: v.optional(v.string()),
       zip: v.optional(v.string()),
-    }),
+    })
   ),
 
   // Metadata
@@ -277,7 +277,6 @@ export const shopifyCustomers = defineTable({
   // Timestamps
   shopifyCreatedAt: v.number(),
   shopifyUpdatedAt: v.number(),
-
   // Sync
   syncedAt: v.number(),
 })
@@ -345,8 +344,8 @@ export const shopifyRefunds = defineTable({
         lineItemId: v.string(),
         quantity: v.number(),
         subtotal: v.number(),
-      }),
-    ),
+      })
+    )
   ),
 
   // Timestamps
@@ -388,8 +387,8 @@ export const shopifyFulfillments = defineTable({
       v.object({
         id: v.string(),
         quantity: v.number(),
-      }),
-    ),
+      })
+    )
   ),
 
   // Timestamps

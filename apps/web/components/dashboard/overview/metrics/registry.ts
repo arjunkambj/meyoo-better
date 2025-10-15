@@ -73,15 +73,12 @@ export const METRIC_CATEGORIES: Record<string, MetricCategory> = {
       "metaReach",
       "metaImpressions",
       "metaFrequency",
-      "metaUniqueClicks",
       "metaCTR",
       "metaCPC",
       "metaCostPerConversion",
       "metaAddToCart",
       "metaInitiateCheckout",
-      "metaPageViews",
       "metaLinkClicks",
-      "metaOutboundClicks",
       "metaLandingPageViews",
       "metaVideoViews",
       "metaCostPerThruPlay",
@@ -481,14 +478,6 @@ export const METRICS: Record<string, MetricDefinition> = {
     decimal: 1,
     description: "Average frequency",
   },
-  metaUniqueClicks: {
-    id: "metaUniqueClicks",
-    label: "Meta Unique Clicks",
-    icon: "solar:cursor-bold-duotone",
-    category: "metaInsights",
-    format: "number",
-    description: "Unique link clicks",
-  },
   metaCTR: {
     id: "metaCTR",
     label: "Meta CTR",
@@ -535,14 +524,6 @@ export const METRICS: Record<string, MetricDefinition> = {
     format: "number",
     description: "Checkout initiations",
   },
-  metaPageViews: {
-    id: "metaPageViews",
-    label: "Meta Page Views",
-    icon: "solar:document-bold-duotone",
-    category: "metaInsights",
-    format: "number",
-    description: "Page view events",
-  },
   metaViewContent: {
     id: "metaViewContent",
     label: "Meta View Content",
@@ -551,7 +532,6 @@ export const METRICS: Record<string, MetricDefinition> = {
     format: "number",
     description: "Content views",
   },
-  
   metaLinkClicks: {
     id: "metaLinkClicks",
     label: "Meta Link Clicks",
@@ -559,14 +539,6 @@ export const METRICS: Record<string, MetricDefinition> = {
     category: "metaInsights",
     format: "number",
     description: "Link clicks",
-  },
-  metaOutboundClicks: {
-    id: "metaOutboundClicks",
-    label: "Meta Outbound Clicks",
-    icon: "solar:arrow-right-up-bold-duotone",
-    category: "metaInsights",
-    format: "number",
-    description: "Outbound clicks",
   },
   metaLandingPageViews: {
     id: "metaLandingPageViews",

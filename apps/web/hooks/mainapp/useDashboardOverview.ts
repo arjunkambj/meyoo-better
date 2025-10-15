@@ -126,9 +126,11 @@ function buildOverviewMetrics(
   } as const;
 
   const metricMap = overview.metrics ?? {};
-  const netRevenue = Math.max((summary.revenue || 0) - (summary.refunds || 0) - (summary.rtoRevenueLost || 0), 0);
-  const netRevenueChange =
-    (summary.revenueChange || 0) - (summary.refundsChange || 0) - (summary.rtoRevenueLostChange || 0);
+  const netRevenueMetric = metricMap.netRevenue;
+  const netRevenue = netRevenueMetric?.value ??
+    Math.max((summary.revenue || 0) - (summary.refunds || 0) - (summary.rtoRevenueLost || 0), 0);
+  const netRevenueChange = netRevenueMetric?.change ??
+    ((summary.revenueChange || 0) - (summary.refundsChange || 0) - (summary.rtoRevenueLostChange || 0));
 
   return {
     revenue: {

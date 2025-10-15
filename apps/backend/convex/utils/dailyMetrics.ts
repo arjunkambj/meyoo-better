@@ -195,6 +195,110 @@ const EMPTY_AGGREGATES: AggregatedDailyMetrics = {
   conversions: 0,
 };
 
+type MetaInsightsTotals = {
+  spend: number;
+  reach: number;
+  impressions: number;
+  clicks: number;
+  uniqueClicks: number;
+  conversions: number;
+  conversionValue: number;
+  addToCart: number;
+  initiateCheckout: number;
+  pageViews: number;
+  viewContent: number;
+  linkClicks: number;
+  outboundClicks: number;
+  landingPageViews: number;
+  videoViews: number;
+  video3SecViews: number;
+  videoThruPlay: number;
+};
+
+const EMPTY_META_TOTALS: MetaInsightsTotals = {
+  spend: 0,
+  reach: 0,
+  impressions: 0,
+  clicks: 0,
+  uniqueClicks: 0,
+  conversions: 0,
+  conversionValue: 0,
+  addToCart: 0,
+  initiateCheckout: 0,
+  pageViews: 0,
+  viewContent: 0,
+  linkClicks: 0,
+  outboundClicks: 0,
+  landingPageViews: 0,
+  videoViews: 0,
+  video3SecViews: 0,
+  videoThruPlay: 0,
+};
+
+function createEmptyMetaTotals(): MetaInsightsTotals {
+  return { ...EMPTY_META_TOTALS };
+}
+
+function accumulateMetaTotals(target: MetaInsightsTotals, record: AnyRecord): void {
+  target.spend += toNumber((record as { spend?: unknown }).spend);
+  target.reach += toNumber((record as { reach?: unknown }).reach);
+  target.impressions += toNumber((record as { impressions?: unknown }).impressions);
+
+  const clicks = toNumber((record as { clicks?: unknown }).clicks);
+  target.clicks += clicks;
+
+  const uniqueClicks = toNumber(
+    (record as { uniqueClicks?: unknown }).uniqueClicks ??
+      (record as { clicks?: unknown }).clicks,
+  );
+  target.uniqueClicks += uniqueClicks;
+
+  target.conversions += toNumber((record as { conversions?: unknown }).conversions);
+  target.conversionValue += toNumber((record as { conversionValue?: unknown }).conversionValue);
+  target.addToCart += toNumber((record as { addToCart?: unknown }).addToCart);
+  target.initiateCheckout += toNumber(
+    (record as { initiateCheckout?: unknown }).initiateCheckout,
+  );
+  target.pageViews += toNumber((record as { pageViews?: unknown }).pageViews);
+  target.viewContent += toNumber((record as { viewContent?: unknown }).viewContent);
+  target.linkClicks += toNumber((record as { linkClicks?: unknown }).linkClicks);
+  target.outboundClicks += toNumber(
+    (record as { outboundClicks?: unknown }).outboundClicks,
+  );
+  target.landingPageViews += toNumber(
+    (record as { landingPageViews?: unknown }).landingPageViews,
+  );
+  target.videoViews += toNumber((record as { videoViews?: unknown }).videoViews);
+  target.video3SecViews += toNumber(
+    (record as { video3SecViews?: unknown }).video3SecViews,
+  );
+  target.videoThruPlay += toNumber(
+    (record as { videoThruPlay?: unknown }).videoThruPlay,
+  );
+}
+
+function hasMetaData(totals: MetaInsightsTotals): boolean {
+  return (
+    totals.spend > 0 ||
+    totals.impressions > 0 ||
+    totals.clicks > 0 ||
+    totals.uniqueClicks > 0 ||
+    totals.conversions > 0
+  );
+}
+
+function deriveMetaSessions(totals: MetaInsightsTotals | null | undefined): number {
+  if (!totals) {
+    return 0;
+  }
+
+  if (totals.uniqueClicks > 0) {
+    return totals.uniqueClicks;
+  }
+
+  return totals.clicks > 0 ? totals.clicks : 0;
+}
+
 
 const EMPTY_PNL_METRICS: PnLMetrics = {
   grossSales: 0,
@@ -861,6 +965,21 @@ function buildChannelRevenueBreakdown(
   return { channels };
 }
 
+function extractMetaRevenueFromTotals(totals: ChannelTotals | null | undefined): number {
+  if (!totals) {
+    return 0;
+  }
+
+  for (const [name, stats] of totals.entries()) {
+    const normalized = name.trim().toLowerCase();
+    if (normalized === "meta" || normalized === "meta ads") {
+      return stats.revenue;
+    }
+  }
+
+  return 0;
+}
+
 function mergeDailyMetrics(docs: DailyMetricDoc[]): AggregatedDailyMetrics {
   return docs.reduce<AggregatedDailyMetrics>((acc, doc) => {
     const revenue = toNumber(doc.totalRevenue);
@@ -921,8 +1040,10 @@ function makeMetric(value: number, change = 0, previousValue?: number): MetricVa
 function buildOverviewFromAggregates(
   aggregates: AggregatedDailyMetrics,
   previous: AggregatedDailyMetrics | null | undefined,
-  metaClicks: number,
-  previousMetaClicks: number,
+  metaTotals: MetaInsightsTotals,
+  previousMetaTotals: MetaInsightsTotals | null | undefined,
+  manualReturnRatePercentOverride?: number,
+  previousManualReturnRatePercentOverride?: number,
 ): OverviewComputation {
   const prev = previous ?? null;
 
@@ -937,8 +1058,21 @@ function buildOverviewFromAggregates(
 
   const refundsAmount = aggregates.refundsAmount;
   const prevRefundsAmount = prev?.refundsAmount ?? 0;
-  const rtoRevenueLost = aggregates.rtoRevenueLost;
-  const prevRtoRevenueLost = prev?.rtoRevenueLost ?? 0;
+  const manualReturnRatePercent = manualReturnRatePercentOverride ?? aggregates.manualReturnRatePercent ?? 0;
+  const prevManualReturnRatePercent =
+    previousManualReturnRatePercentOverride ?? prev?.manualReturnRatePercent ?? 0;
+  const grossRevenueBase = Math.max(grossSales, revenue, 0);
+  const prevGrossRevenueBase = prev ? Math.max(prevGrossSales, prevRevenue, 0) : prevRevenue;
+  let rtoRevenueLost = aggregates.rtoRevenueLost;
+  if (rtoRevenueLost <= 0 && manualReturnRatePercent > 0 && grossRevenueBase > 0) {
+    rtoRevenueLost = Math.min((grossRevenueBase * manualReturnRatePercent) / 100, grossRevenueBase);
+  }
+  let prevRtoRevenueLost = prev?.rtoRevenueLost ?? 0;
+  if (prevRtoRevenueLost <= 0 && prevManualReturnRatePercent > 0 && prevGrossRevenueBase > 0) {
+    prevRtoRevenueLost = Math.min((prevGrossRevenueBase * prevManualReturnRatePercent) / 100, prevGrossRevenueBase);
+  }
+  const netRevenue = Math.max(revenue - refundsAmount - rtoRevenueLost, 0);
+  const prevNetRevenue = Math.max(prevRevenue - prevRefundsAmount - prevRtoRevenueLost, 0);
 
   const orders = aggregates.orders;
   const prevOrders = prev?.orders ?? 0;
@@ -966,6 +1100,21 @@ function buildOverviewFromAggregates(
 
   const marketingCost = aggregates.marketingCost;
   const prevMarketingCost = prev?.marketingCost ?? 0;
+
+  const currentMeta = metaTotals ?? EMPTY_META_TOTALS;
+  const previousMeta = previousMetaTotals ?? EMPTY_META_TOTALS;
+  const metaSessions = deriveMetaSessions(currentMeta);
+  const prevMetaSessions = deriveMetaSessions(previousMeta);
+  const metaSpend = Math.max(currentMeta.spend, 0);
+  const prevMetaSpend = Math.max(previousMeta.spend, 0);
+  const metaConversionValue = Math.max(currentMeta.conversionValue, 0);
+  const prevMetaConversionValue = Math.max(previousMeta.conversionValue, 0);
+  const metaSpendPercentage = marketingCost > 0 ? (metaSpend / marketingCost) * 100 : 0;
+  const prevMetaSpendPercentage = prevMarketingCost > 0
+    ? (prevMetaSpend / prevMarketingCost) * 100
+    : 0;
+  const metaRoas = metaSpend > 0 ? metaConversionValue / metaSpend : 0;
+  const prevMetaRoas = prevMetaSpend > 0 ? prevMetaConversionValue / prevMetaSpend : 0;
 
   const paidCustomers = aggregates.paidCustomers;
   const prevPaidCustomers = prev?.paidCustomers ?? 0;
@@ -1112,13 +1261,13 @@ function buildOverviewFromAggregates(
   const ltvToCac = customerAcquisitionCost > 0 ? lifetimeValue / customerAcquisitionCost : 0;
   const prevLtvToCac = prevCustomerAcquisitionCost > 0 ? prevLifetimeValue / prevCustomerAcquisitionCost : 0;
 
-  const safeMetaClicks = Math.max(metaClicks, 0);
-  const safePrevMetaClicks = Math.max(previousMetaClicks, 0);
-  const blendedSessionConversionRate = safeMetaClicks > 0
-    ? (orders / safeMetaClicks) * 100
+  const safeMetaSessions = Math.max(metaSessions, 0);
+  const safePrevMetaSessions = Math.max(prevMetaSessions, 0);
+  const blendedSessionConversionRate = safeMetaSessions > 0
+    ? (orders / safeMetaSessions) * 100
     : 0;
-  const prevBlendedSessionConversionRate = safePrevMetaClicks > 0
-    ? (prevOrders / safePrevMetaClicks) * 100
+  const prevBlendedSessionConversionRate = safePrevMetaSessions > 0
+    ? (prevOrders / safePrevMetaSessions) * 100
     : 0;
   const uniqueVisitors = Math.max(aggregates.visitors, 0);
 
@@ -1138,10 +1287,10 @@ function buildOverviewFromAggregates(
     refundsChange: percentageChange(refundsAmount, prevRefundsAmount),
     rtoRevenueLost,
     rtoRevenueLostChange: percentageChange(rtoRevenueLost, prevRtoRevenueLost),
-    manualReturnRate: aggregates.manualReturnRatePercent,
+    manualReturnRate: manualReturnRatePercent,
     manualReturnRateChange: percentageChange(
-      aggregates.manualReturnRatePercent,
-      prev?.manualReturnRatePercent ?? 0,
+      manualReturnRatePercent,
+      prevManualReturnRatePercent,
     ),
     profit: netProfit,
     profitChange: percentageChange(netProfit, prevNetProfit),
@@ -1162,10 +1311,13 @@ function buildOverviewFromAggregates(
     operatingMarginChange: percentageChange(operatingMargin, prevOperatingMargin),
     blendedMarketingCost: marketingCost,
     blendedMarketingCostChange: percentageChange(marketingCost, prevMarketingCost),
-    metaAdSpend: 0,
-    metaAdSpendChange: 0,
-    metaSpendPercentage: 0,
-    metaSpendPercentageChange: 0,
+    metaAdSpend: metaSpend,
+    metaAdSpendChange: percentageChange(metaSpend, prevMetaSpend),
+    metaSpendPercentage,
+    metaSpendPercentageChange: percentageChange(
+      metaSpendPercentage,
+      prevMetaSpendPercentage,
+    ),
     marketingPercentageOfGross,
     marketingPercentageOfGrossChange: percentageChange(
       marketingPercentageOfGross,
@@ -1176,8 +1328,8 @@ function buildOverviewFromAggregates(
       marketingPercentageOfNet,
       prevMarketingPercentageOfNet,
     ),
-    metaROAS: 0,
-    metaROASChange: 0,
+    metaROAS: metaRoas,
+    metaROASChange: percentageChange(metaRoas, prevMetaRoas),
     roas: blendedRoas,
     roasChange: percentageChange(blendedRoas, prevBlendedRoas),
     ncROAS: blendedRoas,
@@ -1272,6 +1424,7 @@ function buildOverviewFromAggregates(
 
   const metrics: OverviewComputation["metrics"] = {
     revenue: makeMetric(revenue, percentageChange(revenue, prevRevenue), prevRevenue),
+    netRevenue: makeMetric(netRevenue, percentageChange(netRevenue, prevNetRevenue), prevNetRevenue),
     profit: makeMetric(netProfit, percentageChange(netProfit, prevNetProfit), prevNetProfit),
     orders: makeMetric(orders, percentageChange(orders, prevOrders), prevOrders),
     avgOrderValue: makeMetric(
@@ -1290,6 +1443,21 @@ function buildOverviewFromAggregates(
       marketingCost,
       percentageChange(marketingCost, prevMarketingCost),
       prevMarketingCost,
+    ),
+    metaAdSpend: makeMetric(
+      metaSpend,
+      percentageChange(metaSpend, prevMetaSpend),
+      prevMetaSpend,
+    ),
+    metaROAS: makeMetric(
+      metaRoas,
+      percentageChange(metaRoas, prevMetaRoas),
+      prevMetaRoas,
+    ),
+    metaSpendPercentage: makeMetric(
+      metaSpendPercentage,
+      percentageChange(metaSpendPercentage, prevMetaSpendPercentage),
+      prevMetaSpendPercentage,
     ),
     customerAcquisitionCost: makeMetric(
       customerAcquisitionCost,
@@ -1312,9 +1480,9 @@ function buildOverviewFromAggregates(
       prevRtoRevenueLost,
     ),
     manualReturnRate: makeMetric(
-      aggregates.manualReturnRatePercent,
-      percentageChange(aggregates.manualReturnRatePercent, prev?.manualReturnRatePercent ?? 0),
-      prev?.manualReturnRatePercent ?? 0,
+      manualReturnRatePercent,
+      percentageChange(manualReturnRatePercent, prevManualReturnRatePercent),
+      prevManualReturnRatePercent,
     ),
     cancelledOrderRate: makeMetric(
       cancellationRate,
@@ -1465,24 +1633,76 @@ function buildOrdersOverviewFromAggregates(
   } satisfies OrdersOverviewMetrics;
 }
 
-function buildPlatformMetricsFromAggregates(aggregates: AggregatedDailyMetrics): PlatformMetrics {
-  if (aggregates.blendedCtrCount === 0) {
-    return ZERO_PLATFORM_METRICS;
-  }
+function buildPlatformMetricsFromAggregates(
+  aggregates: AggregatedDailyMetrics,
+  metaTotals: MetaInsightsTotals,
+): PlatformMetrics {
+  const blendedCTR =
+    aggregates.blendedCtrCount > 0
+      ? aggregates.blendedCtrSum / aggregates.blendedCtrCount
+      : 0;
 
-  const averageCtr = aggregates.blendedCtrSum / aggregates.blendedCtrCount;
+  const spend = Math.max(metaTotals.spend, 0);
+  const impressions = Math.max(metaTotals.impressions, 0);
+  const clicks = Math.max(metaTotals.clicks, 0);
+  const uniqueClicks = Math.max(metaTotals.uniqueClicks, 0);
+  const conversions = Math.max(metaTotals.conversions, 0);
+  const reach = Math.max(metaTotals.reach, 0);
+  const addToCart = Math.max(metaTotals.addToCart, 0);
+  const initiateCheckout = Math.max(metaTotals.initiateCheckout, 0);
+  const pageViews = Math.max(metaTotals.pageViews, 0);
+  const viewContent = Math.max(metaTotals.viewContent, 0);
+  const linkClicks = Math.max(metaTotals.linkClicks, 0);
+  const outboundClicks = Math.max(metaTotals.outboundClicks, 0);
+  const landingPageViews = Math.max(metaTotals.landingPageViews, 0);
+  const videoViews = Math.max(metaTotals.videoViews, 0);
+  const video3SecViews = Math.max(metaTotals.video3SecViews, 0);
+  const videoThruPlay = Math.max(metaTotals.videoThruPlay, 0);
+  const metaSessions = deriveMetaSessions(metaTotals);
+
+  const metaFrequency = reach > 0 ? impressions / reach : 0;
+  const metaCTR = impressions > 0 ? (clicks / impressions) * 100 : 0;
+  const metaCPM = impressions > 0 ? (spend / impressions) * 1000 : 0;
+  const metaCPC = clicks > 0 ? spend / clicks : 0;
+  const metaConversionRate = clicks > 0 ? (conversions / clicks) * 100 : 0;
+  const metaCostPerConversion = conversions > 0 ? spend / conversions : 0;
+  const metaCostPerThruPlay = videoThruPlay > 0 ? spend / videoThruPlay : 0;
 
   return {
     ...ZERO_PLATFORM_METRICS,
-    blendedCTR: averageCtr,
+    blendedCTR,
+    blendedCPM: metaCPM,
+    blendedCPC: metaCPC,
+    metaSessions,
+    metaClicks: clicks,
+    metaConversion: conversions,
+    metaConversionRate,
+    metaImpressions: impressions,
+    metaCTR,
+    metaCPM,
+    metaReach: reach,
+    metaFrequency,
+    metaUniqueClicks: uniqueClicks,
+    metaCPC,
+    metaCostPerConversion,
+    metaAddToCart: addToCart,
+    metaInitiateCheckout: initiateCheckout,
+    metaPageViews: pageViews,
+    metaViewContent: viewContent,
+    metaLinkClicks: linkClicks,
+    metaOutboundClicks: outboundClicks,
+    metaLandingPageViews: landingPageViews,
+    metaVideoViews: videoViews,
+    metaVideo3SecViews: video3SecViews,
+    metaCostPerThruPlay,
   };
 }
 
-async function sumMetaUniqueClicksForRange(
+async function aggregateMetaInsightsForRange(
   ctx: QueryCtx,
   organizationId: Id<"organizations">,
   range: DateRange,
-): Promise<number> {
+): Promise<MetaInsightsTotals> {
   const records = await ctx.db
     .query("metaInsights")
     .withIndex("by_org_date", (q) =>
@@ -1491,18 +1711,21 @@ async function sumMetaUniqueClicksForRange(
     .filter((q) => q.lte(q.field("date"), range.endDate))
     .collect();
 
-  let accountLevelSum = 0;
-  let fallbackSum = 0;
+  const overallTotals = createEmptyMetaTotals();
+  const accountTotals = createEmptyMetaTotals();
 
   for (const record of records) {
-    const clicks = toNumber(record.uniqueClicks ?? record.clicks);
-    fallbackSum += clicks;
+    accumulateMetaTotals(overallTotals, record);
     if (String(record.entityType).toLowerCase() === "account") {
-      accountLevelSum += clicks;
+      accumulateMetaTotals(accountTotals, record);
     }
   }
 
-  return accountLevelSum > 0 ? accountLevelSum : fallbackSum;
+  const preferredTotals = hasMetaData(accountTotals)
+    ? accountTotals
+    : overallTotals;
+
+  return { ...preferredTotals };
 }
 
 function createEmptyPnLMetrics(): PnLMetrics {
@@ -1792,12 +2015,13 @@ export async function loadOverviewFromDailyMetrics(
     manualRatePercent,
   );
 
-  const metaClicks = await sumMetaUniqueClicksForRange(ctx, organizationId, range);
+  const metaTotals = await aggregateMetaInsightsForRange(ctx, organizationId, range);
 
   const previousRange = derivePreviousRange(range);
   let previousAggregatesWithCosts: AggregatedDailyMetrics | null = null;
-  let previousMetaClicks = 0;
+  let previousMetaTotals: MetaInsightsTotals | null = null;
   let previousChannelTotals: ChannelTotals | null = null;
+  let previousRatePercent = 0;
 
   if (previousRange) {
     const previousFetched = await fetchDailyMetricsDocs(ctx, organizationId, previousRange);
@@ -1808,7 +2032,7 @@ export async function loadOverviewFromDailyMetrics(
         activeOperationalCostDocs,
         previousRange,
       );
-      const previousRatePercent = computeManualReturnRateForRange(
+      previousRatePercent = computeManualReturnRateForRange(
         manualReturnRateDocs,
         previousRange,
       );
@@ -1818,16 +2042,22 @@ export async function loadOverviewFromDailyMetrics(
       );
       previousChannelTotals = aggregateChannelRevenueFromDocs(previousFetched.docs);
     }
-    previousMetaClicks = await sumMetaUniqueClicksForRange(ctx, organizationId, previousRange);
+    previousMetaTotals = await aggregateMetaInsightsForRange(
+      ctx,
+      organizationId,
+      previousRange,
+    );
   }
 
   const overview = buildOverviewFromAggregates(
     aggregatesAdjusted,
     previousAggregatesWithCosts,
-    metaClicks,
-    previousMetaClicks,
+    metaTotals,
+    previousMetaTotals,
+    manualRatePercent,
+    previousRatePercent,
   );
-  const platformMetrics = buildPlatformMetricsFromAggregates(aggregatesAdjusted);
+  const platformMetrics = buildPlatformMetricsFromAggregates(aggregatesAdjusted, metaTotals);
   const ordersOverview = buildOrdersOverviewFromAggregates(
     aggregatesAdjusted,
     previousAggregatesWithCosts,
@@ -1839,6 +2069,32 @@ export async function loadOverviewFromDailyMetrics(
     range,
   );
   const channelRevenue = buildChannelRevenueBreakdown(channelTotals, previousChannelTotals);
+  const metaRevenue = metaTotals.conversionValue > 0
+    ? metaTotals.conversionValue
+    : extractMetaRevenueFromTotals(channelTotals);
+  const prevMetaRevenue = previousMetaTotals && previousMetaTotals.conversionValue > 0
+    ? previousMetaTotals.conversionValue
+    : extractMetaRevenueFromTotals(previousChannelTotals);
+
+  if (overview?.summary) {
+    const summary = overview.summary;
+    const metaSpend = Math.max(
+      summary.metaAdSpend ?? metaTotals.spend ?? 0,
+      0,
+    );
+    const prevMetaSpend = Math.max(previousMetaTotals?.spend ?? 0, 0);
+    const metaRoas = metaSpend > 0 ? metaRevenue / metaSpend : 0;
+    const prevMetaRoas = prevMetaSpend > 0 ? prevMetaRevenue / prevMetaSpend : 0;
+    const metaRoasChange = percentageChange(metaRoas, prevMetaRoas);
+
+    summary.metaROASChange = metaRoasChange;
+    summary.metaROAS = metaRoas;
+
+    const metrics = overview.metrics;
+    if (metrics?.metaROAS) {
+      metrics.metaROAS = makeMetric(metaRoas, metaRoasChange, prevMetaRoas);
+    }
+  }
 
   let previousCustomerMetrics: CustomerOverviewMetrics | null = null;
   if (previousRange) {
@@ -1959,6 +2215,25 @@ export async function loadOverviewFromDailyMetrics(
     },
     manualReturnRate: aggregatesAdjusted.manualReturnRatePercent,
     rtoRevenueLost: aggregatesAdjusted.rtoRevenueLost,
+    metaInsights: {
+      spend: metaTotals.spend,
+      reach: metaTotals.reach,
+      impressions: metaTotals.impressions,
+      clicks: metaTotals.clicks,
+      uniqueClicks: metaTotals.uniqueClicks,
+      conversions: metaTotals.conversions,
+      conversionValue: metaTotals.conversionValue,
+      addToCart: metaTotals.addToCart,
+      initiateCheckout: metaTotals.initiateCheckout,
+      pageViews: metaTotals.pageViews,
+      viewContent: metaTotals.viewContent,
+      linkClicks: metaTotals.linkClicks,
+      outboundClicks: metaTotals.outboundClicks,
+      landingPageViews: metaTotals.landingPageViews,
+      videoViews: metaTotals.videoViews,
+      video3SecViews: metaTotals.video3SecViews,
+      videoThruPlay: metaTotals.videoThruPlay,
+    },
   };
 
   if (previousRange) {
@@ -1972,6 +2247,28 @@ export async function loadOverviewFromDailyMetrics(
       marketingCost: previousAggregatesWithCosts.marketingCost,
       totalCustomers: previousAggregatesWithCosts.totalCustomers,
       newCustomers: previousAggregatesWithCosts.newCustomers,
+    } satisfies Record<string, unknown>;
+  }
+
+  if (previousMetaTotals) {
+    meta.previousMetaInsights = {
+      spend: previousMetaTotals.spend,
+      reach: previousMetaTotals.reach,
+      impressions: previousMetaTotals.impressions,
+      clicks: previousMetaTotals.clicks,
+      uniqueClicks: previousMetaTotals.uniqueClicks,
+      conversions: previousMetaTotals.conversions,
+      conversionValue: previousMetaTotals.conversionValue,
+      addToCart: previousMetaTotals.addToCart,
+      initiateCheckout: previousMetaTotals.initiateCheckout,
+      pageViews: previousMetaTotals.pageViews,
+      viewContent: previousMetaTotals.viewContent,
+      linkClicks: previousMetaTotals.linkClicks,
+      outboundClicks: previousMetaTotals.outboundClicks,
+      landingPageViews: previousMetaTotals.landingPageViews,
+      videoViews: previousMetaTotals.videoViews,
+      video3SecViews: previousMetaTotals.video3SecViews,
+      videoThruPlay: previousMetaTotals.videoThruPlay,
     } satisfies Record<string, unknown>;
   }
 

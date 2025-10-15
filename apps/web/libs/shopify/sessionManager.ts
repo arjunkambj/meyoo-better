@@ -1,8 +1,12 @@
+import crypto from "node:crypto";
+
 import { Session } from "@shopify/shopify-api";
 import { fetchQuery } from "convex/nextjs";
 
 import { api } from "@/libs/convexApi";
 import { createLogger } from "@/libs/logging/Logger";
+import { normalizeShopDomain } from "@/libs/shopify/domain";
+import { createShopProvisionSignature } from "@/libs/shopify/signature";
 
 const logger = createLogger("Shopify.SessionManager");
 
@@ -20,32 +24,43 @@ export interface ShopifySessionData {
 export async function getSessionByShop(
   shopDomain: string,
 ): Promise<Session | null> {
-  try {
-    logger.info("Getting session by shop domain", { shopDomain });
+  const canonicalShopDomain = normalizeShopDomain(shopDomain);
 
-    // Get store data from database
+  try {
+    logger.info("Getting session by shop domain", {
+      shopDomain: canonicalShopDomain,
+      inputShopDomain: shopDomain,
+    });
+
+    const nonce = crypto.randomBytes(16).toString("hex");
+    const sig = createShopProvisionSignature(canonicalShopDomain, nonce);
+
     const store = await fetchQuery(
       api.shopify.publicQueries.getPublicStoreByDomain,
-      { shopDomain },
-      { token: undefined }, // Admin query
+      { shopDomain: canonicalShopDomain, nonce, sig },
+      { token: undefined },
     );
 
     if (!store) {
-      logger.warn("No store found for shop domain", { shopDomain });
+      logger.warn("No store found for shop domain", {
+        shopDomain: canonicalShopDomain,
+      });
 
       return null;
     }
 
     if (!store.accessToken) {
-      logger.warn("No access token found for store", { shopDomain });
+      logger.warn("No access token found for store", {
+        shopDomain: canonicalShopDomain,
+      });
 
       return null;
     }
 
     // Create a proper Shopify Session object
     const session = new Session({
-      id: `offline_${shopDomain}`,
-      shop: shopDomain,
+      id: `offline_${canonicalShopDomain}`,
+      shop: canonicalShopDomain,
       state: "offline",
       isOnline: false,
       accessToken: store.accessToken,
@@ -53,7 +68,7 @@ export async function getSessionByShop(
     });
 
     logger.info("Session retrieved successfully", {
-      shopDomain,
+      shopDomain: canonicalShopDomain,
       hasAccessToken: !!session.accessToken,
       scope: session.scope,
     });
@@ -61,7 +76,8 @@ export async function getSessionByShop(
     return session;
   } catch (error) {
     logger.error("Error retrieving session by shop", error as Error, {
-      shopDomain,
+      shopDomain: canonicalShopDomain,
+      inputShopDomain: shopDomain,
     });
 
     return null;

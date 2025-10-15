@@ -4,6 +4,7 @@ import { v } from "convex/values";
 import { query } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { normalizeShopDomain } from "../utils/shop";
+import { verifyShopProvisionSignature } from "../utils/crypto";
 
 export const getStore = query({
   args: {},
@@ -379,7 +380,11 @@ export const getProductVariants = query({
  * Public version of getStoreByDomain for session management
  */
 export const getPublicStoreByDomain = query({
-  args: { shopDomain: v.string() },
+  args: {
+    shopDomain: v.string(),
+    nonce: v.optional(v.string()),
+    sig: v.optional(v.string()),
+  },
   returns: v.union(
     v.null(),
     v.object({
@@ -387,7 +392,7 @@ export const getPublicStoreByDomain = query({
       organizationId: v.id("organizations"),
       shopDomain: v.string(),
       storeName: v.string(),
-      accessToken: v.string(),
+      accessToken: v.optional(v.string()),
       scope: v.string(),
       isActive: v.boolean(),
       webhooksRegistered: v.optional(v.boolean()),
@@ -403,12 +408,20 @@ export const getPublicStoreByDomain = query({
 
     if (!store) return null;
 
+    let accessToken: string | undefined;
+    if (args.nonce && args.sig) {
+      const ok = await verifyShopProvisionSignature(domain, args.nonce, args.sig);
+      if (ok) {
+        accessToken = store.accessToken;
+      }
+    }
+
     return {
       _id: store._id,
       organizationId: store.organizationId as Id<"organizations">,
       shopDomain: store.shopDomain,
       storeName: store.storeName,
-      accessToken: store.accessToken,
+      accessToken,
       scope: store.scope || "",
       isActive: store.isActive,
       webhooksRegistered: store.webhooksRegistered,

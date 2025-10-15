@@ -118,37 +118,18 @@ export async function GET(req: NextRequest) {
           { token },
         );
 
-        if (existing && currentUser?.organizationId && existing.organizationId !== currentUser.organizationId) {
-          // Store belongs to a different org. Switch auth to the store owner (issue tokens for store.userId)
-          const nonce = crypto.randomBytes(16).toString("hex");
-          const sig = createAuthSignature(shopDomain, nonce);
-
-          // Ensure store creds are up to date (will preserve mapping)
-          await fetchMutation(
-            api.installations.createOrAttachFromShopifyOAuth,
-            {
-              shop: shopDomain,
-              accessToken: session.accessToken || "",
-              scope: session.scope || "",
-              shopData,
-              nonce,
-              sig,
-            },
-            { token },
+        if (
+          existing &&
+          currentUser?.organizationId &&
+          existing.organizationId !== currentUser.organizationId
+        ) {
+          logger.warn("Shopify store already linked to another organization", {
+            requestId,
+          });
+          const redirect = NextResponse.redirect(
+            `${baseUrl}/onboarding/shopify?error=store-already-connected`,
+            { status: 303 },
           );
-
-          // Issue tokens for the store's linked user and set cookies
-          const tokens = await fetchAction(
-            api.installations.issueTokensFromShopifyOAuth,
-            { shop: shopDomain, nonce, sig },
-          );
-
-          // Register webhooks as needed for this store
-          await registerStoreWebhooks(session);
-
-          const target = await getRedirectUrl(tokens.token, shopDomain);
-          const redirect = NextResponse.redirect(target);
-          setAuthCookies(redirect, tokens);
           redirect.headers.set("X-Request-Id", requestId);
           return redirect;
         }
@@ -273,31 +254,7 @@ export async function GET(req: NextRequest) {
         }
 
         const redirect = NextResponse.redirect(target);
-        // Set secure __Host- cookies for production compatibility
-        const prefix = "__Host-";
-        const common = {
-          httpOnly: true as const,
-          sameSite: "lax" as const,
-          secure: true,
-          path: "/",
-        };
-        redirect.cookies.set(`${prefix}__convexAuthJWT`, tokens.token, {
-          ...common,
-          maxAge: 60 * 60 * 24 * 30,
-        });
-        redirect.cookies.set(
-          `${prefix}__convexAuthRefreshToken`,
-          tokens.refreshToken,
-          {
-            ...common,
-            maxAge: 60 * 60 * 24 * 30,
-          },
-        );
-        // Clear verifier cookie if present
-        redirect.cookies.set(`${prefix}__convexAuthOAuthVerifier`, "", {
-          ...common,
-          expires: new Date(0),
-        });
+        setAuthCookies(redirect, tokens);
 
         // Register webhooks if not already registered
         await registerStoreWebhooks(session);

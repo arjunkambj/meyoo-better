@@ -1,4 +1,3 @@
-import crypto from "node:crypto";
 import { fetchMutation, fetchQuery } from "convex/nextjs";
 import { NextResponse } from "next/server";
 import { api } from "@/libs/convexApi";
@@ -8,17 +7,13 @@ import { createLogger } from "@/libs/logging/Logger";
 import { optionalEnv, requireEnv } from "@/libs/env";
 import type { Session } from "@shopify/shopify-api";
 import type { GenericId as Id } from "convex/values";
+import { createShopProvisionSignature } from "@/libs/shopify/signature";
+
+export { normalizeShopDomain } from "@/libs/shopify/domain";
 
 const logger = createLogger("Shopify.Callback.Helpers");
-const SHOPIFY_API_KEY = requireEnv("SHOPIFY_API_KEY");
 const NEXT_PUBLIC_APP_URL = requireEnv("NEXT_PUBLIC_APP_URL");
 const SHOPIFY_WEBHOOK_DEBUG = optionalEnv("SHOPIFY_WEBHOOK_DEBUG") === "1";
-
-/**
- * Normalizes a shop domain by removing protocol and trailing slashes
- */
-export const normalizeShopDomain = (shop: string): string =>
-  shop.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/$/, "");
 
 /**
  * Fetches shop data from Shopify GraphQL API
@@ -50,15 +45,7 @@ export async function fetchShopData(session: Session): Promise<Record<string, un
   }
 }
 
-/**
- * Creates authentication signature for Shopify OAuth
- */
-export function createAuthSignature(shopDomain: string, nonce: string): string {
-  return crypto
-    .createHmac("sha256", SHOPIFY_API_KEY)
-    .update(`${shopDomain}:${nonce}`)
-    .digest("hex");
-}
+export const createAuthSignature = createShopProvisionSignature;
 
 /**
  * Registers webhooks for a Shopify store

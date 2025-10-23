@@ -3,6 +3,7 @@
 @plugin './hero.ts';
 @source '../../node_modules/@heroui/theme/dist/**/*.{js,ts,jsx,tsx}';
 @custom-variant dark (&:is(.dark *));
+@source '../../../../node_modules/@heroui/theme/dist/**/*.{js,ts,jsx,tsx}';
 
 html,
 body {

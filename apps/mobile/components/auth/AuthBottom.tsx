@@ -82,14 +82,12 @@ export function AuthBottom({ onSuccess }: AuthBottomProps) {
           onPress={handleGoogleLogin}
           className="h-12 bg-surface-3 border border-border"
         >
-          <Button.StartContent>
-            <View className="w-5 h-5 items-center justify-center">
-              <GoogleLogo />
-            </View>
-          </Button.StartContent>
-          <Button.LabelContent classNames={{ text: "font-medium" }}>
+          <View className="w-5 h-5 items-center justify-center">
+            <GoogleLogo />
+          </View>
+          <Button.Label className="font-medium">
             Continue with Google
-          </Button.LabelContent>
+          </Button.Label>
         </Button>
 
         {appleAvailable ? (
@@ -100,14 +98,12 @@ export function AuthBottom({ onSuccess }: AuthBottomProps) {
             onPress={handleAppleSignIn}
             className="h-12 bg-foreground border border-foreground"
           >
-            <Button.StartContent>
-              <View className="w-5 h-5 items-center justify-center">
-                <Ionicons name="logo-apple" size={20} color={appleIconColor} />
-              </View>
-            </Button.StartContent>
-            <Button.LabelContent classNames={{ text: "text-background" }}>
+            <View className="w-5 h-5 items-center justify-center">
+              <Ionicons name="logo-apple" size={20} color={appleIconColor} />
+            </View>
+            <Button.Label className="text-background">
               Continue with Apple
-            </Button.LabelContent>
+            </Button.Label>
           </Button>
         ) : null}
       </View>

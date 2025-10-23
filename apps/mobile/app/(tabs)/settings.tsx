@@ -210,9 +210,9 @@ export default function SettingsTab() {
                       size="sm"
                       color={billing?.isPremium ? "accent" : "default"}
                     >
-                      <Chip.LabelContent className="text-[10px] font-semibold uppercase tracking-wide text-foreground">
+                      <Chip.Label className="text-[10px] font-semibold uppercase tracking-wide text-foreground">
                         {planLabel}
-                      </Chip.LabelContent>
+                      </Chip.Label>
                     </Chip>
                   </View>
                 </Card.Body>
@@ -358,14 +358,10 @@ export default function SettingsTab() {
                 onPress={handleSignOut}
                 className="h-12 rounded-2xl"
               >
-                <Button.StartContent>
-                  <Ionicons name="log-out" size={22} color="#ffffff" />
-                </Button.StartContent>
-                <Button.LabelContent
-                  classNames={{ text: "font-semibold text-white" }}
-                >
+                <Ionicons name="log-out" size={22} color="#ffffff" />
+                <Button.Label className="font-semibold text-white">
                   Sign Out
-                </Button.LabelContent>
+                </Button.Label>
               </Button>
             </View>
           )}

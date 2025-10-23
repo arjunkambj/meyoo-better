@@ -120,13 +120,10 @@ export default function OnboardingScreen() {
             variant="danger"
             onPress={handleLogout}
           >
-            
-            <Button.StartContent>
-              <Ionicons name="log-out-outline" size={18} color={colors.default} />
-            </Button.StartContent>
-            <Button.LabelContent classNames={{ text: 'font-semibold text-white' }}>
-                  Sign Out
-            </Button.LabelContent> 
+            <Ionicons name="log-out-outline" size={18} color={colors.default} />
+            <Button.Label className="font-semibold text-white">
+              Sign Out
+            </Button.Label>
           </Button>
         </Animated.View>
       </View>

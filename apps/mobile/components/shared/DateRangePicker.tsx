@@ -185,12 +185,10 @@ export function DateRangePicker({ onClose }: DateRangePickerProps) {
               onPress={handleCustomDateChange}
               className="mt-3 h-14 rounded-2xl"
             >
-              <Button.StartContent>
-                <Ionicons name="checkmark-circle" size={20} color="#ffffff" />
-              </Button.StartContent>
-              <Button.LabelContent classNames={{ text: "font-bold" }}>
+              <Ionicons name="checkmark-circle" size={20} color="#ffffff" />
+              <Button.Label className="font-bold">
                 Apply Custom Range
-              </Button.LabelContent>
+              </Button.Label>
             </Button>
           </View>
         </View>

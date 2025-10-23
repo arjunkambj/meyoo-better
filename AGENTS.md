@@ -1,127 +1,89 @@
-# Repository Guidelines
+# Agent Handbook
 
-##
+## Core Rules
+- Remove legacy or unused functions once the replacement is live; do not leave dead code behind.
+- Explain work in plain language so the team can follow quickly.
+- Merge or delete duplicate code and docs whenever you see them.
 
-- always remove legecy or unused funtion , we are doing rewrite of some funtion , make sure old get deleted
-
-- explain explain in simple plain langagues without addin jargons. with clariy
-- removing legacy or duplicate code where relevant
-
-## Agent & Components Usage Rules
-
-- When wiring components:
+## Component Wiring
+- Register backend components in this exact order:
   - `app.use(workpool, { name: "mainWorkpool" })`
   - `app.use(actionRetrier)`
   - `app.use(rag)`
   - `app.use(agent)`
   - `app.use(resend)`
-    Always fetch latest Context7 docs before editing code related to compoents
+- Always fetch the latest Context7 docs before touching these components or their wiring.
 
-## Project Structure & Module Organization
+## Monorepo Layout
+- Turborepo + Bun power the workspace.
 
-- Monorepo managed by Turbo and Bun.
-- Apps
-  - `apps/web` — Next.js (App Router) storefront; code in `app/`, shared UI in `components/`, utilities under `libs/`.
-  - `apps/backend` — Convex backend. Functions and jobs under `convex/` organized by domain:
-    - `convex/web/*` — storefront APIs
-    - `convex/meyoo/*` — Meyoo APIs
-    - shared domains under `convex/core`, `convex/engine`, `convex/integrations`, etc.
+### Apps
+- `apps/web` – Next.js dashboard. Routes live in `src/app`, shared UI in `src/components`, helpers in `src/libs`, state in `src/store`, and static assets in `public/`.
+- `apps/mobile` – Expo + React Native client. Screens under `app/`, shared pieces in `components/`, contexts in `contexts/`, state in `store/`, and styles in `styles/`.
+- `apps/backend` – Convex backend runtime. Business logic under `convex/` with shared helpers in `libs/`.
 
-- Packages
-  - `packages/ui` — Shared React components.
-  - `packages/eslint-config` — Centralized ESLint configs.
-  - `packages/typescript-config` — Shared `tsconfig` presets.
-- Assets live in `apps/web/public`. Env files use `*.env.local` per app.
+### Packages
+- `@repo/ui` – Shared React and React Native components.
+- `@repo/types` – Cross-platform TypeScript types.
+- `@repo/time` – Time utilities used by web and backend.
+- `@repo/eslint-config` – Centralized ESLint rules.
+- `@repo/typescript-config` – Shared tsconfig presets.
 
-## Build, Test, and Development Commands
+### Backend Convex Map
+- `agent/` – Agent flows, chat actions, and MCP tooling.
+- `core/` – Core domain logic: orgs, users, onboarding, costs, usage.
+- `engine/` – Scheduling, analytics, events, rate limiting, workpool jobs.
+- `jobs/` – Background jobs triggered by workpool or cron.
+- `meta/` – Meta Ads integrations and storage helpers.
+- `meyoo/` – Backoffice/admin APIs.
+- `resend/` – Transactional email actions and helpers.
+- `schema/` – Table definitions and indexes (`schema.ts` is the entry point).
+- `shopify/` – Shopify auth, sync, and webhook helpers.
+- `utils/` – Shared backend utilities.
+- `web/` – Customer-facing storefront APIs.
+- `webhooks/` – HTTP handlers for Shopify + GDPR flows.
+- Root files: `auth*.ts`, `http.ts`, `httpSync.ts`, `rag.ts`, `ResendOTP.ts`, `installations.ts`.
+- `_generated/` and `schema.ts` come from Convex codegen—do not edit.
 
-- Install: `bun install` (root) — installs all workspace deps.
-- Dev (all): `bun run dev` — runs `turbo run dev` across apps.
-- Dev (web): `bun run dev` in `apps/web` — Next dev on port 3000.
-- Dev (backend): `bun run dev` in `apps/backend` — starts Convex.
-- Build: `bun run build` — `turbo run build` with caching.
-- Lint: `bun run lint` — ESLint via shared configs.
-- Types: `bun run check-types` — TypeScript no‑emit checks.
-- Format: `bun run format` — Prettier on `ts/tsx/md`.
-- Convex codegen runs on the managed server; **never run `convex codegen` locally**.
+### Backend Shared Libraries
+- `apps/backend/libs/env.ts` – Environment variable loading.
+- `apps/backend/libs/integrations.ts`, `meta/`, `shopify/`, `time/`, `utils/` – Reusable backend helpers shared across Convex domains.
 
-### Workspace filtering (Turbo)
+## Development Commands
+- Install everything once with `bun install` from the repo root.
+- Run all apps via `bun run dev`. Use `bun run dev --filter=web`, `--filter=backend`, or `--filter=mobile` to target one workspace.
+- Build with `bun run build`; add `--filter=<workspace>` for a single target.
+- Quality checks: `bun run lint` and `bun run check-types`.
+- Formatting: `bun run format` keeps markdown and ts/tsx tidy.
+- Only use Bun (no npm/pnpm/yarn). Node 18+ and Bun 1.2.18+ are required.
 
-- Target a single app: `bun run dev --filter=web` or `bun run dev --filter=meyoo`.
-- Build a single app: `bun run build --filter=web`.
-- Run any script in one workspace: `bun run --filter=web <script>`.
+## Frontend Conventions
+- Use HeroUI on web and HeroUI Native on mobile.
+- Tailwind CSS 4 powers styling—stick to semantic utility classes and keep config files in sync.
+- Icons come from `@iconify/react`.
+- Tables and charts rely on TanStack Table and Recharts.
+- Share UI through `@repo/ui`; avoid copy/paste duplicates.
 
-### Package manager policy
+## Convex in Frontend
+- Import Convex IDs with `GenericId` aliased as `Id` from `convex/values`.
+- Use generated Convex helpers via `@/libs/convexApi` and `@repo/convex/*`.
+- Convex codegen runs on the managed server—never run `convex codegen` locally.
 
-- Use `bun` exclusively (do not use npm/pnpm/yarn).
+## Testing and Quality
+- Run `bun run check-types` and `bun run lint` before handing off work.
+- Add Vitest (`*.test.ts(x)`) when introducing critical logic.
+- When editing Convex queries, use indexes and prefer pagination helpers over raw collection scans.
 
-## Coding Style & Naming Conventions
+## Environment and Secrets
+- Keep secrets per app in `*.env.local`; never commit them.
+- Common keys: `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_CONVEX_URL`, Shopify (`SHOPIFY_*`), Meta (`META_*`), Google (`GOOGLE_*`), `RESEND_API_KEY`, `CONVEX_DEPLOY_KEY`, `CONVEX_*_SITE_URL`, and MCP-related keys.
 
-- Languages: TypeScript, React 19, Next.js 15, Convex.
-- Linting: use `@repo/eslint-config` variants (`base`, `react-internal`, `next-js`).
-- Formatting: Prettier 3; 2‑space indent, single quotes where applicable.
-- Naming: React components `PascalCase` (`MyComponent.tsx`); hooks `useX.ts`; utilities `camelCase.ts`; Convex functions colocated by domain under `convex/<area>/` (see structure above).
-- TS: strict mode enabled; prefer explicit types for exports and public APIs.
+## Tools and MCP Usage
+- Use Convex MCP helpers to inspect or run one-off data queries. Add temporary MCP code in its own folder and remove it after use.
+- Use Shopify MCP to study webhook payloads when needed.
+- Pull the latest Context7 docs before editing Shopify components or related docs.
 
-### UI & Frontend Conventions
-
-- Components: prefer `@heroui/react` for building UI.
-- Styling: Tailwind CSS 4 with semantic, utility-first classes.
-- Icons: always use `@iconify/react` for icons.
-- Tables/Charts: TanStack Table and Recharts are available in web.
-- Mobile: use NativeWind for styling and HeroUI Native (HeroUI for React Native) components in the Expo app; avoid mixing other UI kits without alignment.
-
-### Convex Types in Frontend
-
-- For Convex document IDs in React code, import `GenericId` and alias as `Id` to match generated types: `import type { GenericId as Id } from 'convex/values'`.
-- Do not use ad-hoc `Id` shims in `apps/web`; rely on generated types via `api` and `useQuery/useMutation` inference where possible.
-- Path aliases are set so web clients can import the Convex generated API via `@/libs/convexApi` and, when needed, generated data model via `@repo/convex/*` path.
-
-## Monorepo Best Practices
-
-- Share code via packages (e.g., `packages/ui`, `packages/typescript-config`), avoid duplication.
-- Keep workspace dependencies explicit; add deps in the specific workspace.
-- Leverage Turbo caching; use `--filter` for targeted operations.
-- Install dependencies from the repo root with `bun install`.
-
-## Rule Files
-
-- `rules_convex.md` — Convex patterns and best practices.
-- `rules_performance.md` — Performance optimization guidelines.
-- `rules_style.md` — UI conventions and design system.
-
-## Testing Guidelines
-
-- No dedicated test runner configured yet. Prioritize:
-  - Type checks (`bun run check-types`) and ESLint (`bun run lint`).
-  - Add unit tests if introducing critical logic; prefer Vitest, files as `*.test.ts(x)` colocated next to sources.
-
-## Environment Variables
-
-- Store per app in `*.env.local` and never commit.
-- Common keys used across apps/integrations (set only what you need):
-  - Next.js: `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_CONVEX_URL`
-  - Auth: `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`
-  - Shopify: `SHOPIFY_API_KEY`, `SHOPIFY_API_SECRET`, `SHOPIFY_SCOPES`, `SHOPIFY_APP_HANDLE`
-  - Ads: `META_APP_ID`, `META_APP_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
-  - Email: `RESEND_API_KEY`
-  - Turbo remote caching (optional): `TURBO_TOKEN`, `TURBO_TEAM`
-
-## Commit & Pull Request Guidelines
-
-- Commits: follow Conventional Commits when possible (`feat:`, `fix:`, `chore:`). Keep concise, imperative.
-- PRs must include:
-  - Problem statement, summary of changes, and scope.
-  - Linked issue (if applicable) and screenshots for UI changes.
-  - Verification: `bun run lint`, `bun run check-types`, and local build pass.
-
-## Security & Configuration Tips
-
-- Store secrets only in per‑app `*.env.local` (never commit). Refer via `process.env` or Convex env.
-- Node ≥ 18 and Bun ≥ 1.2.18 required.
-
-## MPC and Tools
-
-- Use convex mcp to fetch data to check data credibility if you are confuse,
-- you can write funtion executeing using mcp if specicfic data is needed , which you cn delete later, also keep them in diffent folder
-- you can use shopify mcp to webhooks payload if needed
+## Reference Files
+- `rules_convex.md` – Convex patterns and examples.
+- `rules_performance.md` – Performance guidelines.
+- `rules_style.md` – UI conventions and design system details.

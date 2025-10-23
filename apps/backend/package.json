@@ -20,10 +20,11 @@
     "@mendable/firecrawl-js": "^4.3.5",
     "@oslojs/crypto": "^1.0.1",
     "@react-email/render": "^1.2.1",
+    "@repo/time": "workspace:*",
     "@repo/types": "workspace:*",
     "@repo/typescript-config": "workspace:*",
     "ai": "^5.0.71",
-    "convex": "^1.27.3",
+    "convex": "^1.28.0",
     "graphql-request": "^7.2.0",
     "zod": "^4.1.11"
   },

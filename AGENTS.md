@@ -24,7 +24,7 @@
   - `apps/web` — Next.js (App Router) storefront; code in `app/`, shared UI in `components/`, utilities under `libs/`.
   - `apps/backend` — Convex backend. Functions and jobs under `convex/` organized by domain:
     - `convex/web/*` — storefront APIs
-    - `convex/meyoo/*` — admin APIs
+    - `convex/meyoo/*` — Meyoo APIs
     - shared domains under `convex/core`, `convex/engine`, `convex/integrations`, etc.
 
 - Packages
@@ -75,7 +75,7 @@
 
 - For Convex document IDs in React code, import `GenericId` and alias as `Id` to match generated types: `import type { GenericId as Id } from 'convex/values'`.
 - Do not use ad-hoc `Id` shims in `apps/web`; rely on generated types via `api` and `useQuery/useMutation` inference where possible.
-- Path aliases are set so web/admin clients can import the Convex generated API via `@/libs/convexApi` and, when needed, generated data model via `@repo/convex/*` path.
+- Path aliases are set so web clients can import the Convex generated API via `@/libs/convexApi` and, when needed, generated data model via `@repo/convex/*` path.
 
 ## Monorepo Best Practices
 

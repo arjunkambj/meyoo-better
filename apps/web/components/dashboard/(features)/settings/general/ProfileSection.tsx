@@ -6,7 +6,6 @@ import { Input } from "@heroui/input";
 import { Select, SelectItem } from "@heroui/select";
 import { addToast } from "@heroui/toast";
 import { useDisclosure } from "@heroui/use-disclosure";
-import type { Selection } from "@react-types/shared";
 import { Icon } from "@iconify/react";
 import { useAction } from "convex/react";
 import { useCallback, useEffect, useMemo, useState } from "react";

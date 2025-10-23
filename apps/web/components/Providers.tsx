@@ -1,12 +1,10 @@
 "use client";
 
-import { HeroUIProvider } from "@heroui/system";
+import { HeroUIProvider } from "@heroui/react";
 import { ConvexQueryCacheProvider } from "convex-helpers/react/cache/provider";
 import { Provider as JotaiProvider } from "jotai";
-import { useRouter } from "next/navigation";
-import type { ThemeProviderProps } from "next-themes";
-import { ThemeProvider as NextThemesProvider } from "next-themes";
-import type * as React from "react";
+import { ThemeProviderProps } from "next-themes";
+import React from "react";
 
 import { FeatureAccessProvider } from "@/hooks/mainapp/useFeatureAccess";
 import { OnboardingProvider } from "@/hooks/onboarding/useOnboarding";
@@ -17,22 +15,14 @@ interface ProvidersProps {
   themeProps?: ThemeProviderProps;
 }
 
-declare module "@react-types/shared" {
-  interface RouterConfig {
-    routerOptions: NonNullable<
-      Parameters<ReturnType<typeof useRouter>["push"]>[1]
-    >;
-  }
-}
-
 export function Providers({ children, themeProps }: ProvidersProps) {
-  const router = useRouter();
-
   return (
     <ConvexClientProvider>
       <JotaiProvider>
-        <HeroUIProvider navigate={router.push}>
-          <NextThemesProvider {...themeProps}>
+        <HeroUIProvider>
+          <NextThemesProvider
+            hemeProps={{ attribute: "class", defaultTheme: "light" }}
+          >
             <ConvexQueryCacheProvider>
               <OnboardingProvider>
                 <FeatureAccessProvider>{children}</FeatureAccessProvider>

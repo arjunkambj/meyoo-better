@@ -42,7 +42,7 @@ export default function RootLayout({
       <html lang="en" suppressHydrationWarning>
         <head />
         <body>
-          <Providers themeProps={{ attribute: "class", defaultTheme: "light" }}>
+          <Providers>
             <main className={`h-dvh w-full antialiased ${inter.className}`}>
               <ToastProvider />
               <SpeedInsights />

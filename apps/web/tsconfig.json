@@ -8,7 +8,7 @@
     ],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./*"],
+      "@/*": ["./src/*"],
       "@repo/convex/*": ["../backend/convex/_generated/*"],
       "@repo/types/*": ["../../packages/types/*"],
       "@repo/ui/*": ["../../packages/ui/src/*"]

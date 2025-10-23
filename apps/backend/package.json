@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "convex dev",
     "check-types": "tsc --noEmit",
-    "lint": "node ../web/node_modules/eslint/bin/eslint.js . --fix"
+    "lint": "eslint"
   },
   "dependencies": {
     "@ai-sdk/openai": "^2.0.32",

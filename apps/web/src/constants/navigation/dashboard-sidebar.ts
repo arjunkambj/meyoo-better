@@ -1,4 +1,21 @@
-export const DASHBOARD_SIDEBAR_ITEMS = [
+import type { Route } from "next";
+
+type SidebarItem = {
+  key: string;
+  href: Route;
+  icon: string;
+  activeIcon?: string;
+  label: string;
+};
+
+type SidebarSection = {
+  label: string;
+  items: SidebarItem[];
+};
+
+type FooterItem = SidebarItem;
+
+export const DASHBOARD_SIDEBAR_ITEMS: SidebarSection[] = [
   {
     label: "Analytics",
     items: [
@@ -39,7 +56,7 @@ export const DASHBOARD_SIDEBAR_ITEMS = [
   },
 ];
 
-export const DASHBOARD_FOOTER_ITEMS = [
+export const DASHBOARD_FOOTER_ITEMS: FooterItem[] = [
   {
     key: "cost-expenses",
     href: "/cost-management",

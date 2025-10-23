@@ -2,6 +2,7 @@
 
 import { addToast } from "@heroui/toast";
 import { useRouter, useSearchParams } from "next/navigation";
+import type { Route } from "next";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import IntegrationCard from "@/components/onboarding/IntegrationCard";
@@ -25,7 +26,7 @@ const clearParams = (
   const next = new URLSearchParams(searchParams);
   keys.forEach((k) => next.delete(k));
   const url = `${window.location.pathname}${next.toString() ? `?${next.toString()}` : ""}`;
-  router.replace(url);
+  router.replace(url as Route);
 };
 
 export default function MarketingIntegrationsClient() {

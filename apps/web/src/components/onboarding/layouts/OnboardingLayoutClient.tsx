@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
+import type { Route } from "next";
 import type React from "react";
 import { memo, useEffect, useMemo } from "react";
 import { useSetAtom, useAtomValue } from "jotai";
@@ -99,7 +100,7 @@ const useOnboardingData = () => {
         typeof window !== "undefined" ? window.location.pathname : undefined
       );
       if (nextStep?.route) {
-        router.prefetch(nextStep.route);
+        router.prefetch(nextStep.route as Route);
         prefetchRoute(nextStep.route);
       }
     }

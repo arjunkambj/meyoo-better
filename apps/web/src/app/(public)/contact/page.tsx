@@ -2,7 +2,6 @@
 
 import { Card, CardBody } from "@heroui/card";
 import { Icon } from "@iconify/react";
-import Link from "next/link";
 import { designSystem } from "@/libs/design-system";
 
 const contactInfo = [
@@ -65,7 +64,7 @@ export default function ContactPage() {
                         {item.description}
                       </p>
                       {item.link && (
-                        <Link
+                        <a
                           className="text-primary text-sm font-medium hover:underline inline-flex items-center gap-1.5"
                           href={item.link}
                         >
@@ -74,7 +73,7 @@ export default function ContactPage() {
                             className="w-4 h-4"
                             icon="solar:arrow-right-up-linear"
                           />
-                        </Link>
+                        </a>
                       )}
                     </div>
                   </div>

@@ -15,7 +15,7 @@ export const FooterItems = () => {
 
   const footerItemsContent = useMemo(() => {
     return DASHBOARD_FOOTER_ITEMS.map((item) => {
-      const active = isActive(item.href || "");
+      const active = isActive(item.href);
       const iconName = active && item.activeIcon ? item.activeIcon : item.icon;
 
       return (
@@ -29,7 +29,7 @@ export const FooterItems = () => {
               ? "bg-primary/20 text-primary font-medium"
               : "text-default-800 hover:text-default-900 hover:bg-default-200"
           )}
-          href={item.href || "#"}
+          href={item.href}
           prefetch={true}
         >
           {iconName && (

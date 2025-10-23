@@ -6,6 +6,7 @@ import { Input } from "@heroui/input";
 import { Select, SelectItem } from "@heroui/select";
 import { addToast } from "@heroui/toast";
 import { useDisclosure } from "@heroui/use-disclosure";
+import type { SharedSelection } from "@heroui/system";
 import { Icon } from "@iconify/react";
 import { useAction } from "convex/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -263,16 +264,16 @@ export default function ProfileSection() {
     []
   );
 
-  const handleCurrencyChange = useCallback((keys: Selection) => {
+  const handleCurrencyChange = useCallback((keys: SharedSelection) => {
     if (keys === "all") return;
-    const [nextCurrency] = Array.from(keys) as string[];
+    const [nextCurrency] = Array.from(keys).map(String);
     if (!nextCurrency) return;
     setFormData((prev) => ({ ...prev, currency: nextCurrency }));
   }, []);
 
-  const handleTimezoneChange = useCallback((keys: Selection) => {
+  const handleTimezoneChange = useCallback((keys: SharedSelection) => {
     if (keys === "all") return;
-    const [nextTimezone] = Array.from(keys) as string[];
+    const [nextTimezone] = Array.from(keys).map(String);
     if (!nextTimezone) return;
     setFormData((prev) => ({ ...prev, timezone: nextTimezone }));
   }, []);

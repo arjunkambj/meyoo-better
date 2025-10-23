@@ -8,8 +8,9 @@ import { Tab, Tabs } from "@heroui/tabs";
 import { addToast } from "@heroui/toast";
 import { Icon } from "@iconify/react";
 import Link from "next/link";
+import type { Route } from "next";
 import { useRouter } from "next/navigation";
-import React, { lazy, Suspense, useCallback, useState } from "react";
+import React, { lazy, Suspense, useCallback, useMemo, useState } from "react";
 import { parseAuthError } from "@/libs/auth/errorParser";
 import { AuthDivider } from "./AuthDivider";
 import { GoogleAuthButton } from "./GoogleAuthButton";
@@ -26,6 +27,16 @@ interface AuthFormProps {
   mode: AuthMode;
   returnUrl?: string;
 }
+
+const DEFAULT_RETURN_ROUTE: Route = "/overview";
+
+const resolveReturnRoute = (url?: string): Route => {
+  if (url && url.startsWith("/")) {
+    return url as Route;
+  }
+
+  return DEFAULT_RETURN_ROUTE;
+};
 
 export const AuthForm = React.memo(function AuthForm({
   mode,
@@ -44,6 +55,7 @@ export const AuthForm = React.memo(function AuthForm({
 
   const { signIn } = useAuthActions();
   const router = useRouter();
+  const safeReturnRoute = useMemo(() => resolveReturnRoute(returnUrl), [returnUrl]);
 
   // Handle password auth with memoization
   const handlePasswordAuth = useCallback(
@@ -132,7 +144,7 @@ export const AuthForm = React.memo(function AuthForm({
 
         // Removed redundant API call - middleware will handle routing
         // Just navigate to the intended return URL
-        router.push(returnUrl);
+        router.push(safeReturnRoute);
       } catch (err) {
         const message = parseAuthError(err);
 
@@ -146,7 +158,16 @@ export const AuthForm = React.memo(function AuthForm({
         setIsLoading(false);
       }
     },
-    [email, password, mode, name, confirmPassword, returnUrl, router, signIn]
+    [
+      email,
+      password,
+      mode,
+      name,
+      confirmPassword,
+      safeReturnRoute,
+      router,
+      signIn,
+    ]
   );
 
   // Memoized toggle password visibility
@@ -171,7 +192,7 @@ export const AuthForm = React.memo(function AuthForm({
 
         {/* Google Auth */}
         <GoogleAuthButton
-          returnUrl={returnUrl}
+          returnUrl={safeReturnRoute}
           text={
             mode === "signin" ? "Continue with Google" : "Sign up with Google"
           }
@@ -195,7 +216,7 @@ export const AuthForm = React.memo(function AuthForm({
               </div>
             }
           >
-            <OTPAuthForm mode={mode} returnUrl={returnUrl} />
+            <OTPAuthForm mode={mode} returnUrl={safeReturnRoute} />
           </Suspense>
         ) : (
           <Tabs
@@ -295,7 +316,7 @@ export const AuthForm = React.memo(function AuthForm({
                   </div>
                 }
               >
-                <OTPAuthForm mode={mode} returnUrl={returnUrl} />
+                <OTPAuthForm mode={mode} returnUrl={safeReturnRoute} />
               </Suspense>
             </Tab>
           </Tabs>

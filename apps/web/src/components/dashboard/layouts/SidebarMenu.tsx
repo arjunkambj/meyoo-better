@@ -4,6 +4,7 @@ import { Accordion, AccordionItem } from "@heroui/accordion";
 import { cn } from "@heroui/theme";
 import { Icon } from "@iconify/react";
 import Link from "next/link";
+import type { Route } from "next";
 import { usePathname } from "next/navigation";
 import { useCallback, useMemo } from "react";
 
@@ -11,7 +12,7 @@ export type SidebarItem = {
   key: string;
   title: string;
   icon?: string;
-  href?: string;
+  href?: Route;
   items?: SidebarItem[];
   isCategoryOpen?: boolean;
 };
@@ -39,35 +40,41 @@ const SidebarMenu = ({ items, className }: SidebarMenuProps) => {
   }, [items]);
 
   const renderMenuItem = useCallback(
-    (item: SidebarItem) => (
-      <Link
-        key={item.key}
-        aria-current={isActive(item.href || "") ? "page" : undefined}
-        className={cn(
-          "flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200",
-          "no-underline group",
-          isActive(item.href || "")
-            ? "bg-primary/20 text-primary-600 font-semibold"
-            : "text-default-700 hover:text-foreground hover:bg-default-200/70"
-        )}
-        href={item.href || "#"}
-        prefetch={true}
-      >
-        {item.icon && (
-          <Icon
-            aria-hidden
-            className={cn(
-              "shrink-0 transition-all w-5 h-5",
-              isActive(item.href || "")
-                ? "text-primary-600"
-                : "text-default-700 group-hover:text-foreground"
-            )}
-            icon={item.icon}
-          />
-        )}
-        <span className="text-sm font-medium truncate">{item.title}</span>
-      </Link>
-    ),
+    (item: SidebarItem) => {
+      if (!item.href) return null;
+
+      const active = isActive(item.href);
+
+      return (
+        <Link
+          key={item.key}
+          aria-current={active ? "page" : undefined}
+          className={cn(
+            "flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200",
+            "no-underline group",
+            active
+              ? "bg-primary/20 text-primary-600 font-semibold"
+              : "text-default-700 hover:text-foreground hover:bg-default-200/70"
+          )}
+          href={item.href}
+          prefetch={true}
+        >
+          {item.icon && (
+            <Icon
+              aria-hidden
+              className={cn(
+                "shrink-0 transition-all w-5 h-5",
+                active
+                  ? "text-primary-600"
+                  : "text-default-700 group-hover:text-foreground"
+              )}
+              icon={item.icon}
+            />
+          )}
+          <span className="text-sm font-medium truncate">{item.title}</span>
+        </Link>
+      );
+    },
     [isActive]
   );
 

@@ -5,6 +5,7 @@ import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
 import { addToast } from "@heroui/toast";
 import { Icon } from "@iconify/react";
+import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import React, { useCallback, useState } from "react";
 
@@ -12,7 +13,7 @@ import { parseAuthError } from "@/libs/auth/errorParser";
 
 interface OTPAuthFormProps {
   mode: "signin" | "signup";
-  returnUrl: string;
+  returnUrl: Route;
 }
 
 export const OTPAuthForm = React.memo(function OTPAuthForm({

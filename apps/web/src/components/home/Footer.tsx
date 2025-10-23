@@ -8,6 +8,7 @@ import { footerNavigation } from "@/constants/navigation/footerNavigation";
 import { Logo } from "@/components/shared/Logo";
 import { designSystem } from "@/libs/design-system";
 import Link from "next/link";
+import type { Route } from "next";
 
 const navigationSections = [
   {
@@ -99,12 +100,21 @@ const Footer = () => {
                   <ul className="space-y-2 sm:space-y-4">
                     {section.links.map((link) => (
                       <li key={link.name}>
-                        <Link
-                          href={link.href}
-                          className="inline-block text-sm sm:text-base text-muted-foreground transition-colors duration-300 hover:text-primary"
-                        >
-                          {link.name}
-                        </Link>
+                        {link.href?.startsWith("/") ? (
+                          <Link
+                            href={link.href as Route}
+                            className="inline-block text-sm sm:text-base text-muted-foreground transition-colors duration-300 hover:text-primary"
+                          >
+                            {link.name}
+                          </Link>
+                        ) : (
+                          <a
+                            href={link.href || "#"}
+                            className="inline-block text-sm sm:text-base text-muted-foreground transition-colors duration-300 hover:text-primary"
+                          >
+                            {link.name}
+                          </a>
+                        )}
                       </li>
                     ))}
                   </ul>

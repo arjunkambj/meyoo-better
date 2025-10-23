@@ -5,6 +5,7 @@ import { Modal, ModalBody, ModalContent } from "@heroui/modal";
 import { Navbar, NavbarBrand, NavbarContent, NavbarItem } from "@heroui/navbar";
 import { Icon } from "@iconify/react";
 import Link from "next/link";
+import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
@@ -12,7 +13,7 @@ import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
 import { Logo } from "@/components/shared/Logo";
 import { designSystem } from "@/libs/design-system";
 
-const navItems = [
+const navItems: { name: string; href: Route }[] = [
   { name: "About", href: "/about" },
   { name: "Contact", href: "/contact" },
   { name: "Pricing", href: "/pricing" },

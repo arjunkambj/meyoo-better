@@ -3,6 +3,7 @@
 import { Button } from "@heroui/button";
 import { Icon } from "@iconify/react";
 import { useRouter, usePathname } from "next/navigation";
+import type { Route } from "next";
 import { memo, useCallback, useMemo, useState } from "react";
 import { useSetAtom } from "jotai";
 import {
@@ -136,7 +137,7 @@ const NavigationButtons = memo(function NavigationButtons({
       }
 
       // Navigate after server acknowledges step update
-      router.push(nextRoute);
+      router.push(nextRoute as Route);
     } catch (error) {
       console.error("Navigation error:", error);
       setInternalLoading(false);
@@ -173,7 +174,7 @@ const NavigationButtons = memo(function NavigationButtons({
 
     // Navigate
     setNavigationPending(true);
-    router.push(previousRoute);
+    router.push(previousRoute as Route);
   }, [
     previousRoute,
     onPrevious,

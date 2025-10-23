@@ -2,10 +2,13 @@
 
 import { Button } from "@heroui/button";
 import { Icon } from "@iconify/react";
+import type { Route } from "next";
 import { useRouter } from "next/navigation";
 
 export default function NotFound() {
   const router = useRouter();
+  const dashboardRoute: Route = "/overview";
+  const contactRoute: Route = "/contact";
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
@@ -70,7 +73,7 @@ export default function NotFound() {
               <Icon icon="solar:double-alt-arrow-up-bold" width={20} />
             }
             variant="bordered"
-            onPress={() => router.push("/dashboard")}
+            onPress={() => router.push(dashboardRoute)}
           >
             Back to Dashboard
           </Button>
@@ -83,7 +86,7 @@ export default function NotFound() {
             <button
               type="button"
               className="text-primary hover:underline transition-all duration-200"
-              onClick={() => router.push("/settings/help")}
+              onClick={() => router.push(contactRoute)}
             >
               Contact Support
             </button>
@@ -93,7 +96,7 @@ export default function NotFound() {
             <button
               type="button"
               className="text-default-700 hover:underline transition-all duration-200"
-              onClick={() => router.push("/dashboard")}
+              onClick={() => router.push(dashboardRoute)}
             >
               Report an issue
             </button>

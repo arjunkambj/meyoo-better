@@ -1,5 +1,10 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { listUIMessages, syncStreams, vStreamArgs } from "@convex-dev/agent";
+import {
+  listUIMessages,
+  syncStreams,
+  vStreamArgs,
+  type SyncStreamsReturnValue,
+} from "@convex-dev/agent";
 import { ConvexError, v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { components } from "../_generated/api";
@@ -93,14 +98,14 @@ export const listMessages = query({
   },
   returns: v.object({
     page: v.array(v.any()),
-    continueCursor: v.union(v.string(), v.null()),
+    continueCursor: v.string(),
     isDone: v.boolean(),
     streams: v.optional(v.any()),
   }),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) {
-      const emptyStreams = args.streamArgs
+      const emptyStreams: SyncStreamsReturnValue | undefined = args.streamArgs
         ? args.streamArgs.kind === "deltas"
           ? { kind: "deltas", deltas: [] }
           : { kind: "list", messages: [] }
@@ -108,7 +113,7 @@ export const listMessages = query({
 
       return {
         page: [],
-        continueCursor: null,
+        continueCursor: "",
         isDone: true,
         streams: emptyStreams,
       };
@@ -119,7 +124,7 @@ export const listMessages = query({
     });
 
     if (!thread) {
-      const emptyStreams = args.streamArgs
+      const emptyStreams: SyncStreamsReturnValue | undefined = args.streamArgs
         ? args.streamArgs.kind === "deltas"
           ? { kind: "deltas", deltas: [] }
           : { kind: "list", messages: [] }
@@ -127,7 +132,7 @@ export const listMessages = query({
 
       return {
         page: [],
-        continueCursor: null,
+        continueCursor: "",
         isDone: true,
         streams: emptyStreams,
       };
@@ -152,7 +157,7 @@ export const listMessages = query({
 
     return {
       page: result.page,
-      continueCursor: result.continueCursor ?? null,
+      continueCursor: result.continueCursor ?? "",
       isDone: result.isDone,
       streams,
     };

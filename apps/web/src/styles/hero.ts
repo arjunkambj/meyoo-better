@@ -1,5 +1,5 @@
-// hero.ts
 import { heroui } from "@heroui/theme";
+
 const heroConfig = heroui({
   themes: {
     light: {
@@ -238,4 +238,4 @@ const heroConfig = heroui({
   },
 });
 
-export default heroConfig;
+export default heroConfig as unknown as typeof heroui;

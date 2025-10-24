@@ -23,21 +23,21 @@ const d2cBrands = [
 const Hero = () => {
   return (
     <section
-      className={`relative w-full min-h-[calc(90vh)] flex items-center justify-center overflow-hidden mt-16 ${designSystem.background.gradient} pb-12 sm:pb-16 lg:pb-20 2xl:pb-24`}
+      className={`relative w-full min-h-[calc(90vh)] flex items-center justify-center overflow-hidden mt-16 ${designSystem.background.gradient} pb-16 sm:pb-20 lg:pb-24 2xl:pb-32`}
     >
       <div className={`${designSystem.spacing.container} relative z-10`}>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 sm:gap-12 lg:gap-12 items-center">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 sm:gap-14 lg:gap-16 items-center">
           {/* Left Column - Text Content */}
           <div className="text-center sm:text-left flex flex-col items-center sm:items-start px-2 sm:px-0">
             {/* Category Chip */}
             <Chip
-              className="mb-4 text-xs  uppercase tracking-[0.05em] font-medium text-primary px-2"
+              className="mb-6 text-xs  uppercase tracking-[0.05em] font-medium px-2"
               variant="flat"
             >
               Built for D2C brands
             </Chip>
             {/* Header  */}
-            <h1 className="flex flex-col gap-3 font-semibold tracking-tight  text-pretty text-7xl mb-4 sm:mb-5">
+            <h1 className="flex flex-col gap-4 font-semibold tracking-tight  text-pretty text-7xl mb-6">
               <span className="block text-balance text-default-900">
                 See, Measure
               </span>
@@ -52,14 +52,14 @@ const Hero = () => {
             </h1>
 
             {/* Professional info */}
-            <p className="text-sm sm:text-base lg:text-lg text-muted-foreground leading-relaxed text-pretty text-center sm:text-left max-w-xl mx-auto sm:mx-0 mb-2">
+            <p className="text-sm sm:text-base lg:text-lg text-muted-foreground leading-relaxed text-pretty text-center sm:text-left max-w-xl mx-auto sm:mx-0 mb-0">
               Meyoo pulls sales, ad spend, product costs, shipping, discounts,
               and fees into one simple view—so you can see real profit by order
               and SKU
             </p>
 
             {/* CTA Buttons */}
-            <div className="mt-8 sm:mt-10 flex flex-row flex-wrap justify-center sm:justify-start items-center gap-3 sm:gap-4">
+            <div className="mt-10 sm:mt-12 flex flex-row flex-wrap justify-center sm:justify-start items-center gap-4">
               <Button
                 as={Link}
                 href="/signin"
@@ -82,7 +82,7 @@ const Hero = () => {
             </div>
 
             {/* Trust line */}
-            <div className="mt-6 sm:mt-8">
+            <div className="mt-8 sm:mt-10">
               <div className="inline-flex items-center gap-2 sm:gap-2.5 text-xs sm:text-sm text-default-600">
                 <Icon
                   icon="solar:shield-check-bold"
@@ -131,12 +131,12 @@ const Hero = () => {
           </motion.div>
         </div>
 
-        <div className="mt-16 sm:mt-20 lg:mt-18">
+        <div className="mt-20">
           <div className="mx-auto w-full max-w-7xl px-2 sm:px-4">
-            <p className="text-center text-xs sm:text-sm text-muted-foreground mb-4">
+            <p className="text-center text-xs sm:text-sm text-muted-foreground mb-6 sm:mb-8">
               Trusted by data‑driven D2C teams.
             </p>
-            <div className="grid grid-cols-3 sm:flex sm:flex-nowrap items-center justify-between gap-4 sm:gap-6 lg:gap-10 text-default-400">
+            <div className="grid grid-cols-3 sm:flex sm:flex-nowrap items-center justify-between gap-6 sm:gap-8 lg:gap-12 text-default-400">
               {d2cBrands.map((brand) => (
                 <div
                   key={brand.name}

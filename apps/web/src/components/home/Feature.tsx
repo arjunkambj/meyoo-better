@@ -17,7 +17,7 @@ const featureData: FeatureCard[] = [
     icon: "solar:chart-bold-duotone",
     title: "Real Profit Dashboard",
     description:
-      "See your actual profit after all expenses in one place. Track revenue, costs, margins, and ROI—no more guessing if you're profitable.",
+      "A live, unified view of revenue, costs, spend, and profit—no more spreadsheets or guesswork.",
     badge: "Live Insights",
   },
   {
@@ -25,7 +25,7 @@ const featureData: FeatureCard[] = [
     icon: "solar:graph-new-bold-duotone",
     title: "100+ Analytics Metrics",
     description:
-      "Track customer behavior, inventory levels, marketing performance, and more. Everything updates automatically from your connected platforms.",
+      "From AOV and CAC to SKU‑level margins and LTV cohorts, the metrics that matter are ready out of the box.",
     badge: "Deep Analytics",
   },
   {
@@ -33,31 +33,31 @@ const featureData: FeatureCard[] = [
     icon: "solar:chat-round-line-bold-duotone",
     title: "Meyoo AI Copilot",
     description:
-      "Chat with an AI that knows your business inside out. Ask questions, get insights, and make data-driven decisions faster than ever.",
+      "Ask plain‑English questions (“Which SKUs are unprofitable after returns?”) and get answers, drivers, and next steps.",
     badge: "AI Powered",
   },
   {
     id: 4,
     icon: "solar:box-bold-duotone",
-    title: "Track Inventory & Orders",
+    title: "Inventory & Orders",
     description:
-      "Monitor stock levels and order fulfillment in real-time. Get alerts when products are running low and track order status from purchase to delivery.",
+      "Track inventory health, returns, and back‑orders. See how stock levels affect spend efficiency and margin.",
     badge: "Smart Stock",
   },
   {
     id: 5,
     icon: "solar:link-circle-bold-duotone",
-    title: "MCP Integration",
+    title: "Integrations & Imports",
     description:
-      "Connect your data to Claude, ChatGPT, and other AI tools via MCP (Model Context Protocol). Your business intelligence follows you everywhere.",
-    badge: "AI Tools",
+      "Connect ad platforms and tools in minutes. Bulk‑upload product costs and shipping rules when you’re ready.",
+    badge: "Plug & Play",
   },
   {
     id: 6,
     icon: "solar:phone-bold-duotone",
     title: "Mobile App",
     description:
-      "Access your dashboard anywhere. Check profits, monitor orders, and get real-time alerts on the go. Your entire business in your pocket.",
+      "Your profit pulse on the go. Check today’s performance and alerts without opening your laptop.",
     badge: "On The Go",
   },
 ];

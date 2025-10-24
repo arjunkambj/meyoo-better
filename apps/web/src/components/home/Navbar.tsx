@@ -87,7 +87,7 @@ export default function CenteredNavbar() {
           height="auto"
         >
           {/* Left side - Logo */}
-          <NavbarContent className="shrink-0 flex-grow-0" justify="start">
+          <NavbarContent className="shrink-0" justify="start">
             <NavbarBrand className="gap-0">
               <Link
                 className="flex items-center gap-1 sm:gap-2 hover:opacity-80 transition-opacity"
@@ -100,14 +100,14 @@ export default function CenteredNavbar() {
 
           {/* Center - Navigation Items */}
           <NavbarContent className="hidden md:flex flex-1" justify="center">
-            <div className="flex items-center gap-12">
+            <div className="flex items-center gap-10">
               {navItems.map((item) => (
                 <NavbarItem key={item.name}>
                   <Button
                     className={`relative px-3 py-2 transition-all bg-transparent hover:bg-transparent duration-300 font-medium text-sm group h-auto min-w-0 ${
                       currentPath === item.href
                         ? "text-primary"
-                        : "text-muted-foreground hover:text-primary"
+                        : "text-default-700 hover:text-primary"
                     }`}
                     onPress={() => router.push(item.href)}
                   >
@@ -138,13 +138,13 @@ export default function CenteredNavbar() {
                   color="primary"
                   href="/signin"
                 >
-                  Get Started Now
+                  Try Meyoo free
                   <Icon className="ml-2" icon="mdi:arrow-right" />
                 </Button>
               </Unauthenticated>
               <AuthLoading>
                 <Button as={Link} href="/signin" color="primary">
-                  Get Started Now
+                  Try Meyoo free
                 </Button>
               </AuthLoading>
               <Authenticated>
@@ -234,7 +234,7 @@ export default function CenteredNavbar() {
                           radius="full"
                           size="lg"
                         >
-                          Get Started Now
+                          Try Meyoo free
                           <Icon className="ml-2" icon="mdi:arrow-right" />
                         </Button>
                       </Unauthenticated>
@@ -245,7 +245,7 @@ export default function CenteredNavbar() {
                           radius="full"
                           size="lg"
                         >
-                          Get Started Now
+                          Try Meyoo free
                         </Button>
                       </AuthLoading>
                       <Authenticated>

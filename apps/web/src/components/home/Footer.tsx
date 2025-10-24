@@ -53,25 +53,22 @@ const Footer = () => {
           >
             <div className="flex flex-col items-center text-center gap-5">
               <h2 className="max-w-[700px] text-2xl leading-tight font-semibold tracking-tight text-balance sm:text-3xl lg:text-4xl text-foreground">
-                Revolutionize Decision Making for your D2C{" "}
-                <span className="text-primary relative inline-block">
-                  Brand with Meyoo.
-                </span>
+                Revolutionize decision‑making for your D2C brand with Meyoo.
               </h2>
               <p className="max-w-[600px] text-base text-muted-foreground sm:text-lg">
-                Connect every channel and get real-time clarity on true profit.
+                Know your profit. Move faster. Grow smarter.
               </p>
               <div className="mt-6 flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center sm:justify-center sm:gap-4">
                 <Button
                   as={Link}
-                  href="/get-started"
+                  href="/signin"
                   size="lg"
                   className="group w-full sm:w-auto font-medium"
                   variant="solid"
                   color="primary"
                 >
                   <span className="flex items-center gap-2">
-                    Start 14-day free trial
+                    Start free today
                     <Icon
                       icon="solar:arrow-right-linear"
                       className="h-4 w-4 transition-transform group-hover:translate-x-1"

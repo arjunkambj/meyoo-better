@@ -15,18 +15,18 @@ type IntegrationLogo =
 const howItWorks = [
   {
     number: "01",
-    title: "Connect Shopify",
+    title: "Connect your store",
     description:
-      "Install Meyoo and sync Shopify in one click. We import orders, products, and customers automatically—plus your last 60 days of sales history.",
+      "Link Shopify in a few clicks. We’ll import orders, refunds, discounts, and fees automatically.",
     icon: "solar:shop-bold-duotone",
     imageOrder: "order-1",
     contentOrder: "order-2",
   },
   {
     number: "02",
-    title: "Link your ad spend",
+    title: "Link your ad channels",
     description:
-      "Connect Meta and Google Ads to see which campaigns actually drive profit. Track spend, ROAS, and conversions—all in real-time.",
+      "Sync Meta Ads, Google Ads, TikTok Ads, Snapchat, and Google Analytics to see spend right next to revenue.",
     icon: "solar:graph-up-bold-duotone",
     imageOrder: "order-2",
     contentOrder: "order-1",
@@ -35,7 +35,7 @@ const howItWorks = [
     number: "03",
     title: "Track profit automatically",
     description:
-      "Add your product costs, shipping fees, and expenses once. Meyoo calculates your real profit on every sale automatically—no spreadsheets needed.",
+      "See true profit by order, SKU, and campaign—updated throughout the day. Spot trends, anomalies, and waste before they snowball.",
     icon: "solar:wallet-money-bold-duotone",
     imageOrder: "order-1",
     contentOrder: "order-2",

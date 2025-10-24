@@ -5,6 +5,7 @@ import { Icon } from "@iconify/react";
 import React from "react";
 
 import { Button } from "@heroui/button";
+import { Chip } from "@heroui/chip";
 import { Card, CardBody } from "@heroui/card";
 import Image from "next/image";
 import Link from "next/link";
@@ -28,21 +29,33 @@ const Hero = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 sm:gap-12 lg:gap-12 items-center">
           {/* Left Column - Text Content */}
           <div className="text-center sm:text-left flex flex-col items-center sm:items-start px-2 sm:px-0">
+            {/* Category Chip */}
+            <Chip
+              className="mb-4 text-xs  uppercase tracking-[0.05em] font-medium text-primary px-2"
+              variant="flat"
+            >
+              Built for D2C brands
+            </Chip>
             {/* Header  */}
-            <h1 className="flex flex-col gap-3 font-semibold tracking-tight leading-[1.05] text-pretty text-[clamp(2.8rem,7.5vw,4.1rem)] sm:text-[clamp(3.1rem,5vw,5rem)] xl:text-[clamp(3.4rem,4vw,5.6rem)] mb-4 sm:mb-5">
-              <span className="block text-balance">
-                See, Measure and <span className="text-primary">Grow Profit</span>
+            <h1 className="flex flex-col gap-3 font-semibold tracking-tight  text-pretty text-7xl mb-4 sm:mb-5">
+              <span className="block text-balance text-default-900">
+                See, Measure
               </span>
-              <span className="block font-playfair italic leading-snug text-[clamp(1.9rem,7vw,2.9rem)] sm:text-[clamp(2rem,4.5vw,3.4rem)]">
-                Built for <span className="text-primary italic">D2C</span> brands.
+
+              <span className="block text-balance text-default-900">
+                <span>and{` `}</span>
+                <span className="text-primary">Grow Profit</span>
+              </span>
+              <span className="block text-5xl mt-2 text-default-900 font-playfair italic ">
+                For every order. Every ad.
               </span>
             </h1>
 
             {/* Professional info */}
             <p className="text-sm sm:text-base lg:text-lg text-muted-foreground leading-relaxed text-pretty text-center sm:text-left max-w-xl mx-auto sm:mx-0 mb-2">
-              Meyoo connects Shopify, ad platforms, and costs to show real
-              profit by product and channel—so D2C brands can make smarter
-              decisions fast.
+              Meyoo pulls sales, ad spend, product costs, shipping, discounts,
+              and fees into one simple view—so you can see real profit by order
+              and SKU
             </p>
 
             {/* CTA Buttons */}
@@ -55,7 +68,7 @@ const Hero = () => {
                 endContent={<Icon icon="solar:arrow-right-linear" width={18} />}
                 size="lg"
               >
-                Start free trial
+                Try Meyoo free
               </Button>
               <Button
                 as={Link}
@@ -68,7 +81,7 @@ const Hero = () => {
               </Button>
             </div>
 
-            {/* Money Back Guarantee */}
+            {/* Trust line */}
             <div className="mt-6 sm:mt-8">
               <div className="inline-flex items-center gap-2 sm:gap-2.5 text-xs sm:text-sm text-default-600">
                 <Icon
@@ -77,7 +90,7 @@ const Hero = () => {
                   className="text-success sm:w-[18px]"
                 />
                 <span className="font-medium">
-                  14-day free trial · Cancel anytime
+                  Fast setup · Free for 300 orders/month/store
                 </span>
               </div>
             </div>
@@ -120,11 +133,14 @@ const Hero = () => {
 
         <div className="mt-16 sm:mt-20 lg:mt-18">
           <div className="mx-auto w-full max-w-7xl px-2 sm:px-4">
+            <p className="text-center text-xs sm:text-sm text-muted-foreground mb-4">
+              Trusted by data‑driven D2C teams.
+            </p>
             <div className="grid grid-cols-3 sm:flex sm:flex-nowrap items-center justify-between gap-4 sm:gap-6 lg:gap-10 text-default-400">
               {d2cBrands.map((brand) => (
                 <div
                   key={brand.name}
-                  className="flex items-center justify-center opacity-60 transition-all duration-200 hover:opacity-100 hover:scale-105"
+                  className="flex items-center justify-center  transition-all duration-200 hover:opacity-100 hover:scale-105"
                 >
                   <Image
                     alt={`${brand.name} logo`}

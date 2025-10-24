@@ -8,36 +8,36 @@ import { designSystem } from "@/libs/design-system";
 const testimonials = [
   {
     id: "1",
-    title: "We found bad spend fast",
+    title: "We finally saw the real margins",
     description:
-      "Returns were wiping out a hero SKU. We changed the bundle and got margin back that week.",
+      "We finally saw the real margins by SKU and cut wasted spend in a week.",
     user: {
-      name: "Lena Cho",
-      location: "Glow Lab Skincare · Austin, TX",
+      name: "Founder",
+      location: "Skincare brand",
       avatar:
         "https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=160&q=80",
     },
   },
   {
     id: "2",
-    title: "We agree on profit",
+    title: "One dashboard, shared truth",
     description:
-      "Marketing and finance use the same number. Stand‑ups take 10 minutes.",
+      "Meyoo became our daily stand‑up. One dashboard, shared truth.",
     user: {
-      name: "Marcus Reed",
-      location: "Trailside Outfitters · Denver, CO",
+      name: "Growth lead",
+      location: "Apparel",
       avatar:
         "https://images.unsplash.com/photo-1527980965255-d3b416303d12?auto=format&fit=crop&w=160&q=80",
     },
   },
   {
     id: "3",
-    title: "No Friday spreadsheets",
+    title: "The AI Copilot answers everything",
     description:
-      "Shopify and ads sync by themselves. I open Meyoo, see profit, done.",
+      "The AI Copilot answers the questions I used to Slack the analyst.",
     user: {
-      name: "Priya Natarajan",
-      location: "Hearth & Home · Toronto, ON",
+      name: "CEO",
+      location: "Home goods",
       avatar:
         "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=160&q=80",
     },
@@ -57,10 +57,8 @@ const Testimonial = () => {
             </span>
           </div>
         </div>
-        <h2 className={designSystem.typography.sectionTitle}>What our Customers say…</h2>
-        <p className={designSystem.typography.sectionSubtitle}>
-          Loved by successful founders and agencies.
-        </p>
+        <h2 className={designSystem.typography.sectionTitle}>What customers say</h2>
+        <p className={designSystem.typography.sectionSubtitle}>Loved by operators and teams.</p>
       </div>
       <div
         className={`relative mx-auto mt-16 grid w-full max-w-7xl items-stretch gap-8 px-4 sm:px-6 lg:px-8 md:grid-cols-2 lg:grid-cols-3`}

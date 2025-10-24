@@ -7,34 +7,33 @@ import { designSystem } from "@/libs/design-system";
 
 const faqs = [
   {
-    question: "How does Meyoo figure out my profit?",
+    question: "How does Meyoo calculate profit?",
     answer:
-      "We sync Shopify orders and ad spend, then subtract the costs you track—COGS, shipping, payment fees, returns, and taxes—so you see a true profit line.",
+      "We combine revenue with product cost (COGS), shipping, discounts, transaction fees, refunds, and ad spend to show true profit by order, SKU, and campaign.",
   },
   {
-    question: "How fresh is the data?",
+    question: "What do I need to get started?",
     answer:
-      "Orders show up instantly. Ad channels refresh about every 15 minutes, and any cost changes you make update your numbers right away.",
+      "Connect Shopify and your ad channels. Add product costs (upload or edit inline). You’ll see profit start to populate right away.",
   },
   {
-    question: "Can I break results down by product or channel?",
+    question: "Which integrations are available?",
     answer:
-      "Yes. Filter by product, campaign, traffic source, region, day, and more to see what is helping or hurting margin.",
+      "Shopify, Meta Ads, Google Ads, TikTok Ads, Snapchat, and Google Analytics—with more coming soon.",
   },
   {
-    question: "Which integrations are live today?",
+    question: "Can I export my data?",
     answer:
-      "Shopify, Meta Ads, and Google Ads are available now. TikTok Ads, Amazon, and leading email platforms are on the roadmap.",
+      "Yes. Export CSVs or copy to clipboard for quick shares. (API and scheduled exports on Growth+ plans.)",
   },
   {
-    question: "Will Meyoo keep up as we scale?",
+    question: "Is my data secure?",
     answer:
-      "Yes. We handle high order volume and sales spikes while keeping profit and campaign performance responsive.",
+      "We use modern encryption and strict access controls. Your data is yours—we never sell it. (Add your formal security/legal language here.)",
   },
   {
-    question: "How is our data protected?",
-    answer:
-      "Your data stays encrypted in transit and at rest. Each organization gets isolated access with roles so only the right people can view sensitive numbers.",
+    question: "Can I cancel anytime?",
+    answer: "Absolutely. Manage your plan from your account settings with one click.",
   },
 ];
 

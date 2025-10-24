@@ -73,13 +73,12 @@ const Pricing = () => {
             </span>
           </div>
           <h2 className={designSystem.typography.sectionTitle}>
-            Simple, Transparent Pricing
+            Simple, transparent pricing
           </h2>
           <p
             className={`${designSystem.typography.sectionSubtitle} max-w-2xl mx-auto`}
           >
-            Choose the perfect plan for your business. Start free, scale as you
-            grow, cancel anytime.
+            Start free. Scale as you grow. Cancel anytime.
           </p>
         </div>
 

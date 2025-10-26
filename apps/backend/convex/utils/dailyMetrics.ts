@@ -157,6 +157,8 @@ export type AggregatedDailyMetrics = {
   otherOrders: number;
   cancelledOrders: number;
   returnedOrders: number;
+  fulfilledOrders: number;
+  fulfillmentDataPoints: number;
   sessions: number;
   visitors: number;
   conversions: number;
@@ -190,6 +192,8 @@ const EMPTY_AGGREGATES: AggregatedDailyMetrics = {
   otherOrders: 0,
   cancelledOrders: 0,
   returnedOrders: 0,
+  fulfilledOrders: 0,
+  fulfillmentDataPoints: 0,
   sessions: 0,
   visitors: 0,
   conversions: 0,
@@ -1021,6 +1025,10 @@ function mergeDailyMetrics(docs: DailyMetricDoc[]): AggregatedDailyMetrics {
 
     acc.cancelledOrders += toNumber(doc.cancelledOrders);
     acc.returnedOrders += toNumber(doc.returnedOrders);
+    if (Object.prototype.hasOwnProperty.call(doc, "fulfilledOrders")) {
+      acc.fulfillmentDataPoints += 1;
+    }
+    acc.fulfilledOrders += toNumber((doc as AnyRecord).fulfilledOrders);
     acc.sessions += toNumber(doc.sessions);
     acc.visitors += toNumber(doc.visitors);
     acc.conversions += toNumber(doc.conversions);
@@ -1525,6 +1533,7 @@ function buildOrdersOverviewFromAggregates(
   const marketingCost = aggregates.marketingCost;
   const refundsAmount = aggregates.refundsAmount;
   const rtoRevenueLost = aggregates.rtoRevenueLost;
+  const cancelledOrders = Math.max(aggregates.cancelledOrders, 0);
   const totalCosts =
     cogs +
     shippingCosts +
@@ -1541,7 +1550,14 @@ function buildOrdersOverviewFromAggregates(
   const customerAcquisitionCost = totalOrders > 0
     ? marketingCost / totalOrders
     : 0;
-  const fulfilledOrders = Math.max(0, totalOrders - aggregates.cancelledOrders);
+  const recordedFulfilledOrders = Math.max(aggregates.fulfilledOrders, 0);
+  const hasFulfillmentSamples = aggregates.fulfillmentDataPoints > 0;
+  const fallbackFulfilledOrders = totalOrders > 0
+    ? Math.max(0, totalOrders - cancelledOrders)
+    : 0;
+  const fulfilledOrders = hasFulfillmentSamples
+    ? recordedFulfilledOrders
+    : fallbackFulfilledOrders;
   const fulfillmentRate = totalOrders > 0 ? (fulfilledOrders / totalOrders) * 100 : 0;
   const prepaidOrders = Math.max(aggregates.prepaidOrders, 0);
   const prepaidRate = totalOrders > 0 ? (prepaidOrders / totalOrders) * 100 : 0;
@@ -1584,7 +1600,15 @@ function buildOrdersOverviewFromAggregates(
   const prevCustomerAcquisitionCost = prevTotalOrders > 0
     ? prevMarketingCost / prevTotalOrders
     : 0;
-  const prevFulfilledOrders = prev ? Math.max(0, prev.orders - prev.cancelledOrders) : 0;
+  const prevCancelledOrders = Math.max(prev?.cancelledOrders ?? 0, 0);
+  const prevRecordedFulfilledOrders = Math.max(prev?.fulfilledOrders ?? 0, 0);
+  const prevHasSamples = (prev?.fulfillmentDataPoints ?? 0) > 0;
+  const prevFallbackFulfilled = prevTotalOrders > 0
+    ? Math.max(0, prevTotalOrders - prevCancelledOrders)
+    : 0;
+  const prevFulfilledOrders = prevHasSamples
+    ? prevRecordedFulfilledOrders
+    : prevFallbackFulfilled;
   const prevFulfillmentRate = prevTotalOrders > 0
     ? (prevFulfilledOrders / prevTotalOrders) * 100
     : 0;
@@ -2149,6 +2173,14 @@ export async function loadOverviewFromDailyMetrics(
     summary.abandonedRateChange = previousMetrics
       ? percentageChange(currentCustomerMetrics.abandonedRate, previousMetrics.abandonedRate)
       : summary.abandonedRateChange;
+
+    if (ordersOverview) {
+      const repeatRate = currentCustomerMetrics.repeatPurchaseRate;
+      ordersOverview.repeatRate = repeatRate;
+      ordersOverview.changes.repeatRate = previousMetrics
+        ? percentageChange(repeatRate, previousMetrics.repeatPurchaseRate)
+        : ordersOverview.changes.repeatRate;
+    }
 
     overview.metrics = overview.metrics ?? {};
     const existingCustomerAcquisitionMetric = overview.metrics.customerAcquisitionCost;

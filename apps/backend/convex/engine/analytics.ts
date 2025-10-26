@@ -915,6 +915,51 @@ function classifyPaymentMethod(order: GenericRecord, transactions: GenericRecord
   return "prepaid";
 }
 
+function normalizeFulfillmentStatus(value: unknown): string {
+  if (typeof value !== "string") return "";
+  return value.trim().toLowerCase();
+}
+
+function resolveFulfillmentStatus(order: GenericRecord): string {
+  const candidates = [
+    order.displayFulfillmentStatus,
+    order.fulfillmentStatus,
+    order.fulfillment_status,
+    order.status,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim().length > 0) {
+      return candidate;
+    }
+  }
+
+  return "";
+}
+
+function isOrderFulfilled(order: GenericRecord): boolean {
+  const normalized = normalizeFulfillmentStatus(resolveFulfillmentStatus(order));
+  if (!normalized) {
+    return false;
+  }
+
+  if (normalized.includes("partial") || normalized.includes("unfulfilled")) {
+    return false;
+  }
+
+  if (
+    normalized.includes("fulfilled") ||
+    normalized.includes("delivered") ||
+    normalized.includes("complete") ||
+    normalized.includes("shipped") ||
+    normalized.includes("success")
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
 function sanitizeDocument(doc: Record<string, unknown>): Record<string, unknown> {
   const cleaned: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(doc)) {
@@ -953,6 +998,7 @@ function buildDailyMetricsFromResponse(
   let codOrders = 0;
   let otherOrders = 0;
   let cancelledOrders = 0;
+  let fulfilledOrders = 0;
 
   const ordersPerCustomer = new Map<string, number>();
 
@@ -1039,6 +1085,10 @@ function buildDailyMetricsFromResponse(
     const cancelled = isCancelledOrder(order);
     if (cancelled) {
       cancelledOrders += 1;
+    }
+
+    if (!cancelled && isOrderFulfilled(order)) {
+      fulfilledOrders += 1;
     }
 
     const customerKey = order.customerId ? String(order.customerId) : undefined;
@@ -1171,6 +1221,7 @@ function buildDailyMetricsFromResponse(
     blendedCtr: toSafeNumber(platformMetrics.blendedCTR),
     blendedMarketingCost: toSafeNumber(summary?.blendedMarketingCost),
     cancelledOrders,
+    fulfilledOrders,
     returnedOrders,
     sessions: analytics.reduce((sum, a) => sum + toSafeNumber(a.sessions), 0),
     visitors: analytics.reduce((sum, a) => sum + toSafeNumber(a.visitors), 0),
@@ -1257,6 +1308,7 @@ const dailyMetricsPayload = v.object({
   blendedMarketingCost: v.optional(v.number()),
   cancelledOrders: v.optional(v.number()),
   returnedOrders: v.optional(v.number()),
+  fulfilledOrders: v.optional(v.number()),
   sessions: v.optional(v.number()),
   visitors: v.optional(v.number()),
   conversions: v.optional(v.number()),

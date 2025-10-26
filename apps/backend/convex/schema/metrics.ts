@@ -36,6 +36,7 @@ export const dailyMetrics = defineTable({
   blendedMarketingCost: v.optional(v.number()),
   cancelledOrders: v.optional(v.number()),
   returnedOrders: v.optional(v.number()),
+  fulfilledOrders: v.optional(v.number()),
 
   // Session and analytics data
   sessions: v.optional(v.number()),

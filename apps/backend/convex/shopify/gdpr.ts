@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { internalMutation } from "../_generated/server";
+import { findShopifyStoreByDomain } from "../utils/shop";
 import { logger } from "./shared";
 
 export const handleGDPRDataRequest = internalMutation({
@@ -19,10 +20,7 @@ export const handleGDPRDataRequest = internalMutation({
   handler: async (ctx, args) => {
     try {
       // Find the store
-      const store = await ctx.db
-        .query("shopifyStores")
-        .withIndex("by_shop_domain", (q) => q.eq("shopDomain", args.shopDomain))
-        .first();
+      const store = await findShopifyStoreByDomain(ctx.db, args.shopDomain);
 
       if (!store) {
         throw new Error(`Store not found for domain: ${args.shopDomain}`);
@@ -115,10 +113,7 @@ export const handleGDPRRedact = internalMutation({
   handler: async (ctx, args) => {
     try {
       // Find the store
-      const store = await ctx.db
-        .query("shopifyStores")
-        .withIndex("by_shop_domain", (q) => q.eq("shopDomain", args.shopDomain))
-        .first();
+      const store = await findShopifyStoreByDomain(ctx.db, args.shopDomain);
 
       if (!store) {
         throw new Error(`Store not found for domain: ${args.shopDomain}`);

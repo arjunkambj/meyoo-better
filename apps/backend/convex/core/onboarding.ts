@@ -5,7 +5,7 @@ import type { MutationCtx } from "../_generated/server";
 import { internalMutation, internalQuery, mutation, query } from "../_generated/server";
 import { ensureActiveMembership } from "../authHelpers";
 import { createJob, PRIORITY } from "../engine/workpool";
-import { normalizeShopDomain } from "../utils/shop";
+import { findShopifyStoreByDomain, normalizeShopDomain } from "../utils/shop";
 import { getUserAndOrg, requireUserAndOrg } from "../utils/auth";
 import { buildDateSpan } from "../utils/date";
 import { getOrgTimeInfo } from "../utils/orgDateRange";
@@ -1789,10 +1789,7 @@ export const connectShopifyStore = mutation({
 
     // Normalize the domain and check if store already exists
     const domain = normalizeShopDomain(args.domain);
-    const existingStore = await ctx.db
-      .query("shopifyStores")
-      .withIndex("by_shop_domain", (q) => q.eq("shopDomain", domain))
-      .first();
+    const existingStore = await findShopifyStoreByDomain(ctx.db, domain);
 
     const storeName = args.shopData?.shopName || domain;
     const currency = args.shopData?.currency || "USD";

@@ -3,7 +3,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { query } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
-import { normalizeShopDomain } from "../utils/shop";
+import { findShopifyStoreByDomain, normalizeShopDomain } from "../utils/shop";
 import { verifyShopProvisionSignature } from "../utils/crypto";
 
 export const getStore = query({
@@ -401,10 +401,7 @@ export const getPublicStoreByDomain = query({
   handler: async (ctx, args) => {
     // Get the store by shop domain - no auth required for session management
     const domain = normalizeShopDomain(args.shopDomain);
-    const store = await ctx.db
-      .query("shopifyStores")
-      .withIndex("by_shop_domain", (q) => q.eq("shopDomain", domain))
-      .first();
+    const store = await findShopifyStoreByDomain(ctx.db, domain);
 
     if (!store) return null;
 

@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { internalQuery } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
-import { normalizeShopDomain } from "../utils/shop";
+import { findShopifyStoreByDomain } from "../utils/shop";
 
 export const getOrderByShopifyIdInternal = internalQuery({
   args: {
@@ -61,11 +61,7 @@ export const getStoreByDomain = internalQuery({
   args: { shopDomain: v.string() },
   returns: v.union(v.null(), v.any()),
   handler: async (ctx, args) => {
-    const domain = normalizeShopDomain(args.shopDomain);
-    return await ctx.db
-      .query("shopifyStores")
-      .withIndex("by_shop_domain", (q) => q.eq("shopDomain", domain))
-      .first();
+    return await findShopifyStoreByDomain(ctx.db, args.shopDomain);
   },
 });
 

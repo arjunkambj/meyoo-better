@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery } from "../_generated/server";
+import { findShopifyStoreByDomain } from "../utils/shop";
 
 // Minimal helpers kept for fast-path Shopify handling
 
@@ -101,10 +102,7 @@ export const getOrganizationIdByShopDomain = internalQuery({
   args: { shopDomain: v.string() },
   returns: v.union(v.string(), v.null()),
   handler: async (ctx, args) => {
-    const store = await ctx.db
-      .query("shopifyStores")
-      .withIndex("by_shop_domain", (q) => q.eq("shopDomain", args.shopDomain))
-      .first();
+    const store = await findShopifyStoreByDomain(ctx.db, args.shopDomain);
     return (store?.organizationId as unknown as string) || null;
   },
 });

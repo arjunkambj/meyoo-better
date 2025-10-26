@@ -1,16 +1,13 @@
 import { v } from "convex/values";
 import { mutation } from "../_generated/server";
-import { normalizeShopDomain } from "../utils/shop";
+import { findShopifyStoreByDomain, normalizeShopDomain } from "../utils/shop";
 
 export const setWebhooksRegisteredByDomain = mutation({
   args: { shopDomain: v.string(), value: v.boolean() },
   returns: v.object({ success: v.boolean() }),
   handler: async (ctx, args) => {
     const domain = normalizeShopDomain(args.shopDomain);
-    const store = await ctx.db
-      .query("shopifyStores")
-      .withIndex("by_shop_domain", (q) => q.eq("shopDomain", domain))
-      .first();
+    const store = await findShopifyStoreByDomain(ctx.db, domain);
 
     if (!store) throw new Error("Store not found");
 
@@ -31,10 +28,7 @@ export const checkAndSetWebhooksRegistered = mutation({
   }),
   handler: async (ctx, args) => {
     const domain = normalizeShopDomain(args.shopDomain);
-    const store = await ctx.db
-      .query("shopifyStores")
-      .withIndex("by_shop_domain", (q) => q.eq("shopDomain", domain))
-      .first();
+    const store = await findShopifyStoreByDomain(ctx.db, domain);
 
     if (!store) {
       throw new Error("Store not found");

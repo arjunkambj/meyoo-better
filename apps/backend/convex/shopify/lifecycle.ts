@@ -4,6 +4,7 @@ import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { internalMutation, type MutationCtx } from "../_generated/server";
 import { logger } from "./shared";
+import { findShopifyStoreByDomain } from "../utils/shop";
 import { DELETE_BATCH_SIZE, ORGANIZATION_TABLES, STORE_TABLES } from "./cleanup";
 import { createNewUserData } from "../authHelpers";
 
@@ -15,10 +16,7 @@ export const handleAppUninstallInternal = internalMutation({
   handler: async (ctx, args) => {
     // This function ONLY marks the store as inactive
     // The full cleanup is handled by handleAppUninstalled which is called separately
-    const store = await ctx.db
-      .query("shopifyStores")
-      .withIndex("by_shop_domain", (q) => q.eq("shopDomain", args.shopDomain))
-      .first();
+    const store = await findShopifyStoreByDomain(ctx.db, args.shopDomain);
 
     if (store) {
       await ctx.db.patch(store._id, {

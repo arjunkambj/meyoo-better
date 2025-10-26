@@ -4,6 +4,7 @@ import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { internalMutation, mutation } from "../_generated/server";
 import { logger } from "./shared";
+import { findShopifyStoreByDomain } from "../utils/shop";
 
 export const webhooks = {
   /**
@@ -230,12 +231,7 @@ export const webhooks = {
     handler: async (ctx, args) => {
       try {
         // Find the organization by shop domain
-        const store = await ctx.db
-          .query("shopifyStores")
-          .withIndex("by_shop_domain", (q) =>
-            q.eq("shopDomain", args.shopDomain)
-          )
-          .first();
+        const store = await findShopifyStoreByDomain(ctx.db, args.shopDomain);
 
         if (!store) {
           throw new Error(`Store not found for domain: ${args.shopDomain}`);
@@ -312,12 +308,7 @@ export const webhooks = {
     handler: async (ctx, args) => {
       try {
         // Find the organization by shop domain
-        const store = await ctx.db
-          .query("shopifyStores")
-          .withIndex("by_shop_domain", (q) =>
-            q.eq("shopDomain", args.shopDomain)
-          )
-          .first();
+        const store = await findShopifyStoreByDomain(ctx.db, args.shopDomain);
 
         if (!store) {
           throw new Error(`Store not found for domain: ${args.shopDomain}`);
@@ -422,12 +413,7 @@ export const webhooks = {
     handler: async (ctx, args) => {
       try {
         // Find the organization by shop domain
-        const store = await ctx.db
-          .query("shopifyStores")
-          .withIndex("by_shop_domain", (q) =>
-            q.eq("shopDomain", args.shopDomain)
-          )
-          .first();
+        const store = await findShopifyStoreByDomain(ctx.db, args.shopDomain);
 
         if (!store) {
           return {

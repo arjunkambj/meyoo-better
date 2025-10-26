@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { action, mutation } from "./_generated/server";
-import { normalizeShopDomain } from "./utils/shop";
+import { normalizeShopDomain, findShopifyStoreByDomain } from "./utils/shop";
 import { verifyShopProvisionSignature } from "./utils/crypto";
 import { ensureActiveMembership, findExistingUser, normalizeEmail } from "./authHelpers";
 import { ensureShopifyOnboarding } from "./utils/onboarding";
@@ -49,10 +49,7 @@ export const createOrAttachFromShopifyOAuth = mutation({
 
     // IMPORTANT: Preserve existing store-user link if store already exists.
     // First, check if the store is already provisioned for any user/org.
-    const existingStore = await ctx.db
-      .query("shopifyStores")
-      .withIndex("by_shop_domain", (q) => q.eq("shopDomain", shop))
-      .first();
+    const existingStore = await findShopifyStoreByDomain(ctx.db, shop);
     let user: Doc<"users"> | null = null;
     let organizationId: Id<"organizations"> | undefined;
 

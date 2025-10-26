@@ -30,7 +30,7 @@ const milestones = [
 
 export default function AboutPage() {
   return (
-    <div className={`min-h-screen ${designSystem.background.gradient} pt-28`}>
+    <div className={`min-h-screen ${designSystem.background.gradient}`}>
       {/* Hero Section */}
       <section className={`relative ${designSystem.spacing.section} px-4`}>
         <div className="max-w-4xl mx-auto text-center">
@@ -51,7 +51,7 @@ export default function AboutPage() {
       </section>
 
       {/* Content */}
-      <section className="py-12 px-4">
+      <section className="px-4">
         <div className="max-w-4xl mx-auto">
           {/* Our Story */}
           <div className="mb-12">

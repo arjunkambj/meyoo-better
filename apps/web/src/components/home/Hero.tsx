@@ -23,7 +23,7 @@ const d2cBrands = [
 const Hero = () => {
   return (
     <section
-      className={`relative w-full min-h-[calc(90vh)] flex items-center justify-center overflow-hidden mt-16 ${designSystem.background.gradient} pb-16 sm:pb-20 lg:pb-24 2xl:pb-32`}
+      className={`relative w-full min-h-[calc(90vh)] flex items-center justify-center overflow-hidden mt-13 ${designSystem.background.gradient} pb-16 sm:pb-20 lg:pb-24 2xl:pb-28`}
     >
       <div className={`${designSystem.spacing.container} relative z-10`}>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 sm:gap-14 lg:gap-16 items-center">
@@ -63,7 +63,7 @@ const Hero = () => {
               <Button
                 as={Link}
                 href="/signin"
-                className="w-auto font-semibold px-6 sm:px-8 h-11 sm:h-12 transition-all duration-200 hover:scale-105 active:scale-100 text-sm sm:text-base"
+                className="w-auto font-semibold px-6 sm:px-8 h-11 sm:h-12 transition-all duration-200 active:scale-100 text-sm sm:text-base"
                 color="primary"
                 endContent={<Icon icon="solar:arrow-right-linear" width={18} />}
                 size="lg"
@@ -75,7 +75,7 @@ const Hero = () => {
                 href="#pricing"
                 variant="flat"
                 size="lg"
-                className="w-auto h-11 sm:h-12 transition-all duration-200 hover:scale-105 active:scale-100 text-sm sm:text-base"
+                className="w-auto h-11 sm:h-12 transition-all duration-200 active:scale-100 text-sm sm:text-base"
               >
                 View pricing
               </Button>

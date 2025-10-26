@@ -5,6 +5,7 @@ import {
   getRangeStartMs,
   type DateRange,
 } from "./analyticsSource";
+import { computeCostRetentionFactor } from "./analytics/shared";
 import type {
   OverviewComputation,
   MetricValue,
@@ -1064,11 +1065,14 @@ function buildOverviewFromAggregates(
   const discounts = aggregates.discounts;
   const prevDiscounts = prev?.discounts ?? 0;
 
-  const refundsAmount = aggregates.refundsAmount;
-  const prevRefundsAmount = prev?.refundsAmount ?? 0;
-  const manualReturnRatePercent = manualReturnRatePercentOverride ?? aggregates.manualReturnRatePercent ?? 0;
-  const prevManualReturnRatePercent =
-    previousManualReturnRatePercentOverride ?? prev?.manualReturnRatePercent ?? 0;
+  const refundsAmount = Math.max(aggregates.refundsAmount, 0);
+  const prevRefundsAmount = Math.max(prev?.refundsAmount ?? 0, 0);
+  const manualReturnRatePercent = clampPercentage(
+    manualReturnRatePercentOverride ?? aggregates.manualReturnRatePercent ?? 0,
+  );
+  const prevManualReturnRatePercent = clampPercentage(
+    previousManualReturnRatePercentOverride ?? prev?.manualReturnRatePercent ?? 0,
+  );
   const grossRevenueBase = Math.max(grossSales, revenue, 0);
   const prevGrossRevenueBase = prev ? Math.max(prevGrossSales, prevRevenue, 0) : prevRevenue;
   let rtoRevenueLost = aggregates.rtoRevenueLost;
@@ -1088,20 +1092,38 @@ function buildOverviewFromAggregates(
   const unitsSold = aggregates.unitsSold;
   const prevUnitsSold = prev?.unitsSold ?? 0;
 
-  const cogs = aggregates.cogs;
-  const prevCogs = prev?.cogs ?? 0;
-
   const shippingCosts = aggregates.shippingCosts;
   const prevShippingCosts = prev?.shippingCosts ?? 0;
 
   const transactionFees = aggregates.transactionFees;
   const prevTransactionFees = prev?.transactionFees ?? 0;
 
-  const handlingFees = aggregates.handlingFees;
-  const prevHandlingFees = prev?.handlingFees ?? 0;
+  const rawCogs = aggregates.cogs;
+  const rawPrevCogs = prev?.cogs ?? 0;
+  const rawHandlingFees = aggregates.handlingFees;
+  const rawPrevHandlingFees = prev?.handlingFees ?? 0;
+  const rawTaxesCollected = aggregates.taxesCollected;
+  const rawPrevTaxesCollected = prev?.taxesCollected ?? 0;
 
-  const taxesCollected = aggregates.taxesCollected;
-  const prevTaxesCollected = prev?.taxesCollected ?? 0;
+  const costRetentionFactor = computeCostRetentionFactor({
+    revenue,
+    refunds: refundsAmount,
+    rtoRevenueLost,
+    manualReturnRatePercent,
+  });
+  const prevCostRetentionFactor = computeCostRetentionFactor({
+    revenue: prevRevenue,
+    refunds: prevRefundsAmount,
+    rtoRevenueLost: prevRtoRevenueLost,
+    manualReturnRatePercent: prevManualReturnRatePercent,
+  });
+
+  const cogs = rawCogs * costRetentionFactor;
+  const prevCogs = rawPrevCogs * prevCostRetentionFactor;
+  const handlingFees = rawHandlingFees * costRetentionFactor;
+  const prevHandlingFees = rawPrevHandlingFees * prevCostRetentionFactor;
+  const taxesCollected = rawTaxesCollected * costRetentionFactor;
+  const prevTaxesCollected = rawPrevTaxesCollected * prevCostRetentionFactor;
 
   const customCosts = aggregates.customCosts;
   const prevCustomCosts = prev?.customCosts ?? 0;
@@ -1524,15 +1546,22 @@ function buildOrdersOverviewFromAggregates(
 ): OrdersOverviewMetrics {
   const totalOrders = aggregates.orders;
   const totalRevenue = aggregates.revenue;
-  const cogs = aggregates.cogs;
+  const refundsAmount = Math.max(aggregates.refundsAmount, 0);
+  const manualReturnRatePercent = clampPercentage(aggregates.manualReturnRatePercent ?? 0);
+  const rtoRevenueLost = Math.max(aggregates.rtoRevenueLost ?? 0, 0);
+  const costRetentionFactor = computeCostRetentionFactor({
+    revenue: totalRevenue,
+    refunds: refundsAmount,
+    rtoRevenueLost,
+    manualReturnRatePercent,
+  });
+  const cogs = aggregates.cogs * costRetentionFactor;
+  const handlingFees = aggregates.handlingFees * costRetentionFactor;
+  const taxesCollected = aggregates.taxesCollected * costRetentionFactor;
   const shippingCosts = aggregates.shippingCosts;
   const transactionFees = aggregates.transactionFees;
-  const handlingFees = aggregates.handlingFees;
-  const taxesCollected = aggregates.taxesCollected;
   const customCosts = aggregates.customCosts;
   const marketingCost = aggregates.marketingCost;
-  const refundsAmount = aggregates.refundsAmount;
-  const rtoRevenueLost = aggregates.rtoRevenueLost;
   const cancelledOrders = Math.max(aggregates.cancelledOrders, 0);
   const totalCosts =
     cogs +
@@ -1573,15 +1602,22 @@ function buildOrdersOverviewFromAggregates(
   const prev = previous ?? null;
   const prevTotalOrders = prev?.orders ?? 0;
   const prevTotalRevenue = prev?.revenue ?? 0;
-  const prevCogs = prev?.cogs ?? 0;
+  const prevRefundsAmount = Math.max(prev?.refundsAmount ?? 0, 0);
+  const prevManualReturnRatePercent = clampPercentage(prev?.manualReturnRatePercent ?? 0);
+  const prevRtoRevenueLost = Math.max(prev?.rtoRevenueLost ?? 0, 0);
+  const prevCostRetentionFactor = computeCostRetentionFactor({
+    revenue: prevTotalRevenue,
+    refunds: prevRefundsAmount,
+    rtoRevenueLost: prevRtoRevenueLost,
+    manualReturnRatePercent: prevManualReturnRatePercent,
+  });
+  const prevCogs = (prev?.cogs ?? 0) * prevCostRetentionFactor;
   const prevShippingCosts = prev?.shippingCosts ?? 0;
   const prevTransactionFees = prev?.transactionFees ?? 0;
-  const prevHandlingFees = prev?.handlingFees ?? 0;
-  const prevTaxesCollected = prev?.taxesCollected ?? 0;
+  const prevHandlingFees = (prev?.handlingFees ?? 0) * prevCostRetentionFactor;
+  const prevTaxesCollected = (prev?.taxesCollected ?? 0) * prevCostRetentionFactor;
   const prevCustomCosts = prev?.customCosts ?? 0;
   const prevMarketingCost = prev?.marketingCost ?? 0;
-  const prevRefundsAmount = prev?.refundsAmount ?? 0;
-  const prevRtoRevenueLost = prev?.rtoRevenueLost ?? 0;
   const prevTotalCosts =
     prevCogs +
     prevShippingCosts +

@@ -20,7 +20,7 @@ const contactInfo = [
 
 export default function ContactPage() {
   return (
-    <div className={`min-h-screen ${designSystem.background.gradient} pt-24 pb-20`}>
+    <div className={`min-h-screen ${designSystem.background.gradient} pb-20`}>
       {/* Hero Section */}
       <section className={`relative ${designSystem.spacing.section} px-4 pb-8`}>
         <div className="max-w-4xl mx-auto text-center">
@@ -39,7 +39,7 @@ export default function ContactPage() {
       </section>
 
       {/* Contact Options */}
-      <section className="py-16 px-4">
+      <section className="px-4">
         <div className="max-w-6xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
             {contactInfo.map((item) => (

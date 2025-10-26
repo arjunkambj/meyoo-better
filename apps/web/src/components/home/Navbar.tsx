@@ -81,7 +81,7 @@ export default function CenteredNavbar() {
                        w-full rounded-2xl bg-transparent transition-all duration-300
           `}
           classNames={{
-            base: "px-2 sm:px-4 md:px-6 py-2.5 sm:py-2.5 md:py-3 rounded-2xl w-full",
+            base: "px-2 sm:px-4 md:px-6 py-2.5 sm:py-2.5 md:py-4 rounded-2xl w-full",
             wrapper: "px-0 w-full gap-2 sm:gap-4",
           }}
           height="auto"

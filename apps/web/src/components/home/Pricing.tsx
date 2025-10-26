@@ -129,7 +129,7 @@ const Pricing = () => {
             return (
               <Card
                 key={tier.key}
-                className={`h-full w-full ${designSystem.card.base} rounded-3xl p-1.5 transition-all duration-300 hover:scale-[1.02] shadow-none sm:w-96 overflow-hidden`}
+                className={`h-full w-full ${designSystem.card.base} rounded-3xl p-1.5 transition-all duration-300 shadow-none sm:w-96 overflow-hidden`}
               >
                 <CardHeader className="flex flex-col gap-3 py-5 px-6 bg-background rounded-[20px]">
                   <div className="text-center space-y-1.5">
@@ -167,7 +167,7 @@ const Pricing = () => {
 
                   <Button
                     as={Link}
-                    className="w-full h-10 font-semibold transition-all duration-200 hover:scale-105 active:scale-100"
+                    className="w-full h-10 font-semibold transition-all duration-200 active:scale-100"
                     color={tier.buttonColor}
                     href={tier.href}
                     variant={tier.buttonVariant}

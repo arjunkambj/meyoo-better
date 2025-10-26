@@ -43,7 +43,7 @@ const socialLinks = [
 const Footer = () => {
   return (
     <section
-      className={`relative py-20 sm:py-24 lg:py-24 ${designSystem.background.gradient}`}
+      className={`relative pt-20 pb-16 sm:pt-24`}
     >
       <div className={designSystem.spacing.container}>
         <footer>

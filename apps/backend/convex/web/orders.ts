@@ -26,6 +26,14 @@ import {
 const DEFAULT_ORDERS_PAGE_SIZE = 50;
 const MAX_ORDERS_PAGE_SIZE = 50;
 const MIN_ORDERS_PAGE_SIZE = 1;
+const MIN_ORDER_SCAN_CHUNK = 120;
+const MAX_ORDER_SCAN_CHUNK = 400;
+
+type OrdersScanCursorMode = "range" | "ties";
+type OrdersScanCursor = {
+  createdAt: number;
+  shopifyId: string;
+};
 function matchesStatusFilter(
   order: Doc<"shopifyOrders">,
   status: string,
@@ -477,50 +485,95 @@ export const getOrdersAnalytics = query({
     const normalizedStatus = (args.status ?? "all").toLowerCase();
     const normalizedSearch = args.searchTerm?.trim().toLowerCase() ?? null;
 
-    const baseQuery = ctx.db
-      .query("shopifyOrders")
-      .withIndex("by_organization_and_created", (q) =>
-        q
-          .eq("organizationId", auth.orgId as Id<"organizations">)
-          .gte("shopifyCreatedAt", rangeStartMs)
-          .lte("shopifyCreatedAt", rangeEndExclusiveMs - 1)
-      )
-      .order("desc");
+    const buildOrdersQuery = (
+      cursor: OrdersScanCursor | null,
+      mode: OrdersScanCursorMode,
+    ) =>
+      ctx.db
+        .query("shopifyOrders")
+        .withIndex("by_org_created_shopifyId", (q) => {
+          const base = q.eq("organizationId", auth.orgId as Id<"organizations">);
+
+          if (!cursor) {
+            return base
+              .gte("shopifyCreatedAt", rangeStartMs)
+              .lt("shopifyCreatedAt", rangeEndExclusiveMs);
+          }
+
+          if (mode === "ties") {
+            return base
+              .eq("shopifyCreatedAt", cursor.createdAt)
+              .lt("shopifyId", cursor.shopifyId);
+          }
+
+          return base
+            .gte("shopifyCreatedAt", rangeStartMs)
+            .lt("shopifyCreatedAt", cursor.createdAt);
+        })
+        .order("desc");
 
     const customerCache = new Map<string, Doc<"shopifyCustomers"> | null>();
     const matchedOrders: Doc<"shopifyOrders">[] = [];
-    let cursor: string | null = null;
+    const chunkSize = Math.min(
+      MAX_ORDER_SCAN_CHUNK,
+      Math.max(pageSize * 2, MIN_ORDER_SCAN_CHUNK),
+    );
     let skipped = 0;
     let totalFiltered = 0;
     let hasMoreMatches = false;
-    let lastPageIsDone = false;
+    let databaseExhausted = false;
+    let cursorState: OrdersScanCursor | null = null;
+    let cursorMode: OrdersScanCursorMode = "range";
 
     while (matchedOrders.length < pageSize) {
-      const page = await baseQuery.paginate({ numItems: pageSize, cursor });
-      lastPageIsDone = page.isDone;
+      const page: Doc<"shopifyOrders">[] = await buildOrdersQuery(
+        cursorState,
+        cursorMode,
+      ).take(chunkSize);
+      if (page.length === 0) {
+        if (cursorMode === "ties" && cursorState) {
+          cursorMode = "range";
+          continue;
+        }
+        databaseExhausted = true;
+        break;
+      }
 
-      const customerIds: string[] = [];
-      for (const order of page.page) {
+      const lastOrder = page[page.length - 1]!;
+      cursorState = {
+        createdAt: lastOrder.shopifyCreatedAt,
+        shopifyId: lastOrder.shopifyId,
+      };
+      if (cursorMode === "range") {
+        cursorMode = "ties";
+      } else if (page.length < chunkSize) {
+        cursorMode = "range";
+      }
+
+      const pageCustomerIds: string[] = [];
+      const seenIds = new Set<string>();
+      for (const order of page) {
         if (!order.customerId) {
           continue;
         }
         const id = order.customerId as string;
-        if (customerCache.has(id) || customerIds.includes(id)) {
+        if (customerCache.has(id) || seenIds.has(id)) {
           continue;
         }
-        customerIds.push(id);
+        seenIds.add(id);
+        pageCustomerIds.push(id);
       }
 
-      if (customerIds.length > 0) {
+      if (pageCustomerIds.length > 0) {
         const customerDocs = await Promise.all(
-          customerIds.map((id) => ctx.db.get(id as Id<"shopifyCustomers">)),
+          pageCustomerIds.map((id) => ctx.db.get(id as Id<"shopifyCustomers">)),
         );
-        customerIds.forEach((id, index) => {
+        pageCustomerIds.forEach((id, index) => {
           customerCache.set(id, customerDocs[index] ?? null);
         });
       }
 
-      const filtered = page.page.filter((order) => {
+      const filtered = page.filter((order) => {
         const customerKey = order.customerId ? (order.customerId as string) : null;
         let customerDoc: Doc<"shopifyCustomers"> | null | undefined = null;
         if (customerKey) {
@@ -543,7 +596,7 @@ export const getOrdersAnalytics = query({
 
         matchedOrders.push(order);
         if (matchedOrders.length >= pageSize) {
-          if (index < filtered.length - 1) {
+          if (index < filtered.length - 1 || page.length === chunkSize) {
             hasMoreMatches = true;
           }
           break;
@@ -551,18 +604,15 @@ export const getOrdersAnalytics = query({
       }
 
       if (matchedOrders.length >= pageSize) {
-        if (!page.isDone) {
-          hasMoreMatches = true;
-        }
         break;
       }
-
-      if (page.isDone) {
-        break;
-      }
-
-      cursor = page.continueCursor;
     }
+
+    if (!hasMoreMatches) {
+      hasMoreMatches = !databaseExhausted;
+    }
+
+    const lastPageIsDone = databaseExhausted;
 
     const overviewResult = await overviewPromise;
     const overview = overviewResult?.ordersOverview ?? ZERO_ORDERS_OVERVIEW;

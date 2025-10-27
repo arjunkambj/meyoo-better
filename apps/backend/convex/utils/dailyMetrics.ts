@@ -520,10 +520,24 @@ function applyOperationalCostsToAggregates(
     return Math.abs(base - computed) <= tolerance ? base : Math.max(base, computed);
   })();
 
+  const transactionFees = (() => {
+    const base = aggregates.transactionFees;
+    const computed = totals.payment;
+    if (computed <= 0) {
+      return base;
+    }
+    if (base <= 0) {
+      return computed;
+    }
+    // Avoid double counting payment gateway fees when both sources carry the same data.
+    const tolerance = Math.max(1, Math.min(Math.abs(base), Math.abs(computed)) * 0.05);
+    return Math.abs(base - computed) <= tolerance ? base : Math.max(base, computed);
+  })();
+
   return {
     ...aggregates,
     shippingCosts,
-    transactionFees: aggregates.transactionFees + totals.payment,
+    transactionFees,
     customCosts: aggregates.customCosts + totals.operational,
   } satisfies AggregatedDailyMetrics;
 }

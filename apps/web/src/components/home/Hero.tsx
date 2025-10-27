@@ -55,7 +55,7 @@ const Hero = () => {
             <p className="text-sm sm:text-base lg:text-lg text-muted-foreground leading-relaxed text-pretty text-center sm:text-left max-w-xl mx-auto sm:mx-0 mb-0">
               Meyoo pulls sales, ad spend, product costs, shipping, discounts,
               and fees into one simple view—so you can see real profit by order
-              and SKU
+              and SKU.
             </p>
 
             {/* CTA Buttons */}
@@ -63,12 +63,12 @@ const Hero = () => {
               <Button
                 as={Link}
                 href="/signin"
-                className="w-auto font-semibold px-6 sm:px-8 h-11 sm:h-12 transition-all duration-200 active:scale-100 text-sm sm:text-base"
+                className="w-auto font-semibold h-11 sm:h-12 transition-all duration-200 active:scale-100 text-sm sm:text-base"
                 color="primary"
                 endContent={<Icon icon="solar:arrow-right-linear" width={18} />}
                 size="lg"
               >
-                Try Meyoo free
+                Start 28-day Trial
               </Button>
               <Button
                 as={Link}
@@ -90,7 +90,7 @@ const Hero = () => {
                   className="text-success sm:w-[18px]"
                 />
                 <span className="font-medium">
-                  Fast setup · Free for 300 orders/month/store
+                  Fast setup · 28-day free trial · Free for 300 orders/month/store
                 </span>
               </div>
             </div>
@@ -116,7 +116,7 @@ const Hero = () => {
                   className="block dark:hidden size-full rounded-xl sm:rounded-2xl object-cover object-left-top transition-transform duration-300 scale-[1.02]  hover:scale-[1.03]"
                   fill
                   priority
-                  src="/meyoo light.png"
+                  src="/light.png"
                 />
                 {/* Dark mode preview */}
                 <Image
@@ -124,7 +124,7 @@ const Hero = () => {
                   className="hidden dark:block size-full rounded-xl sm:rounded-2xl object-cover object-left-top transition-transform duration-300 scale-[1.02] hover:scale-[1.03]"
                   fill
                   priority
-                  src="/dark-meyoo.png"
+                  src="/dark.png"
                 />
               </CardBody>
             </Card>

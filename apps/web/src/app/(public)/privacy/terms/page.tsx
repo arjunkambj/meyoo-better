@@ -288,7 +288,7 @@ export default function TermsOfServicePage() {
                   <CardBody className="p-6">
                     <h3 className="font-semibold mb-3">Subscription Terms</h3>
                     <ul className="space-y-2 text-sm text-default-600">
-                      <li>• 14-day free trial for new users</li>
+                      <li>• 28-day free trial for new users</li>
                       <li>• Monthly or annual subscription plans available</li>
                       <li>• Automatic renewal unless cancelled</li>
                       <li>• Prices subject to change with 30 days notice</li>

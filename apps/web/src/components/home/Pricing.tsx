@@ -61,6 +61,7 @@ const Pricing = () => {
 
   return (
     <section
+      id="pricing"
       className={`relative ${designSystem.spacing.section} ${designSystem.background.gradient} w-full`}
     >
       <div
@@ -78,7 +79,7 @@ const Pricing = () => {
           <p
             className={`${designSystem.typography.sectionSubtitle} max-w-2xl mx-auto`}
           >
-            Start free. Scale as you grow. Cancel anytime.
+            Start free for 28 days. Scale as you grow. Cancel anytime.
           </p>
         </div>
 

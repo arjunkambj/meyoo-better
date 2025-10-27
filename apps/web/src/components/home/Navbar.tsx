@@ -138,13 +138,13 @@ export default function CenteredNavbar() {
                   color="primary"
                   href="/signin"
                 >
-                  Try Meyoo free
+                  Get started
                   <Icon className="ml-2" icon="mdi:arrow-right" />
                 </Button>
               </Unauthenticated>
               <AuthLoading>
                 <Button as={Link} href="/signin" color="primary">
-                  Try Meyoo free
+                  Get started
                 </Button>
               </AuthLoading>
               <Authenticated>
@@ -234,7 +234,7 @@ export default function CenteredNavbar() {
                           radius="full"
                           size="lg"
                         >
-                          Try Meyoo free
+                          Start 28-day trial
                           <Icon className="ml-2" icon="mdi:arrow-right" />
                         </Button>
                       </Unauthenticated>
@@ -245,7 +245,7 @@ export default function CenteredNavbar() {
                           radius="full"
                           size="lg"
                         >
-                          Try Meyoo free
+                          Start 28-day trial
                         </Button>
                       </AuthLoading>
                       <Authenticated>

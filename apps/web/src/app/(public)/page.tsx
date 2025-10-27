@@ -28,11 +28,11 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Meyoo — Profit Analytics for D2C Brands",
   description:
-    "See real profit by order, SKU, and campaign. Meyoo unifies sales, ad spend, and costs so D2C teams can cut waste and scale what works. Start free—no credit card.",
+    "See real profit by order, SKU, and campaign. Meyoo unifies sales, ad spend, and costs so D2C teams can cut waste and scale what works. Start free for 28 days—no credit card.",
   openGraph: {
     title: "Know your true profit.",
     description:
-      "One clean view of revenue, costs, spend, and profit—so you can grow with confidence.",
+      "One clean view of revenue, costs, spend, and profit—plus a 28-day free trial so you can grow with confidence.",
     url: "/",
     images: [
       {
@@ -47,7 +47,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Know your true profit.",
     description:
-      "One clean view of revenue, costs, spend, and profit—so you can grow with confidence.",
+      "One clean view of revenue, costs, spend, and profit—plus a 28-day free trial so you can grow with confidence.",
     images: ["/dark-meyoo.png"],
   },
 };

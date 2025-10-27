@@ -63,15 +63,21 @@ const Faq = () => {
             <p className="text-base text-muted-foreground">
               Drop a note to our
               <a
-                href="mailto:support@meyoo.app"
+                href="mailto:hey@meyoo.io"
                 className="mx-1 whitespace-nowrap underline text-primary hover:text-primary/80 transition-colors"
               >
                 support team
               </a>
               and we&apos;ll point you in the right direction.
             </p>
-            <Button size="lg" color="primary" className="w-full sm:w-fit ">
-              Contact Support
+            <Button
+              as="a"
+              href="mailto:hey@meyoo.io"
+              size="lg"
+              color="primary"
+              className="w-full sm:w-fit"
+            >
+              Email hey@meyoo.io
             </Button>
           </div>
           <Accordion

@@ -323,7 +323,7 @@ export default function ContactSupport() {
             {/* Email CTA */}
             <a
               className="flex items-center gap-3 rounded-xl border border-default-200 bg-content1 px-4 py-3 hover:bg-content2 transition-colors"
-              href="mailto:support@meyoo.com"
+              href="mailto:hey@meyoo.io"
             >
               <span className="p-2 rounded-md bg-primary/10">
                 <Icon
@@ -336,9 +336,7 @@ export default function ContactSupport() {
                 <p className="text-sm font-semibold text-default-800">
                   Email Support
                 </p>
-                <p className="text-xs text-primary truncate">
-                  support@meyoo.com
-                </p>
+                <p className="text-xs text-primary truncate">hey@meyoo.io</p>
               </div>
             </a>
 

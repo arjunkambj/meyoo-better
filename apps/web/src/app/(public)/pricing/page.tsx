@@ -5,11 +5,11 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Pricing — Meyoo",
   description:
-    "Simple, transparent pricing. Start free. Scale as you grow. Cancel anytime.",
+    "Simple, transparent pricing. Start free for 28 days. Scale as you grow. Cancel anytime.",
   openGraph: {
     title: "Pricing — Meyoo",
     description:
-      "Simple, transparent pricing. Start free. Scale as you grow. Cancel anytime.",
+      "Simple, transparent pricing. Start free for 28 days. Scale as you grow. Cancel anytime.",
     url: "/pricing",
     images: [
       {
@@ -24,7 +24,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Pricing — Meyoo",
     description:
-      "Simple, transparent pricing. Start free. Scale as you grow. Cancel anytime.",
+      "Simple, transparent pricing. Start free for 28 days. Scale as you grow. Cancel anytime.",
     images: ["/dark-meyoo.png"],
   },
 };

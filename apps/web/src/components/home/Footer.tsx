@@ -68,12 +68,22 @@ const Footer = () => {
                   color="primary"
                 >
                   <span className="flex items-center gap-2">
-                    Start free today
+                    Start 28-day trial
                     <Icon
                       icon="solar:arrow-right-linear"
                       className="h-4 w-4 transition-transform group-hover:translate-x-1"
                     />
                   </span>
+                </Button>
+                <Button
+                  as="a"
+                  href="mailto:hey@meyoo.io"
+                  size="lg"
+                  className="w-full sm:w-auto font-medium"
+                  variant="bordered"
+                  color="default"
+                >
+                  Email hey@meyoo.io
                 </Button>
               </div>
             </div>

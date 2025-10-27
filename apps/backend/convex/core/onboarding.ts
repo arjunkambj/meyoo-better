@@ -1855,7 +1855,7 @@ export const connectShopifyStore = mutation({
         billingRecord.hasTrialExpired;
 
       if (needsTrialInit) {
-        const trialEndDate = now + 14 * 24 * 60 * 60 * 1000;
+        const trialEndDate = now + 28 * 24 * 60 * 60 * 1000;
 
         await ctx.db.patch(billingRecord._id, {
           trialStartDate: now,
@@ -1867,7 +1867,7 @@ export const connectShopifyStore = mutation({
         });
 
         console.log(
-          `[ONBOARDING] Initialized 14-day trial for store organization ${user.organizationId as Id<"organizations">}`,
+          `[ONBOARDING] Initialized 28-day trial for store organization ${user.organizationId as Id<"organizations">}`,
         );
       } else {
         console.log(

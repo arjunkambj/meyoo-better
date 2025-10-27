@@ -8,36 +8,36 @@ import { designSystem } from "@/libs/design-system";
 const testimonials = [
   {
     id: "1",
-    title: "We finally saw the real margins",
+    title: "We finally trust every margin call",
     description:
-      "We finally saw the real margins by SKU and cut wasted spend in a week.",
+      "Within two weeks we spotted three SKUs that looked profitable in Shopify but were underwater after shipping. Killing them paid for Meyoo twice over.",
     user: {
-      name: "Founder",
-      location: "Skincare brand",
+      name: "Noah Patel",
+      location: "CRO, Brightside Apparel",
       avatar:
         "https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=160&q=80",
     },
   },
   {
     id: "2",
-    title: "One dashboard, shared truth",
+    title: "One dashboard for the whole growth squad",
     description:
-      "Meyoo became our daily stand‑up. One dashboard, shared truth.",
+      "Our merch, finance, and paid teams finally look at the same numbers. Meyoo replaced five spreadsheets and gave us a daily profit standup.",
     user: {
-      name: "Growth lead",
-      location: "Apparel",
+      name: "Jessie Han",
+      location: "VP Growth, Kinfield Labs",
       avatar:
         "https://images.unsplash.com/photo-1527980965255-d3b416303d12?auto=format&fit=crop&w=160&q=80",
     },
   },
   {
     id: "3",
-    title: "The AI Copilot answers everything",
+    title: "AI answers what I used to DM the analyst",
     description:
-      "The AI Copilot answers the questions I used to Slack the analyst.",
+      "The Copilot surfaces blended CAC, refund drag, and cash impact in plain English. I make decisions in minutes instead of waiting for a deck.",
     user: {
-      name: "CEO",
-      location: "Home goods",
+      name: "Lena Ortiz",
+      location: "COO, Ember Living",
       avatar:
         "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=160&q=80",
     },

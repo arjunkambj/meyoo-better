@@ -64,6 +64,7 @@ export const onboardingStatusValidator = v.union(
     analyticsTriggeredAt: v.optional(v.number()),
     lastSyncCheckAt: v.optional(v.number()),
     syncCheckAttempts: v.optional(v.number()),
+    referralSource: v.optional(v.string()),
     syncStatus: v.optional(
       v.object({
         shopify: v.optional(platformSyncStatusValidator),

@@ -231,6 +231,7 @@ export const getOnboardingStatus = query({
         onboarding.onboardingData?.analyticsTriggeredAt || undefined,
       lastSyncCheckAt: onboarding.onboardingData?.lastSyncCheckAt || undefined,
       syncCheckAttempts: onboarding.onboardingData?.syncCheckAttempts || undefined,
+      referralSource: onboarding.onboardingData?.referralSource || undefined,
       syncStatus: {
         shopify: latestShopifySession
           ? {

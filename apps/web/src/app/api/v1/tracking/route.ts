@@ -183,19 +183,11 @@ export async function POST(req: NextRequest) {
     const email = typeof user.email === "string" ? user.email : null;
     const billingCycle = billingSummary?.billingCycle ?? null;
     const billingId = billingSummary?.subscriptionId ?? null;
-    const onboardingData = onboarding.onboardingData;
-    let referralSource: string | undefined;
-
-    if (
-      typeof onboardingData === "object" &&
-      onboardingData !== null &&
-      "referralSource" in onboardingData
-    ) {
-      const candidate = (onboardingData as { referralSource?: unknown }).referralSource;
-      if (typeof candidate === "string" && candidate.trim().length > 0) {
-        referralSource = candidate;
-      }
-    }
+    const referralSource =
+      typeof onboarding.referralSource === "string" &&
+      onboarding.referralSource.trim().length > 0
+        ? onboarding.referralSource
+        : undefined;
 
     const referralSlug = referralSource ?? cookie.value ?? null;
 

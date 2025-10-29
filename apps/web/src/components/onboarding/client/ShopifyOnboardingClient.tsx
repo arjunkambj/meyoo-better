@@ -67,9 +67,7 @@ export default function ShopifyOnboardingClient({ installUri }: Props) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            type: "signup.created",
             eventType: "signup.created",
-            context: "onboarding_shopify",
           }),
         });
       } catch {

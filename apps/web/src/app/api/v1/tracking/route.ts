@@ -34,18 +34,16 @@ const normalizePlanName = (planKey: string | null | undefined): string | null =>
 
 type TrackingPayload = {
   type: TrackingEventType;
-  eventType: TrackingEventType;
   source: string;
-  ref: string | null;
   slug: string | null;
   customerId: string | null;
   email: string | null;
   userId: string | null;
   organizationId: string | null;
-  plan: string | null;
-  planKey: string | null;
-  billingCycle: string | null;
-  billingId: string | null;
+  plan?: string | null;
+  planKey?: string | null;
+  billingCycle?: string | null;
+  billingId?: string | null;
   metadata?: Record<string, unknown>;
 };
 
@@ -173,7 +171,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const planKey = billingSummary?.plan ?? (eventType === "signup.created" ? "free" : null);
+    const planKey = billingSummary?.plan ?? null;
     const planName = normalizePlanName(planKey);
     const userId = user._id ? String(user._id) : null;
     const organizationId =
@@ -185,30 +183,35 @@ export async function POST(req: NextRequest) {
     const email = typeof user.email === "string" ? user.email : null;
     const billingCycle = billingSummary?.billingCycle ?? null;
     const billingId = billingSummary?.subscriptionId ?? null;
-    const referralSlug =
-      (onboarding.onboardingData as { referralSource?: string } | undefined)?.referralSource ||
-      cookie.value ||
-      null;
+    const onboardingData = onboarding.onboardingData;
+    let referralSource: string | undefined;
+
+    if (
+      typeof onboardingData === "object" &&
+      onboardingData !== null &&
+      "referralSource" in onboardingData
+    ) {
+      const candidate = (onboardingData as { referralSource?: unknown }).referralSource;
+      if (typeof candidate === "string" && candidate.trim().length > 0) {
+        referralSource = candidate;
+      }
+    }
+
+    const referralSlug = referralSource ?? cookie.value ?? null;
 
     const metadata =
       typeof body.metadata === "object" && body.metadata !== null
         ? body.metadata
         : undefined;
 
-    const trackingResult = await sendTrackingEvent({
+    const trackingPayload: TrackingPayload = {
       type: eventType,
-      eventType,
       source: `web:${body.context || "onboarding"}`,
-      ref: referralSlug,
       slug: referralSlug,
       customerId: userId,
       email,
       userId,
       organizationId,
-      plan: planName,
-      planKey: planKey ?? null,
-      billingCycle,
-      billingId: eventType === "subscription.updated" ? billingId : null,
       metadata: {
         ...metadata,
         currentStep: onboarding.currentStep ?? null,
@@ -217,7 +220,16 @@ export async function POST(req: NextRequest) {
         hasShopifySubscription: onboarding.hasShopifySubscription ?? false,
         subscriptionStatus: billingSummary?.subscriptionStatus ?? null,
       },
-    });
+    };
+
+    if (eventType === "subscription.updated") {
+      trackingPayload.plan = planName;
+      trackingPayload.planKey = planKey ?? null;
+      trackingPayload.billingCycle = billingCycle;
+      trackingPayload.billingId = billingId;
+    }
+
+    const trackingResult = await sendTrackingEvent(trackingPayload);
 
     const res = NextResponse.json(
       {

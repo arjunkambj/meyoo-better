@@ -43,7 +43,8 @@ export default convexAuthNextjsMiddleware(
         sameSite: "lax",
       });
 
-      const trackingEndpoint = process.env.NEXT_PUBLIC_TRACKING_URL ?? process.env.TRACKING_URL;
+      const trackingEndpoint =
+        process.env.NEXT_PUBLIC_TRACKING_URL ?? process.env.TRACKING_URL;
 
       if (trackingEndpoint) {
         try {
@@ -53,11 +54,7 @@ export default convexAuthNextjsMiddleware(
             body: JSON.stringify({
               type: "link.click",
               eventType: "link.click",
-              ref: slug,
               slug,
-              path: url.pathname,
-              source: request.headers.get("referer"),
-              timestamp: Date.now(),
             }),
           });
         } catch (error) {

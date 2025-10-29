@@ -39,6 +39,7 @@ export default function MarketingIntegrationsClient() {
   const searchParams = useSearchParams();
   // Guard against double-effects in React Strict Mode to avoid duplicate toasts
   const handledRef = useRef<{ error?: boolean; meta?: boolean }>({});
+  const paymentEventSentRef = useRef(false);
 
   // Check prerequisites: must have Shopify connection and subscription
   useEffect(() => {
@@ -59,6 +60,44 @@ export default function MarketingIntegrationsClient() {
   useEffect(() => {
     trackOnboardingView("marketing");
   }, []);
+
+  // Fire payment tracking event once the merchant lands on marketing after subscribing
+  useEffect(() => {
+    if (!status?.hasShopifySubscription) {
+      paymentEventSentRef.current = false;
+      return;
+    }
+
+    if (paymentEventSentRef.current) {
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        await fetch("/api/v1/tracking", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: "subscription.updated",
+            eventType: "subscription.updated",
+            context: "onboarding_marketing",
+          }),
+        });
+      } catch {
+        // Ignore tracking failures so onboarding continues smoothly.
+      } finally {
+        if (!cancelled) {
+          paymentEventSentRef.current = true;
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [status?.hasShopifySubscription]);
 
   // Derived integration state (memoized)
   const _hasMetaAccounts = useMemo(

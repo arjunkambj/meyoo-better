@@ -1,7 +1,19 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
+import type { Id } from "../_generated/dataModel";
+import { internal } from "../_generated/api";
 import { internalMutation, mutation, query } from "../_generated/server";
 import { createMonthlyInvoiceIfMissing } from "../utils/billing";
+
+const PLAN_DISPLAY_NAMES: Record<
+  "free" | "starter" | "growth" | "business",
+  string
+> = {
+  free: "Free Plan",
+  starter: "Starter Plan",
+  growth: "Growth Plan",
+  business: "Business Plan",
+};
 
 /**
  * Get organization by user
@@ -286,6 +298,54 @@ export const updateOrganizationPlanInternalWithTracking = internalMutation({
         }
       }
     }
+
+    const ownerIdRaw = organization.ownerId as Id<"users"> | undefined;
+    const ownerId = ownerIdRaw ? String(ownerIdRaw) : undefined;
+    const ownerUser = ownerIdRaw ? await ctx.db.get(ownerIdRaw) : null;
+    const ownerEmail = ownerUser?.email ?? undefined;
+
+    const onboardingRecord = ownerIdRaw
+      ? await ctx.db
+          .query("onboarding")
+          .withIndex("by_user_organization", (q) =>
+            q.eq("userId", ownerIdRaw).eq("organizationId", organizationId),
+          )
+          .first()
+      : null;
+    const referralSlug = onboardingRecord?.onboardingData?.referralSource ?? null;
+
+    const billingCycle =
+      args.billingCycle ||
+      billing?.billingCycle ||
+      "monthly";
+    const previousPlanDisplay =
+      PLAN_DISPLAY_NAMES[
+        previousPlan as keyof typeof PLAN_DISPLAY_NAMES
+      ] ?? previousPlan;
+
+    await ctx.scheduler.runAfter(
+      0,
+      internal.utils.tracking.emitTrackingEvent,
+      {
+        eventType: "subscription.updated",
+        type: "subscription.updated",
+        source: "convex:organizationBilling",
+        userId: ownerId,
+        customerEmail: ownerEmail,
+        organizationId: String(organizationId),
+        referral: referralSlug ?? undefined,
+        slug: referralSlug ?? undefined,
+        plan: PLAN_DISPLAY_NAMES[plan],
+        planKey: plan,
+        billingCycle,
+        billingId: args.shopifySubscriptionId ?? undefined,
+        subscriptionId: args.shopifySubscriptionId ?? undefined,
+        subscriptionStatus: args.shopifySubscriptionStatus ?? undefined,
+        isUpgrade: isUpgrade ?? undefined,
+        becamePaid,
+        previousPlan: previousPlanDisplay,
+      },
+    );
 
     return { success: true };
   },

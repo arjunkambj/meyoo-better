@@ -22,8 +22,51 @@ const isAuthRoute = createRouteMatcher(["/signin", "/signup"]);
 
 export default convexAuthNextjsMiddleware(
   async (request, { convexAuth }) => {
-    const pathname = request.nextUrl.pathname;
+    const url = request.nextUrl;
+    const pathname = url.pathname;
     const method = request.method;
+
+    const ref = url.searchParams.get("ref");
+    const join = url.searchParams.get("join");
+    const inv = url.searchParams.get("inv");
+
+    const slug = ref || join || inv;
+
+    if (slug) {
+      const res = NextResponse.next();
+
+      res.cookies.set({
+        name: "meyoo_ref",
+        value: slug,
+        path: "/",
+        maxAge: 30 * 24 * 60 * 60,
+        sameSite: "lax",
+      });
+
+      const trackingEndpoint = process.env.NEXT_PUBLIC_TRACKING_URL ?? process.env.TRACKING_URL;
+
+      if (trackingEndpoint) {
+        try {
+          await fetch(trackingEndpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              type: "link.click",
+              eventType: "link.click",
+              ref: slug,
+              slug,
+              path: url.pathname,
+              source: request.headers.get("referer"),
+              timestamp: Date.now(),
+            }),
+          });
+        } catch (error) {
+          console.error("Link click tracking failed", error);
+        }
+      }
+
+      return res;
+    }
 
     // Simple logging for all API routes without affecting behavior
     if (pathname.startsWith("/api/")) {

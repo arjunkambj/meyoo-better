@@ -121,6 +121,8 @@ export const getUserBilling = query({
       billingCycle: v.optional(
         v.union(v.literal("monthly"), v.literal("yearly")),
       ),
+      subscriptionId: v.optional(v.string()),
+      subscriptionStatus: v.optional(v.string()),
     }),
   ),
   handler: async (ctx) => {
@@ -143,6 +145,8 @@ export const getUserBilling = query({
         isPremium: false,
         status: "active" as const,
         billingCycle: "monthly" as const,
+        subscriptionId: undefined,
+        subscriptionStatus: undefined,
       };
     }
 
@@ -153,6 +157,8 @@ export const getUserBilling = query({
       isPremium: billing.isPremium,
       status: billing.status,
       billingCycle: billing.billingCycle,
+      subscriptionId: billing.shopifyBilling?.shopifySubscriptionId ?? undefined,
+      subscriptionStatus: billing.shopifyBilling?.status ?? undefined,
     };
   },
 });

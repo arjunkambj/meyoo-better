@@ -78,6 +78,7 @@ export interface CleanupJobData {
 export interface MaintenanceReassignJobData {
   organizationId: Id<"organizations">;
   userId: Id<"users">;
+  previousUserIds?: Id<"users">[];
 }
 
 export type JobData =
@@ -145,7 +146,8 @@ export async function createJob(
       // Normalize payload to match handler validator
       {
         const d = data as SyncJobData;
-        const platforms = d.platforms ?? (d.platform ? [d.platform] : undefined);
+        const platforms =
+          d.platforms ?? (d.platform ? [d.platform] : undefined);
         const normalized = (platforms ?? ["shopify", "meta"]).filter(
           (p): p is "shopify" | "meta" => p === "shopify" || p === "meta",
         );
@@ -174,7 +176,8 @@ export async function createJob(
       // Normalize payload and include a default triggeredBy
       {
         const d = data as SyncJobData;
-        const platforms = d.platforms ?? (d.platform ? [d.platform] : undefined);
+        const platforms =
+          d.platforms ?? (d.platform ? [d.platform] : undefined);
         const normalized = (platforms ?? ["shopify", "meta"]).filter(
           (p): p is "shopify" | "meta" => p === "shopify" || p === "meta",
         );
@@ -183,7 +186,8 @@ export async function createJob(
           platforms: normalized,
           syncType: (d.syncType ?? "incremental") as "initial" | "incremental",
           triggeredBy:
-            d.triggeredBy || (options?.context as any)?.triggeredBy ||
+            d.triggeredBy ||
+            (options?.context as any)?.triggeredBy ||
             (type === "sync:manual" ? "manual" : "system"),
         };
 
@@ -219,7 +223,9 @@ export async function createJob(
     case "analytics:rebuildDaily": {
       const payload = data as AnalyticsJobData;
       if (!Array.isArray(payload.dates) || payload.dates.length === 0) {
-        throw new Error("analytics:rebuildDaily job requires one or more dates");
+        throw new Error(
+          "analytics:rebuildDaily job requires one or more dates",
+        );
       }
 
       jobId = await workpool.enqueueAction(

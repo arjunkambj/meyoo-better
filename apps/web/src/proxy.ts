@@ -53,7 +53,6 @@ export default convexAuthNextjsMiddleware(
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               type: "link.click",
-              eventType: "link.click",
               slug,
             }),
           });

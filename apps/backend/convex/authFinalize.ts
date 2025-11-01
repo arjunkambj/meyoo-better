@@ -13,8 +13,11 @@ import { createJob, PRIORITY } from "./engine/workpool";
 
 async function enqueueMembershipReassign(
   ctx: MutationCtx,
-  authUserId: Id<"users">
+  authUserId: Id<"users">,
+  previousUserIds: Id<"users">[] | undefined,
 ) {
+  if (!previousUserIds || previousUserIds.length === 0) return;
+
   const updatedUser = await ctx.db.get(authUserId);
   if (!updatedUser?.organizationId) return;
 
@@ -25,6 +28,7 @@ async function enqueueMembershipReassign(
     {
       organizationId: updatedUser.organizationId,
       userId: authUserId,
+      previousUserIds,
     },
   );
 }
@@ -51,7 +55,9 @@ export const finalizeSignIn = internalMutation({
         );
 
         if (activated) {
-          await enqueueMembershipReassign(mutationCtx, args.userId);
+          await enqueueMembershipReassign(mutationCtx, args.userId, [
+            existingUser._id,
+          ]);
         }
         return;
       }
@@ -63,21 +69,19 @@ export const finalizeSignIn = internalMutation({
       );
 
       if (merged) {
-        await enqueueMembershipReassign(mutationCtx, args.userId);
+        await enqueueMembershipReassign(mutationCtx, args.userId, [
+          existingUser._id,
+        ]);
       }
       return;
     }
 
     if (authUser.status === "invited") {
-      const activated = await handleInvitedUser(
+      await handleInvitedUser(
         mutationCtx,
         args.userId,
         authUser as Doc<"users">,
       );
-
-      if (activated) {
-        await enqueueMembershipReassign(mutationCtx, args.userId);
-      }
       return;
     }
 

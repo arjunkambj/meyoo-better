@@ -1,6 +1,10 @@
 import { v } from "convex/values";
 
-import { internalAction, internalMutation, internalQuery } from "../_generated/server";
+import {
+  internalAction,
+  internalMutation,
+  internalQuery,
+} from "../_generated/server";
 import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 
@@ -25,7 +29,6 @@ export const handleDataCleanup = internalAction({
     error: v.optional(v.string()),
   }),
   handler: async (_ctx, _args): Promise<CleanupResult> => {
-
     // TODO: Implement cleanup logic here
     // - Remove old sync sessions
     // - Archive old analytics data
@@ -70,15 +73,32 @@ export const patchStoreUsersBatch = internalMutation({
   args: {
     storeIds: v.array(v.id("shopifyStores")),
     userId: v.id("users"),
+    previousUserIds: v.optional(v.array(v.id("users"))),
   },
   returns: v.number(),
   handler: async (ctx, args) => {
+    const previousIds = Array.isArray(args.previousUserIds)
+      ? args.previousUserIds.filter(Boolean)
+      : [];
+    const previousSet = previousIds.length > 0 ? new Set(previousIds) : null;
+
     let changed = 0;
     for (const storeId of args.storeIds) {
       const store = await ctx.db.get(storeId);
       if (!store) continue;
       if (store.userId === args.userId) continue;
-      await ctx.db.patch(storeId, { userId: args.userId, updatedAt: Date.now() });
+
+      if (previousSet) {
+        const currentOwner = store.userId as Id<"users"> | undefined;
+        if (currentOwner && !previousSet.has(currentOwner)) {
+          continue;
+        }
+      }
+
+      await ctx.db.patch(storeId, {
+        userId: args.userId,
+        updatedAt: Date.now(),
+      });
       changed += 1;
     }
     return changed;
@@ -93,9 +113,17 @@ export const handleReassignStoreUsers = internalAction({
   args: {
     organizationId: v.id("organizations"),
     userId: v.id("users"),
+    previousUserIds: v.optional(v.array(v.id("users"))),
   },
   returns: v.object({ success: v.boolean(), updated: v.number() }),
   handler: async (ctx, args) => {
+    const previousIds = Array.isArray(args.previousUserIds)
+      ? args.previousUserIds.filter(Boolean)
+      : [];
+    if (previousIds.length === 0) {
+      return { success: true, updated: 0 };
+    }
+
     let cursor: string | null = null;
     let updated = 0;
     const PAGE = 500; // fewer pages → fewer query calls
@@ -106,7 +134,10 @@ export const handleReassignStoreUsers = internalAction({
       const page = (await ctx.runQuery(
         internal.jobs.maintenanceHandlers.listStoreIdsByOrganization,
         { organizationId: args.organizationId, cursor, limit: PAGE },
-      )) as unknown as { ids: Id<"shopifyStores">[]; nextCursor: string | null };
+      )) as unknown as {
+        ids: Id<"shopifyStores">[];
+        nextCursor: string | null;
+      };
 
       if (page.ids.length > 0) {
         const changed = await ctx.runMutation(
@@ -114,6 +145,7 @@ export const handleReassignStoreUsers = internalAction({
           {
             storeIds: page.ids,
             userId: args.userId,
+            previousUserIds: previousIds,
           },
         );
         updated += Math.max(0, Number(changed) || 0);

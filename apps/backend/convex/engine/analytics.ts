@@ -1510,40 +1510,37 @@ export const countCustomersBeforeUtcExclusive = internalQuery({
   args: {
     organizationId: v.id("organizations"),
     endDateTimeUtcExclusive: v.string(),
+    cursor: v.optional(v.string()),
   },
-  returns: v.number(),
+  returns: v.object({
+    count: v.number(),
+    isDone: v.boolean(),
+    cursor: v.union(v.string(), v.null()),
+  }),
   handler: async (ctx, args) => {
     const cutoffMs = Date.parse(args.endDateTimeUtcExclusive);
     if (!Number.isFinite(cutoffMs)) {
-      return 0;
+      return { count: 0, isDone: true, cursor: null } as const;
     }
 
     const PAGE_SIZE = 256;
-    let total = 0;
-    let cursor: string | null = null;
 
-    while (true) {
-      const page = await ctx.db
-        .query("shopifyCustomers")
-        .withIndex("by_organization_and_created", (q) =>
-          q.eq("organizationId", args.organizationId).lt("shopifyCreatedAt", cutoffMs),
-        )
-        .order("asc")
-        .paginate({
-          numItems: PAGE_SIZE,
-          cursor,
-        });
+    const page = await ctx.db
+      .query("shopifyCustomers")
+      .withIndex("by_organization_and_created", (q) =>
+        q.eq("organizationId", args.organizationId).lt("shopifyCreatedAt", cutoffMs),
+      )
+      .order("asc")
+      .paginate({
+        numItems: PAGE_SIZE,
+        cursor: args.cursor ?? null,
+      });
 
-      total += page.page.length;
-
-      if (page.isDone) {
-        break;
-      }
-
-      cursor = page.continueCursor ?? null;
-    }
-
-    return total;
+    return {
+      count: page.page.length,
+      isDone: page.isDone,
+      cursor: page.continueCursor ?? null,
+    } as const;
   },
 });
 
@@ -1666,13 +1663,40 @@ export const rebuildDailyMetrics = internalAction({
           } else if (dateRange.endDateTimeUtcExclusive) {
             const cutoffMs = Date.parse(dateRange.endDateTimeUtcExclusive);
             if (Number.isFinite(cutoffMs)) {
-              const baselineTotal = await ctx.runQuery(
-                internal.engine.analytics.countCustomersBeforeUtcExclusive,
-                {
-                  organizationId: args.organizationId,
-                  endDateTimeUtcExclusive: dateRange.endDateTimeUtcExclusive,
-                },
-              );
+              let baselineTotal = 0;
+              let baselineCursor: string | null = null;
+              const MAX_ITERATIONS = 128;
+              for (let iteration = 0; iteration < MAX_ITERATIONS; iteration += 1) {
+                const { count: pageCount, isDone, cursor: nextCursor } = (await ctx.runQuery(
+                  internal.engine.analytics.countCustomersBeforeUtcExclusive,
+                  {
+                    organizationId: args.organizationId,
+                    endDateTimeUtcExclusive: dateRange.endDateTimeUtcExclusive,
+                    cursor: baselineCursor ?? undefined,
+                  },
+                )) as {
+                  count: number;
+                  isDone: boolean;
+                  cursor: string | null;
+                };
+
+                baselineTotal += pageCount;
+
+                if (isDone) {
+                  break;
+                }
+
+                baselineCursor = nextCursor ?? null;
+
+                if (!baselineCursor) {
+                  console.warn("[Analytics] Missing cursor while counting customer baseline", {
+                    organizationId: args.organizationId,
+                    date,
+                    endDateTimeUtcExclusive: dateRange.endDateTimeUtcExclusive,
+                  });
+                  break;
+                }
+              }
               if (Number.isFinite(baselineTotal) && baselineTotal >= 0) {
                 totalCustomers = Math.max(baselineTotal, customersCreated);
               }

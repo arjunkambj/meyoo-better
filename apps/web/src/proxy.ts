@@ -33,6 +33,7 @@ export default convexAuthNextjsMiddleware(
     const slug = ref || join || inv;
 
     if (slug) {
+      const existingReferral = request.cookies.get("meyoo_ref")?.value;
       const res = NextResponse.next();
 
       res.cookies.set({
@@ -42,6 +43,11 @@ export default convexAuthNextjsMiddleware(
         maxAge: 30 * 24 * 60 * 60,
         sameSite: "lax",
       });
+
+      // Only fire the tracking event when we do not already have the same referral cookie set.
+      if (existingReferral === slug) {
+        return res;
+      }
 
       const trackingEndpoint =
         process.env.NEXT_PUBLIC_TRACKING_URL ?? process.env.TRACKING_URL;
